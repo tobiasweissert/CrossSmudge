@@ -1,0 +1,11 @@
+# CrossPlay parity and limits
+
+Ported ChessCore legal generation, attack detection, castling, en passant, four promotions, reversible moves and FEN; ChessEngine material/piece-square evaluation, MVV/LVA selection ordering and alpha-beta negamax. The UI uses explicit search frames with source depth levels 1/3/4 and 60,000-node budget, processed in 24-operation callbacks; no coroutine or background task. Source tests compare search scores, chosen moves and node counts, not merely legal random moves. Threefold and fifty-move draws follow mate/stalemate priority. Exact FEN keys replace uint64 FNV because the shipped Lua integers are 32-bit.
+
+The board uses inherited CrossSmudge bitmap pieces (letters when landscape cells are too small for 36-pixel sprites), legal destinations, check/turn status, promotion selection, local two-player or either AI side, undo, and hints. UI history retains at most 100 plies and legal transitions are validated on restore. No Nearby radio, SAN move sheet, source-specific artwork/font, clock, or tournament-strength claim. Saved completed games remain reviewable.
+
+Tests use the committed Lua source with signed int32/float32 settings and only shipped host APIs. They are native adapters, not a firmware build. Read the independent test directory for exact source oracles, failure injection and measured memory. No firmware/SDK download, flash, commit, push or PR creation was performed.
+
+CrossPlay gameplay is selected only when `smudge.get_device()` returns `"sticky"`. Every other device (including X3, X4, X4 Pro and simulator), and firmware without that API, runs the byte-identical original game from base `2c82f306`. Original modules, assets, callbacks and save APIs are preserved; the replacement core/journal is never loaded on that path.
+
+All CrossPlay feature descriptions and limitations above apply to Sticky only. Legacy behavior (including pre-existing limitations) is intentionally unchanged elsewhere. Native adapters use the stock int32/float32 Lua configuration but host pointers and instrumentation differ from hardware. Full legacy trace comparisons use a 2 MiB host cap; separate 75 KiB observations compare the unchanged baseline and dispatcher candidate and do not claim hardware memory parity.

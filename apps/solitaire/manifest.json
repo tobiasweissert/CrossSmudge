@@ -1,8 +1,8 @@
 {
   "id": "solitaire",
   "name": "Solitaire",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Mumfee",
-  "description": "Classic Klondike Solitaire with crisp 1-bit cards, touch & button play, and auto-complete",
+  "description": "CrossPlay Solitaire on Sticky; original game and saves unchanged on other devices",
   "entry": "main.lua"
 }
