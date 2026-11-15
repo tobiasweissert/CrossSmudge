@@ -200,7 +200,7 @@
     {
       "id": "watertracker",
       "name": "Water Tracker",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": "Mumfee",
       "description": "Daily hydration tracker with a cute water cup that fills as you drink",
       "files": [
@@ -224,7 +224,7 @@
     {
       "id": "dashboard",
       "name": "Desk Stand",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "author": "Mumfee",
       "description": "Multi-style ambient desk clock with calendar, year progress, and landscape stand",
       "files": [
@@ -236,7 +236,7 @@
     {
       "id": "hourglass",
       "name": "Hourglass",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": "Mumfee",
       "description": "Expressive countdown timer with dynamic sand funnel physics and cute expressions",
       "files": [
