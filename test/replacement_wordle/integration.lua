@@ -7,20 +7,26 @@ local today=C.dayIndex(2026,10,2)
 assert(smudge.write_file('wordle.ans',string.rep('.',(today-1)*5)..'CRANEAPPLE'))
 assert(smudge.write_file('wordle.words','ALLEYAPPLECRANESTONE'))
 assert(smudge.write_file(base..'wordle_state.dat','APPLE;;ZZZZZ;27'))
-on_init();on_draw()
+on_init();if app.layout().keys then smudge.header=function()error('legacy Wordle UI rendered')end;smudge.bitmap=function(x,y,w,h,data,white,gray)assert(not gray,'pale hint glyph')end end;on_draw()
 assert(app.state().day==today and app.state().game.answer=='APPLE')
 assert(smudge.read_file(base..'wordle_state.dat',100)=='APPLE;;ZZZZZ;27')
 assert(smudge.read_file(base..'legacy-wordle_state.bak',100)=='APPLE;;ZZZZZ;27')
 local labels={'Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Del','Z','X','C','V','B','N','M','Enter','Clear','Menu'}
 local function tap(n)
  local l=app.layout();local x=12+(n-1)%10*l.kw+(l.kw-3)//2;local y=l.ky+(n-1)//10*(l.kh+4)+l.kh//2
+ if l.keys then
+  local b=l.keys[n==29 and 20 or n]
+  if n==30 then on_button('back',true);return end
+  x,y=b.x+b.w//2,b.y+b.h//2
+  if n==29 then on_long_press(x,y);return end
+ end
  if on_tap then on_tap(x,y) end;if on_touch then on_touch(x,y,'tap') end
 end
 local function typeWord(w)
  for ch in w:gmatch('.') do for i,key in ipairs(labels)do if key==ch then tap(i);break end end end
 end
 local function menu(n)
- on_button('back',true);on_draw();local l=app.layout();on_touch(l.mx+10,l.my+10+(n-1)*38,'tap');on_draw()
+ on_button('back',true);on_draw();local l=app.layout();local b=l.menu and l.menu[n];on_touch(b and b.x+2 or l.mx+10,b and b.y+2 or l.my+10+(n-1)*38,'tap');on_draw()
 end
 tap(1);assert(app.state().game.typing=='Q','physical dispatch typed twice');tap(20)
 typeWord('ZZZZZ');tap(28);assert(#app.state().game.rows==0 and app.state().game.typing=='ZZZZZ');tap(29)

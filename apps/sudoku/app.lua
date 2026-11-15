@@ -1,16 +1,9 @@
 local C=dofile('cp_core.lua')
 local J=dofile('cp_journal.lua')
+local V=dofile('board.lua')
 local G={cell=1,digit=1,notesMode=false,level=0,menu=true,menuIndex=1,notice='',history={},closed=false,elapsed=0,hinted=false}
 local L={};local journal,dirty,lastTime,lastSave
 local levels={'Easy','Medium','Hard','Expert'}
--- Tiny pencil digits remain legible inside landscape cells without overlapping.
-local pencil={'26227','61647','61616','55711','74616','74656','71111','65656','65716'}
-local function drawNote(x,y,d,scale)
- local pattern=pencil[d]
- for row=1,5 do local bits=tonumber(pattern:sub(row,row))
-  for col=0,2 do if bits&(1<<(2-col))~=0 then smudge.rect(x+col*scale,y+(row-1)*scale,scale,scale,true,true) end end
- end
-end
 local function digits(a) local t={};for i=1,81 do t[i]=tostring(a[i]) end;return table.concat(t) end
 local function array(s) if #s~=81 or s:find('[^0-9]') then return nil end;local a={};for i=1,81 do a[i]=tonumber(s:sub(i,i)) end;return a end
 local function decode(s)
@@ -47,10 +40,7 @@ local function start(level)
  lastTime=smudge.millis();G.pendingLevel=level;G.job=C.newGenerator(level,smudge.millis());G.attempts=1;G.menu=false;G.notice='Generating '..levels[level+1]..' (Back cancels)';refresh()
 end
 local function geometry()
- local w,h=smudge.get_bounds();local m=smudge.get_metrics();local y=m.top_padding+m.header_height+4
- local size=math.min((w-24)//9,(h-y-m.button_hints_height-140)//9)
- L={w=w,h=h,size=size,x=(w-size*9)//2,y=y,footer=h-m.button_hints_height,buttons={}}
- return L
+ local w,h=smudge.get_bounds();L=V.layout(w,h);return L
 end
 local function action(n)
  if n==1 then G.notesMode=not G.notesMode elseif n==2 then hint()
@@ -61,33 +51,10 @@ function on_init()
  local payload;journal,payload=J.open('sudoku',1024,function(s) return decode(s)~=nil end)
  if payload then for k,v in pairs(decode(payload)) do G[k]=v end;G.menu=false;G.solved=solved() end
  local old,msg=journal:preserve('state',4096);if old and not payload then G.notice=msg end
- lastTime=smudge.millis();lastSave=lastTime;geometry()
+ lastTime=smudge.millis();lastSave=lastTime;V.init(G);geometry()
 end
 function on_draw()
- local l=geometry();smudge.clear();smudge.header('Sudoku',levels[G.level+1]..(G.hinted and ' / hinted' or ''))
- for i=1,81 do local r,c=(i-1)//9,(i-1)%9;local x,y=l.x+c*l.size,l.y+r*l.size;local v=G.value and G.value[i] or 0
-  smudge.rect(x,y,l.size,l.size,false,1,true)
-  if i==G.cell then smudge.rect(x+2,y+2,l.size-4,l.size-4,false,2,true) end
-  if v~=0 then smudge.text(x+l.size//2,y+(l.size-24)//2,tostring(v),10,G.given[i]~=0,'center',true)
-   for j=1,81 do if j~=i and G.value[j]==v and ((j-1)//9==r or (j-1)%9==c or ((j-1)//27==r//3 and ((j-1)%9)//3==c//3)) then smudge.text(x+2,y+1,'!',10,true,'left',true);break end end
-  elseif G.notes and G.notes[i]~=0 then
-   local taken=0;for j=1,81 do if G.value[j]~=0 and ((j-1)//9==r or (j-1)%9==c or ((j-1)//27==r//3 and ((j-1)%9)//3==c//3)) then taken=taken|(1<<(G.value[j]-1)) end end
-   for d=1,9 do if G.notes[i]&(1<<(d-1))&~taken~=0 then drawNote(x+((d-1)%3)*l.size//3+2,y+((d-1)//3)*l.size//3+2,d,l.size>=42 and 2 or 1) end end
-  end
- end
- for i=0,3 do smudge.line(l.x+i*l.size*3,l.y,l.x+i*l.size*3,l.y+l.size*9,true);smudge.line(l.x,l.y+i*l.size*3,l.x+l.size*9,l.y+i*l.size*3,true) end
- local y=l.y+l.size*9+6;local kw=(l.w-24)//9
- l.keyY=y;l.keyW=kw
- for d=1,9 do local x=12+(d-1)*kw;smudge.rect(x,y,kw-3,32,d==G.digit,1,true);smudge.text(x+(kw-3)//2,y+5,tostring(d),10,true,'center',d~=G.digit) end
- local labels={G.notesMode and 'Notes ON' or 'Notes','Hint','Undo','Menu'};local bw=(l.w-24)//4
- for n,label in ipairs(labels) do local x=12+(n-1)*bw;l.buttons[n]={x=x,y=y+38,w=bw-3,h=30};smudge.rect(x,y+38,bw-3,30,false,1,true);smudge.text(x+(bw-3)//2,y+43,label,10,false,'center',true) end
- smudge.text(l.w//2,y+74,G.notice~='' and G.notice or ('Time '..(G.elapsed//60)..':'..string.format('%02d',G.elapsed%60)),10,false,'center',true)
- smudge.button_hints('Menu','Enter','Up','Down')
- if G.menu then
-  local labels={'Resume','New Easy','New Medium','New Hard','New Expert','Exit'};local width=math.min(360,l.w-32);local x,yy=(l.w-width)//2,(l.h-248)//2
-  smudge.rect(x,yy,width,248,true,false);smudge.rect(x,yy,width,248,false,2,true);l.menu={}
-  for n,label in ipairs(labels) do local by=yy+8+(n-1)*38;l.menu[n]={x=x+8,y=by,w=width-16,h=36};smudge.rect(x+8,by,width-16,36,G.menuIndex==n,1,true);smudge.text(l.w//2,by+8,label,10,true,'center',G.menuIndex~=n) end
- end
+ if not G.closed then V.draw(geometry(),G) end
 end
 local function menuSelect()
  lastTime=smudge.millis()
@@ -98,6 +65,7 @@ end
 function on_button(b,pressed)
  if not pressed or G.closed then return end
  if G.job then if b=='back' then G.job=nil;G.notice='Generation canceled';G.menu=not G.given end;refresh();return end
+ if V.button(G,b,menuSelect,refresh) then return end
  if G.menu then
   if b=='confirm' then menuSelect() elseif b=='back' then if G.given then G.menu=false else G.closed=true;smudge.exit() end
   elseif b=='left' or b=='up' or b=='page_back' then G.menuIndex=(G.menuIndex-2)%6+1
@@ -112,22 +80,16 @@ end
 function on_touch(x,y,event)
  if G.closed then return end
  if G.job then if event=='tap' then on_button('back',true) end;return end
- if G.menu then if event=='tap' then for i,b in ipairs(L.menu or {}) do if x>=b.x and x<b.x+b.w and y>=b.y and y<b.y+b.h then G.menuIndex=i;menuSelect();return end end end;return end
- if event~='tap' and event~='hold' then return end
- local c,r=(x-L.x)//L.size,(y-L.y)//L.size
- if c>=0 and c<9 and r>=0 and r<9 then G.cell=r*9+c+1;enter(G.cell,event=='hold' or G.notesMode);return end
- if event~='tap' then return end
- if y>=L.keyY and y<L.keyY+32 and x>=12 then local d=(x-12)//L.keyW+1;if d<=9 then G.digit=d;refresh() end;return end
- for i,b in ipairs(L.buttons) do if x>=b.x and x<b.x+b.w and y>=b.y and y<b.y+b.h then action(i);return end end
- if y>=L.footer then on_button(({'back','confirm','left','right'})[math.min(4,x*4//L.w+1)],true) end
+ V.touch(L,G,x,y,event,enter,action,menuSelect,refresh)
 end
+function on_long_press(x,y)on_touch(x,y,'hold')end
 function on_update()
  if G.closed then return end
  if G.job then
   lastTime=smudge.millis()
   if C.stepGenerator(G.job) then local j=G.job
    if j.accepted then G.level=G.pendingLevel;G.given=j.given;G.solution=j.v;G.value={};G.notes={};for i=1,81 do G.value[i]=G.given[i];G.notes[i]=0 end
-    G.history={};G.elapsed=0;G.hinted=false;G.solved=false;G.cell=1;G.job=nil;G.notice=C.names[j.report.hardest];dirty=true
+    G.history={};G.elapsed=0;G.hinted=false;G.solved=false;G.cell=1;G.job=nil;G.notice='';dirty=true
    elseif G.attempts<200 then G.attempts=G.attempts+1;G.job=C.newGenerator(G.pendingLevel,j.rng)
    else G.job=nil;G.notice='No matching puzzle in 200 attempts; try again';G.menu=true end
    refresh()

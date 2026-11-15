@@ -11,7 +11,7 @@ assert catalog['repo'] == 'tobiasweissert/CrossSmudge'
 assert catalog['branch'] == 'integration/sticky-test-all'
 expected = {'chess': '1.1.0', 'sudoku': '1.1.0', 'solitaire': '1.1.0',
             'wordle': '1.2.0', 'dashboard': '1.0.3', 'hourglass': '1.0.1',
-            'watertracker': '1.0.1'}
+            'watertracker': '1.0.1', '2048': '1.1.0'}
 ids = set()
 for app in catalog['apps']:
     app_id = app['id']
@@ -56,4 +56,4 @@ assert {i for i in old if old[i] != new[i]} == set(expected)
 for app in catalog['apps']:
     if app['id'] in expected or app['id'].startswith('cp-'):
         assert not any(path.endswith(('.dat', '.cache', '.bak', '.sav')) for path in app['files'])
-print('36 catalog entries: 20 new, 7 updated, 9 unchanged; no save payloads')
+print('36 catalog entries: 20 new, 8 updated, 8 unchanged; no save payloads')

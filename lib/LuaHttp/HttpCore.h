@@ -6,7 +6,13 @@
 #include <string>
 
 namespace ink::http {
+// Reading an article needs more than a metadata response. Only PSRAM boards
+// reserve the larger bounded result; C3 keeps its existing native-RAM budget.
+#if defined(BOARD_HAS_PSRAM) && BOARD_HAS_PSRAM
+constexpr size_t MaxBody = 64 * 1024;
+#else
 constexpr size_t MaxBody = 8192;
+#endif
 constexpr size_t MaxUpload = 2048;
 constexpr size_t MaxDomains = 4;
 struct Url { char host[128]{}; char path[385]{}; };

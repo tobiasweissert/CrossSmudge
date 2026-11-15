@@ -42,7 +42,7 @@ static int unsupported(lua_State*L){return luaL_error(L,"unmodeled stock API cal
 static int yes(lua_State*L){lua_pushboolean(L,1);return 1;}
 static const luaL_Reg api[]={
  {"get_memory",memoryinfo},{"get_bounds",bounds},{"get_metrics",metrics},{"read_file",readfile},{"write_file",writefile},{"dofile",dofile_app},
- {"rect_dither",draw},{"clear",draw},{"text",draw},{"centered_text",draw},{"rect",draw},{"circle",draw},{"line",draw},{"header",draw},{"button_hints",draw},
+ {"bitmap",draw},{"rounded_rect",draw},{"rect_dither",draw},{"clear",draw},{"text",draw},{"centered_text",draw},{"rect",draw},{"circle",draw},{"line",draw},{"header",draw},{"button_hints",draw},
  {"prevent_sleep",nothing},{"request_update",nothing},{"exit",nothing},{"full_refresh",nothing},{"log",nothing},{"millis",millis},{"time",millis},{"random",randomfn},{"text_width",textwidth},{"has_touch",yes},{NULL,NULL}};
 int main(int argc,char**argv){if(argc<2)return 2;Budget b={0,0,76800};if(argc>2)b.limit=strtoul(argv[2],0,10);if(argc>4){width=atoi(argv[3]);height=atoi(argv[4]);}
  lua_State*L=lua_newstate(alloc,&b);if(!L)return 3;lua_gc(L,LUA_GCINC,105,250,0);

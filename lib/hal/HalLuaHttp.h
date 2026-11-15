@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <string>
 #include <LuaHttp.h>
-// NVS opt-out is outside Lua's filesystem. UTC trust remains explicit per boot.
+// NVS opt-out is outside Lua's filesystem. HTTPS obtains UTC from NTP automatically.
 namespace HalLuaHttp {
 bool networkEnabled();
 bool setNetworkEnabled(bool enabled);

@@ -5,6 +5,10 @@
 // the contact after a hold, so its release cannot also become a dig.
 template <typename Input, typename Runner>
 bool dispatchLuaTouch(Input& input, Runner& runner) {
+  if (runner.hasActiveTouchHold() && !input.isScreenContactActive()) {
+    runner.onTouchRelease();
+    return true;
+  }
   int x = 0, y = 0;
   const bool acceptsHold = runner.hasLongPressHandler();
   if (acceptsHold && input.wasScreenLongPress(x, y)) {

@@ -99,6 +99,7 @@ class HalGPIO {
   unsigned long getPowerButtonHeldTime() const;
 #if CROSSSMUDGE_APP_CAP_TOUCH
   bool hasTouch() const;
+  bool isTouchPressed() const;
   bool supportsMultiTouch() const;
   TouchSnapshot getTouchSnapshot() const;
   bool wasCompletedMultiTouchSwipe(CompletedMultiTouchSwipe& swipe) const;
@@ -125,6 +126,7 @@ class HalGPIO {
   bool wasTouchActivity() const;
 #else
   constexpr bool hasTouch() const { return false; }
+  constexpr bool isTouchPressed() const { return false; }
   constexpr bool supportsMultiTouch() const { return false; }
   constexpr TouchSnapshot getTouchSnapshot() const { return {}; }
   constexpr bool wasCompletedMultiTouchSwipe(CompletedMultiTouchSwipe&) const { return false; }

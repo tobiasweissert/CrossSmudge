@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-export TMPDIR=/root/.hermes/cache/scratch
+export TMPDIR="${TMPDIR:-/tmp}"
 out="${NETWORK_TEST_OUT:-$TMPDIR/cp-network-tests}"
 mkdir -p "$out"
 cc -O1 -Ilib/Lua/src test/network_apps/runner.c lib/Lua/src/l*.c -lm -ldl -o "$out/lua"

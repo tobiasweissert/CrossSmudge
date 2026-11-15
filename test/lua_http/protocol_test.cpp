@@ -25,7 +25,9 @@ int main(){
  check("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello",nullptr,"hello");
  check("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nhe\r\n3\r\nllo\r\n0\r\n\r\n",nullptr,"hello");
  check("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nx","truncated","");
- check("HTTP/1.1 200 OK\r\nContent-Length: 9000\r\n\r\n","body_limit","");
+ check("HTTP/1.1 200 OK\r\nContent-Length: "+std::to_string(MaxBody+1)+"\r\n\r\n","body_limit","");
+ const std::string maximum(MaxBody,'x');
+ check("HTTP/1.1 200 OK\r\nContent-Length: "+std::to_string(MaxBody)+"\r\n\r\n"+maximum,nullptr,maximum.c_str());
  check("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nTransfer-Encoding: chunked\r\n\r\n","protocol","");
  check("HTTP/1.1 302 Moved\r\nLocation: https://127.0.0.1/\r\nContent-Length: 0\r\n\r\n","redirect_denied","");
  check("HTTP/1.1 200 OK\r\nBig: "+std::string(600,'x')+"\r\n\r\n","header_limit","");

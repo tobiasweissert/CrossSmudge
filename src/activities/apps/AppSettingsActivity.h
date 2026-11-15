@@ -6,9 +6,6 @@
 
 #include "SmudgeSettings.h"
 #include <HalLuaHttp.h>
-#include <ctime>
-#include "Memory.h"
-#include "activities/apps/lua/LuaConsentActivity.h"
 #include "activities/Activity.h"
 #include "components/UITheme.h"
 
@@ -28,7 +25,7 @@ class AppSettingsActivity : public Activity {
 
   void loop() override {
     auto& settings = SmudgeSettings::getInstance();
-    constexpr int totalItems = 4;
+    constexpr int totalItems = 3;
 
     if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
       settings.save();
@@ -69,7 +66,7 @@ class AppSettingsActivity : public Activity {
     const int menuHeight = pageHeight - startY - metrics.buttonHintsHeight - metrics.verticalSpacing;
 
     auto& settings = SmudgeSettings::getInstance();
-    constexpr int totalItems = 4;
+    constexpr int totalItems = 3;
 
     // 1. Draw Header
     GUI.drawHeader(renderer, Rect{0, headerY, pageWidth, headerH}, "App Settings");
@@ -86,7 +83,6 @@ class AppSettingsActivity : public Activity {
                                                                  : "Most Frequently Used";
           }
           if (index == 2) return HalLuaHttp::networkEnabled() ? tr(STR_LUA_NETWORK_DISABLE) : tr(STR_LUA_NETWORK_ENABLE);
-          if (index == 3) return tr(STR_LUA_TRUST_TIME);
           return "";
         },
         [](int index) { return (index == 0) ? UIIcon::Applications : UIIcon::Recent; });
@@ -116,21 +112,7 @@ class AppSettingsActivity : public Activity {
         requestUpdate();
         return;
       }
-      const auto proposal=HalLuaHttp::proposeTime();
-      char date[40]{}; time_t now=proposal.epoch; tm utc{};
-      if (gmtime_r(&now,&utc)) strftime(date,sizeof(date),"%Y-%m-%d %H:%M:%S UTC",&utc);
-      std::unique_ptr<Activity> prompt;
-      prompt=makeUniqueNoThrow<LuaConsentActivity>(renderer,mappedInput,date,tr(STR_LUA_TRUST_TIME),tr(STR_CONFIRM));
-      if (!prompt) { LOG_ERR("LHTTP", "Dialog allocation failed"); return; }
-      startActivityForResult(std::move(prompt), [this,proposal](const ActivityResult& result) {
-        if (!result.isCancelled) {
-          bool ok=HalLuaHttp::trustTime(proposal);
-          if (!ok) LOG_ERR("LHTTP", "Time confirmation failed");
-          operationResult_ = ok ? 1 : -1;
-        }
-        requestUpdate();
-      });
-      return;
+
     }
     settings.save();
     requestUpdate();

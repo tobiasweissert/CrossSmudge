@@ -217,6 +217,7 @@ unsigned long HalGPIO::getPowerButtonHeldTime() const { return inputMgr.getPower
 bool HalGPIO::hasTouch() const { return inputMgr.hasTouch(); }
 
 bool HalGPIO::supportsMultiTouch() const { return inputMgr.supportsMultiTouch(); }
+bool HalGPIO::isTouchPressed() const { return inputMgr.isTouchPressed(); }
 
 HalGPIO::TouchSnapshot HalGPIO::getTouchSnapshot() const {
   TouchSnapshot result;

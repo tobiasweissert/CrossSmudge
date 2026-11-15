@@ -87,7 +87,17 @@ void* LuaRunner::customLuaAlloc(void* ud, void* ptr, size_t osize, size_t nsize)
   }
 #endif
 
+  // Keep the whole PSRAM-backed VM out of internal RAM, including tiny tables
+  // and strings. TLS and Wi-Fi still need internal RAM even on PSRAM boards.
+#if defined(ARDUINO_ARCH_ESP32) && defined(BOARD_HAS_PSRAM) && !defined(SIMULATOR)
+  void* newPtr = self->luaHeapUsesPsram_
+                     ? heap_caps_realloc(ptr, nsize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
+                     : realloc(ptr, nsize);
+#else
   void* newPtr = realloc(ptr, nsize);
+#endif
+  // No internal fallback when the selected PSRAM heap is exhausted: returning
+  // nullptr lets Lua perform its own emergency GC without consuming TLS memory.
   if (newPtr) {
     if (ptr == nullptr) {
       self->currentAllocatedBytes_ += nsize;
@@ -123,11 +133,19 @@ bool LuaRunner::init() {
   maxLuaHeapBytes_ = 220 * 1024;  // 220 KB ceiling on C3 (governed by live free heap)
 #endif
 
-  LOG_INF("LUA", "[%s] Init with heap limit: %zu bytes", appId_.c_str(), maxLuaHeapBytes_);
 
   saveDir_ = "/.smudge/saved_data/" + appId_;
 
+  // Select the pool once, before the first VM allocation. Keep that policy
+  // through lua_close; free() is compatible with heap_caps_realloc allocations.
+#if defined(ARDUINO_ARCH_ESP32) && defined(BOARD_HAS_PSRAM) && !defined(SIMULATOR)
+  luaHeapUsesPsram_ = psramHeapAvailable();
+#else
+  luaHeapUsesPsram_ = false;
+#endif
   L = lua_newstate(customLuaAlloc, this);
+  LOG_INF("LUA", "[%s] Init with heap limit: %zu bytes, pool=%s", appId_.c_str(), maxLuaHeapBytes_,
+          luaHeapUsesPsram_ ? "PSRAM" : "default");
   if (!L) {
     setError("Failed to create Lua state (out of memory)");
     return false;
@@ -377,6 +395,38 @@ void LuaRunner::onLongPress(int x, int y) {
   } else {
     lua_pop(L, 1);
   }
+  if (!hasError_ && hasTouchReleaseHandler()) {
+    touchHoldActive_ = true;
+    touchHoldX_ = x;
+    touchHoldY_ = y;
+  }
+  lua_gc(L, LUA_GCSTEP, 50);
+}
+
+bool LuaRunner::hasTouchReleaseHandler() {
+  if (!L || hasError_) return false;
+  lua_getglobal(L, "on_touch_release");
+  const bool present = lua_isfunction(L, -1);
+  lua_pop(L, 1);
+  return present;
+}
+
+void LuaRunner::onTouchRelease() {
+  if (!touchHoldActive_) return;
+  touchHoldActive_ = false;
+  if (!L || hasError_) return;
+  s_activeRunner = this;
+  lua_getglobal(L, "on_touch_release");
+  if (lua_isfunction(L, -1)) {
+    lua_pushinteger(L, touchHoldX_);
+    lua_pushinteger(L, touchHoldY_);
+    if (lua_pcall(L, 2, 0, 0) != LUA_OK) {
+      setError(lua_tostring(L, -1));
+      lua_pop(L, 1);
+    }
+  } else {
+    lua_pop(L, 1);
+  }
   lua_gc(L, LUA_GCSTEP, 50);
 }
 
@@ -396,6 +446,7 @@ void LuaRunner::onSwipe(const char* dir) {
 }
 
 void LuaRunner::onExit() {
+  onTouchRelease();
   if (!L || hasError_) return;
   s_activeRunner = this;
   lua_getglobal(L, "on_exit");
@@ -2012,6 +2063,10 @@ int LuaRunner::l_hasFeature(lua_State* L) {
   bool supported = false;
   if (strcmp(feat, "https_async") == 0) {
 #ifndef SIMULATOR
+    supported = true;
+#endif
+  } else if (strcmp(feat, "touch_release") == 0) {
+#if CROSSINK_APP_CAP_TOUCH
     supported = true;
 #endif
   } else if (strcmp(feat, "prevent_sleep") == 0 || strcmp(feat, "keep_awake") == 0 || strcmp(feat, "orientation") == 0 ||

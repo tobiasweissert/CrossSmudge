@@ -2,6 +2,14 @@
 
 ### Fixed
 
+- HTTPS apps synchronize UTC automatically without manual App Settings confirmation; certificate checks remain enabled.
+- Sticky Five Letters keeps its new design when Back opens the game menu, with solid hint glyphs and darker dashed absent-key outlines.
+
+- Applications on touch devices can now page through the app list with vertical swipes.
+- Hourglass on Sticky displays Start/Pause, Reset and adjustment controls, with settings hit targets aligned to the dialog.
+- Sticky Solitaire and Five Letters have new card/grid/keypad layouts; Sudoku uses CrossPlay Jersey masks, its heavy grid and three-by-three digit pad, with long-press pencil input.
+- Hacker News now has a ranked story list, feed tabs, nested comments and paged article reading. PSRAM builds permit bounded HTTP responses up to 64 KiB; other devices retain the 8 KiB cap.
+
 - Minesweeper 0.1.4 now uses CrossPlay graphics, fonts and dither; an opt-in Lua long-press callback flags once without digging on release, while other apps keep their existing touch behavior.
 
 - Fixed Hacker News startup and JSON/text decoding by loading native UTF-8 for valid network apps, including offline cache use.

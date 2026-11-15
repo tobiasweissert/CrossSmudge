@@ -23,9 +23,13 @@ app=nil;initial=nil;collectgarbage('collect')
 app=dofile('main.lua');on_init();on_draw()
 C=dofile('cp_core.lua');assert(C.save(app.state())==saved,'resume changed board');C=nil
 -- Toolbar New 3 uses confirmation; Back cancels without touching the deal.
-l=app.layout();local b=l.buttons[2];on_touch(b.x+2,b.y+2,'tap');on_button('back',true)
+local function newThree()
+ l=app.layout();if l.menuButton then local m=l.menuButton;on_touch(m.x+2,m.y+2,'tap');on_draw();l=app.layout() end
+ local b=l.buttons[2];on_touch(b.x+2,b.y+2,'tap')
+end
+newThree();on_button('back',true)
 assert(app.state().moves==1 and not app.state().drawThree)
-on_touch(b.x+2,b.y+2,'tap');on_button('confirm',true);on_draw()
+newThree();on_button('confirm',true);on_draw()
 assert(app.state().moves==0 and app.state().drawThree)
 l=app.layout();on_touch(l.x+2,l.top+2,'tap');assert(#app.state().piles[0]==21)
 on_update();on_exit();app=nil;collectgarbage('collect')

@@ -37,7 +37,7 @@ static int yes(lua_State*L){lua_pushboolean(L,1);return 1;}
 static int memory(lua_State*L){void*ud=NULL;lua_getallocf(L,&ud);Budget*b=ud;lua_newtable(L);lua_pushinteger(L,b->used/1024);lua_setfield(L,-2,"lua_kb");lua_pushinteger(L,b->limit/1024);lua_setfield(L,-2,"lua_max_kb");return 1;}
 static const luaL_Reg api[]={
  {"get_bounds",bounds},{"get_metrics",metrics},{"read_file",readfile},{"write_file",writefile},{"dofile",dofile_app},
- {"clear",draw},{"text",draw},{"centered_text",draw},{"rect",draw},{"circle",draw},{"line",draw},{"header",draw},{"button_hints",draw},
+ {"bitmap",draw},{"rounded_rect",draw},{"rect_dither",draw},{"clear",draw},{"text",draw},{"centered_text",draw},{"rect",draw},{"circle",draw},{"line",draw},{"header",draw},{"button_hints",draw},
  {"prevent_sleep",nothing},{"request_update",nothing},{"exit",nothing},{"full_refresh",nothing},{"log",nothing},{"millis",millis},{"time",millis},{"random",randomfn},{"text_width",textwidth},{"has_touch",yes},{"get_memory",memory},{"memory",memory},{NULL,NULL}};
 int main(int argc,char**argv){if(argc<2)return 2;Budget b={0,0,76800};if(argc>2)b.limit=strtoul(argv[2],0,10);if(argc>4){width=atoi(argv[3]);height=atoi(argv[4]);}
  lua_State*L=lua_newstate(alloc,&b);if(!L)return 3;lua_gc(L,LUA_GCINC,105,250,0);

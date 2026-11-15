@@ -4,10 +4,25 @@ smudge.get_device=function() return "sticky" end
 -- Coordinates and monochrome geometry are retained; font metrics and header
 -- chrome are approximate. This is not a hardware/firmware screenshot.
 local width,height=smudge.get_bounds()
-local nodes={}
+local started=false
 local function esc(s)return tostring(s):gsub('&','&amp;'):gsub('<','&lt;'):gsub('>','&gt;'):gsub('"','&quot;') end
-local function add(s)nodes[#nodes+1]=s end
-smudge.clear=function()nodes={} end
+local function add(s)assert(smudge.write_file('render.svg',s,true))end
+smudge.clear=function()
+ assert(smudge.write_file('render.svg','<svg xmlns="http://www.w3.org/2000/svg" width="'..width..'" height="'..height..'" viewBox="0 0 '..width..' '..height..'"><desc>Actual Lua draw calls; native capture, not a device screenshot.</desc><rect width="100%" height="100%" fill="white"/>',false))
+end
+smudge.rounded_rect=function(x,y,w,h,r,fill,color,stroke)
+ add(string.format('<rect x="%d" y="%d" width="%d" height="%d" rx="%d" fill="%s" stroke="%s" stroke-width="%d"/>',x,y,w,h,r,fill and (color==false and 'white' or 'black') or 'none',color==false and 'white' or 'black',stroke or 1))
+end
+smudge.bitmap=function(x,y,w,h,data,white,gray)
+ local paths={};local stride=(w+7)//8
+ for row=0,h-1 do local start
+  for col=0,w do
+   local ink=col<w and (data:byte(row*stride+col//8+1)&(128>>(col%8)))==0
+   if ink and not start then start=col elseif not ink and start then paths[#paths+1]=string.format('M%d %dh%dv1h-%dz',x+start,y+row,col-start,col-start);start=nil end
+  end
+ end
+ add('<path fill="'..(white and 'white' or gray and '#888' or 'black')..'" d="'..table.concat(paths)..'"/>')
+end
 smudge.rect=function(x,y,w,h,fill,a,b)
  local color,stroke=true,1
  if fill then if a~=nil then color=a~=false and a~=0 end
@@ -26,5 +41,4 @@ smudge.circle=function(x,y,r,fill,color)add(string.format('<circle cx="%d" cy="%
 smudge.rect_dither=function(x,y,w,h,dark)add(string.format('<rect x="%d" y="%d" width="%d" height="%d" fill="%s"/>',x,y,w,h,dark and '#777' or '#ddd')) end
 smudge.get_date=function()return {year=2026,month=10,day=2} end
 local app=dofile('main.lua');on_init();on_draw()
-local svg='<svg xmlns="http://www.w3.org/2000/svg" width="'..width..'" height="'..height..'" viewBox="0 0 '..width..' '..height..'"><desc>Native adapter rendering of actual Lua on_draw. Approximate fonts and chrome; not on-device evidence.</desc><rect width="100%" height="100%" fill="white"/>'..table.concat(nodes)..'</svg>'
-assert(smudge.write_file('render.svg',svg,false));on_exit()
+add('</svg>');on_exit()

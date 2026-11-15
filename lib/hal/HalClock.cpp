@@ -8,10 +8,12 @@
 #include <time.h>
 
 #include <cassert>
+#include <mutex>
 
 HalClock halClock;  // Singleton instance
 
 namespace {
+std::mutex ntpMutex;
 constexpr uint16_t kBaseYear = 2000;
 constexpr const char* kMonthNames[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
                                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
@@ -282,6 +284,8 @@ bool HalClock::syncFromNTP() {
 }
 
 bool HalClock::syncSystemTimeFromNTP() {
+  // The UI and the Lua HTTP worker share esp-netif's single SNTP instance.
+  std::lock_guard<std::mutex> lock(ntpMutex);
   if (WiFi.status() != WL_CONNECTED) {
     LOG_ERR("CLK", "WiFi not connected, cannot sync NTP");
     return false;
@@ -314,5 +318,6 @@ bool HalClock::syncSystemTimeFromNTP() {
     return false;
   }
 
+  _systemTimeSynchronized.store(true);
   return true;
 }

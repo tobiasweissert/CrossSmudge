@@ -11,10 +11,15 @@ local function fixture(piles)
 end
 local function tap(p,i)
  local l=app.layout();local col=p>=6 and p-6 or p<=1 and p or p+1
+ if l.pileColumns and p<6 then col=l.pileColumns[p] end
  local y=p>=6 and l.tab+(i or math.max(1,#app.state().piles[p]))*l.pileSteps[p]-l.pileSteps[p]+1 or l.top+2
- on_touch(l.x+col*(l.cw+6)+l.cw//2,y,'tap');on_draw()
+ on_touch(l.x+col*(l.cw+(l.gap or 6))+l.cw//2,y,'tap');on_draw()
 end
-local function toolbar(i) local b=app.layout().buttons[i];on_touch(b.x+b.w//2,b.y+b.h//2,'tap');on_draw() end
+local function toolbar(i)
+ local l=app.layout()
+ if l.menuButton and not l.buttons[i] then local b=l.menuButton;on_touch(b.x+b.w//2,b.y+b.h//2,'tap');on_draw() end
+ local b=app.layout().buttons[i];on_touch(b.x+b.w//2,b.y+b.h//2,'tap');on_draw()
+end
 -- Same-card second tap must deselect, not silently reselect and move later.
 local g=fixture({[6]={140}});tap(6);tap(6);tap(7)
 assert(g.moves==0 and #g.piles[6]==1,'second tap must deselect')
