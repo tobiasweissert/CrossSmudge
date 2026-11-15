@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <LuaHttp.h>
 
 extern "C" {
 #include "lauxlib.h"
@@ -18,7 +19,7 @@ namespace ink {
 
 class LuaRunner {
  public:
-  static constexpr int LUA_API_VERSION = 2;
+  static constexpr int LUA_API_VERSION = 3;
 
   LuaRunner(GfxRenderer& renderer, MappedInputManager& input, const std::string& appDir, const std::string& appId);
   ~LuaRunner();
@@ -53,6 +54,10 @@ class LuaRunner {
   bool hasError() const { return hasError_; }
   const std::string& getErrorMessage() const { return errorMessage_; }
 
+  bool needsNetworkPermission() const { return http_.domains.count && !http_.allowed; }
+  const http::Domains& networkDomains() const { return http_.domains; }
+  bool allowNetwork();
+
   bool preventAutoSleep() const { return preventAutoSleep_.load(std::memory_order_relaxed); }
   void setPreventAutoSleep(bool prevent) { preventAutoSleep_.store(prevent, std::memory_order_relaxed); }
 
@@ -63,6 +68,8 @@ class LuaRunner {
   std::string appId_;
   std::string saveDir_;
 
+  http::Session http_{http::platformExecutor()};
+  bool resolvePath(const char* path, std::string& result) const;
   lua_State* L = nullptr;
   bool requestedExit_ = false;
   bool hasError_ = false;

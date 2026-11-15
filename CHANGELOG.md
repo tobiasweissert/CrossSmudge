@@ -1,3 +1,13 @@
+## [Unreleased]
+
+### Added
+
+- Lua API v3: asynchronous, permission-controlled HTTPS GET/POST with cancellation and bounded responses. Network apps use the existing Wi-Fi selector; App Settings can revoke network grants and explicitly trust displayed UTC for certificate checks until restart.
+
+### Security
+
+- Confine Lua file access to each app and its saved data, and disable host file/process escape functions. This prevents an offline app from replacing an approved network app or reading unrelated saved credentials. Absolute paths outside these directories are no longer supported.
+
 ## [v1.6.5.3] - 2026-10-06
 
 ### Added
