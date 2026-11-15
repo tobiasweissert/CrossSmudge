@@ -1,7 +1,7 @@
 {
   "id": "cp-forehead",
-  "name": "CP Forehead",
-  "version": "0.1.1",
+  "name": "Forehead",
+  "version": "0.1.2",
   "author": "CrossPlay contributors; Lua port",
   "description": "Timed spoken-clue party game. 2474 entries in 17 categories.",
   "entry": "main.lua",

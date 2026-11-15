@@ -35,7 +35,7 @@ function on_init()
  if old then mode=old.mode;g=old.g else g=Y.new(smudge.millis())end;redraw()
 end
 function on_draw()
- geometry();smudge.clear();smudge.header('CP Yahtzee','P1 '..Y.total(g.cards[1])..' / P2 '..Y.total(g.cards[2]))
+ geometry();smudge.clear();smudge.header('Yahtzee','P1 '..Y.total(g.cards[1])..' / P2 '..Y.total(g.cards[2]))
  smudge.rect(w-105,65,85,30,false);smudge.text(w-98,70,'Menu','small')
  if screen=='menu' then
   for i,label in ipairs(menuItems)do smudge.text(left,105+(i-1)*42,(i==menu and '> ' or '  ')..label,'ui12')end

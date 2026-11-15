@@ -33,7 +33,7 @@ end
 function on_init()w,h=smudge.get_bounds();redraw()end
 function on_draw()
  w,h=smudge.get_bounds();margin=w>h and 64 or 25;pageRows=math.max(1,(h-180)//36)
- smudge.clear();smudge.header('CP Notes',screen=='library' and 'Eight app-local cards' or 'note'..index..'.md')
+ smudge.clear();smudge.header('Notes',screen=='library' and 'Eight app-local cards' or 'note'..index..'.md')
  smudge.rect(w-105,60,85,30,false);smudge.text(w-98,65,'Menu','small')
  if screen=='library' then
   for i=1,8 do smudge.text(margin,95+(i-1)*36,(choice==i and '> ' or '  ')..'Note '..i,'ui12') end

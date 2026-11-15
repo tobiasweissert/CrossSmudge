@@ -1,7 +1,7 @@
 {
   "id": "cp-connectfour",
-  "name": "CP Connect Four",
-  "version": "0.1.1",
+  "name": "Connect Four",
+  "version": "0.1.2",
   "author": "CrossPlay contributors; Lua port",
   "description": "Local CrossPlay rules port. See PARITY.md for stock firmware limitations.",
   "entry": "main.lua",
