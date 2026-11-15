@@ -17,6 +17,8 @@
 - Fixed Solitaire v1.0.1 touch input on reTerminal Sticky: tapping cards now deals, selects, and moves cards; reset confirmation buttons match their drawn bounds, and taps in tableau gaps or below cards are ignored. Other devices retain their existing input behavior and saved games remain compatible.
 
 ### Added
+
+- Published Flashcards, Habits, Pomodoro, Weather and Browser previews to the fork’s owner-test App Store. All package dependencies and icons are included; Weather and Browser require PSRAM and Lua API v3.
 - Sticky owner test profile with paired fork app downloads, source-identified firmware, and Sticky-only Chess, Sudoku, Solitaire and Wordle replacements that preserve legacy games and saves on other devices.
 
 

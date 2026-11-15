@@ -1,0 +1,20 @@
+[
+  {
+    "file": "forecast.csv",
+    "url": "https://api.open-meteo.com/v1/forecast?latitude=47.3769&longitude=8.5417&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&hourly=temperature_2m,weather_code&forecast_hours=16&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5&timezone=auto&format=csv",
+    "retrieved": "2026-11-15",
+    "sha256": "dd7db89c92a76cd0acec7e7ebfc9c09bd71c2e648b54c2b553a627090fe6719b"
+  },
+  {
+    "file": "cities.json",
+    "url": "https://geocoding-api.open-meteo.com/v1/search?name=Zurich&count=3&language=en&format=json",
+    "retrieved": "2026-11-15",
+    "sha256": "e1dbcd64a3474cff73a4a23517195f0ba3716f6a6c15401f9ea90702362c9ce7"
+  },
+  {
+    "file": "page.txt",
+    "url": "https://r.jina.ai/https://example.com/",
+    "retrieved": "2026-11-15",
+    "sha256": "ccfad4c95ab3ff30944f84cd5eaba490bac0a35bafe0551f9fe93154e237d1cb"
+  }
+]

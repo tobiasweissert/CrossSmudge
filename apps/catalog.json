@@ -3,6 +3,97 @@
   "branch": "integration/sticky-test-all",
   "apps": [
     {
+      "id": "flashcards",
+      "name": "Flashcards",
+      "version": "0.1.0",
+      "author": "CrossSmudge",
+      "description": "Create and study question and answer cards.",
+      "min_api": 2,
+      "files": [
+        "core.lua",
+        "editor.lua",
+        "icon.raw",
+        "main.lua",
+        "manifest.json",
+        "storage.lua",
+        "ui.lua"
+      ]
+    },
+    {
+      "id": "habits",
+      "name": "Habits",
+      "version": "0.1.0",
+      "author": "CrossSmudge",
+      "description": "Daily habit checklists, streaks and sixteen weeks of history.",
+      "min_api": 2,
+      "files": [
+        "core.lua",
+        "editor.lua",
+        "icon.raw",
+        "main.lua",
+        "manifest.json",
+        "storage.lua",
+        "ui.lua"
+      ]
+    },
+    {
+      "id": "pomodoro",
+      "name": "Pomodoro",
+      "version": "0.1.0",
+      "author": "CrossSmudge",
+      "description": "Focus sessions with short and long breaks.",
+      "min_api": 2,
+      "files": [
+        "core.lua",
+        "digits.lua",
+        "editor.lua",
+        "icon.raw",
+        "main.lua",
+        "manifest.json",
+        "storage.lua",
+        "ui.lua"
+      ]
+    },
+    {
+      "id": "weather",
+      "name": "Weather",
+      "version": "0.1.0",
+      "author": "CrossSmudge",
+      "description": "Current conditions and forecasts from Open-Meteo.",
+      "min_api": 3,
+      "requires_psram": true,
+      "files": [
+        "digits.lua",
+        "editor.lua",
+        "forecast.lua",
+        "icon.raw",
+        "json.lua",
+        "main.lua",
+        "manifest.json",
+        "model.lua",
+        "storage.lua",
+        "ui.lua"
+      ]
+    },
+    {
+      "id": "browser",
+      "name": "Browser",
+      "version": "0.1.0",
+      "author": "CrossSmudge",
+      "description": "Paginated public web text through Jina Reader. URLs are sent to Jina.",
+      "min_api": 3,
+      "requires_psram": true,
+      "files": [
+        "cache.lua",
+        "editor.lua",
+        "icon.raw",
+        "main.lua",
+        "manifest.json",
+        "model.lua",
+        "ui.lua"
+      ]
+    },
+    {
       "id": "dice",
       "name": "Dice Roller",
       "version": "1.0.0",
