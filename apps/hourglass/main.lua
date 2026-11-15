@@ -485,6 +485,17 @@ local function draw_hourglass(cx, cy, pct)
     smudge.thick_line(cx + half_w - 10, bot_y - 12, cx + half_w - 18, bot_y - 36, 2)
 end
 
+-- Value boxes use the same bounds for drawing and Sticky touch input.
+local function settings_value_geometry(cx, row)
+    local box_w, box_h = 260, 36
+    return cx - math.floor(box_w / 2), 195 + (row == 1 and 80 or 164), box_w, box_h
+end
+
+local function settings_value_hit(cx, row, tx, ty)
+    local x, y, bw, bh = settings_value_geometry(cx, row)
+    return tx >= x and tx < x + bw and ty >= y and ty < y + bh
+end
+
 local function draw_settings_dialog(cx, w, h)
     local mw = 430
     local mh = 300
@@ -500,15 +511,13 @@ local function draw_settings_dialog(cx, w, h)
     smudge.text(cx, my + 12, "Adjust Increments", 12, true, "center", true)
     smudge.line(mx + 16, my + 42, mx + mw - 16, my + 42)
 
-    local box_w = 260
-    local box_h = 36
-    local box_x = cx - math.floor(box_w / 2)
+    local box_x, box1_y, box_w, box_h = settings_value_geometry(cx, 1)
+    local _, box2_y = settings_value_geometry(cx, 2)
 
     -- Row 1: Top / Bottom Hardware Buttons
     local r1_y = my + 52
     smudge.text(mx + 24, r1_y, "Top / Bottom Buttons (hardware):", 10, true, "left", true)
 
-    local box1_y = r1_y + 28
     if setting_row == 1 then
         smudge.rounded_rect(box_x - 2, box1_y - 2, box_w + 4, box_h + 4, 6, true, true)
         smudge.rounded_rect(box_x, box1_y, box_w, box_h, 5, true, false)
@@ -526,7 +535,6 @@ local function draw_settings_dialog(cx, w, h)
     local r2_y = my + 136
     smudge.text(mx + 24, r2_y, "Bottom - / + Buttons (screen):", 10, true, "left", true)
 
-    local box2_y = r2_y + 28
     if setting_row == 2 then
         smudge.rounded_rect(box_x - 2, box2_y - 2, box_w + 4, box_h + 4, 6, true, true)
         smudge.rounded_rect(box_x, box2_y, box_w, box_h, 5, true, false)
@@ -706,7 +714,8 @@ function on_button(btn, pressed)
 end
 
 function on_touch(action, tx, ty)
-    if smudge.get_device and smudge.get_device() == "sticky" then
+    local sticky = smudge.get_device and smudge.get_device() == "sticky"
+    if sticky then
         action, tx, ty = ty, action, tx
     end
     if action ~= "tap" and action ~= "click" then return end
@@ -733,7 +742,8 @@ function on_touch(action, tx, ty)
         end
 
         -- Row 1 tap (Top/Bottom buttons step)
-        if ty >= my + 60 and ty <= my + 120 then
+        if (sticky and settings_value_hit(cx, 1, tx, ty)) or
+            (not sticky and ty >= my + 60 and ty <= my + 120) then
             setting_row = 1
             if tx < cx then
                 adjust_step(1, -1)
@@ -744,7 +754,8 @@ function on_touch(action, tx, ty)
         end
 
         -- Row 2 tap (Bottom -/+ buttons step)
-        if ty >= my + 145 and ty <= my + 215 then
+        if (sticky and settings_value_hit(cx, 2, tx, ty)) or
+            (not sticky and ty >= my + 145 and ty <= my + 215) then
             setting_row = 2
             if tx < cx then
                 adjust_step(2, -1)

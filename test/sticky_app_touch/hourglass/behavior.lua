@@ -74,7 +74,9 @@ else
     touch(240,550); eq("in_settings",true); draw()
     touch(300,270); eq("step_top_sec",300); eq("step_bot_sec",60)
     touch(300,310); eq("step_top_sec",600); eq("step_bot_sec",60); draw()
-    touch(100,400); eq("step_top_sec",600); eq("step_bot_sec",45); draw()
+    -- Sticky uses the visible box; legacy retains its historical broad hit strip.
+    touch(DEVICE == "sticky" and 140 or 100, DEVICE == "sticky" and 390 or 400)
+    eq("step_top_sec",600); eq("step_bot_sec",45); draw()
     touch(240,510); eq("in_settings",false)
     assert(files["hourglass.dat"]=="900;600;45")
     on_exit(); load_app(); eq("total_sec",900); eq("step_top_sec",600); eq("step_bot_sec",45); draw()
