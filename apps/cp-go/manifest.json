@@ -1,7 +1,7 @@
 {
   "id": "cp-go",
   "name": "Go",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "author": "CrossPlay contributors; Lua port",
   "description": "9/13/19 Go, Chinese area scoring, dead-group agreement and an optional 9x9 heuristic.",
   "entry": "main.lua",
