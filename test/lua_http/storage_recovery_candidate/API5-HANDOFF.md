@@ -1,0 +1,9 @@
+# API5 proposal and terminal envelope — bounded phase completed
+
+Defined a separate proposed Lua recoverable-download API5 in `LUA-RECOVERY-API5.md`, without changing the frozen API4 promise or production Lua bindings. It explicitly specifies startup recovery, exclusive ownership, uncertain-outcome admission, no automatic replay, opaque app/generation-bound read handles, int32/float32-safe generation strings, and required Connections adoption.
+
+Added a pure C++ terminal-envelope mapper with four tested groups: unknown never means success/retry, committed is the only success, not-committed is not retry authority, and unknown enum fails closed. Missing-header RED is preserved in `lua-outcome-red.log`. This is not a Lua runtime or uncertainty-latch implementation.
+
+Registered the suite in `run_all.py`, corrected its stale staging-sync pending label, and executed the full entrypoint. All seven portable suites pass normal and ASan/UBSan (14 executable runs); all three real pinned FAT fixture suites also pass both modes. Compile/run exits and unchanged source/contract hashes are preserved in `api5-evidence-20261115T184947Z.json`. Previous combined receipt remains separately preserved. Real-FAT tests use synthetic block storage; no physical durability is claimed.
+
+Next bounded implementation: app-scoped lifecycle/admission state machine with startup-needs-recovery, unknown latch, drain-before-recover and stale-completion tests; then freeze complete candidate for independent read-only review before production adapter/bindings/client adoption. Generation codec and opaque handle implementation are still absent. No target enablement, firmware builds, source checkout edits, publication, upstream mutation, delivery or new workers in this slice. Existing active 2048 and Minesweeper owners were preserved. Target downloads remain disabled and owner hardware/screenshots publication gate remains intact.

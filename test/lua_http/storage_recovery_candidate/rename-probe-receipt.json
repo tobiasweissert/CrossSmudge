@@ -1,0 +1,31 @@
+{
+  "kind": "exact pinned method with instrumented dependency seams; not physical FAT/SD qualification",
+  "source": "/root/github/crosssmudge-lua-http/.pio/libdeps/sticky/SdFat/src/FatLib/FatFile.cpp",
+  "source_sha256": "c1757a57ea134df2aab650d2db109b7d731f66cf309e5a070a9b50667c258948",
+  "method_sha256": "43b7932a50db9bdd9ee60d4054158deff1a2cf5efb27c2958a83c2ebf7c4035a",
+  "generated_sha256": "5d5da3dc864398fce4ecbc237e71e4ce2569ead6a45e57053386ae6a27e15be6",
+  "compile_command": [
+    "g++",
+    "-std=c++17",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-g",
+    "-fsanitize=address,undefined",
+    "-fno-omit-frame-pointer",
+    "/root/github/.host-data/crosssmudge/http-storage-recovery/rename_fault_probe.cpp",
+    "-o",
+    "/root/.hermes/cache/scratch/crosssmudge-rename-fault-probe"
+  ],
+  "compile_exit": 0,
+  "run_exit": 0,
+  "asserted_cases": 6,
+  "cases": [
+    "success",
+    "source-cache failure",
+    "destination-cache failure after create",
+    "source-remove failure with alias plus unsafe abort cleanup",
+    "final-cache-sync failure after unlink",
+    "initial-sync failure ignored by pinned method"
+  ]
+}

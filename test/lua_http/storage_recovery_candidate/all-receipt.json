@@ -1,0 +1,222 @@
+{
+  "io_receipt_sha256": "25ab313fac22dad5390b4d55e031673349b42543ee4310fe99b0a35ac70d3abc",
+  "staging_receipt_sha256": "a6c4f08a51308f065089a20a65b51ed5a331860db4fec638c4b8fb6a2e43b29d",
+  "sdfat_receipt_sha256": "eea7a7abbed9036b50644be7299587d8046f60e4bdb8a98239877154f40415cf",
+  "kind": "portable recovery and sealing plus real pinned FAT library with synthetic block device",
+  "sha256": {
+    "RecoverableDownloadStore.h": "0ce723d15dff9aab90d32675947323c45f2d99779ab19b689fab30a624592bfa",
+    "WriteAdmission.h": "bd0263e52da8c1ad9865c5e0ee40c49562e89d5c0fe8443d2cc1c7b9725269fe",
+    "BodyStage.h": "d6dcf6e6e69ae30ccbfc8be1f72594cd28aa5272329b2e371089af403d1b7949",
+    "PreSealCheck.h": "625416efbda97cb6f40e88de05a10b86ecc2aee647cf4cd9b185415d1d8ef80c",
+    "SealStage.h": "e746822ab8ee45b225244ce8964887a8ff3ea18751d74f3426d8a457812f2730",
+    "recovery_test.cpp": "7abbdd670e70f206ca662baf7c9c3ae8c78a3ed46b758eeac9bc42601315fd3f",
+    "admission_test.cpp": "a0636d2f997d417c9a932920fcc256faead0a172f3b2f851da21afb0051aabfb",
+    "body_test.cpp": "06f0f37041f896f663e925d4fa160e678b0efe347235dd846746fcfa5a15e586",
+    "preseal_test.cpp": "0cabb45e5a672fdc782a52065ce4b0fe4780e5c6db5521cb29f52687d19d74d6",
+    "stage_receipt_test.cpp": "326457bd99685a08b10aaf8225841f71433b9efe9c037f71507cf4a609cae886",
+    "seal_test.cpp": "f833e2f8f30c25851ae039f1d786ea9b05103d66fc7f692187117bc5b8aa5243",
+    "LuaRecoveryContract.h": "cac8a2c1b49d6bbd68b4148438c52647c9474bc44f1324283d423c3f1b42e477",
+    "lua_outcome_test.cpp": "bb45c8d34a33bcffbb05ab66a2e824ce59bf291f3e5c3573198395b1c918b8b7",
+    "LUA-RECOVERY-API5.md": "eeb073fc20fee09819a10d12e93fbafb23be7ad32ad1b2eef8c6a59adac34eab",
+    "run_all.py": "c5e92bf985c61f6cac505c41c2f32d86236be1f52d9b7489751be19e7a577dfe"
+  },
+  "results": [
+    {
+      "suite": "recovery",
+      "mode": "normal",
+      "compile_exit": 0,
+      "run_exit": 0,
+      "groups": [
+        "PASS valid sealed record",
+        "PASS newest valid generation recovered",
+        "PASS every-byte corruption preserves prior generation",
+        "PASS truncated and trailing records rejected",
+        "PASS absence distinguished from size and read uncertainty",
+        "PASS equal-generation conflicts include actual checksum collision",
+        "PASS identical equal generations and comparison I/O failure",
+        "PASS 2 MiB limit, bounded reads, numeric-slot admission, max generation read",
+        "PASS empty storage"
+      ]
+    },
+    {
+      "suite": "recovery",
+      "mode": "sanitize",
+      "compile_exit": 0,
+      "run_exit": 0,
+      "groups": [
+        "PASS valid sealed record",
+        "PASS newest valid generation recovered",
+        "PASS every-byte corruption preserves prior generation",
+        "PASS truncated and trailing records rejected",
+        "PASS absence distinguished from size and read uncertainty",
+        "PASS equal-generation conflicts include actual checksum collision",
+        "PASS identical equal generations and comparison I/O failure",
+        "PASS 2 MiB limit, bounded reads, numeric-slot admission, max generation read",
+        "PASS empty storage"
+      ]
+    },
+    {
+      "suite": "admission",
+      "mode": "normal",
+      "compile_exit": 0,
+      "run_exit": 0,
+      "groups": [
+        "PASS empty recovery begins generation one",
+        "PASS inactive slot preserves selected generation",
+        "PASS generation exhaustion never wraps",
+        "PASS uncertain and conflicting recovery deny writes",
+        "PASS size and cancellation deny writes",
+        "PASS malformed selected recovery denied"
+      ]
+    },
+    {
+      "suite": "admission",
+      "mode": "sanitize",
+      "compile_exit": 0,
+      "run_exit": 0,
+      "groups": [
+        "PASS empty recovery begins generation one",
+        "PASS inactive slot preserves selected generation",
+        "PASS generation exhaustion never wraps",
+        "PASS uncertain and conflicting recovery deny writes",
+        "PASS size and cancellation deny writes",
+        "PASS malformed selected recovery denied"
+      ]
+    },
+    {
+      "suite": "body",
+      "mode": "normal",
+      "compile_exit": 0,
+      "run_exit": 0,
+      "groups": [
+        "PASS body staged bounded and unsealed without touching old slot",
+        "PASS every mutating operation failure preserves selected slot and leaves candidate invalid",
+        "PASS cancellation before and between body chunks never publishes",
+        "PASS invalid plans and oversized body rejected before mutation",
+        "PASS empty body remains unsealed",
+        "PASS source read failures with simultaneous close failure never publish",
+        "PASS cancellation with close failure leaves unsealed candidate and old slot intact"
+      ]
+    },
+    {
+      "suite": "body",
+      "mode": "sanitize",
+      "compile_exit": 0,
+      "run_exit": 0,
+      "groups": [
+        "PASS body staged bounded and unsealed without touching old slot",
+        "PASS every mutating operation failure preserves selected slot and leaves candidate invalid",
+        "PASS cancellation before and between body chunks never publishes",
+        "PASS invalid plans and oversized body rejected before mutation",
+        "PASS empty body remains unsealed",
+        "PASS source read failures with simultaneous close failure never publish",
+        "PASS cancellation with close failure leaves unsealed candidate and old slot intact"
+      ]
+    },
+    {
+      "suite": "preseal",
+      "mode": "normal",
+      "compile_exit": 0,
+      "run_exit": 0,
+      "groups": [
+        "PASS exact staged body and zero metadata verified read-only",
+        "PASS every read and size uncertainty fail closed",
+        "PASS every staged body header and footer byte corruption rejected",
+        "PASS extent slot payload limit and expected checksum enforced",
+        "PASS empty staged body verified without publication"
+      ]
+    },
+    {
+      "suite": "preseal",
+      "mode": "sanitize",
+      "compile_exit": 0,
+      "run_exit": 0,
+      "groups": [
+        "PASS exact staged body and zero metadata verified read-only",
+        "PASS every read and size uncertainty fail closed",
+        "PASS every staged body header and footer byte corruption rejected",
+        "PASS extent slot payload limit and expected checksum enforced",
+        "PASS empty staged body verified without publication"
+      ]
+    },
+    {
+      "suite": "stage_receipt",
+      "mode": "normal",
+      "compile_exit": 0,
+      "run_exit": 0,
+      "groups": [
+        "PASS accepted input checksum reaches read-only preseal verification without publication",
+        "PASS failed cancelled and rejected staging clears stale receipts including close and sync errors",
+        "PASS empty-body receipt retains FNV offset basis and verifies unsealed extent"
+      ]
+    },
+    {
+      "suite": "stage_receipt",
+      "mode": "sanitize",
+      "compile_exit": 0,
+      "run_exit": 0,
+      "groups": [
+        "PASS accepted input checksum reaches read-only preseal verification without publication",
+        "PASS failed cancelled and rejected staging clears stale receipts including close and sync errors",
+        "PASS empty-body receipt retains FNV offset basis and verifies unsealed extent"
+      ]
+    },
+    {
+      "suite": "seal",
+      "mode": "normal",
+      "compile_exit": 0,
+      "run_exit": 0,
+      "groups": [
+        "PASS seal publishes verified newer generation without changing old slot",
+        "PASS every partial and fully mutated failed seal write is indeterminate and recoverable",
+        "PASS sync close and readback failures preserve ambiguous publication until recovery",
+        "PASS cancellation admitted before seal and cannot report no-change after seal",
+        "PASS invalid stale corrupt and unopened candidates reject before seal mutation"
+      ]
+    },
+    {
+      "suite": "seal",
+      "mode": "sanitize",
+      "compile_exit": 0,
+      "run_exit": 0,
+      "groups": [
+        "PASS seal publishes verified newer generation without changing old slot",
+        "PASS every partial and fully mutated failed seal write is indeterminate and recoverable",
+        "PASS sync close and readback failures preserve ambiguous publication until recovery",
+        "PASS cancellation admitted before seal and cannot report no-change after seal",
+        "PASS invalid stale corrupt and unopened candidates reject before seal mutation"
+      ]
+    },
+    {
+      "suite": "lua_outcome",
+      "mode": "normal",
+      "compile_exit": 0,
+      "run_exit": 0,
+      "groups": [
+        "PASS unknown_never_success_or_retry",
+        "PASS committed_is_only_success",
+        "PASS not_committed_is_not_auto_retry_authority",
+        "PASS unknown_enum_fails_closed"
+      ]
+    },
+    {
+      "suite": "lua_outcome",
+      "mode": "sanitize",
+      "compile_exit": 0,
+      "run_exit": 0,
+      "groups": [
+        "PASS unknown_never_success_or_retry",
+        "PASS committed_is_only_success",
+        "PASS not_committed_is_not_auto_retry_authority",
+        "PASS unknown_enum_fails_closed"
+      ]
+    }
+  ],
+  "hardware_enabled": false,
+  "pending": [
+    "exFAT; physical power loss",
+    "independent review",
+    "API5 production bindings, uncertainty/startup admission and client adoption",
+    "target and physical acceptance"
+  ]
+}
