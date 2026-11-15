@@ -1,7 +1,7 @@
 {
   "id": "cp-toybattle",
   "name": "CP Toy Battle",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "CrossPlay contributors; Lua port",
   "description": "Nine playable maps, troop/base effects, placement chains and a local heuristic opponent.",
   "entry": "main.lua",

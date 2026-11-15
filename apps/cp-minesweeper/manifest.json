@@ -1,7 +1,7 @@
 {
   "id": "cp-minesweeper",
   "name": "CP Minesweeper",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "CrossPlay contributors; Lua port",
   "description": "Local CrossPlay rules port. See PARITY.md for stock firmware limitations.",
   "entry": "main.lua",
