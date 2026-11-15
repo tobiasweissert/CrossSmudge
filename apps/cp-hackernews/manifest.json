@@ -1,0 +1,10 @@
+{
+  "id": "cp-hackernews",
+  "name": "Hacker News",
+  "version": "0.1.0",
+  "author": "CrossSmudge contributors",
+  "description": "Live Hacker News stories and bounded article reading; APIv3 preview",
+  "entry": "main.lua",
+  "min_api": 3,
+  "network": {"domains": ["hacker-news.firebaseio.com", "r.jina.ai"]}
+}
