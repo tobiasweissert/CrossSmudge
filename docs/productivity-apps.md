@@ -1,10 +1,17 @@
-# Productivity apps — local preview, 2026-11-15
+# Productivity apps — App Store preview, 2026-11-15
 
 Five standalone Lua packages live in `apps/flashcards`, `apps/habits`,
 `apps/pomodoro`, `apps/weather`, and `apps/browser`. Their layouts follow the
 supplied monochrome designs and adapt to the device bounds. They support
 physical buttons and touch, including text entry through an on-screen keyboard.
-These packages have not been published to the App Store.
+These packages are published to your fork’s owner-test App Store catalog on
+`integration/sticky-test-all`. Standard upstream firmware uses the upstream
+App Store and will not list this fork’s additions.
+
+Close and reopen **App Store** with Wi-Fi connected to fetch the new catalog.
+Flashcards, Habits and Pomodoro appear on all supported devices. Weather and
+Browser follow the existing network previews’ PSRAM requirement and appear on
+Sticky/X4 Pro; C3 TLS/heap qualification is still pending.
 
 ## Install locally
 

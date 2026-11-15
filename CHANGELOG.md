@@ -16,7 +16,7 @@
 
 ### Added
 
-- Added local Flashcards, Habits, Pomodoro, Weather, and Browser Lua app previews with button/touch controls and saved state. Weather reuses Lua API v3 for Open-Meteo forecasts; Browser reads bounded public web text through Jina Reader. These packages are available for local installation and have not been published to the App Store.
+- Added local Flashcards, Habits, Pomodoro, Weather, and Browser Lua app previews with button/touch controls and saved state. Weather reuses Lua API v3 for Open-Meteo forecasts; Browser reads bounded public web text through Jina Reader. These packages are published in the fork’s owner-test App Store on `integration/sticky-test-all`; Weather and Browser require PSRAM and Lua API v3.
 - Sticky owner test profile with paired fork app downloads, source-identified firmware, and Sticky-only Chess, Sudoku, Solitaire and Wordle replacements that preserve legacy games and saves on other devices.
 
 
