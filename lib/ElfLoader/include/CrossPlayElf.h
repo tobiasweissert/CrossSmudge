@@ -1,0 +1,5 @@
+#pragma once
+#define CONFIG_ELF_LOADER_BUS_ADDRESS_MIRROR 1
+#define CONFIG_ELF_LOADER_LOAD_PSRAM 1
+#define CONFIG_ELF_LOADER_CACHE_OFFSET 1
+#include "esp_elf.h"

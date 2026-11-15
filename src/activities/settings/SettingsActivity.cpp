@@ -1,3 +1,6 @@
+#if defined(FREEINK_DEVICE_STICKY)
+#include "apps_local/sdapps/KeySettingsActivity.h"
+#endif
 #include "SettingsActivity.h"
 
 #include <BoardConfig.h>
@@ -136,6 +139,9 @@ void SettingsActivity::rebuildSettingsLists() {
   // looking for a CrossPoint setting never scrolls past one of ours to reach
   // it. host-tests/settingsorder/ holds the line. See LOCAL_SCOPE.md.
   for (const auto& setting : forkSystemSettings) systemSettings.push_back(setting);
+#if defined(FREEINK_DEVICE_STICKY)
+  systemSettings.push_back(SettingInfo::Action(StrId::STR_OPENAI_API_KEY, SettingAction::OpenAiKey));
+#endif
   readerSettings.insert(readerSettings.begin(),
                         SettingInfo::Action(StrId::STR_TEXT_SETTINGS, SettingAction::TextSettings));
   readerSettings.insert(readerSettings.begin() + 1,
@@ -406,6 +412,14 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::OPDSBrowser:
         startActivityForResult(std::make_unique<OpdsServerListActivity>(renderer, mappedInput), resultHandler);
         break;
+      case SettingAction::OpenAiKey: {
+#if defined(FREEINK_DEVICE_STICKY)
+        auto activity = makeUniqueNoThrow<sdapps::KeySettingsActivity>(renderer, mappedInput);
+        if (!activity) { LOG_ERR("SETTINGS", "OOM: key settings"); return; }
+        startActivityForResult(std::move(activity), resultHandler);
+#endif
+        break;
+      }
       case SettingAction::Network: {
         auto activity = makeUniqueNoThrow<WifiSelectionActivity>(renderer, mappedInput, false);
         if (!activity) {

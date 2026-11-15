@@ -1,4 +1,8 @@
 #include "Shelf.h"
+#if defined(FREEINK_DEVICE_STICKY)
+#include "sdapps/Catalog.h"
+#include "sdapps/ModuleActivity.h"
+#endif
 
 #include <HalStorage.h>
 #include <Logging.h>
@@ -200,6 +204,39 @@ constexpr bool everyTitleFitsTheStateFile() {
 static_assert(everyTitleFitsTheStateFile(), "shelf item titles must fit shelf::MAX_ITEM_TITLE; see ShelfState.h");
 static_assert(kFolderCount <= shelf::MAX_FOLDERS, "raise shelf::MAX_FOLDERS in ShelfState.h");
 
+// Stable backing storage keeps shelf row pointers valid between renders.
+shelf::Folder runtimeFolders[] = {kFolders[0], kFolders[1]};
+int builtInCount(int folder) { return kFolders[folder].count; }
+#if defined(FREEINK_DEVICE_STICKY)
+constexpr size_t MAX_SHELF_ITEMS = 25 + sdapps::MAX_PACKAGES_PER_FOLDER;
+shelf::Item runtimeItems[kFolderCount][MAX_SHELF_ITEMS];
+sdapps::Catalog packageCatalogs[kFolderCount];
+size_t packageSlots[kFolderCount][sdapps::MAX_PACKAGES_PER_FOLDER];
+constexpr const char* packageRoots[] = {"/games", "/apps"};
+void refreshPackages(int folder) {
+  RenderLock lock;
+  auto& output = runtimeFolders[folder];
+  output = kFolders[folder];
+  for (int i = 0; i < output.count; ++i) runtimeItems[folder][i] = output.items[i];
+  output.items = runtimeItems[folder];
+  auto& catalog = packageCatalogs[folder];
+  sdapps::discoverPackages(packageRoots[folder], catalog);
+  for (size_t i = 0; i < catalog.count; ++i) {
+    bool duplicate = false;
+    for (const auto& current : runtimeFolders) {
+      for (int j = 0; j < current.count; ++j) {
+        if (strcasecmp(current.items[j].title, catalog.entries[i].title) == 0) duplicate = true;
+      }
+    }
+    if (duplicate) continue;
+    packageSlots[folder][output.count - builtInCount(folder)] = i;
+    runtimeItems[folder][output.count++] = {catalog.entries[i].title, output.mark, nullptr};
+  }
+}
+#else
+void refreshPackages(int) {}
+#endif
+
 // Row limits as the registry stands now, for parseState's clamp.
 const int* itemLimits() {
   static int limits[shelf::MAX_FOLDERS] = {};
@@ -329,7 +366,7 @@ bool replaceWith(std::unique_ptr<Activity> activity, const char* what) {
 
 namespace shelf {
 
-const Folder* folders() { return kFolders; }
+const Folder* folders() { return runtimeFolders; }
 
 int folderCount() { return kFolderCount; }
 
@@ -338,6 +375,7 @@ void openFolder(const int index, GfxRenderer& renderer, MappedInputManager& mapp
     LOG_ERR("SHELF", "Bad folder index: %d", index);
     return;
   }
+  refreshPackages(index);
   // Opening a folder means nothing below it is open any more. Clearing here
   // rather than in leave() keeps the fact true even when a folder is reached by
   // some route that did not go through leave().
@@ -346,7 +384,7 @@ void openFolder(const int index, GfxRenderer& renderer, MappedInputManager& mapp
   ensureLoaded();
   saveIfChanged(index, state.resumeRow[index]);
   setOpenTitle(nullptr);
-  replaceWith(ShelfFolderActivity::create(renderer, mappedInput, index), kFolders[index].title);
+  replaceWith(ShelfFolderActivity::create(renderer, mappedInput, index), runtimeFolders[index].title);
 }
 
 bool openItem(const int folder, const int item, GfxRenderer& renderer, MappedInputManager& mappedInput) {
@@ -354,7 +392,7 @@ bool openItem(const int folder, const int item, GfxRenderer& renderer, MappedInp
     LOG_ERR("SHELF", "Bad folder index: %d", folder);
     return false;
   }
-  const Folder& parent = kFolders[folder];
+  const Folder& parent = runtimeFolders[folder];
   if (item < 0 || item >= parent.count) {
     LOG_ERR("SHELF", "Bad item index %d in %s", item, parent.title);
     return false;
@@ -365,8 +403,19 @@ bool openItem(const int folder, const int item, GfxRenderer& renderer, MappedInp
   openFolderIndex = folder;
   homeReturn = true;
   saveIfChanged(folder, item);
-  setOpenTitle(parent.items[item].title);
-  if (!replaceWith(parent.items[item].create(renderer, mappedInput), parent.items[item].title)) {
+  const bool external = item >= builtInCount(folder);
+  setOpenTitle(external ? nullptr : parent.items[item].title);
+  std::unique_ptr<Activity> activity;
+#if defined(FREEINK_DEVICE_STICKY)
+  if (external) {
+    const auto slot = packageSlots[folder][item - builtInCount(folder)];
+    activity = sdapps::ModuleActivity::create(renderer, mappedInput, packageRoots[folder], packageCatalogs[folder].entries[slot]);
+  } else
+#endif
+  {
+    activity = parent.items[item].create(renderer, mappedInput);
+  }
+  if (!replaceWith(std::move(activity), parent.items[item].title)) {
     openFolderIndex = -1;
     setOpenTitle(nullptr);
     return false;
@@ -376,14 +425,14 @@ bool openItem(const int folder, const int item, GfxRenderer& renderer, MappedInp
 
 // A folder's titles, by row, for the conversions in ShelfHidden.h.
 auto titlesOf(const int folder) {
-  return [folder](const int i) { return kFolders[folder].items[i].title; };
+  return [folder](const int i) { return runtimeFolders[folder].items[i].title; };
 }
 
 bool isHidden(const int folder, const int item) {
   if (folder < 0 || folder >= kFolderCount) return false;
-  if (item < 0 || item >= kFolders[folder].count) return false;
+  if (item < 0 || item >= runtimeFolders[folder].count) return false;
   ensureHiddenLoaded();
-  return hiddenItems.contains(kFolders[folder].items[item].title);
+  return hiddenItems.contains(runtimeFolders[folder].items[item].title);
 }
 
 void setHidden(const int folder, const int item, const bool hide) {
@@ -391,13 +440,13 @@ void setHidden(const int folder, const int item, const bool hide) {
     LOG_ERR("SHELF", "Bad folder index: %d", folder);
     return;
   }
-  if (item < 0 || item >= kFolders[folder].count) {
-    LOG_ERR("SHELF", "Bad item index %d in %s", item, kFolders[folder].title);
+  if (item < 0 || item >= runtimeFolders[folder].count) {
+    LOG_ERR("SHELF", "Bad item index %d in %s", item, runtimeFolders[folder].title);
     return;
   }
   ensureHiddenLoaded();
-  if (!hiddenItems.set(kFolders[folder].items[item].title, hide)) return;
-  LOG_INF("SHELF", "%s is now %s", kFolders[folder].items[item].title, hide ? "hidden" : "shown");
+  if (!hiddenItems.set(runtimeFolders[folder].items[item].title, hide)) return;
+  LOG_INF("SHELF", "%s is now %s", runtimeFolders[folder].items[item].title, hide ? "hidden" : "shown");
   saveHiddenItems();
 }
 
@@ -407,19 +456,19 @@ void setHidden(const int folder, const int item, const bool hide) {
 int shownCount(const int folder) {
   if (folder < 0 || folder >= kFolderCount) return 0;
   ensureHiddenLoaded();
-  return shownCountIn(hiddenItems, kFolders[folder].count, titlesOf(folder));
+  return shownCountIn(hiddenItems, runtimeFolders[folder].count, titlesOf(folder));
 }
 
 int shownItem(const int folder, const int row) {
   if (folder < 0 || folder >= kFolderCount) return -1;
   ensureHiddenLoaded();
-  return shownItemIn(hiddenItems, kFolders[folder].count, row, titlesOf(folder));
+  return shownItemIn(hiddenItems, runtimeFolders[folder].count, row, titlesOf(folder));
 }
 
 int shownRowFor(const int folder, const int item) {
   if (folder < 0 || folder >= kFolderCount) return 0;
   ensureHiddenLoaded();
-  return shownRowForIn(hiddenItems, kFolders[folder].count, item, titlesOf(folder));
+  return shownRowForIn(hiddenItems, runtimeFolders[folder].count, item, titlesOf(folder));
 }
 
 void autostartFromEnv(GfxRenderer& renderer, MappedInputManager& mappedInput) {
@@ -440,7 +489,7 @@ void autostartFromEnv(GfxRenderer& renderer, MappedInputManager& mappedInput) {
     LOG_ERR("SHELF", "Autostart: no item titled '%s'", wanted);
     return;
   }
-  LOG_INF("SHELF", "Autostart into %s", kFolders[folder].items[item].title);
+  LOG_INF("SHELF", "Autostart into %s", runtimeFolders[folder].items[item].title);
   openItem(folder, item, renderer, mappedInput);
 }
 
@@ -471,7 +520,7 @@ bool resumeFromWake(GfxRenderer& renderer, MappedInputManager& mappedInput) {
     return false;
   }
 
-  LOG_INF("SHELF", "Wake: resuming %s", kFolders[folder].items[item].title);
+  LOG_INF("SHELF", "Wake: resuming %s", runtimeFolders[folder].items[item].title);
   return openItem(folder, item, renderer, mappedInput);
 }
 
@@ -531,7 +580,7 @@ void rememberRowIn(const int index, const int row) {
   // guard the registry count used to give when the two were the same number.
   const int item = shownItem(index, row);
   if (item < 0) {
-    LOG_ERR("SHELF", "Bad row %d in %s", row, kFolders[index].title);
+    LOG_ERR("SHELF", "Bad row %d in %s", row, runtimeFolders[index].title);
     return;
   }
   saveIfChanged(index, item);

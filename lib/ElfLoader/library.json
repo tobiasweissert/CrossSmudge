@@ -1,0 +1,29 @@
+{
+  "name": "CrossPlayElfLoader",
+  "version": "2.1.0",
+  "license": "Apache-2.0",
+  "platforms": [
+    "espressif32"
+  ],
+  "frameworks": [
+    "arduino"
+  ],
+  "build": {
+    "srcFilter": [
+      "-<*>",
+      "+<esp_elf.c>",
+      "+<esp_elf_validate.c>",
+      "+<esp_elf_adapter.c>",
+      "+<arch/esp_elf_xtensa.c>",
+      "+<CrossPlaySymbols.c>"
+    ],
+    "flags": [
+      "-DCONFIG_ELF_LOADER_BUS_ADDRESS_MIRROR=1",
+      "-DCONFIG_ELF_LOADER_LOAD_PSRAM=1",
+      "-DCONFIG_ELF_LOADER_CACHE_OFFSET=1",
+      "-DELF_LOADER_VER_MAJOR=2",
+      "-DELF_LOADER_VER_MINOR=1",
+      "-DELF_LOADER_VER_PATCH=0"
+    ]
+  }
+}

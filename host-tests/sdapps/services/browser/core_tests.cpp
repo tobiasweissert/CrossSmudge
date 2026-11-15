@@ -1,0 +1,102 @@
+#include "BrowserCore.h"
+#include <cstdio>
+#include <cstdlib>
+using namespace stickyweb;
+static int checks = 0;
+#define CHECK(expr) do { ++checks; if (!(expr)) { std::fprintf(stderr,"FAIL line %d: %s\n",__LINE__,#expr); std::exit(1); } } while (0)
+int main() {
+ CHECK(resolveUrl("", "https://Example.COM:443/a?x=1#top") == "https://example.com:443/a?x=1#top");
+ const char* invalid[] = {"http://example.com", "javascript:alert(1)", "https://user:pass@example.com/", "https://@example.com", "https:///a", "https://x:0/", "https://x:65536/", "https://x:abc/", "https://x:/", "https://bad_host/", "https://-host/", "https://x\\evil/", "https://x/\n", "https://x/%0a", "https://x/%zz", "https://x/%00", "https://x/ space", "https://[not-ip]/"};
+ for (auto url : invalid) CHECK(resolveUrl("", url).empty());
+ CHECK(resolveUrl("", "HTTPS://EXAMPLE.COM") == "https://example.com/");
+ CHECK(resolveUrl("", "https://example.com:8443/") == "https://example.com:8443/");
+ const std::string base="https://example.com/a/b/page?q=old#old";
+ CHECK(resolveUrl(base,"../story/./x/../") == "https://example.com/a/story/");
+ CHECK(resolveUrl(base,"/root/../../safe") == "https://example.com/safe");
+ CHECK(resolveUrl(base,"?new=1") == "https://example.com/a/b/page?new=1");
+ CHECK(resolveUrl(base,"#next") == "https://example.com/a/b/page?q=old#next");
+ CHECK(resolveUrl(base,"") == "https://example.com/a/b/page?q=old");
+ CHECK(resolveUrl(base,"//Other.test/x") == "https://other.test/x");
+ CHECK(resolveUrl(base,"https://other.test/a/../b") == "https://other.test/b");
+ CHECK(resolveUrl(base,"javascript:x").empty());
+ CHECK(resolveUrl("http://bad/","path").empty());
+ CHECK(resolveUrl(base,"a:b").empty());
+ CHECK(resolveUrl(base,"a//b") == "https://example.com/a/b/a//b");
+ auto page=parseHtml("<!doctype html><HTML><head><TITLE>A title</TITLE></head><body><h1>Hello</h1><p>world <b>bold</b>.</p><p data-x='a > b'>Next<br>line</body>", base);
+ CHECK(page.ok);
+ CHECK(page.error.empty());
+ CHECK(page.document.title=="A title");
+ CHECK(page.document.text=="Hello\nworld bold.\nNext\nline");
+ CHECK(!parseHtml("<!-- only a comment -->",base).ok);
+ CHECK(!parseHtml("<title>Only title</title>",base).ok);
+ CHECK(parseHtml("Hello < broken",base).document.text=="Hello < broken");
+ CHECK(parseHtml("one<p>two<p>three",base).document.text=="one\ntwo\nthree");
+ page=parseHtml("<title>Caf&eacute; &amp; tea</title><p>café &lt;x&gt; &quot;yes&quot; &apos;ok&apos; A&nbsp;B &#169; &#x1F600; &mdash; &unknown; &#xD800; &#0;</p>",base);
+ CHECK(page.ok);
+ CHECK(page.document.title=="Café & tea");
+ CHECK(page.document.text=="café <x> \"yes\" 'ok' A B © 😀 — &unknown; � �");
+ CHECK(parseHtml(std::string("A")+char(0xff)+"B"+char(0xc0)+char(0xaf),base).document.text=="A�B��");
+ CHECK(parseHtml(std::string("A\0B",3),base).document.text=="A�B");
+ CHECK(parseHtml("&#x110000; &#9999999999999999999999;",base).document.text=="� �");
+ CHECK(parseHtml("x\x01\x7f y",base).document.text=="x�� y");
+ page=parseHtml("<p>Read <A HREF='../story?x=1&amp;y=2' data-x='>'>a <b>good</b> &amp; story</A>. <a href='../story?x=1&amp;y=2'>duplicate</a><a href='http://bad'>bad</a><a href='javascript:go()'>bad</a><a href='/empty'></a><a href=/unquoted>Unquoted</a><a HREF='/first' href='/second'>First</a><a href='#part'>Part</a>",base);
+ CHECK(page.ok);
+ CHECK(page.document.links.size()==5);
+ CHECK(page.document.links[0].label=="a good & story");
+ CHECK(page.document.links[0].url=="https://example.com/a/story?x=1&y=2");
+ CHECK(page.document.links[1].label=="https://example.com/empty");
+ CHECK(page.document.links[2].url=="https://example.com/unquoted");
+ CHECK(page.document.links[3].url=="https://example.com/first");
+ CHECK(page.document.links[4].url=="https://example.com/a/b/page?q=old#part");
+ CHECK(parseHtml("<a href='/x'>Unclosed",base).document.links[0].label=="Unclosed");
+ const char* suppressed[]={"script","style","form","iframe","nav","footer","object","svg","math","template","noscript","canvas","video","audio","button","select","textarea"};
+ for(auto tag:suppressed) {
+  std::string markup="<p>Before</p><"+std::string(tag)+"><a href='/bad'>SECRET</a><div>HIDE</div></"+tag+"><p>After</p>";
+  auto inert=parseHtml(markup,base);
+  CHECK(inert.ok); CHECK(inert.document.text=="Before\nAfter"); CHECK(inert.document.links.empty());
+ }
+ page=parseHtml("<p>Visible</p><DIV HIDDEN='false'><p>SECRET</p></DIV><span aria-hidden='TRUE'>SECRET</span><div STYLE='color:red; DISPLAY : none !important'>SECRET</div><span style='visibility: hidden'>SECRET</span><section inert><p>SECRET</p></section><p>End</p>",base);
+ CHECK(page.document.text=="Visible\nEnd");
+ CHECK(parseHtml("Before<script>if(a < b) { '<p>SECRET</p>'; } </ScRiPt><p>After</p>",base).document.text=="Before\nAfter");
+ CHECK(parseHtml("Before<script/>SECRET<p>not closed",base).document.text=="Before");
+ CHECK(parseHtml("<div hidden><div>x</div><a href='/bad'>y</a></div><p>Fine</p>",base).document.text=="Fine");
+ CHECK(!parseHtml("<form>only unsafe content</form>",base).ok);
+ CHECK(parseHtml("<head><base href='https://evil.test/'><meta http-equiv='refresh' content='0;https://evil.test'></head><a href='/safe'>Safe</a>",base).document.links[0].url=="https://example.com/safe");
+ auto failure=parseHtml(std::string(512*1024+1,'x'),base);
+ CHECK(!failure.ok); CHECK(!failure.error.empty()); CHECK(failure.document.text.empty());
+ std::string padded="<p>ok</p><!--"; padded.append(512*1024-padded.size()-3,'x'); padded+="-->";
+ CHECK(parseHtml(padded,base).ok);
+ CHECK(parseHtml(std::string(192*1024,'x'),base).ok);
+ CHECK(!parseHtml(std::string(192*1024+1,'x'),base).ok);
+ std::string depth;
+ for(int i=0;i<256;++i) depth+="<div>";
+ CHECK(parseHtml(depth+"ok",base).ok);
+ CHECK(!parseHtml(depth+"<div>too deep",base).ok);
+ std::string manyLinks="<p>links</p>";
+ for(int i=0;i<130;++i) manyLinks+="<a href='/"+std::to_string(i)+"'>Link</a>";
+ page=parseHtml(manyLinks,base); CHECK(page.ok); CHECK(page.document.links.size()==128);
+ CHECK(page.document.links.back().url=="https://example.com/127");
+ std::string expansion; for(int i=0;i<70000;++i) expansion+=char(0xff);
+ CHECK(!parseHtml(expansion,base).ok);
+ CHECK(!parseHtml("<title>"+std::string(192*1024+1,'x')+"</title>ok",base).ok);
+ std::string attrStorm="<a"; for(int i=0;i<10000;++i) attrStorm+=" data-x='x'";
+ CHECK(parseHtml(attrStorm+" href='/ok'>ok</a>",base).document.links[0].url=="https://example.com/ok");
+ CHECK(parseHtml("<p>One<p>Two<p>Three",base).ok);
+ std::string paragraphs; for(int i=0;i<300;++i) paragraphs+="<p>word";
+ CHECK(parseHtml(paragraphs,base).ok);
+ CHECK(parseHtml("<p>&cent; &deg; &times; &aacute; &Ouml; &divide;</p>",base).document.text=="¢ ° × á Ö ÷");
+ CHECK(parseHtml("<a href=' /trimmed '>Trimmed</a>",base).document.links.size()==1);
+ CHECK(parseHtml("<a href=' /trimmed '>Trimmed</a>",base).document.links[0].url=="https://example.com/trimmed");
+ CHECK(resolveUrl(base,std::string(4097,'a')).empty());
+ const std::string longUrl="https://example.com/"+std::string(4096-std::string("https://example.com/").size(),'a');
+ CHECK(resolveUrl("",longUrl).size()==4096);
+ CHECK(resolveUrl("",longUrl+"b").empty());
+ CHECK(resolveUrl(base,std::string(4090,'a')).empty());
+ CHECK(resolveUrl(longUrl,"relative").size()<4096);
+ // Actual portfolio structure: icon-font span is not prose; preserve real UTF-8/entities and LF separators.
+ page=parseHtml("<h1>Tobias Weissert</h1><p>Senior Problem Solver</p><a href='#projects'><span class='material-icons'>arrow_downward</span>View My Work</a><p>Café &amp; 日本語 &#x1f600;</p>",base);
+ CHECK(page.document.text=="Tobias Weissert\nSenior Problem Solver\nView My Work\nCafé & 日本語 😀");
+ CHECK(page.document.links[0].label=="View My Work");
+ CHECK(parseHtml("<p>arrow_downward is prose</p><span class='not-material-icons'>日本語</span>",base).document.text=="arrow_downward is prose\n日本語");
+ std::printf("PASS %d assertions\n", checks);
+}

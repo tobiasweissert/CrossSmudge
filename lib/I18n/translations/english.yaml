@@ -610,3 +610,8 @@ STR_CLIP: "Clip"
 STR_CLIPPING_TOO_LONG: "Selection Too Long — Select Less Text"
 STR_CLIPPING_EXPORT_FAILED: "Clipping Saved — Text Export Failed"
 STR_GO_TO_PASSAGE: "Go to Passage"
+
+STR_OPENAI_API_KEY: "OpenAI API key"
+
+STR_SD_ASK_ANYTHING: "Ask anything"
+STR_SD_SEND: "Send"

@@ -1,0 +1,39 @@
+{
+  "Games": [
+    "CHESS",
+    "BATTLESHIP",
+    "CONNECTIONS",
+    "SOLITAIRE",
+    "HEARTS",
+    "D&DIAGRAMS",
+    "INSIDER",
+    "JAIPUR",
+    "SEA SALT",
+    "MURDLE",
+    "CHECKERS",
+    "CONNECT FOUR",
+    "YAHTZEE",
+    "KNUCKLEBONES",
+    "MINESWEEPER",
+    "SUDOKU",
+    "PICROSS",
+    "TOY BATTLE",
+    "FOREHEAD",
+    "TRIVIA",
+    "WAVELENGTH",
+    "GO",
+    "HEX",
+    "UNDERHAND",
+    "WORDLE"
+  ],
+  "Apps": [
+    "STUDY",
+    "HACKER NEWS",
+    "XKCD",
+    "INSTAPAPER",
+    "WALLPAPERS",
+    "WIKIPEDIA",
+    "CALCULATOR",
+    "NOTES"
+  ]
+}
