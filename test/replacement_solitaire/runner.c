@@ -39,7 +39,14 @@ static int randomfn(lua_State*L){lua_Integer a=luaL_checkinteger(L,1),b=luaL_che
 static int textwidth(lua_State*L){lua_pushinteger(L,strlen(luaL_checkstring(L,1))*10);return 1;}
 static int unsupported(lua_State*L){return luaL_error(L,"unmodeled stock API called by test");}
 static int yes(lua_State*L){lua_pushboolean(L,1);return 1;}
+#ifdef PRODUCTION_DEVICE_IDENTITY
+extern int production_get_device(lua_State *L);
+extern int production_touch(lua_State *L);
+#endif
 static const luaL_Reg api[]={
+#ifdef PRODUCTION_DEVICE_IDENTITY
+ {"get_device",production_get_device},{"test_touch",production_touch},
+#endif
  {"get_bounds",bounds},{"get_metrics",metrics},{"read_file",readfile},{"write_file",writefile},{"dofile",dofile_app},
  {"rect_dither",draw},{"clear",draw},{"text",draw},{"centered_text",draw},{"rect",draw},{"circle",draw},{"line",draw},{"header",draw},{"button_hints",draw},
  {"prevent_sleep",nothing},{"request_update",nothing},{"exit",nothing},{"full_refresh",nothing},{"log",nothing},{"millis",millis},{"time",millis},{"random",randomfn},{"text_width",textwidth},{"has_touch",yes},{NULL,NULL}};

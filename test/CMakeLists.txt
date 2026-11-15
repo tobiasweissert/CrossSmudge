@@ -95,3 +95,5 @@ add_subdirectory(app_store_wifi)
 add_subdirectory(app_store)
 
 add_subdirectory(lua_http)
+
+add_subdirectory(lua_device_identity)

@@ -2,6 +2,8 @@
 
 ### Fixed
 
+- Corrected Lua device identification so Sticky apps select their touch controls; X4 Pro and X3 also report their proper identities.
+
 - App Store now fetches missing icons for the visible catalog page and caches validated icons for reuse without reinstalling apps.
 - App Store lists fit the available screen space in portrait and landscape, with bounded text and visible touch navigation.
 - Fixed touch controls on reTerminal Sticky in Desk Stand 1.0.3; other devices retain their existing behavior.
