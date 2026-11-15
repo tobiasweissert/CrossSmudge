@@ -54,9 +54,8 @@ class LuaRunner {
   bool hasError() const { return hasError_; }
   const std::string& getErrorMessage() const { return errorMessage_; }
 
-  bool needsNetworkPermission() const { return http_.domains.count && !http_.allowed; }
+  bool networkEnabled() const { return http_.allowed; }
   const http::Domains& networkDomains() const { return http_.domains; }
-  bool allowNetwork();
 
   bool preventAutoSleep() const { return preventAutoSleep_.load(std::memory_order_relaxed); }
   void setPreventAutoSleep(bool prevent) { preventAutoSleep_.store(prevent, std::memory_order_relaxed); }

@@ -2,7 +2,7 @@
 
 This is a credential-free, bounded HTTP/1.1 service over verified TLS 1.2 on hardware. It does not reuse the legacy downloader's insecure wolfSSL mode. API v2 names remain available; file access is now confined to each app and its saved-data directory, and binary Lua chunks/host filesystem/process functions are disabled.
 
-## Manifest and consent
+## Manifest and network setting
 
 Declare exact lowercase DNS names (no wildcard, port, IP literal, trailing dot, or scheme):
 
@@ -12,7 +12,9 @@ Declare exact lowercase DNS names (no wildcard, port, IP literal, trailing dot, 
 
 There are at most four domains, each at most 127 ASCII bytes. Unknown top-level manifest fields remain compatible. A malformed `network` object, unknown field inside it, duplicate domain, wrong type, or invalid domain disables network access. A missing declaration leaves an app offline. Network-app saves use `/.smudge/network_data<full-app-directory>/`; they do not import the basename-only legacy save namespace, which could be shared by same-named offline apps in different search roots. Manifest input is limited to 4096 bytes at runner initialization.
 
-Before executing app code, firmware shows each declared domain separately. All characters must fit on screen before Allow is enabled. Only approval of every domain creates a grant. Grants are stored in NVS, bound to the app directory and canonical domain set, outside Lua's SD access. Reordering domains does not require approval again; changing the set does. App Settings → Revoke all app network permissions clears persisted grants. The app must be relaunched after revocation. There is no private-network opt-in or hidden exception.
+Valid network manifests are enabled by default within their declared domain scope. No launch, per-domain, or per-request consent is required, and no domain grants are written. App Settings → App networking enabled — disable is an optional global opt-out; the same row enables networking again. The setting is stored in NVS outside Lua's filesystem. Missing settings default to enabled; storage errors fail closed. Existing per-domain grants are ignored. Relaunch the app after changing this setting. Invalid network declarations fail startup without authorizing partially parsed domains. There is no private-network exception.
+
+The runtime opens base, table, string, math and os for every app, with the restrictions below. A valid nonempty network declaration additionally opens the native Lua UTF-8 library, including when networking is disabled so cached JSON/text can still be decoded. Offline apps retain the previous library set and retained Lua heap baseline. Library initialization is protected against allocation failure; no full standard-library preload is used.
 
 Network apps use the existing Wi-Fi selector when disconnected. Cancelling it exits the app. Wi-Fi acquired by the app is disconnected on exit; pre-existing connections are preserved. Loss of Wi-Fi is an error, never an automatic POST retry.
 
@@ -68,6 +70,6 @@ PR1 does **not** include streaming downloads, a JSON decoder, HTML extraction, i
 
 Run `bash test/lua_http/run.sh` for production policy/parser/manifest/Lua bridge tests under ASan+UBSan. The Lua integration allocator enforces 75 KiB and uses the shipped int32/float32 Lua configuration. LeakSanitizer is disabled because this execution environment uses ptrace. `test/lua_http/openssl_probe.cpp` is a separate host transport harness using the production parser; it is not evidence that the ESP32 TLS HAL works.
 
-Copy `examples/lua-https/` to `/.smudge/applications/https-demo/` on SD. No App Store/catalog change is needed. On Sticky: sync and verify UTC, trust it, launch HTTPS Demo, approve `example.com`, connect Wi-Fi, press Fetch. Expect HTTP 200 and a nonzero byte count. Back/Home during DNS/handshake/read must remain usable; repeat launch/cancel/sleep/reopen and inspect free internal heap, largest block, worker stack watermark and TLS allocation retention logs. Verify persisted grants, per-domain visibility in all orientations/themes, revoke/relaunch, invalid clock, wrong-host/untrusted/expired/not-yet-valid certificates, private DNS answers and redirects. No EPUB cache reset is needed.
+Copy `examples/lua-https/` to `/.smudge/applications/https-demo/` on SD. No App Store/catalog change is needed. On Sticky: sync and verify UTC, trust it, launch HTTPS Demo, connect Wi-Fi, press Fetch. Expect HTTP 200 and a nonzero byte count. Back/Home during DNS/handshake/read must remain usable; repeat launch/cancel/sleep/reopen and inspect free internal heap, largest block, worker stack watermark and TLS allocation retention logs. Verify default-enabled launches without consent, disable/relaunch and reenable/relaunch, invalid clock, wrong-host/untrusted/expired/not-yet-valid certificates, private DNS answers and redirects. No EPUB cache reset is needed.
 
 The implementation sandbox denies sockets, so live checks were run separately on the host. Real OpenSSL fixtures passed valid, wrong-host, expired, not-yet-valid and unrelated-CA cases using the production HTTP parser; certificate failures delivered no HTTP request bytes. This is host transport evidence, not validation of the ESP32 TLS HAL. Public numeric-IP connectivity and device lifecycle/heap behavior remain unverified; compilation alone is not device crypto approval.

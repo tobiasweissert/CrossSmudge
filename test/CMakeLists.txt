@@ -92,3 +92,4 @@ add_subdirectory(persistable_store_atomic)
 add_subdirectory(book_reading_stats_atomic)
 
 add_subdirectory(lua_http)
+add_subdirectory(lua_startup)

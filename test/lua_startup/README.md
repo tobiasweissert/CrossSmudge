@@ -1,0 +1,11 @@
+# API3 startup regressions
+
+Run `python3 test/lua_startup/run.py` (or `--sanitize`) offline. Both modes are registered in `test/CMakeLists.txt` through this directory. No package installation, shared build cache, provider access or firmware build is needed.
+
+The tests compile the actual production library-registration selection and `l_getDevice` function, using vendored Lua with int32/float32 and a 75 KiB allocation cap. They exercise native UTF-8 semantics, offline library absence, recoverable essential/network initialization OOM, configured Sticky/Sticky-debug/X4 Pro/X4 Classic/default identities, simulator precedence and defined-zero macros. A tiny Lua API double captures the production device return string; physical touch and whole-board compilation are not implied.
+
+The NVS fixture reuses the reviewed production `AppNetworkPolicy.h` test adapter. It checks missing namespace/key, explicit disable/re-enable, operational read/write/commit failures and nonzero opt-out values. The startup admission assignment is extracted unchanged from `LuaRunner.cpp` and executed with real `Domains` objects for missing/offline declarations, valid declarations and changed/expanded declaration sets, including preserving explicit opt-out across a manifest change. This boundary assumes a validated declaration; it is not a rerun of ArduinoJson manifest parsing. Structural caller checks additionally ensure launch consent is absent and opted-out apps skip Wi-Fi setup.
+
+`--baseline da264a5844e87abb4c694e4143b2972f435f99c8 --section libraries|identity|policy` reads the old production runner from immutable Git objects; it never switches branches or overwrites source. The baseline library test fails with missing native UTF8; board tests expose Sticky/X4 Pro/default misidentification; the policy guard fails on old per-domain grant wiring. Historical RED and final GREEN logs live outside the checkout in the parent task evidence directory.
+
+The existing portable HTTP policy/parser/budget/async tests remain unchanged. The full `test/lua_http/run.sh` additionally needs ArduinoJson; this task does not install it or consume a sibling/shared dependency cache. Target NVS persistence, ESP TLS and physical device acceptance remain separate. Vendored Lua's existing `os_tmpname` linker warning is retained in logs, not silently rewritten.

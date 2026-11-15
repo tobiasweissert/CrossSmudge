@@ -5,6 +5,7 @@
 #include <HalStorage.h>
 #include <HalLuaHttp.h>
 #include <HttpManifest.h>
+#include "LuaRuntime.h"
 
 #include <chrono>
 #include <cmath>
@@ -137,13 +138,10 @@ bool LuaRunner::init() {
   // - stepmul = 250: GC sweeps 2.5x faster than allocations so garbage doesn't accumulate
   lua_gc(L, LUA_GCINC, 105, 250, 0);
 
-  // Open only essential libraries (base, table, string, math, os) to save 12+ KB of heap on embedded devices
-  static const luaL_Reg essentialLibs[] = {{LUA_GNAME, luaopen_base},        {LUA_TABLIBNAME, luaopen_table},
-                                           {LUA_STRLIBNAME, luaopen_string}, {LUA_MATHLIBNAME, luaopen_math},
-                                           {LUA_OSLIBNAME, luaopen_os},      {nullptr, nullptr}};
-  for (const luaL_Reg* lib = essentialLibs; lib->func; lib++) {
-    luaL_requiref(L, lib->name, lib->func, 1);
+  if (runtime::openEssential(L) != LUA_OK) {
+    setError(lua_tostring(L, -1));
     lua_pop(L, 1);
+    return false;
   }
   registerSmudgeApi();
 
@@ -161,8 +159,16 @@ bool LuaRunner::init() {
     if (!deserializeJson(doc, jsonStr)) {
       if (!http::readNetworkDeclaration(doc["network"], http_.domains)) {
         LOG_ERR("LHTTP", "Invalid network declaration");
+        http_.domains = {};
+        setError("Invalid network declaration");
+        return false;
       }
-      http_.allowed = HalLuaHttp::approved(appDir_, http_.domains);
+      if (runtime::openNetwork(L, http_.domains.count != 0) != LUA_OK) {
+        setError(lua_tostring(L, -1));
+        lua_pop(L, 1);
+        return false;
+      }
+      http_.allowed = http_.domains.count && HalLuaHttp::networkEnabled();
       // Network apps use a full-path namespace: same-named offline apps in another search root cannot inject saves.
       if (http_.domains.count) saveDir_ = "/.smudge/network_data" + appDir_;
       if (doc["prevent_sleep"].is<bool>() && doc["prevent_sleep"].as<bool>()) {
@@ -183,11 +189,6 @@ bool LuaRunner::init() {
 
   if (!Storage.ensureDirectoryExists(saveDir_.c_str())) LOG_ERR("LUA", "Cannot create app save directory");
   return true;
-}
-
-bool LuaRunner::allowNetwork() {
-  http_.allowed = HalLuaHttp::approve(appDir_, http_.domains);
-  return http_.allowed;
 }
 
 bool LuaRunner::resolvePath(const char* path, std::string& result) const {
@@ -1820,11 +1821,11 @@ int LuaRunner::l_getBattery(lua_State* L) {
 int LuaRunner::l_getDevice(lua_State* L) {
 #if defined(SIMULATOR)
   lua_pushstring(L, "simulator");
-#elif defined(CROSSINK_APP_DEVICE_STICKY)
+#elif defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY
   lua_pushstring(L, "sticky");
-#elif defined(CROSSINK_APP_DEVICE_X4PRO)
+#elif defined(FREEINK_DEVICE_X4PRO) && FREEINK_DEVICE_X4PRO
   lua_pushstring(L, "x4pro");
-#elif defined(CROSSINK_APP_DEVICE_X4CLASSIC)
+#elif defined(FREEINK_DEVICE_X4CLASSIC) && FREEINK_DEVICE_X4CLASSIC
   lua_pushstring(L, "x4");
 #else
   lua_pushstring(L, "x3");

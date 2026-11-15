@@ -2,7 +2,9 @@
 
 ### Added
 
-- Lua API v3: asynchronous, permission-controlled HTTPS GET/POST with cancellation and bounded responses. Network apps use the existing Wi-Fi selector; App Settings can revoke network grants and explicitly trust displayed UTC for certificate checks until restart.
+- Lua API v3: asynchronous, domain-bounded HTTPS GET/POST with cancellation and bounded responses. Valid network apps are enabled by default; App Settings offers a persisted global opt-out and still requires explicit trust of displayed UTC for certificate checks until restart. No launch/domain/request consent is required.
+- Register native UTF-8 for valid network manifests (also for cached reading under opt-out), with protected library-allocation failures; offline library loading is unchanged.
+- Report actual value-checked FREEINK board identities to Lua, preserving simulator precedence and legacy board dispatch.
 
 ### Security
 

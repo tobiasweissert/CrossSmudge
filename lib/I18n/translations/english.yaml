@@ -847,6 +847,7 @@ STR_CUSTOM_BOOTSCREEN: "Custom Boot Screen"
 STR_TAP_HIDE_STATUS_BAR: "Tap to Hide Status Bar"
 
 STR_LUA_NETWORK_ALLOW: "Allow HTTPS access to this domain?"
-STR_LUA_NETWORK_REVOKE: "Revoke all app network permissions"
+STR_LUA_NETWORK_DISABLE: "App networking enabled — disable"
+STR_LUA_NETWORK_ENABLE: "App networking disabled — enable"
 STR_LUA_TRUST_TIME: "Trust this UTC time for HTTPS until restart? Confirm only if correct."
 STR_LUA_NETWORK_ALLOW_BUTTON: "Allow"
