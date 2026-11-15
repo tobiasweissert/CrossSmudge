@@ -355,6 +355,31 @@ void LuaRunner::onTap(int x, int y) {
   lua_gc(L, LUA_GCSTEP, 50);
 }
 
+bool LuaRunner::hasLongPressHandler() {
+  if (!L || hasError_) return false;
+  lua_getglobal(L, "on_long_press");
+  const bool present = lua_isfunction(L, -1);
+  lua_pop(L, 1);
+  return present;
+}
+
+void LuaRunner::onLongPress(int x, int y) {
+  if (!L || hasError_) return;
+  s_activeRunner = this;
+  lua_getglobal(L, "on_long_press");
+  if (lua_isfunction(L, -1)) {
+    lua_pushinteger(L, x);
+    lua_pushinteger(L, y);
+    if (lua_pcall(L, 2, 0, 0) != LUA_OK) {
+      setError(lua_tostring(L, -1));
+      lua_pop(L, 1);
+    }
+  } else {
+    lua_pop(L, 1);
+  }
+  lua_gc(L, LUA_GCSTEP, 50);
+}
+
 void LuaRunner::onSwipe(const char* dir) {
   if (!L || hasError_) return;
   s_activeRunner = this;

@@ -35,6 +35,8 @@ class LuaRunner {
   void onButton(const char* buttonName, bool isPressed);
   void onTouch(int x, int y, const char* eventType);
   void onTap(int x, int y);
+  bool hasLongPressHandler();
+  void onLongPress(int x, int y);
   void onSwipe(const char* dir);
   void onExit();
 

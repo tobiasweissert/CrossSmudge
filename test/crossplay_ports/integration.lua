@@ -16,7 +16,7 @@ on_exit()
 assert(smudge.read_file('state-a.dat',4097))
 -- Reload in same process, just as another lifecycle; callbacks replaced.
 for i=1,10 do
- on_init=nil;on_draw=nil;on_update=nil;on_exit=nil;on_touch=nil;on_button=nil;on_swipe=nil
+ on_init=nil;on_draw=nil;on_update=nil;on_exit=nil;on_touch=nil;on_button=nil;on_swipe=nil;on_long_press=nil
  collectgarbage('collect')
  dofile('main.lua');on_init();on_button('confirm',true);on_draw()
  on_button('back',true);on_exit();collectgarbage('collect')

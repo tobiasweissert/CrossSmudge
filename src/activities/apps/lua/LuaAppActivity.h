@@ -1,5 +1,7 @@
 #pragma once
 
+#include "LuaTouchDispatch.h"
+
 #include <memory>
 #include <mutex>
 #include <string>
@@ -116,12 +118,9 @@ class LuaAppActivity : public Activity {
       buttonHandled = true;
     }
 
-    int tx = 0, ty = 0;
-    if (mappedInput.wasScreenTapped(tx, ty)) {
+    {
       std::lock_guard<std::mutex> lock(luaMutex_);
-      runner_->onTap(tx, ty);
-      runner_->onTouch(tx, ty, "tap");
-      buttonHandled = true;
+      buttonHandled = dispatchLuaTouch(mappedInput, *runner_) || buttonHandled;
     }
 
     auto swipe = mappedInput.wasSwipe();

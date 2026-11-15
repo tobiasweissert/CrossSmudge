@@ -159,15 +159,18 @@ function on_button(btn, pressed)
 end
 ```
 
-### `on_touch(event, x, y)` *(Touch-Enabled Devices)*
-Called on touch events on supported hardware (e.g. Seeed reTerminal Sticky, Xteink X4 Pro). `event` is `"down"`, `"move"`, or `"up"`:
-```lua
-function on_touch(event, x, y)
-    if event == "up" then
-        -- Check if touch landed inside a button rectangle
-    end
-end
-```
+### `on_touch(x, y, event)` *(Touch-Enabled Devices)*
+The current host calls this on a released tap with `event == "tap"`, using
+logical screen coordinates. It also calls `on_tap(x, y)` when present.
+
+### `on_long_press(x, y)` *(Optional, updated host required)*
+Defining this function opts the app into the existing mapped long-press gesture.
+It fires once per stationary contact after 500 ms. The contact is consumed, so
+release does not also call the tap callbacks. A long contact cancelled by motion
+is not treated as a short tap. Apps without this function retain their previous
+tap/swipe behavior. Do not infer holds from `on_touch(..., "hold")`: the host does
+not emit that event. Older hosts ignore this callback; provide a visible fallback.
+Callbacks run under the same Lua mutex, protected call and GC handling as taps.
 
 ### `on_update()` *(Optional Real-Time Loop)*
 For games or animations requiring real-time gravity or ticking (e.g. *Block Drop* piece falling):

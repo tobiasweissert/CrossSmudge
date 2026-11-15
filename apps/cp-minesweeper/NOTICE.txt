@@ -1,10 +1,17 @@
-CrossPlay -> stock CrossSmudge Lua port
+Minesweeper 0.1.4 — CrossPlay graphics and rules port
 
-Rules and behavior derived from CrossPlay by Mario Ruiz and contributors.
-Original author notices and MIT license are in LICENSE-CrossPlay.txt.
-CrossSmudge project license is in LICENSE-CrossSmudge.txt.
-Lua port and package integration are local task work, not an upstream release.
-No original artwork, private puzzle banks, native engine binaries, network
-credentials, or decNumber implementation are included. Calculator arithmetic
-is a new bounded decimal-string implementation, tested against the original
-calculator/decNumber through a separate host-only test oracle.
+Rules, mine drawing and layout derived from CrossPlay by Mario Ruiz and
+contributors (LICENSE-CrossPlay.txt). CrossSmudge license is retained in
+LICENSE-CrossSmudge.txt.
+
+Jersey 25 glyph pixels come from CrossPlay's generated toybox_20 and toybox_30
+1-bit EpdFont cuts, repacked without resampling into row-padded Lua bitmaps.
+The typeface is licensed under SIL OFL 1.1; see OFL-Jersey25.txt.
+
+The flag comes from CrossPlay's icon_mineflag_32 (Lucide flag), resized with
+nearest-neighbor sampling to the original control/cell sizes. Full Lucide
+and inherited Feather notices are in LICENSE-Lucide.txt.
+
+art/sources.json pins source-file SHA256 hashes. Reproduction tool:
+test/minesweeper_graphics/assets.py in the firmware repository.
+No private owner photograph, save payload, or native engine binary is included.

@@ -1,20 +1,42 @@
-# Minesweeper: stock v1.6.5.3 local port
+# Minesweeper 0.1.4
 
-Status: installable local implementation, **not a claim of full CrossPlay feature parity**.
+The portrait board follows the supplied CrossPlay 480×800 screenshot: 76px black
+header, board starting at y=84, 8×10 continuous 60px cells, 25% dither, original
+Jersey 25 glyph pixels, Lucide flags, source mine bars, and counter/mode control.
+The current CrossPlay C++ source places its board lower (y=98); this port follows
+the owner's screenshot for that geometry. Landscape reduces cell size to keep
+all controls visible. Host PNG captures are logical raster captures of production
+Lua with the same bitmap/glyph data and drawing semantics, not hardware screenshots.
+The reference PNG contains intermediate gray pixels; the firmware output is 1-bit.
 
-Target firmware source: `bae8322b7933fc46007682d2b2d13db7c157f729`.
-Original rules: `CrossPlay/src/apps_local/minesweeper/MinesweeperCore.h`. Original code is MIT; notices are included.
+Controls: tap a cell to dig; tap DIG/FLAG to change the tap mode. With the new
+host firmware, hold a covered cell to toggle its flag once, independent of mode;
+lifting after a hold does not dig. Old hosts retain the mode-button fallback.
+Tap the header or press Back for the menu. Arrow/page buttons move the cursor;
+Confirm acts. The menu provides Resume, mode toggle, confirmed New Game, Help,
+and Save and Exit. Settled boards retain mines and a CLEARED/BOOM control.
 
-Supported: 8 x 10 board, 10 mines; first dig and neighbors safe; flood opening, flags, chording, win/loss and resume.
+The 8×10 rules, first-dig safety, flood opening, chording, win/loss and journal
+schema are unchanged. Statistics/result pages from CrossPlay are not ported;
+the existing local menu and save workflow are retained. No Nearby feature.
 
-Gaps and changes: Stock emits taps, not held-touch events. Use the visible Dig/Flag control or menu toggle instead of hold-to-flag. Original statistics and artwork/layout are not ported.
+Compact font strings are loaded once at initialization; glyph slices are small
+transient strings. No framebuffer is allocated by the app. The native tests use
+the shipped int32/float32 Lua VM with 75 KiB and 2 MiB allocation caps. These
+caps exclude native renderer, HAL and system allocations. The assertion-heavy
+graphics contract and synthetic-board capture fixture require the larger test budget; actual app render,
+basic real-input hold and repeated lifecycle cases are tested at 75 KiB. The
+full instrumented input matrix uses 2 MiB.
 
-Controls: Arrow keys move the cursor; Confirm acts. Touch a cell to act. Menu opens Resume/New/Help/Save and exit. New games require explicit confirmation, with Cancel selected by default. A labeled Menu touch target is near the top right in both orientations. Physical Back also opens the menu. Page buttons are mapped to Up/Down where the firmware sends those names.
+Install only this package's listed files into cp-minesweeper. Keep existing
+state-a.dat, state-b.dat and unknown files; the ZIP contains no saves. Back/menu
+and exit save through the existing checked two-slot journal. Save failure stays
+visible and allows retry. No EPUB cache reset is needed.
 
-Persistence: fixed app-relative two-slot text journals with sequence number, bounded read, checksum, semantic validation and write/readback check. Saves occur on menu/exit paths, including stock activity exit before deep sleep. No claim of surviving power removal before a save. A failed save is shown; menu exit stays available for retry. Corrupted newest saves fall back to the older valid slot. Original apps, books and imports are never written. Journal files are not part of the package.
-
-Validation: vendored **stock Lua 5.4 with int32/float32**, all 71 stock API keys represented, real compilation and logic under a hard 76,800-byte Lua allocation cap, plus 2 MiB runs; native adapter input/draw-call/file tests in 480x800 and 800x480; repeated VM launch/close checks. Drawing is instrumented, **not the production renderer**. Neither a physical Sticky test nor a simulator/HAL run was possible here: PlatformIO is absent and the pinned SDK submodule is uninitialized. Lua allocation peaks exclude native renderer/HAL/system memory.
-
-Install: extract the per-app ZIP into SD `/.crosssmudge/applications/`, producing `cp-minesweeper/manifest.json` and `main.lua`, or upload that individual ZIP in stock Web Transfer /applications. If that app ID already exists, stop and back it up; do not overwrite its journals. Do not upload the combined collection ZIP to the one-app web uploader.
-
-Hardware check: on the Sticky running the delivered v1.6.5.3 firmware, launch CP Minesweeper; test both touch and buttons, Menu/Cancel/New as applicable, rotate using firmware settings and relaunch, save/exit/reopen, then sleep/wake and reopen. Expect the same saved state, no Application Error, and no changes to other app saves. No EPUB cache reset is required. Physical e-ink redraw latency, long AI turns and heap/PSRAM availability still need observation.
+Hardware acceptance remains pending: install the matching new Sticky owner-test
+firmware and app package, verify a stationary hold flags exactly once and release
+does not open a cell; repeat to unflag, then short-tap to dig. Test motion, edge
+Back/Home, disabled touch, release outside, portrait/landscape, save/reopen and
+sleep/wake. Check physical e-ink legibility, refresh latency and free internal
+heap/PSRAM. Verify Solitaire still responds to its usual taps. A successful build
+and native input tests are not physical-device acceptance.

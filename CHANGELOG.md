@@ -2,6 +2,8 @@
 
 ### Fixed
 
+- Minesweeper 0.1.4 now uses CrossPlay graphics, fonts and dither; an opt-in Lua long-press callback flags once without digging on release, while other apps keep their existing touch behavior.
+
 - Fixed Hacker News startup and JSON/text decoding by loading native UTF-8 for valid network apps, including offline cache use.
 
 - Corrected Lua device identification so Sticky apps select their touch controls; X4 Pro and X3 also report their proper identities.
