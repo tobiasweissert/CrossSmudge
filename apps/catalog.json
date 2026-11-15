@@ -358,7 +358,7 @@
     {
       "id": "cp-battleship",
       "name": "Battleship",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "Place a five-ship fleet and play a local hunt-and-target computer opponent.",
       "files": [
@@ -377,7 +377,7 @@
     {
       "id": "cp-calculator",
       "name": "Calculator",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "Decimal calculator with contextual percent and repeated equals.",
       "files": [
@@ -396,7 +396,7 @@
     {
       "id": "cp-checkers",
       "name": "Checkers",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "English draughts, mandatory full captures and two-ply opponent. Local only.",
       "files": [
@@ -414,7 +414,7 @@
     {
       "id": "cp-connectfour",
       "name": "Connect Four",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "Local Connect Four with seven-ply search and shared-device play; no Nearby.",
       "files": [
@@ -433,7 +433,7 @@
     {
       "id": "cp-forehead",
       "name": "Forehead",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "Timed spoken-clue party game. 2474 entries in 17 categories.",
       "files": [
@@ -530,7 +530,7 @@
     {
       "id": "cp-hearts",
       "name": "Hearts",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "Four-seat Hearts with passing, moon scoring, saved matches and heuristic opponents.",
       "files": [
@@ -548,7 +548,7 @@
     {
       "id": "cp-hex",
       "name": "Hex",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "11x11 connection game. Local two-player and shortest-path computer opponent.",
       "files": [
@@ -566,7 +566,7 @@
     {
       "id": "cp-insider",
       "name": "Insider",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "Local hidden-role party game for 4-8 players. Complete 560-word deck.",
       "files": [
@@ -602,7 +602,7 @@
     {
       "id": "cp-knucklebones",
       "name": "Knucklebones",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "Local dice-column game with original one-ply strategy; no Nearby.",
       "files": [
@@ -621,7 +621,7 @@
     {
       "id": "cp-minesweeper",
       "name": "Minesweeper",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "Local 8x10 Minesweeper with safe first reveal, flags and saved game.",
       "files": [
@@ -640,7 +640,7 @@
     {
       "id": "cp-notes",
       "name": "Notes",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "Bounded app-local notes and checklists with manual imports; no phone or sleep-screen integration.",
       "files": [
@@ -659,7 +659,7 @@
     {
       "id": "cp-wavelength",
       "name": "Wavelength",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "Hidden-target party game with original spectrum deck, practice and team end-call scoring.",
       "files": [
@@ -686,7 +686,7 @@
     {
       "id": "cp-yahtzee",
       "name": "Yahtzee",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "Local Yahtzee with Joker/bonus rules and opponent; no Nearby.",
       "files": [
@@ -704,7 +704,7 @@
     {
       "id": "cp-jaipur",
       "name": "Jaipur",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "Trading, camel herds, token sales and multi-round matches with a heuristic opponent.",
       "files": [
@@ -723,7 +723,7 @@
     {
       "id": "cp-seasalt",
       "name": "Sea Salt",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "58-card local Sea Salt with duo effects, Stop/Last Chance and saved matches.",
       "files": [
@@ -746,7 +746,7 @@
     {
       "id": "cp-toybattle",
       "name": "Toy Battle",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "Nine playable maps, troop/base effects, placement chains and a local heuristic opponent.",
       "files": [
@@ -779,7 +779,7 @@
     {
       "id": "cp-murdle",
       "name": "Murdle",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "64 source-generated logic cases across four tiers, grid notes and accusations.",
       "files": [
@@ -862,7 +862,7 @@
     {
       "id": "cp-go",
       "name": "Go",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": "CrossPlay contributors; Lua port",
       "description": "9/13/19 Go, Chinese area scoring, dead-group agreement and an optional 9x9 heuristic.",
       "files": [
@@ -881,7 +881,7 @@
     {
       "id": "cp-hackernews",
       "name": "Hacker News",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "author": "CrossSmudge contributors",
       "description": "Live Hacker News stories and bounded article reading; APIv3 preview",
       "min_api": 3,
@@ -900,7 +900,7 @@
     {
       "id": "cp-trivia",
       "name": "Trivia",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "author": "CrossSmudge contributors",
       "description": "Live Open Trivia DB questions; APIv3 preview",
       "min_api": 3,
