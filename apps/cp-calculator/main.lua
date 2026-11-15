@@ -11,7 +11,7 @@ local function save()
 end
 function on_init()g=S.load(C.decode) or C.new();geometry();smudge.request_update()end
 function on_draw()
- geometry();smudge.clear();smudge.header('CP Calculator','Decimal - 16 working digits')
+ geometry();smudge.clear();smudge.header('Calculator','Decimal - 16 working digits')
  smudge.rect(w-105,65,85,30,false);smudge.text(w-98,70,'Menu','small')
  smudge.text(left,105,C.display(g),'ui12','bold')
  if g.op~='' then smudge.text(w-65,108,g.op,'small') end
