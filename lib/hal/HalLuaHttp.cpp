@@ -1,15 +1,14 @@
 #include "HalLuaHttp.h"
 #ifndef SIMULATOR
+#include <AppNetworkPolicy.h>
 #include <Arduino.h>
 #include <Logging.h>
-#include <Preferences.h>
 #include <WiFi.h>
 #include <esp_crt_bundle.h>
 #include <esp_heap_caps.h>
 #include <esp_timer.h>
 #include <esp_tls.h>
 #include <lwip/netdb.h>
-#include <mbedtls/sha256.h>
 #include <mbedtls/ssl.h>
 #include <mbedtls/x509_crt.h>
 #include <ctime>
@@ -21,22 +20,12 @@ std::atomic<TaskHandle_t> budgetTask{nullptr};
 ink::http::AllocationBudget* activeBudget=nullptr;
 portMUX_TYPE timeMux=portMUX_INITIALIZER_UNLOCKED;
 int64_t trustedEpoch=0, trustedMono=0;
-// Copy one synchronized anchor; SNTP cannot move the trusted clock after consent.
+// Copy one synchronized anchor; SNTP cannot move the trusted clock after confirmation.
 int64_t trustedNow() {
   portENTER_CRITICAL(&timeMux);
   auto epoch=trustedEpoch;auto mono=trustedMono;
   portEXIT_CRITICAL(&timeMux);
   return epoch ? epoch+(esp_timer_get_time()-mono)/1000000 : 0;
-}
-void digest(const std::string& app, const ink::http::Domains& domains, unsigned char out[32]) {
-  mbedtls_sha256_context c;mbedtls_sha256_init(&c);mbedtls_sha256_starts(&c,0);
-  mbedtls_sha256_update(&c,reinterpret_cast<const unsigned char*>(app.c_str()),app.size()+1);
-  for(size_t i=0;i<domains.count;++i)mbedtls_sha256_update(&c,reinterpret_cast<const unsigned char*>(domains.names[i]),strlen(domains.names[i])+1);
-  mbedtls_sha256_finish(&c,out);mbedtls_sha256_free(&c);
-}
-void keyFor(const std::string& app,char key[16]) {
-  unsigned char hash[32];ink::http::Domains empty;digest(app,empty,hash);
-  for(int i=0;i<7;++i)snprintf(key+i*2,3,"%02x",hash[i]);
 }
 int compare(const mbedtls_x509_time& a,const tm& b) {
   const int x[]={a.year,a.mon,a.day,a.hour,a.min,a.sec};
@@ -149,21 +138,17 @@ extern "C" void __wrap_esp_mbedtls_mem_free(void* p) {
 }
 
 namespace HalLuaHttp {
-bool approved(const std::string& app,const ink::http::Domains& domains) {
-  if(!domains.count)return false;
-  Preferences prefs;if(!prefs.begin("lua_https",true))return false;
-  unsigned char expected[32],saved[32];char key[16]{};keyFor(app,key);digest(app,domains,expected);
-  bool yes=prefs.getBytesLength(key)==sizeof(saved) && prefs.getBytes(key,saved,sizeof(saved))==sizeof(saved) && !memcmp(expected,saved,32);
-  prefs.end();return yes;
+bool networkEnabled() {
+  bool readOk;
+  const bool enabled = ink::http::networkEnabled(readOk);
+  if (!readOk) LOG_ERR("LHTTP", "Cannot read app network setting; networking disabled");
+  return enabled;
 }
-bool approve(const std::string& app,const ink::http::Domains& domains) {
-  if(!domains.count)return false;
-  Preferences prefs;if(!prefs.begin("lua_https",false)){LOG_ERR("LHTTP","Cannot open grants");return false;}
-  unsigned char expected[32];char key[16]{};keyFor(app,key);digest(app,domains,expected);
-  bool ok=prefs.putBytes(key,expected,sizeof(expected))==sizeof(expected);prefs.end();
-  if(!ok)LOG_ERR("LHTTP","Cannot save grant");return ok;
+bool setNetworkEnabled(bool enabled) {
+  const bool ok = ink::http::setNetworkEnabled(enabled);
+  if (!ok) LOG_ERR("LHTTP", "Cannot save app network setting");
+  return ok;
 }
-bool revokeAll(){Preferences p;if(!p.begin("lua_https",false))return false;bool ok=p.clear();p.end();return ok;}
 TimeProposal proposeTime(){return {time(nullptr),esp_timer_get_time()};}
 bool trustTime(TimeProposal proposal){
   auto elapsed=esp_timer_get_time()-proposal.monotonicUs;

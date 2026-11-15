@@ -13,7 +13,6 @@
 #include "Memory.h"
 #include <HalLuaHttp.h>
 #include "activities/network/WifiSelectionActivity.h"
-#include "activities/apps/lua/LuaConsentActivity.h"
 
 class LuaAppActivity : public Activity {
  public:
@@ -44,26 +43,12 @@ class LuaAppActivity : public Activity {
       return;
     }
 
-    permissionPending_ = runner_->needsNetworkPermission();
-    if (!permissionPending_) prepareNetwork();
+    prepareNetwork();
   }
 
   bool preventAutoSleep() override { return runner_ && runner_->preventAutoSleep(); }
 
   void loop() override {
-    if (permissionPending_) {
-      permissionPending_ = false;
-      auto prompt = makeUniqueNoThrow<LuaConsentActivity>(renderer, mappedInput,
-          runner_->networkDomains().names[permissionDomain_]);
-      if (!prompt) { LOG_ERR("LHTTP", "Permission dialog allocation failed"); finish(); return; }
-      startActivityForResult(std::move(prompt), [this](const ActivityResult& result) {
-        if (result.isCancelled) { finish(); return; }
-        if (++permissionDomain_ < runner_->networkDomains().count) { permissionPending_=true; return; }
-        if (!runner_->allowNetwork()) { finish(); return; }
-        prepareNetwork();
-      });
-      return;
-    }
     if (wifiPending_) {
       wifiPending_=false;
       auto selector=makeUniqueNoThrow<WifiSelectionActivity>(renderer,mappedInput);
@@ -207,11 +192,9 @@ class LuaAppActivity : public Activity {
   bool wifiPending_ = false;
   bool ownsWifi_ = false;
   void prepareNetwork() {
-    if (runner_->networkDomains().count && !HalLuaHttp::wifiConnected()) wifiPending_=true;
+    if (runner_->networkEnabled() && !HalLuaHttp::wifiConnected()) wifiPending_=true;
     else startScript();
   }
-  size_t permissionDomain_ = 0;
-  bool permissionPending_ = false;
   bool scriptStarted_ = false;
   void startScript() {
     scriptStarted_ = true;

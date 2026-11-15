@@ -2,6 +2,8 @@
 
 ### Fixed
 
+- Fixed Hacker News startup and JSON/text decoding by loading native UTF-8 for valid network apps, including offline cache use.
+
 - Corrected Lua device identification so Sticky apps select their touch controls; X4 Pro and X3 also report their proper identities.
 
 - App Store now fetches missing icons for the visible catalog page and caches validated icons for reuse without reinstalling apps.
@@ -19,7 +21,7 @@
 - Added local Jaipur, Sea Salt, Toy Battle, Murdle and Go Lua adaptations with saved play, explicit opponent/content differences and stock-Lua memory-cap tests. The local collection now has 18 adaptations plus four unchanged equivalents; eleven titles remain blocked. Catalog publication awaits parent push and upstream review.
 - Added local Insider, Forehead, Checkers, Wavelength, Hearts, Hex and Battleship Lua adaptations with checked saves and capped runtime tests. Hearts, Hex and Battleship document their smaller opponent strategies. Prepared catalog entries for the 13 working local adaptations; official store availability awaits upstream maintainer merge. The full 33-title collection remains incomplete.
 - Added six local CrossPlay Lua ports for stock v1.6.5.3: Minesweeper, Connect Four, Knucklebones, Yahtzee, decimal Calculator, and app-local Notes. Packages use separate `cp-*` IDs and checked two-slot saves. Per-package parity notes distinguish supported local features from missing Nearby, phone-transfer, sleep-screen, and original presentation features. These are not a complete 33-title collection or an App Store release.
-- Lua API v3: asynchronous, permission-controlled HTTPS GET/POST with cancellation and bounded responses. Network apps use the existing Wi-Fi selector; App Settings can revoke network grants and explicitly trust displayed UTC for certificate checks until restart.
+- Lua API v3: asynchronous, manifest-scoped HTTPS GET/POST with cancellation and bounded responses. Network apps use the existing Wi-Fi selector; App Settings can disable app networking and explicitly trust displayed UTC for certificate checks until restart.
 - Added an explicit Sticky owner-test profile using a matching fork catalog and package origin; standard builds retain the upstream store.
 
 ### Security
@@ -27,6 +29,8 @@
 - Confine Lua file access to each app and its saved data, and disable host file/process escape functions. This prevents an offline app from replacing an approved network app or reading unrelated saved credentials. Absolute paths outside these directories are no longer supported.
 
 ### Changed
+
+- App networking is enabled by default within declared HTTPS domains, without permission prompts. App Settings provides an explicit disable/enable control; certificate checks and verified UTC remain required.
 
 - Add local APIv3 previews for live Hacker News feed/story/article reading and Open Trivia DB questions, with checked offline data caches and button/touch controls. These are not App Store releases; public-network/device verification and C3 memory qualification remain pending.
 
