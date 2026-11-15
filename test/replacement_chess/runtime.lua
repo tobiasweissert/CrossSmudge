@@ -3,7 +3,8 @@ smudge.get_device=function() return "sticky" end
 local files={}
 local base='/.smudge/saved_data/chess/'
 local old=string.rep('A',76);files[base..'game.dat']=old
-smudge.read_file=function(p,n,offset) assert(n and n<=11065 and offset==0,'unbounded read');local s=files[p];return s and s:sub(1,n) end
+local assetRead=smudge.read_file
+smudge.read_file=function(p,n,offset) if p:match('^art/')then return assetRead(p,n,offset)end;assert(n and n<=11065 and offset==0,'unbounded read');local s=files[p];return s and s:sub(1,n) end
 smudge.write_file=function(p,s,append) assert(p~=base..'game.dat','old save overwritten');assert(append==false and #s<=11064);files[p]=s;return true end
 local app=dofile('main.lua');on_init();on_draw()
 local g=app.state();local C=app.core

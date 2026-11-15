@@ -1,5 +1,6 @@
 local C=dofile('cp_core.lua')
 local J=dofile('cp_journal.lua')
+local V=smudge.get_memory().lua_max_kb>=512 and dofile('presentation.lua')or nil
 local G={position=C.start(),history={},cursor=12,mode=1,level=2,notice='',menu=false,menuIndex=1,closed=false}
 local journal,dirty
 local L={}
@@ -46,6 +47,7 @@ local function choose(s)
  local q=G.position.squares[s];G.selected=q~=0 and (q&8==0)==G.position.whiteToMove and s or nil;refresh()
 end
 local function geometry()
+ if V then L=V.geometry();return L end
  local w,h=smudge.get_bounds();local m=smudge.get_metrics();local y=m.top_padding+m.header_height+8
  local size=math.min((w-24)//8,(h-y-m.button_hints_height-82)//8)
  L={w=w,h=h,x=(w-size*8)//2,y=y,size=size,footer=h-m.button_hints_height,buttons={}}
@@ -61,6 +63,8 @@ local function menuAction()
  elseif i==5 then
   if #G.history>0 then G.position=C.parseFen(table.remove(G.history));if G.mode~=3 and aiTurn() and #G.history>0 then G.position=C.parseFen(table.remove(G.history)) end;G.last=nil;dirty=true;status() end
   G.menu=false;queue()
+ elseif i==8 then if G.mode~=3 then G.mode=G.mode==1 and 2 or 1;dirty=true end
+ elseif i==9 then if V then V.showHints=not V.showHints end
  elseif i==6 then if not G.over then G.job=C.newSearch(G.position,2,3000);G.hint=true;G.menu=false;G.notice='Finding hint...' end
  else save();G.closed=true;smudge.exit() end
  refresh()
@@ -69,10 +73,10 @@ function on_init()
  journal,G.saved=J.open('chess',11000,function(s) return decode(s)~=nil end)
  if G.saved then local a=decode(G.saved);G.position=a.position;G.history=a.history;G.mode=a.mode;G.level=a.level;G.saved=nil end
  local old,msg=journal:preserve('game',76);if old and journal.sequence==0 then G.notice=msg end
- status();geometry();queue()
+ if V then V.init()end;status();geometry();queue()
 end
 function on_draw()
- local l=geometry();smudge.clear();smudge.header('Chess',modes[G.mode]..' / '..({'Easy','Medium','Hard'})[G.level])
+ local l=geometry();if V then V.draw(G,C,l,screenSquare);return end;smudge.clear();smudge.header('Chess',modes[G.mode]..' / '..({'Easy','Medium','Hard'})[G.level])
  for r=0,7 do for c=0,7 do local s=screenSquare(r,c);local x,y=l.x+c*l.size,l.y+r*l.size;local q=G.position.squares[s]
   smudge.rect(x,y,l.size,l.size,true,false)
   if (r+c)%2==1 then smudge.rect_dither(x,y,l.size,l.size,false) end
@@ -112,13 +116,16 @@ function on_button(b,pressed)
  if G.menu or G.promotion then local n=G.promotion and 4 or 7;local idx=G.promotion and G.promoIndex or G.menuIndex
   if b=='back' then G.promotion=nil;G.menu=false;queue()
   elseif b=='confirm' then if G.promotion then play(G.promotion[idx]) else menuAction() end
-  elseif b=='left' or b=='up' or b=='page_back' then idx=(idx-2)%n+1
-  elseif b=='right' or b=='down' or b=='page_forward' then idx=idx%n+1 end
+  elseif b=='left' or b=='up' or b=='page_back' or b=='right' or b=='down' or b=='page_forward' then
+   local delta=(b=='left'or b=='up'or b=='page_back')and -1 or 1
+   if V and not G.promotion then local order={1};for _,v in ipairs(V.order or{2,5,3,4,8,9,6,7})do order[#order+1]=v end;local at=1;for i,v in ipairs(order)do if v==idx then at=i end end;idx=order[(at-1+delta)%#order+1]
+   else idx=(idx-1+delta)%n+1 end
+  end
   if G.promotion then G.promoIndex=idx else G.menuIndex=idx end;refresh();return
  end
  if b=='back' then G.job=nil;G.hint=nil;G.menu=true;G.menuIndex=1;G.selected=nil
  elseif b=='confirm' then choose(G.cursor)
- else local sign=G.mode==2 and -1 or 1
+ else G.buttonCursor=true;local sign=G.mode==2 and -1 or 1
   if b=='up' or b=='page_back' then G.cursor=(G.cursor-sign)%64 elseif b=='down' or b=='page_forward' then G.cursor=(G.cursor+sign)%64
   elseif b=='left' then G.cursor=(G.cursor+8*sign)%64 elseif b=='right' then G.cursor=(G.cursor-8*sign)%64 end
  end
@@ -126,7 +133,13 @@ function on_button(b,pressed)
 end
 function on_touch(x,y,event)
  if event~='tap' or G.closed then return end
- if G.menu or G.promotion then for i,b in ipairs(L.buttons) do if x>=b.x and x<b.x+b.w and y>=b.y and y<b.y+b.h then if G.promotion then play(G.promotion[i]) else G.menuIndex=i;menuAction() end;return end end;return end
+ if G.menu or G.promotion then for i,b in pairs(L.buttons) do if x>=b.x and x<b.x+b.w and y>=b.y and y<b.y+b.h then if G.promotion then play(G.promotion[i]) else G.menuIndex=i;menuAction() end;return end end;return end
+ if V then
+  G.buttonCursor=false
+  if L.gear and x>=L.gear.x and y<76 then on_button('back',true);return end
+  if G.over and x>=16 and x<L.w-16 and y>=L.footer and y<L.footer+52 then G.menu=true;G.menuIndex=2;refresh();return end
+  if y>=L.footer then return end
+ end
  if y>=L.footer then on_button(({'back','confirm','left','right'})[math.min(4,x*4//L.w+1)],true);return end
  local c,r=(x-L.x)//L.size,(y-L.y)//L.size;if c>=0 and c<8 and r>=0 and r<8 then G.cursor=screenSquare(r,c);choose(G.cursor) end
 end

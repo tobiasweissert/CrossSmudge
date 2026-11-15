@@ -33,9 +33,10 @@ static int randomfn(lua_State*L){lua_Integer a=luaL_checkinteger(L,1),b=luaL_che
 static int textwidth(lua_State*L){lua_pushinteger(L,strlen(luaL_checkstring(L,1))*10);return 1;}
 static int unsupported(lua_State*L){return luaL_error(L,"unmodeled stock API called by test");}
 static int yes(lua_State*L){lua_pushboolean(L,1);return 1;}
+static int memoryinfo(lua_State*L){void*ud;lua_getallocf(L,&ud);Budget*b=ud;lua_newtable(L);lua_pushinteger(L,b->limit/1024);lua_setfield(L,-2,"lua_max_kb");lua_pushinteger(L,b->used/1024);lua_setfield(L,-2,"lua_kb");return 1;}
 static const luaL_Reg api[]={
- {"get_bounds",bounds},{"get_metrics",metrics},{"read_file",readfile},{"write_file",writefile},{"dofile",dofile_app},
- {"clear",draw},{"text",draw},{"centered_text",draw},{"rect",draw},{"circle",draw},{"line",draw},{"header",draw},{"button_hints",draw},
+ {"get_memory",memoryinfo},{"memory",memoryinfo},{"get_bounds",bounds},{"get_metrics",metrics},{"read_file",readfile},{"write_file",writefile},{"dofile",dofile_app},
+ {"clear",draw},{"text",draw},{"centered_text",draw},{"rect",draw},{"rounded_rect",draw},{"rect_dither",draw},{"bitmap",draw},{"circle",draw},{"line",draw},{"header",draw},{"button_hints",draw},
  {"prevent_sleep",nothing},{"request_update",nothing},{"exit",nothing},{"full_refresh",nothing},{"log",nothing},{"millis",millis},{"time",millis},{"random",randomfn},{"text_width",textwidth},{"has_touch",yes},{NULL,NULL}};
 int main(int argc,char**argv){if(argc<2)return 2;Budget b={0,0,76800};if(argc>2)b.limit=strtoul(argv[2],0,10);if(argc>4){width=atoi(argv[3]);height=atoi(argv[4]);}
  lua_State*L=lua_newstate(alloc,&b);if(!L)return 3;lua_gc(L,LUA_GCINC,105,250,0);

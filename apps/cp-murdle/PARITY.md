@@ -4,7 +4,7 @@
 
 ## Differences
 
-Finite host-generated case set replaces unlimited on-device generation; selecting next case cycles its 16-case tier. No daily system, original art or record charts. No unrelated commercial puzzle bank was copied. An opponent is not applicable.
+Finite host-generated case set replaces unlimited on-device generation; selecting next case cycles its 16-case tier. No daily system or lifetime record charts. Original font/icon masks and casebook screens are included on the enhanced path below. No unrelated commercial puzzle bank was copied. An opponent is not applicable.
 
 ## Controls and saves
 
@@ -15,3 +15,11 @@ Up/down (or page buttons) scroll the action list; Confirm selects; taps select v
 Stock vendored Lua int32/float32, serial native adapter runs at 76,800 and 2,097,152 allocator bytes, both orientations, complete games/cases, journal failures and independent rule review. Source-oracle full-game traces use 2 MiB to include instrumentation; separate smaller full-game regressions run at 75 KiB. This does not measure C/HAL allocations or prove physical-device headroom. See repository docs/crossplay-ports.md and external five-runtime-results.json/five-oracle-results.json for exact evidence.
 
 On Sticky v1.6.5.3, install this new folder without overwriting saves. Test buttons/taps in portrait/landscape, every inspection/setup menu, a full match/case, exit/reopen and sleep/wake. Inspect Application Error/OOM logs, internal/PSRAM free and largest blocks. No EPUB cache reset. No physical hardware or visual-fidelity test is claimed.
+
+## Original casebook presentation on PSRAM hosts
+
+At 512 KiB or more, the frontend ports the original Jersey cuts, 24px category/face icons, black header with two face doors, miniature board front door, triangular all-pairs grid and initial-letter legend. Player bars are 4px, derived bars 2px, and protected matches are filled rounded squares. Clues use numbered tick boxes; the cast/dossier and clues paginate without dropping their tails. Original two-column accusation choices require an explicit selection for each category before the confirmation button is enabled. Verdict, difficulty, cancellable new-case replacement and the original four-beat illustrated tutorial complete the screen flow. The core/data/save modules are unchanged; compact hosts retain the old list controller.
+
+Differences: the existing finite 64-case bank and source rules above are preserved. Clue ticks and the next-case difficulty preference are presentation state for this visit, because the current core save format has no fields for them; only the board, accusation picks, attempts and case persist. The front door shows actual settled squares (including derived marks) and this visit's used-clue count; no lifetime statistics are invented. The dossier uses the already-exported source text and may wrap where the native backend keeps a fixture on one line. Per-cell focus corners appear after physical navigation. Rounded pixel advances can differ from native FreeInkUI kerning. These previews do not establish pixel-identical hardware rendering.
+
+Run `python3 test/murdle_ui/run.py`: all 64 cases exercise all-pairs touch mapping, derived/protected marks, clue/dossier paging, guarded accusations, correct verdicts and cancel/new-case flow, alongside the existing 75 KiB core/adapter tests. `capture.py` creates actual bitmap-command previews for both board sizes. Original mask provenance is in `art/sources.json`; OFL/Lucide notices are included. On Sticky, check all three header faces, touch the empty staircase corner, cycle marks, refuse a conflicting match, read every clue/dossier page, accuse with all four categories, cancel replacement, then save/reopen.

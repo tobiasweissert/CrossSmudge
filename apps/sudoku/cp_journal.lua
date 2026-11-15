@@ -1,8 +1,9 @@
 -- App-private, readback-verified two-slot journal. No executable save data.
 local J={}
 local function checksum(s) local a,b=1,0;for i=1,#s do a=(a+s:byte(i))%65521;b=(b+a)%65521 end;return a..':'..b end
-function J.open(id,limit,validate)
+function J.open(id,limit,validate,tag)
  local base='/.smudge/saved_data/'..id..'/'
+ local prefix='crossplay-'..(tag or '')
  local j={sequence=0,slot=1,base=base,limit=limit}
  local function decode(raw)
   if type(raw)~='string' or #raw>limit+64 then return nil end
@@ -13,13 +14,13 @@ function J.open(id,limit,validate)
   return seq,s
  end
  local chosen
- for slot=1,2 do local raw=smudge.read_file(base..'crossplay-'..slot..'.dat',limit+65,0);local seq,s=decode(raw)
+ for slot=1,2 do local raw=smudge.read_file(base..prefix..slot..'.dat',limit+65,0);local seq,s=decode(raw)
   if seq and seq>j.sequence then j.sequence=seq;j.slot=slot;chosen=s end
  end
  function j:write(s)
   if type(s)~='string' or #s>limit or not validate(s) or self.sequence>=1000000000 then return false end
   local seq=self.sequence+1;local slot=3-self.slot;local raw='CP1 '..seq..' '..#s..' '..checksum(seq..' '..s)..'\n'..s
-  local path=base..'crossplay-'..slot..'.dat'
+  local path=base..prefix..slot..'.dat'
   if not smudge.write_file(path,raw,false) or smudge.read_file(path,#raw+1,0)~=raw then return false end
   self.sequence=seq;self.slot=slot;return true
  end

@@ -61,6 +61,12 @@ local function draw() on_draw() end
 local function advance(ms) now=now+ms; on_update() end
 
 eq("is_running",false); eq("remaining_sec",900); draw()
+if DEVICE=="sticky" then
+ assert(table.concat(trace,"\n"):find("|Start|",1,true),'visible Start label missing')
+ touch(185,750);eq("is_running",true)
+ touch(185,750);eq("is_running",false)
+ touch(295,750);eq("has_started",false);eq("remaining_sec",900)
+end
 if MODE == "ignored" then
     touch(240,200); touch(240,550); eq("is_running",false); eq("in_settings",false)
 else
@@ -72,9 +78,9 @@ else
     touch(240,550); eq("in_settings",false)
     on_button("left",true); eq("has_started",false); eq("remaining_sec",900); draw()
     touch(240,550); eq("in_settings",true); draw()
-    touch(300,270); eq("step_top_sec",300); eq("step_bot_sec",60)
-    touch(300,310); eq("step_top_sec",600); eq("step_bot_sec",60); draw()
-    touch(100,400); eq("step_top_sec",600); eq("step_bot_sec",45); draw()
+    touch(300,DEVICE=="sticky" and 320 or 270); eq("step_top_sec",300); eq("step_bot_sec",60)
+    touch(300,DEVICE=="sticky" and 340 or 310); eq("step_top_sec",600); eq("step_bot_sec",60); draw()
+    touch(100,DEVICE=="sticky" and 430 or 400); eq("step_top_sec",600); eq("step_bot_sec",45); draw()
     touch(240,510); eq("in_settings",false)
     assert(files["hourglass.dat"]=="900;600;45")
     on_exit(); load_app(); eq("total_sec",900); eq("step_top_sec",600); eq("step_bot_sec",45); draw()

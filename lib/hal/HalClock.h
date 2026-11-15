@@ -2,12 +2,14 @@
 
 #include <Arduino.h>
 #include <Rtc.h>
+#include <atomic>
 
 class HalClock;
 extern HalClock halClock;  // Singleton
 
 class HalClock {
   bool _available = false;
+  std::atomic<bool> _systemTimeSynchronized{false};
   mutable Rtc _sdkRtc;
   mutable uint8_t _cachedHour = 0;
   mutable uint8_t _cachedMinute = 0;
@@ -73,6 +75,7 @@ class HalClock {
 
   // Sync the ESP32 system clock without requiring an external RTC.
   bool syncSystemTimeFromNTP();
+  bool hasSynchronizedSystemTime() const { return _systemTimeSynchronized.load(); }
 
  private:
   bool getDate(uint16_t& year, uint8_t& month, uint8_t& day, uint8_t& hour, uint8_t& minute) const;

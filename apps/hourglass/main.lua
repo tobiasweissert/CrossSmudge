@@ -485,11 +485,28 @@ local function draw_hourglass(cx, cy, pct)
     smudge.thick_line(cx + half_w - 10, bot_y - 12, cx + half_w - 18, bot_y - 36, 2)
 end
 
+local function sticky_touch()
+    return smudge.get_device and smudge.get_device() == "sticky"
+end
+
+local function touch_controls()
+    local width, height = smudge.get_bounds()
+    local gap, margin = 8, 24
+    return margin, height - 76, math.floor((width - margin * 2 - gap * 3) / 4), 52, gap
+end
+
+local function settings_geometry()
+    local width, height = smudge.get_bounds()
+    local mw, mh = math.min(430, width - 32), 300
+    return math.floor((width - mw) / 2), math.max(60, math.floor((height - mh) / 2)), mw, mh
+end
+
 local function draw_settings_dialog(cx, w, h)
     local mw = 430
     local mh = 300
     local mx = math.floor((w - mw) / 2)
     local my = 195
+    if sticky_touch() then mx, my, mw, mh = settings_geometry() end
 
     -- Background shadow and modal frame
     smudge.rounded_rect(mx - 2, my - 2, mw + 4, mh + 4, 12, true, true)
@@ -542,7 +559,12 @@ local function draw_settings_dialog(cx, w, h)
 
     -- Instructions
     smudge.text(cx, my + 224, "[Select] Switch Row   •   [-] / [+] Change", 10, false, "center", true)
-    smudge.text(cx, my + 252, "Press [Done] to save & return", 10, true, "center", true)
+    if sticky_touch() then
+        smudge.rounded_rect(mx + 20, my + 244, mw - 40, 40, 8, false, true)
+        smudge.text(cx, my + 254, "Done", "ui12", true, "center", true)
+    else
+        smudge.text(cx, my + 252, "Press [Done] to save & return", 10, true, "center", true)
+    end
 
     -- Button hints for modal
     smudge.button_hints("Done", "Select", "-", "+")
@@ -631,6 +653,16 @@ function on_draw()
     else
         local b2_label = is_running and "Pause" or "Start"
         smudge.button_hints("Exit", b2_label, "Reset", "")
+    end
+
+    if sticky_touch() then
+        local x, y, bw, bh, gap = touch_controls()
+        local labels = {"Exit", is_running and "Pause" or "Start", has_started and "Reset" or "-", has_started and "Set" or "+"}
+        for i, label in ipairs(labels) do
+            local bx = x + (i - 1) * (bw + gap)
+            smudge.rounded_rect(bx, y, bw, bh, 8, i == 2, true)
+            smudge.text(bx + bw // 2, y + 15, label, "ui12", true, "center", i ~= 2)
+        end
     end
 
     -- 7. Settings Modal Overlay
@@ -723,8 +755,11 @@ function on_touch(action, tx, ty)
         local mx = math.floor((w - mw) / 2)
         local my = 230
 
-        -- Done button area or tap outside dialog
-        if ty >= my + 260 and ty <= my + 310 then
+        if sticky_touch() then mx, my, mw, mh = settings_geometry() end
+
+        -- Match the actual settings rows and visible Done button.
+        local done_y = my + (sticky_touch() and 244 or 260)
+        if tx >= mx and tx < mx + mw and ty >= done_y and ty <= done_y + (sticky_touch() and 40 or 50) then
             in_settings = false
             save_data()
             show_banner("Settings Saved", 1200)
@@ -733,7 +768,7 @@ function on_touch(action, tx, ty)
         end
 
         -- Row 1 tap (Top/Bottom buttons step)
-        if ty >= my + 60 and ty <= my + 120 then
+        if ty >= my + (sticky_touch() and 80 or 60) and ty <= my + (sticky_touch() and 116 or 120) then
             setting_row = 1
             if tx < cx then
                 adjust_step(1, -1)
@@ -744,7 +779,7 @@ function on_touch(action, tx, ty)
         end
 
         -- Row 2 tap (Bottom -/+ buttons step)
-        if ty >= my + 145 and ty <= my + 215 then
+        if ty >= my + (sticky_touch() and 164 or 145) and ty <= my + (sticky_touch() and 200 or 215) then
             setting_row = 2
             if tx < cx then
                 adjust_step(2, -1)
@@ -754,6 +789,22 @@ function on_touch(action, tx, ty)
             return
         end
         return
+    end
+
+    if sticky_touch() then
+        local x, y, bw, bh, gap = touch_controls()
+        if ty >= y and ty < y + bh and tx >= x then
+            local i = math.floor((tx - x) / (bw + gap)) + 1
+            if i >= 1 and i <= 4 and (tx - x) % (bw + gap) < bw then
+                if i == 4 and has_started then
+                    in_settings = true
+                    if smudge.request_update then smudge.request_update() end
+                else
+                    on_button(({"back", "confirm", "left", "right"})[i], true)
+                end
+                return
+            end
+        end
     end
 
     -- Tap Hourglass or Big Time: Start/Pause

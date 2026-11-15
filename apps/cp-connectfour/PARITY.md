@@ -18,3 +18,15 @@ Validation: vendored **stock Lua 5.4 with int32/float32**, all 71 stock API keys
 Install: extract the per-app ZIP into SD `/.crosssmudge/applications/`, producing `cp-connectfour/manifest.json` and `main.lua`, or upload that individual ZIP in stock Web Transfer /applications. If that app ID already exists, stop and back it up; do not overwrite its journals. Do not upload the combined collection ZIP to the one-app web uploader.
 
 Hardware check: on the Sticky running the delivered v1.6.5.3 firmware, launch CP Connect Four; test both touch and buttons, Menu/Cancel/New as applicable, rotate using firmware settings and relaunch, save/exit/reopen, then sleep/wake and reopen. Expect the same saved state, no Application Error, and no changes to other app saves. No EPUB cache reset is required. Physical e-ink redraw latency, long AI turns and heap/PSRAM availability still need observation.
+
+
+## Original presentation on larger Lua heaps
+
+At a Lua limit of at least 512 KiB the app now uses the original Jersey font masks and game-specific CrossPlay board geometry, piece/dice rendering, turn controls and result layouts. The 75 KiB path keeps the original lightweight UI; rules and journal formats are shared. Portrait is the original reference layout; landscape adapts it to fit the shorter screen.
+
+Original three illustrated help pages, disc reserves, inactive full-column slots and winning-line result marks are present. Lifetime statistics, Nearby and a separate completed-match history remain absent; the front door previews the actual current journal position.
+
+Verification: `python3 test/board_visual_ports/run.py` tests the exact shipped Lua numeric ABI, 76,800/2,097,152-byte allocators and both screen orientations, including real rendered touch targets, journal round trips and help pagination. Native draw-call captures are not physical e-ink screenshots. On Sticky, check board controls/help/results in both orientations, then save/reopen and watch Application Error/OOM logs. No cache reset is required.
+
+
+The larger-heap front door now follows the source record/rule/ornament/bottom-door bands, with a live miniature of this port's current position and Play/Resume, Settings and How to Play. Settings exposes the existing new-game, local-player and save/exit actions; no lifetime counts are synthesized. The original Nearby door is replaced by supported settings. Native checks exercise physical and touch action mappings, and capture home/settings in both orientations.
