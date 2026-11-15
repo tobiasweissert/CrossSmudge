@@ -1,8 +1,8 @@
 {
   "id": "sudoku",
   "name": "Sudoku",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Mumfee",
-  "description": "Classic 9x9 Sudoku logic puzzle with puzzle generator",
+  "description": "CrossPlay Sudoku on Sticky; original game and saves unchanged on other devices",
   "entry": "main.lua"
 }

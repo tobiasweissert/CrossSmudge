@@ -91,3 +91,7 @@ add_subdirectory(fs_helpers)
 add_subdirectory(persistable_store_atomic)
 add_subdirectory(book_reading_stats_atomic)
 add_subdirectory(app_store_wifi)
+
+add_subdirectory(app_store)
+
+add_subdirectory(lua_http)

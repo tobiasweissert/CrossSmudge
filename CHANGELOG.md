@@ -2,7 +2,31 @@
 
 ### Fixed
 
+- App Store now fetches missing icons for the visible catalog page and caches validated icons for reuse without reinstalling apps.
+- App Store lists fit the available screen space in portrait and landscape, with bounded text and visible touch navigation.
+- Fixed touch controls on reTerminal Sticky in Desk Stand 1.0.3; other devices retain their existing behavior.
+- Fixed touch controls on reTerminal Sticky in Hourglass 1.0.1; other devices retain their existing behavior.
+- Fixed touch controls on reTerminal Sticky in Water Tracker 1.0.1; other devices retain their existing behavior.
 - Restored a visible, tappable Connect Wi-Fi button and Back control on the App Store offline screen for touch devices. Canceling Wi-Fi setup allows retrying; a successful connection loads the catalog after returning to the store.
+- Fixed Solitaire v1.0.1 touch input on reTerminal Sticky: tapping cards now deals, selects, and moves cards; reset confirmation buttons match their drawn bounds, and taps in tableau gaps or below cards are ignored. Other devices retain their existing input behavior and saved games remain compatible.
+
+### Added
+- Sticky owner test profile with paired fork app downloads, source-identified firmware, and Sticky-only Chess, Sudoku, Solitaire and Wordle replacements that preserve legacy games and saves on other devices.
+
+
+- Added local Jaipur, Sea Salt, Toy Battle, Murdle and Go Lua adaptations with saved play, explicit opponent/content differences and stock-Lua memory-cap tests. The local collection now has 18 adaptations plus four unchanged equivalents; eleven titles remain blocked. Catalog publication awaits parent push and upstream review.
+- Added local Insider, Forehead, Checkers, Wavelength, Hearts, Hex and Battleship Lua adaptations with checked saves and capped runtime tests. Hearts, Hex and Battleship document their smaller opponent strategies. Prepared catalog entries for the 13 working local adaptations; official store availability awaits upstream maintainer merge. The full 33-title collection remains incomplete.
+- Added six local CrossPlay Lua ports for stock v1.6.5.3: Minesweeper, Connect Four, Knucklebones, Yahtzee, decimal Calculator, and app-local Notes. Packages use separate `cp-*` IDs and checked two-slot saves. Per-package parity notes distinguish supported local features from missing Nearby, phone-transfer, sleep-screen, and original presentation features. These are not a complete 33-title collection or an App Store release.
+- Lua API v3: asynchronous, permission-controlled HTTPS GET/POST with cancellation and bounded responses. Network apps use the existing Wi-Fi selector; App Settings can revoke network grants and explicitly trust displayed UTC for certificate checks until restart.
+- Added an explicit Sticky owner-test profile using a matching fork catalog and package origin; standard builds retain the upstream store.
+
+### Security
+
+- Confine Lua file access to each app and its saved data, and disable host file/process escape functions. This prevents an offline app from replacing an approved network app or reading unrelated saved credentials. Absolute paths outside these directories are no longer supported.
+
+### Changed
+
+- Add local APIv3 previews for live Hacker News feed/story/article reading and Open Trivia DB questions, with checked offline data caches and button/touch controls. These are not App Store releases; public-network/device verification and C3 memory qualification remain pending.
 
 ## [v1.6.5.3] - 2026-10-06
 

@@ -3,6 +3,8 @@
 #include <ArduinoJson.h>
 #include <HalClock.h>
 #include <HalStorage.h>
+#include <HalLuaHttp.h>
+#include <HttpManifest.h>
 
 #include <chrono>
 #include <cmath>
@@ -122,7 +124,7 @@ bool LuaRunner::init() {
 
   LOG_INF("LUA", "[%s] Init with heap limit: %zu bytes", appId_.c_str(), maxLuaHeapBytes_);
 
-  Storage.ensureDirectoryExists(saveDir_.c_str());
+  saveDir_ = "/.smudge/saved_data/" + appId_;
 
   L = lua_newstate(customLuaAlloc, this);
   if (!L) {
@@ -145,12 +147,24 @@ bool LuaRunner::init() {
   }
   registerSmudgeApi();
 
+  http::restrictStandardLibraries(L);
+
   // Check if application manifest declares prevent_sleep
   std::string manifestPath = appDir_ + "/manifest.json";
   if (Storage.exists(manifestPath.c_str())) {
+    HalFile manifest = Storage.open(manifestPath.c_str());
+    const bool bounded = manifest && manifest.size() <= 4096;
+    manifest.close();
+    if (!bounded) { LOG_ERR("LHTTP", "Manifest unavailable or too large"); return true; }
     String jsonStr = Storage.readFile(manifestPath.c_str());
     JsonDocument doc;
     if (!deserializeJson(doc, jsonStr)) {
+      if (!http::readNetworkDeclaration(doc["network"], http_.domains)) {
+        LOG_ERR("LHTTP", "Invalid network declaration");
+      }
+      http_.allowed = HalLuaHttp::approved(appDir_, http_.domains);
+      // Network apps use a full-path namespace: same-named offline apps in another search root cannot inject saves.
+      if (http_.domains.count) saveDir_ = "/.smudge/network_data" + appDir_;
       if (doc["prevent_sleep"].is<bool>() && doc["prevent_sleep"].as<bool>()) {
         preventAutoSleep_.store(true, std::memory_order_relaxed);
       }
@@ -167,10 +181,22 @@ bool LuaRunner::init() {
     }
   }
 
+  if (!Storage.ensureDirectoryExists(saveDir_.c_str())) LOG_ERR("LUA", "Cannot create app save directory");
   return true;
 }
 
+bool LuaRunner::allowNetwork() {
+  http_.allowed = HalLuaHttp::approve(appDir_, http_.domains);
+  return http_.allowed;
+}
+
+bool LuaRunner::resolvePath(const char* path, std::string& result) const {
+  return http::resolveAppPath(path, appDir_, saveDir_, result);
+}
+
 void LuaRunner::shutdown() {
+  http_.close();
+  http_.domains = {};
   if (L) {
     lua_close(L);
     L = nullptr;
@@ -193,8 +219,10 @@ bool LuaRunner::loadScript(const std::string& scriptPath) {
     return false;
   }
 
+  std::string checkedPath;
+  if (!resolvePath(scriptPath.c_str(), checkedPath)) { setError("Invalid app entry path"); return false; }
   FileReaderContext ctx;
-  if (!Storage.openFileForRead("LUA", scriptPath.c_str(), ctx.file)) {
+  if (!Storage.openFileForRead("LUA", checkedPath.c_str(), ctx.file)) {
     std::string err = "Failed to read script file: " + scriptPath;
     setError(err.c_str());
     return false;
@@ -202,7 +230,7 @@ bool LuaRunner::loadScript(const std::string& scriptPath) {
 
   s_activeRunner = this;
 
-  int status = lua_load(L, sdFileReader, &ctx, scriptPath.c_str(), nullptr);
+  int status = lua_load(L, sdFileReader, &ctx, scriptPath.c_str(), "t");
   ctx.file.close();
 
   if (status != LUA_OK) {
@@ -241,6 +269,9 @@ void LuaRunner::onInit() {
 void LuaRunner::onUpdate() {
   if (!L || hasError_) return;
   s_activeRunner = this;
+  if (http::dispatch(L, http_) != LUA_OK) {
+    setError(lua_tostring(L, -1)); lua_pop(L, 1); return;
+  }
 
   // Run an incremental GC step to collect ephemeral garbage smoothly
   lua_gc(L, LUA_GCSTEP, 0);
@@ -354,6 +385,7 @@ void LuaRunner::onExit() {
 
 void LuaRunner::registerSmudgeApi() {
   lua_newtable(L);  // table 'smudge' (and 'ink')
+  http::registerApi(L, http_);
 
   lua_pushcfunction(L, l_clear);
   lua_setfield(L, -2, "clear");
@@ -613,11 +645,7 @@ int LuaRunner::l_dofile(lua_State* L) {
   if (!s_activeRunner) return 0;
   const char* filename = luaL_checkstring(L, 1);
   std::string fullPath;
-  if (filename[0] == '/') {
-    fullPath = filename;
-  } else {
-    fullPath = s_activeRunner->appDir_ + "/" + filename;
-  }
+  if (!s_activeRunner->resolvePath(filename, fullPath)) return luaL_error(L, "path outside app");
 
   FileReaderContext ctx;
   if (!Storage.openFileForRead("LUA", fullPath.c_str(), ctx.file)) {
@@ -627,7 +655,7 @@ int LuaRunner::l_dofile(lua_State* L) {
   // Collect dead objects before compiling/loading new file to free heap
   lua_gc(L, LUA_GCCOLLECT, 0);
 
-  int status = lua_load(L, sdFileReader, &ctx, fullPath.c_str(), nullptr);
+  int status = lua_load(L, sdFileReader, &ctx, fullPath.c_str(), "t");
   ctx.file.close();
 
   if (status != LUA_OK) {
@@ -1019,7 +1047,7 @@ int LuaRunner::l_drawSprite(lua_State* L) {
       spriteData = reinterpret_cast<const uint8_t*>(strData);
     } else if (strLen > 0) {
       std::string fullPath = s_activeRunner->appDir_ + "/" + strData;
-      if (Storage.exists(fullPath.c_str())) {
+      if (http::safeRelativePath(strData) && Storage.exists(fullPath.c_str())) {
         HalFile file = Storage.open(fullPath.c_str());
         if (file) {
           size_t fileSize = file.size();
@@ -1164,6 +1192,7 @@ int LuaRunner::l_save(lua_State* L) {
   const char* key = luaL_checkstring(L, 1);
   const char* val = luaL_checkstring(L, 2);
 
+  if (!http::safeRelativePath(key)) { lua_pushnil(L); return 1; }
   std::string filePath = s_activeRunner->saveDir_ + "/" + key + ".dat";
   Storage.writeFile(filePath.c_str(), String(val));
   return 0;
@@ -1175,6 +1204,7 @@ int LuaRunner::l_load(lua_State* L) {
     return 1;
   }
   const char* key = luaL_checkstring(L, 1);
+  if (!http::safeRelativePath(key)) { lua_pushnil(L); return 1; }
   std::string filePath = s_activeRunner->saveDir_ + "/" + key + ".dat";
 
   if (Storage.exists(filePath.c_str())) {
@@ -1197,18 +1227,12 @@ int LuaRunner::l_readFile(lua_State* L) {
   size_t maxBytes = (lua_gettop(L) >= 2 && !lua_isnil(L, 2)) ? static_cast<size_t>(lua_tointeger(L, 2)) : 65536;
   size_t offset = (lua_gettop(L) >= 3 && !lua_isnil(L, 3)) ? static_cast<size_t>(lua_tointeger(L, 3)) : 0;
 
-  std::string fullPath = path;
-  if (path[0] != '/') {
-    fullPath = s_activeRunner->appDir_ + "/" + path;
-  }
+  std::string fullPath;
+  if (!s_activeRunner->resolvePath(path, fullPath)) { lua_pushnil(L); return 1; }
   HalFile file;
   if (!Storage.openFileForRead("Lua", fullPath.c_str(), file)) {
-    if (path[0] != '/' && Storage.openFileForRead("Lua", path, file)) {
-      // opened
-    } else {
-      lua_pushnil(L);
-      return 1;
-    }
+    lua_pushnil(L);
+    return 1;
   }
 
   size_t totalSize = file.size();
@@ -1312,23 +1336,14 @@ int LuaRunner::l_findSection(lua_State* L) {
   }
 #endif
 
-  std::string fullPath = path;
-  if (path[0] != '/') {
-    fullPath = s_activeRunner->appDir_ + "/" + path;
-  }
+  std::string fullPath;
+  if (!s_activeRunner->resolvePath(path, fullPath)) { lua_pushnil(L); return 1; }
 
   HalFile file;
   if (!Storage.openFileForRead("Lua", fullPath.c_str(), file)) {
-    if (path[0] != '/' && Storage.openFileForRead("Lua", path, file)) {
-      // opened relative or alternate path
-    } else {
-      if (callbackIdx != 0) {
-        lua_pushboolean(L, false);
-      } else {
-        lua_pushnil(L);
-      }
-      return 1;
-    }
+    if (callbackIdx != 0) lua_pushboolean(L, false);
+    else lua_pushnil(L);
+    return 1;
   }
 
   // Use stack buffers: 512-byte SD card read chunk, 512-byte line buffer.
@@ -1452,10 +1467,8 @@ int LuaRunner::l_fileExists(lua_State* L) {
     return 1;
   }
   const char* path = luaL_checkstring(L, 1);
-  std::string fullPath = path;
-  if (path[0] != '/') {
-    fullPath = s_activeRunner->appDir_ + "/" + path;
-  }
+  std::string fullPath;
+  if (!s_activeRunner->resolvePath(path, fullPath)) { lua_pushboolean(L, false); return 1; }
   lua_pushboolean(L, Storage.exists(fullPath.c_str()));
   return 1;
 }
@@ -1829,10 +1842,8 @@ int LuaRunner::l_writeFile(lua_State* L) {
   const char* content = luaL_checklstring(L, 2, &len);
   bool append = (lua_gettop(L) >= 3) ? lua_toboolean(L, 3) : false;
 
-  std::string fullPath = path;
-  if (path[0] != '/') {
-    fullPath = s_activeRunner->appDir_ + "/" + path;
-  }
+  std::string fullPath;
+  if (!s_activeRunner->resolvePath(path, fullPath)) { lua_pushboolean(L, false); return 1; }
 
   HalFile f = Storage.open(fullPath.c_str(), append ? (O_WRONLY | O_CREAT | O_APPEND) : (O_WRONLY | O_CREAT | O_TRUNC));
   if (!f) {
@@ -1852,10 +1863,8 @@ int LuaRunner::l_deleteFile(lua_State* L) {
     return 1;
   }
   const char* path = luaL_checkstring(L, 1);
-  std::string fullPath = path;
-  if (path[0] != '/') {
-    fullPath = s_activeRunner->appDir_ + "/" + path;
-  }
+  std::string fullPath;
+  if (!s_activeRunner->resolvePath(path, fullPath)) { lua_pushboolean(L, false); return 1; }
   bool ok = Storage.remove(fullPath.c_str());
   lua_pushboolean(L, ok);
   return 1;
@@ -1869,11 +1878,7 @@ int LuaRunner::l_listFiles(lua_State* L) {
   std::string dirPath = s_activeRunner->appDir_;
   if (lua_gettop(L) >= 1 && lua_isstring(L, 1)) {
     const char* sub = lua_tostring(L, 1);
-    if (sub[0] == '/') {
-      dirPath = sub;
-    } else if (strlen(sub) > 0) {
-      dirPath = s_activeRunner->appDir_ + "/" + sub;
-    }
+    if (strlen(sub) > 0 && !s_activeRunner->resolvePath(sub, dirPath)) { lua_newtable(L); return 1; }
   }
 
   lua_newtable(L);
@@ -1979,7 +1984,11 @@ int LuaRunner::l_getApiVersion(lua_State* L) {
 int LuaRunner::l_hasFeature(lua_State* L) {
   const char* feat = luaL_checkstring(L, 1);
   bool supported = false;
-  if (strcmp(feat, "prevent_sleep") == 0 || strcmp(feat, "keep_awake") == 0 || strcmp(feat, "orientation") == 0 ||
+  if (strcmp(feat, "https_async") == 0) {
+#ifndef SIMULATOR
+    supported = true;
+#endif
+  } else if (strcmp(feat, "prevent_sleep") == 0 || strcmp(feat, "keep_awake") == 0 || strcmp(feat, "orientation") == 0 ||
       strcmp(feat, "set_orientation") == 0 || strcmp(feat, "full_refresh") == 0 || strcmp(feat, "invert") == 0 ||
       strcmp(feat, "touch") == 0 || strcmp(feat, "version") == 0 || strcmp(feat, "button_hints_landscape") == 0) {
     supported = true;

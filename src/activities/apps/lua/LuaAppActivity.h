@@ -10,6 +10,10 @@
 #include "activities/apps/lua/LuaRunner.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "Memory.h"
+#include <HalLuaHttp.h>
+#include "activities/network/WifiSelectionActivity.h"
+#include "activities/apps/lua/LuaConsentActivity.h"
 
 class LuaAppActivity : public Activity {
  public:
@@ -31,30 +35,47 @@ class LuaAppActivity : public Activity {
   void onEnter() override {
     Activity::onEnter();
     initialOrientation_ = renderer.getOrientation();
-    runner_ = std::make_unique<ink::LuaRunner>(renderer, mappedInput, appDir_, appId_);
+    runner_ = makeUniqueNoThrow<ink::LuaRunner>(renderer, mappedInput, appDir_, appId_);
 
+    if (!runner_) { LOG_ERR("LUA", "Runner allocation failed"); finish(); return; }
     if (!runner_->init()) {
       const std::string& err = runner_->getErrorMessage();
       renderError(err.empty() ? "Failed to initialize Lua VM" : err.c_str());
       return;
     }
 
-    std::string scriptPath = appDir_ + "/" + entryScript_;
-    if (!runner_->loadScript(scriptPath)) {
-      renderError(runner_->getErrorMessage().c_str());
-      return;
-    }
-
-    {
-      std::lock_guard<std::mutex> lock(luaMutex_);
-      runner_->onInit();
-    }
-    requestUpdate();
+    permissionPending_ = runner_->needsNetworkPermission();
+    if (!permissionPending_) prepareNetwork();
   }
 
   bool preventAutoSleep() override { return runner_ && runner_->preventAutoSleep(); }
 
   void loop() override {
+    if (permissionPending_) {
+      permissionPending_ = false;
+      auto prompt = makeUniqueNoThrow<LuaConsentActivity>(renderer, mappedInput,
+          runner_->networkDomains().names[permissionDomain_]);
+      if (!prompt) { LOG_ERR("LHTTP", "Permission dialog allocation failed"); finish(); return; }
+      startActivityForResult(std::move(prompt), [this](const ActivityResult& result) {
+        if (result.isCancelled) { finish(); return; }
+        if (++permissionDomain_ < runner_->networkDomains().count) { permissionPending_=true; return; }
+        if (!runner_->allowNetwork()) { finish(); return; }
+        prepareNetwork();
+      });
+      return;
+    }
+    if (wifiPending_) {
+      wifiPending_=false;
+      auto selector=makeUniqueNoThrow<WifiSelectionActivity>(renderer,mappedInput);
+      if (!selector) { LOG_ERR("LHTTP","WiFi dialog allocation failed"); finish(); return; }
+      ownsWifi_=true;
+      startActivityForResult(std::move(selector), [this](const ActivityResult& result) {
+        if(result.isCancelled || !HalLuaHttp::wifiConnected()){finish();return;}
+        startScript();
+      });
+      return;
+    }
+    if (!scriptStarted_ && runner_ && !runner_->hasError()) return;
     if (!runner_ || runner_->shouldExit()) {
       finish();
       return;
@@ -177,11 +198,30 @@ class LuaAppActivity : public Activity {
         runner_.reset();
       }
     }
+    if (ownsWifi_) HalLuaHttp::disconnectWifi();
     renderer.setOrientation(initialOrientation_);
     Activity::onExit();
   }
 
  private:
+  bool wifiPending_ = false;
+  bool ownsWifi_ = false;
+  void prepareNetwork() {
+    if (runner_->networkDomains().count && !HalLuaHttp::wifiConnected()) wifiPending_=true;
+    else startScript();
+  }
+  size_t permissionDomain_ = 0;
+  bool permissionPending_ = false;
+  bool scriptStarted_ = false;
+  void startScript() {
+    scriptStarted_ = true;
+    std::string scriptPath = appDir_ + "/" + entryScript_;
+    {
+      std::lock_guard<std::mutex> lock(luaMutex_);
+      if (runner_->loadScript(scriptPath)) runner_->onInit();
+    }
+    requestUpdate();
+  }
   std::string appDir_;
   std::string appName_;
   std::string entryScript_;

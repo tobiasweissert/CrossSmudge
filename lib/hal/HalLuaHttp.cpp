@@ -1,0 +1,181 @@
+#include "HalLuaHttp.h"
+#ifndef SIMULATOR
+#include <Arduino.h>
+#include <Logging.h>
+#include <Preferences.h>
+#include <WiFi.h>
+#include <esp_crt_bundle.h>
+#include <esp_heap_caps.h>
+#include <esp_timer.h>
+#include <esp_tls.h>
+#include <lwip/netdb.h>
+#include <mbedtls/sha256.h>
+#include <mbedtls/ssl.h>
+#include <mbedtls/x509_crt.h>
+#include <ctime>
+#include <cstring>
+#include <atomic>
+
+namespace {
+std::atomic<TaskHandle_t> budgetTask{nullptr};
+ink::http::AllocationBudget* activeBudget=nullptr;
+portMUX_TYPE timeMux=portMUX_INITIALIZER_UNLOCKED;
+int64_t trustedEpoch=0, trustedMono=0;
+// Copy one synchronized anchor; SNTP cannot move the trusted clock after consent.
+int64_t trustedNow() {
+  portENTER_CRITICAL(&timeMux);
+  auto epoch=trustedEpoch;auto mono=trustedMono;
+  portEXIT_CRITICAL(&timeMux);
+  return epoch ? epoch+(esp_timer_get_time()-mono)/1000000 : 0;
+}
+void digest(const std::string& app, const ink::http::Domains& domains, unsigned char out[32]) {
+  mbedtls_sha256_context c;mbedtls_sha256_init(&c);mbedtls_sha256_starts(&c,0);
+  mbedtls_sha256_update(&c,reinterpret_cast<const unsigned char*>(app.c_str()),app.size()+1);
+  for(size_t i=0;i<domains.count;++i)mbedtls_sha256_update(&c,reinterpret_cast<const unsigned char*>(domains.names[i]),strlen(domains.names[i])+1);
+  mbedtls_sha256_finish(&c,out);mbedtls_sha256_free(&c);
+}
+void keyFor(const std::string& app,char key[16]) {
+  unsigned char hash[32];ink::http::Domains empty;digest(app,empty,hash);
+  for(int i=0;i<7;++i)snprintf(key+i*2,3,"%02x",hash[i]);
+}
+int compare(const mbedtls_x509_time& a,const tm& b) {
+  const int x[]={a.year,a.mon,a.day,a.hour,a.min,a.sec};
+  const int y[]={b.tm_year+1900,b.tm_mon+1,b.tm_mday,b.tm_hour,b.tm_min,b.tm_sec};
+  for(int i=0;i<6;++i)if(x[i]!=y[i])return x[i]<y[i]?-1:1;
+  return 0;
+}
+struct Connection {esp_tls_t* tls=nullptr;const std::atomic<bool>* cancel=nullptr;uint32_t start=0,timeout=0;};
+bool connect(void* p,const char* host,uint32_t timeout,const std::atomic<bool>& cancel) {
+  auto& c=*static_cast<Connection*>(p);c.cancel=&cancel;c.start=millis();c.timeout=timeout;
+  if(!trustedNow() || WiFi.status()!=WL_CONNECTED)return false;
+  // TLS needs two 16 KiB records plus certificates, stack and WiFi. Fail before creating it on a crowded C3.
+  if(heap_caps_get_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT)<112*1024 ||
+     heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT)<40*1024) {
+    LOG_ERR("LHTTP","Insufficient internal heap for TLS");return false;
+  }
+  addrinfo hints{};hints.ai_family=AF_INET;hints.ai_socktype=SOCK_STREAM;
+  addrinfo* addresses=nullptr;
+  if(getaddrinfo(host,"443",&hints,&addresses)!=0 || !addresses)return false;
+  uint32_t chosen=0;bool valid=true;
+  for(auto* a=addresses;a;a=a->ai_next) {
+    if(a->ai_family!=AF_INET || a->ai_addrlen<sizeof(sockaddr_in)){valid=false;break;}
+    auto ip=reinterpret_cast<sockaddr_in*>(a->ai_addr)->sin_addr.s_addr;
+    if(!ink::http::publicV4(ntohl(ip))){valid=false;break;}
+    if(!chosen)chosen=ip;
+  }
+  freeaddrinfo(addresses);
+  if(!valid || !chosen || cancel.load() || uint32_t(millis()-c.start)>=timeout)return false;
+  char numeric[16];in_addr addr{};addr.s_addr=chosen;
+  if(!inet_ntop(AF_INET,&addr,numeric,sizeof(numeric)))return false;
+  c.tls=esp_tls_init();if(!c.tls)return false;
+  esp_tls_cfg_t cfg{};
+  cfg.crt_bundle_attach=esp_crt_bundle_attach;
+  cfg.common_name=host; // mbedTLS verifies this hostname AND sends it as SNI, while TCP uses numeric only.
+  cfg.tls_version=ESP_TLS_VER_TLS_1_2;
+  cfg.timeout_ms=1000;cfg.non_block=true;
+  int rc;
+  do {
+    if(cancel.load() || uint32_t(millis()-c.start)>=timeout)return false;
+    rc=esp_tls_conn_new_async(numeric,strlen(numeric),443,&cfg,c.tls);
+    if(rc==0)vTaskDelay(pdMS_TO_TICKS(10));
+  }while(rc==0);
+  if(rc!=1)return false;
+  auto* ssl=static_cast<mbedtls_ssl_context*>(esp_tls_get_ssl_context(c.tls));
+  if(!ssl || mbedtls_ssl_get_verify_result(ssl)!=0)return false;
+  // Arduino's prebuilt mbedTLS omits HAVE_TIME_DATE: explicitly check every supplied chain certificate.
+  auto* cert=mbedtls_ssl_get_peer_cert(ssl);if(!cert)return false;
+  time_t now=trustedNow();tm utc{};if(!now || !gmtime_r(&now,&utc))return false;
+  size_t count=0,total=0;
+  for(;cert;cert=cert->next) {
+    total+=cert->raw.len;
+    if(++count>8 || total>32768 || compare(cert->valid_from,utc)>0 || compare(cert->valid_to,utc)<0)return false;
+  }
+  return !cancel.load();
+}
+int transfer(Connection& c,char* data,size_t size,bool write) {
+  for(;;) {
+    if(c.cancel->load() || uint32_t(millis()-c.start)>=c.timeout)return -1;
+    int n=write ? esp_tls_conn_write(c.tls,data,size) : esp_tls_conn_read(c.tls,data,size);
+    if(n!=ESP_TLS_ERR_SSL_WANT_READ && n!=ESP_TLS_ERR_SSL_WANT_WRITE)return n;
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+int read(void* p,char* data,size_t n){return transfer(*static_cast<Connection*>(p),data,n,false);}
+int write(void* p,const char* data,size_t n){return transfer(*static_cast<Connection*>(p),const_cast<char*>(data),n,true);}
+void close(void* p){auto& c=*static_cast<Connection*>(p);if(c.tls){esp_tls_conn_destroy(c.tls);c.tls=nullptr;}}
+uint32_t clockMs(void*){return millis();}
+void execute(void*,ink::http::Job& job) {
+  if(!trustedNow()){job.result.error="time_untrusted";return;}
+  activeBudget=&job.tlsBudget;
+  budgetTask.store(xTaskGetCurrentTaskHandle(),std::memory_order_release);
+  Connection c;
+  ink::http::Io io{&c,connect,read,write,close,clockMs};
+  ink::http::exchange(job.request,job.result,job.scratch,io,job.cancel);
+  budgetTask.store(nullptr,std::memory_order_release);
+  activeBudget=nullptr;
+  if(job.tlsBudget.used()) LOG_ERR("LHTTP","TLS allocations retained after close");
+  if(job.result.error)LOG_ERR("LHTTP","Request failed: %s",job.result.error);
+}
+struct Launch {void(*fn)(void*);void* arg;};
+// Single service slot means one launch structure; worker copies it before publishing completion.
+Launch launch{};
+void task(void*) {auto fn=launch.fn;auto arg=launch.arg;fn(arg);vTaskDelete(nullptr);}
+bool spawn(void(*fn)(void*),void* arg) {
+  launch={fn,arg};
+  // 6 KiB accommodates TLS certificate parsing; no request/body arrays on this stack.
+  if(xTaskCreate(task,"lua_https",6144,nullptr,1,nullptr)!=pdPASS){LOG_ERR("LHTTP","Worker allocation failed");return false;}
+  return true;
+}
+}
+
+// Link wrappers budget only the Lua worker; all existing firmware TLS callers retain their allocator.
+extern "C" void* __real_esp_mbedtls_mem_calloc(size_t,size_t);
+extern "C" void __real_esp_mbedtls_mem_free(void*);
+extern "C" void* __wrap_esp_mbedtls_mem_calloc(size_t n,size_t size) {
+  if(!size || n>SIZE_MAX/size)return nullptr;
+  auto owner=budgetTask.load(std::memory_order_acquire);
+  const bool limited=owner && owner==xTaskGetCurrentTaskHandle();
+  if(limited && !activeBudget->permits(n*size))return nullptr;
+  void* p=__real_esp_mbedtls_mem_calloc(n,size);
+  if(limited && p && !activeBudget->add(p,heap_caps_get_allocated_size(p))) {
+    __real_esp_mbedtls_mem_free(p);return nullptr;
+  }
+  return p;
+}
+extern "C" void __wrap_esp_mbedtls_mem_free(void* p) {
+  auto owner=budgetTask.load(std::memory_order_acquire);
+  if(owner && owner==xTaskGetCurrentTaskHandle())activeBudget->remove(p);
+  __real_esp_mbedtls_mem_free(p);
+}
+
+namespace HalLuaHttp {
+bool approved(const std::string& app,const ink::http::Domains& domains) {
+  if(!domains.count)return false;
+  Preferences prefs;if(!prefs.begin("lua_https",true))return false;
+  unsigned char expected[32],saved[32];char key[16]{};keyFor(app,key);digest(app,domains,expected);
+  bool yes=prefs.getBytesLength(key)==sizeof(saved) && prefs.getBytes(key,saved,sizeof(saved))==sizeof(saved) && !memcmp(expected,saved,32);
+  prefs.end();return yes;
+}
+bool approve(const std::string& app,const ink::http::Domains& domains) {
+  if(!domains.count)return false;
+  Preferences prefs;if(!prefs.begin("lua_https",false)){LOG_ERR("LHTTP","Cannot open grants");return false;}
+  unsigned char expected[32];char key[16]{};keyFor(app,key);digest(app,domains,expected);
+  bool ok=prefs.putBytes(key,expected,sizeof(expected))==sizeof(expected);prefs.end();
+  if(!ok)LOG_ERR("LHTTP","Cannot save grant");return ok;
+}
+bool revokeAll(){Preferences p;if(!p.begin("lua_https",false))return false;bool ok=p.clear();p.end();return ok;}
+TimeProposal proposeTime(){return {time(nullptr),esp_timer_get_time()};}
+bool trustTime(TimeProposal proposal){
+  auto elapsed=esp_timer_get_time()-proposal.monotonicUs;
+  if(proposal.epoch<1735689600 || proposal.epoch>4102444800LL || elapsed<0 || elapsed>300000000 || ink::http::Session::busy())return false;
+  portENTER_CRITICAL(&timeMux);
+  trustedMono=proposal.monotonicUs;trustedEpoch=proposal.epoch;
+  portEXIT_CRITICAL(&timeMux);
+  return true;
+}
+bool timeTrusted(){return trustedNow()!=0;}
+bool wifiConnected(){return WiFi.status()==WL_CONNECTED && WiFi.localIP()!=IPAddress(0,0,0,0);}
+void disconnectWifi(){if(WiFi.getMode()!=WIFI_MODE_NULL){WiFi.disconnect(false);WiFi.mode(WIFI_OFF);}}
+}
+namespace ink::http {Executor platformExecutor(){return {nullptr,execute,spawn};}}
+#endif

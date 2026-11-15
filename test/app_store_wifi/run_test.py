@@ -39,7 +39,7 @@ def extract_function(source, signature):
 
 
 def replace_body(source, name, replacement):
-    match = re.search(r'^  (?:static )?(?:void|bool|int) ' + name + r'\([^\n]*\)[^{]*\{', source, re.M)
+    match = re.search(r'^  (?:static )?(?:void|bool|int|CatalogLayout) ' + name + r'\([^\n]*\)[^{]*\{', source, re.M)
     if not match:
         raise RuntimeError('Backend seam missing: ' + name)
     start = match.end() - 1
@@ -52,6 +52,12 @@ for name in ['onExit', 'expand32To64', 'loadAppIcon', 'ensureAppIcon',
              'installApp', 'uninstallApp', 'renderCatalog', 'renderAppDetail',
              'renderDownloadProgress', 'renderError']:
     source = replace_body(source, name, '')
+# Catalog/icon behavior is covered by test/app_store's full production suite.
+source = replace_body(source, 'handleCatalogInput', 'return false;')
+source = replace_body(source, 'readAppIcon', 'return false;')
+source = replace_body(source, 'fetchVisibleIcon', '')
+source = replace_body(source, 'catalogLayout', 'return {};')
+source = replace_body(source, 'fitCatalogText', '')
 source = replace_body(source, 'getDetailActionButtonY', 'return 0;')
 source = replace_body(source, 'isWifiConnected', 'return wifiConnected;')
 source = replace_body(source, 'fetchCatalog', '++fetches; state_ = State::CATALOG_READY;')
@@ -67,7 +73,7 @@ header += '\nvoid draw(GfxRenderer&, const Rect&, const char*, bool, int, const 
 
 with tempfile.TemporaryDirectory(prefix='app-store-wifi-') as tmp:
     cpp = pathlib.Path(tmp) / 'test.cpp'
-    cpp.write_text((HERE / 'boundaries.h').read_text() + buttons + header + source + (HERE / 'behavior.cpp').read_text())
+    cpp.write_text('#include <cstring>\n' + no_includes((ROOT / 'src/network/AppStoreSource.h').read_text()) + '\nunsigned long millis() { return 1000; }\n' + (HERE / 'boundaries.h').read_text() + buttons + header + source + (HERE / 'behavior.cpp').read_text())
     binary = pathlib.Path(tmp) / 'test'
     subprocess.run(['c++', '-std=c++20', '-g', '-fsanitize=address,undefined',
                     '-fno-omit-frame-pointer', str(cpp), '-o', str(binary)], check=True)
