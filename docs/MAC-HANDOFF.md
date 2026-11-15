@@ -40,6 +40,7 @@ git switch --track origin/feat/lua-http-streaming-followup
 ```
 
 - `feat/lua-http-streaming-followup`: experimental API4 download/read-at core, staged Connections package, and API5/recoverable-storage prototype work. **Hardware activation remains disabled.** The pinned SdFat rename can fail after mutating directory entries; naive cleanup can free aliased clusters. See `docs/lua-https-v4.md`, `docs/lua-network-followup-state.md` and `test/lua_http/storage_recovery_candidate/`. Prototype runners contain historical Linux dependency paths that must be adapted explicitly on the Mac, without patching SdFat production behavior to make tests pass.
+- `checkpoint/hourglass-geometry-mac`: late-discovered, **unfinished/unreviewed** Hourglass value-box hit-geometry repair and its tests. This isolated snapshot preserves the in-flight edits without modifying the original draft PR or its owner's checkout; do not treat it as a reviewed release.
 - `fix/api3-draft-alignment`: separately prepared alignment of the draft API3 branch with device reporting, UTF-8/default-network policy and startup tests; not a substitute for the combined branch.
 - `feat/sticky-2048-reference-design`: independently saved 2048 changes on the older local-port base. The combined branch already contains the actual app update.
 - `feat/crossplay-game-replacements`: four independently developed replacement games and their source-oracle/preservation tests.
