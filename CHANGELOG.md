@@ -1,4 +1,4 @@
-## [Unreleased]
+## [Unreleased] - 2026-11-15
 
 ### Fixed
 
@@ -15,6 +15,8 @@
 - Fixed Solitaire v1.0.1 touch input on reTerminal Sticky: tapping cards now deals, selects, and moves cards; reset confirmation buttons match their drawn bounds, and taps in tableau gaps or below cards are ignored. Other devices retain their existing input behavior and saved games remain compatible.
 
 ### Added
+
+- Added local Flashcards, Habits, Pomodoro, Weather, and Browser Lua app previews with button/touch controls and saved state. Weather reuses Lua API v3 for Open-Meteo forecasts; Browser reads bounded public web text through Jina Reader. These packages are available for local installation and have not been published to the App Store.
 - Sticky owner test profile with paired fork app downloads, source-identified firmware, and Sticky-only Chess, Sudoku, Solitaire and Wordle replacements that preserve legacy games and saves on other devices.
 
 

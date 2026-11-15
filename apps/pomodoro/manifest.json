@@ -1,0 +1,9 @@
+{
+  "id": "pomodoro",
+  "name": "Pomodoro",
+  "version": "0.1.0",
+  "author": "CrossSmudge",
+  "description": "Focus sessions with short and long breaks.",
+  "entry": "main.lua",
+  "min_api": 2
+}
