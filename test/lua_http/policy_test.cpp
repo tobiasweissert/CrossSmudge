@@ -4,6 +4,10 @@
 #include <string>
 using namespace ink::http;
 int main() {
+  char root[256];
+  for(auto app:{"/.smudge/applications/demo","/.crosssmudge/applications/demo","/apps/demo","/applications/demo","/.crosspoint/applications/demo"})assert(downloadRoot(app,root,sizeof(root)));
+  for(auto app:{"/apps/../secret","/apps/a/b","/apps/.hidden","/apps/a/","/other/demo","/apps/a\\b"})assert(!downloadRoot(app,root,sizeof(root)) && !root[0]);
+  assert(!downloadRoot("/apps/demo",root,8));
   Url u{};
   assert(parseUrl("https://example.com/a?q=1", u));
   assert(!strcmp(u.host,"example.com") && !strcmp(u.path,"/a?q=1"));

@@ -19,7 +19,7 @@ namespace ink {
 
 class LuaRunner {
  public:
-  static constexpr int LUA_API_VERSION = 3;
+  static constexpr int LUA_API_VERSION = 4;
 
   LuaRunner(GfxRenderer& renderer, MappedInputManager& input, const std::string& appDir, const std::string& appId);
   ~LuaRunner();

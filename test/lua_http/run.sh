@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-TEST_OUT=${LUA_HTTP_TEST_OUT:-/tmp/lua-http-tests}
+TEST_OUT=${LUA_HTTP_TEST_OUT:-/root/.hermes/cache/scratch/lua-http-followup-tests}
 mkdir -p "$TEST_OUT"
 export ASAN_OPTIONS=detect_leaks=0
 FLAGS=(-std=c++20 -O1 -g -Wall -Wextra -fsanitize=address,undefined -fno-omit-frame-pointer -Ilib/LuaHttp -Ilib/Lua/src)
@@ -9,6 +9,8 @@ for unit in policy protocol budget; do
   c++ "${FLAGS[@]}" "test/lua_http/${unit}_test.cpp" lib/LuaHttp/HttpCore.cpp -o "$TEST_OUT/$unit"
   "$TEST_OUT/$unit"
 done
+c++ "${FLAGS[@]}" test/lua_http/download_test.cpp lib/LuaHttp/{DownloadStore,DownloadTransfer,HttpCore}.cpp -o "$TEST_OUT/download"
+"$TEST_OUT/download"
 c++ "${FLAGS[@]}" -I.pio/libdeps/sticky/ArduinoJson/src test/lua_http/manifest_test.cpp lib/LuaHttp/HttpCore.cpp -o "$TEST_OUT/manifest"
 "$TEST_OUT/manifest"
 for source in lib/Lua/src/l*.c; do
@@ -17,3 +19,6 @@ done
 c++ "${FLAGS[@]}" -pthread test/lua_http/async_test.cpp lib/LuaHttp/{LuaHttp,HttpCore}.cpp "$TEST_OUT"/*.o -ldl -lm -o "$TEST_OUT/async"
 SMUDGE_X3_CONSTRAINTS=1 "$TEST_OUT/async"
 printf 'PASS: policy, bounded HTTP parser, allocation budget, production Lua async registration/lifecycle (ASan+UBSan; LSan unavailable under ptrace)\n'
+
+c++ "${FLAGS[@]}" test/lua_http/download_bridge_test.cpp lib/LuaHttp/{LuaHttp,HttpCore,DownloadStore,DownloadTransfer}.cpp "$TEST_OUT"/*.o -ldl -lm -o "$TEST_OUT/download_bridge"
+SMUDGE_X3_CONSTRAINTS=1 "$TEST_OUT/download_bridge" "${CONNECTIONS_FIXTURE:-/root/github/.host-data/crosssmudge/lua-network-apps/public-fixtures-parent/connections.body}"

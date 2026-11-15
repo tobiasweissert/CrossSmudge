@@ -36,6 +36,7 @@ bool parseUrl(std::string_view text, Url& url);
 bool validHost(std::string_view host);
 bool publicV4(uint32_t hostOrder);
 bool safeHeader(std::string_view name, std::string_view value);
+bool downloadRoot(std::string_view appRoot, char* out, size_t capacity);
 bool safeRelativePath(std::string_view path);
 bool resolveAppPath(std::string_view path, std::string_view appRoot, std::string_view saveRoot, std::string& out);
 // Transport owns TLS/DNS/time verification. No bytes may be written before connect succeeds.
@@ -49,5 +50,10 @@ struct Io {
 };
 // Fixed scratch space belongs to the job, never the small worker stack.
 struct Scratch { char line[513]{}; size_t headerBytes = 0; };
-void exchange(const Request&, Result&, Scratch&, Io&, const std::atomic<bool>& cancel);
+struct BodySink {
+  void* context;
+  size_t limit;
+  bool (*append)(void*, const char*, size_t);
+};
+void exchange(const Request&, Result&, Scratch&, Io&, const std::atomic<bool>& cancel, BodySink* sink = nullptr);
 }  // namespace ink::http

@@ -17,7 +17,7 @@ std::atomic<unsigned> nextId{0};
 void worker(void* arg) {
   auto* j=static_cast<Job*>(arg);
   j->executor.run(j->executor.context,*j);
-  if(j->cancel.load()) { j->result.error="cancelled";j->result.size=0; }
+  if(j->cancel.load() && !j->committed) { j->result.error="cancelled";j->result.size=0; }
   j->done.store(true,std::memory_order_release);
   j->release();
 }
@@ -30,13 +30,32 @@ std::string_view string(lua_State* L,int idx) {
 void rawField(lua_State* L,int index,const char* key){lua_pushstring(L,key);lua_rawget(L,index);}
 int requestInner(lua_State* L) {
   auto& s=session(L);
+  const bool download=lua_toboolean(L,lua_upvalueindex(2));
+  if(download && !s.fileApi)return error(L,"api_required");
+  if(download && !s.fileRoot[0])return error(L,"storage_unavailable");
   if(!s.allowed) return error(L,"permission_denied");
   if(!lua_istable(L,1)) return error(L,"invalid_options");
+  if(download) {
+    lua_pushnil(L);
+    while(lua_next(L,1)) {
+      auto key=string(L,-2);
+      if(key!="url" && key!="max_bytes" && key!="timeout_ms")return error(L,"invalid_options");
+      lua_pop(L,1);
+    }
+  }
   // Validate all Lua types and limits before reserving native ownership; no luaL_error across C++ resources.
   rawField(L,1,"url");auto url=string(L,-1);
   if(url.empty() || url.find('\0')!=url.npos)return error(L,"invalid_url");
   Job* j=s.reserve();if(!j)return error(L,Session::busy()?"busy":"out_of_memory");
+  j->download=download;
+  if(download)memcpy(j->fileRoot,s.fileRoot,sizeof(j->fileRoot));
   const char* failure=nullptr;
+  if(download) {
+    rawField(L,1,"max_bytes");
+    if(!lua_isinteger(L,-1) || lua_tointeger(L,-1)<1 || lua_tointeger(L,-1)>int(MaxDownload))failure="invalid_options";
+    else j->maxBytes=lua_tointeger(L,-1);
+    lua_pop(L,1);
+  }
   if(!parseUrl(url,j->request.url))failure="invalid_url";
   else if(!s.domains.contains(j->request.url.host))failure="domain_denied";
   lua_pop(L,1);
@@ -71,7 +90,9 @@ int requestInner(lua_State* L) {
   // Reject unknown option keys so callers cannot mistakenly believe a security/download option worked.
   lua_pushnil(L);while(lua_next(L,1)) {
     auto key=string(L,-2);
-    if(key!="url" && key!="method" && key!="body" && key!="headers" && key!="timeout_ms")failure="invalid_options";
+    if(download) {
+      if(key!="url" && key!="max_bytes" && key!="timeout_ms")failure="invalid_options";
+    } else if(key!="url" && key!="method" && key!="body" && key!="headers" && key!="timeout_ms")failure="invalid_options";
     lua_pop(L,1);
     if(failure){lua_pop(L,1);break;}
   }
@@ -84,10 +105,21 @@ int request(lua_State* L) {
   auto& s=session(L);
   // Reserve ownership is cleaned even if Lua allocation fails during parsing.
   if(s.job())return error(L,"busy");
-  lua_pushlightuserdata(L,&s);lua_pushcclosure(L,requestInner,1);lua_pushvalue(L,1);
+  lua_pushlightuserdata(L,&s);lua_pushvalue(L,lua_upvalueindex(2));lua_pushcclosure(L,requestInner,2);lua_pushvalue(L,1);
   int status=lua_pcall(L,1,2,0);
   if(status!=LUA_OK){s.discard();return lua_error(L);}
   return 2;
+}
+int downloadRead(lua_State* L) {
+  auto& s=session(L);
+  if(!s.fileApi)return error(L,"api_required");
+  if(lua_gettop(L)!=2 || !lua_isinteger(L,1) || !lua_isinteger(L,2) ||
+     lua_tointeger(L,1)<0 || lua_tointeger(L,1)>int(MaxDownload) ||
+     lua_tointeger(L,2)<1 || lua_tointeger(L,2)>int(DownloadChunk))return error(L,"invalid_options");
+  size_t got=0,total=0;
+  const char* failure=s.readAt(lua_tointeger(L,1),lua_tointeger(L,2),got,total);
+  if(failure)return error(L,failure);
+  lua_pushlstring(L,s.readBuffer,got);lua_pushinteger(L,total);return 2;
 }
 int cancel(lua_State* L) {
   auto& s=session(L);auto* j=s.job();
@@ -111,7 +143,9 @@ int deliver(lua_State* L) {
   lua_createtable(L,0,4);
   lua_pushinteger(L,j->id);lua_setfield(L,-2,"id");
   lua_pushinteger(L,j->result.status);lua_setfield(L,-2,"status");
+  if(j->download){lua_pushliteral(L,"download");lua_setfield(L,-2,"kind");}
   if(j->result.error){lua_pushstring(L,j->result.error);lua_setfield(L,-2,"error");}
+  else if(j->download){lua_pushinteger(L,j->result.size);lua_setfield(L,-2,"size");}
   else {lua_pushlstring(L,j->result.body,j->result.size);lua_setfield(L,-2,"body");}
   lua_call(L,1,0);return 0;
 }
@@ -137,7 +171,16 @@ bool Session::start(){
   if(!executor_.spawn(worker,job_)){job_->release();return false;}return true;
 }
 void Session::discard(){if(job_){job_->release();job_=nullptr;}}
-void Session::close(){allowed=false;if(job_)job_->cancel.store(true);discard();}
+void Session::close(){allowed=false;fileApi=false;fileRoot[0]=0;if(job_)job_->cancel.store(true);discard();}
+bool Session::configureFileRoot(std::string_view appRoot) {
+  fileRoot[0]=0;
+  return executor_.readFile && downloadRoot(appRoot,fileRoot,sizeof(fileRoot));
+}
+const char* Session::readAt(size_t offset,size_t count,size_t& got,size_t& total) {
+  if(!fileRoot[0] || !executor_.readFile)return "storage_unavailable";
+  if(busy())return "busy";
+  return executor_.readFile(fileRoot,offset,readBuffer,count,got,total);
+}
 void restrictStandardLibraries(lua_State* L) {
   for (const char* key : {"loadfile", "io", "package", "require", "debug"}) {
     lua_pushnil(L); lua_setglobal(L, key);
@@ -152,7 +195,9 @@ void restrictStandardLibraries(lua_State* L) {
   lua_getglobal(L, "load"); lua_pushcclosure(L, textOnlyLoad, 1); lua_setglobal(L, "load");
 }
 void registerApi(lua_State* L,Session& s){
-  lua_pushlightuserdata(L,&s);lua_pushcclosure(L,request,1);lua_setfield(L,-2,"http_request");
+  lua_pushlightuserdata(L,&s);lua_pushboolean(L,false);lua_pushcclosure(L,request,2);lua_setfield(L,-2,"http_request");
+  lua_pushlightuserdata(L,&s);lua_pushboolean(L,true);lua_pushcclosure(L,request,2);lua_setfield(L,-2,"http_download");
+  lua_pushlightuserdata(L,&s);lua_pushcclosure(L,downloadRead,1);lua_setfield(L,-2,"download_read");
   lua_pushlightuserdata(L,&s);lua_pushcclosure(L,cancel,1);lua_setfield(L,-2,"http_cancel");
 }
 int dispatch(lua_State* L,Session& s){

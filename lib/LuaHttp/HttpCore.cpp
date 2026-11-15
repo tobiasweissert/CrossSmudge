@@ -102,6 +102,21 @@ bool safeRelativePath(std::string_view s) {
   }
   return true;
 }
+bool downloadRoot(std::string_view appRoot,char* out,size_t capacity) {
+  if(!capacity)return false;
+  out[0]=0;
+  for(auto root:{"/.crosssmudge/applications/", "/applications/", "/apps/", "/.smudge/applications/", "/.crosspoint/applications/"}) {
+    std::string_view prefix(root);
+    if(appRoot.substr(0,prefix.size())!=prefix)continue;
+    auto name=appRoot.substr(prefix.size());
+    if(!safeRelativePath(name) || name.find('/')!=name.npos)return false;
+    constexpr std::string_view base="/.smudge/http_data";
+    if(base.size()+appRoot.size()>=capacity)return false;
+    memcpy(out,base.data(),base.size());memcpy(out+base.size(),appRoot.data(),appRoot.size());
+    out[base.size()+appRoot.size()]=0;return true;
+  }
+  return false;
+}
 bool resolveAppPath(std::string_view path, std::string_view appRoot, std::string_view saveRoot, std::string& out) {
   auto relative = path;
   if (!relative.empty() && relative.front() == '/') {
@@ -123,7 +138,8 @@ bool resolveAppPath(std::string_view path, std::string_view appRoot, std::string
   out.append(path);
   return true;
 }
-void exchange(const Request& q,Result& r,Scratch& scratch,Io& io,const std::atomic<bool>& cancel) {
+void exchange(const Request& q,Result& r,Scratch& scratch,Io& io,const std::atomic<bool>& cancel,BodySink* sink) {
+  const size_t limit=sink?sink->limit:MaxBody;
   r.status=0; r.size=0; r.error=nullptr;
   const uint32_t start=io.millis(io.context);
   auto ok=[&]() {
@@ -181,7 +197,7 @@ void exchange(const Request& q,Result& r,Scratch& scratch,Io& io,const std::atom
     while(!value.empty() && (value.back()==' ' || value.back()=='\t'))value.remove_suffix(1);
     if(equalFold(name,"content-length")) {
       if(hasLength || !decimal(value,length)){fail("protocol");return;} hasLength=true;
-      if(length>MaxBody){fail("body_limit");return;}
+      if(length>limit){fail("body_limit");return;}
     } else if(equalFold(name,"transfer-encoding")) {
       if(chunked || !equalFold(value,"chunked")){fail("protocol");return;}chunked=true;
     } else if(equalFold(name,"content-encoding") && !equalFold(value,"identity")) {fail("encoding");return;}
@@ -189,10 +205,18 @@ void exchange(const Request& q,Result& r,Scratch& scratch,Io& io,const std::atom
   if(r.error) return;
   if(chunked && hasLength){fail("protocol");return;}
   if(r.status>=300 && r.status<=399) {fail("redirect_denied");return;}
+  if(sink && r.status!=200){fail("http_status");return;}
   if(r.status==204 || r.status==304) return;
   auto bytes=[&](size_t count) {
-    if(count>MaxBody-r.size){fail("body_limit");return false;}
-    while(count) {int got=read(r.body+r.size,count);if(got<=0){fail("truncated");return false;}r.size+=got;count-=got;}
+    if(count>limit-r.size){fail("body_limit");return false;}
+    while(count) {
+      const size_t wanted=sink?(count>1024?1024:count):count;
+      char* target=sink?r.body:r.body+r.size;
+      int got=read(target,wanted);
+      if(got<=0 || size_t(got)>wanted){fail("truncated");return false;}
+      if(sink && !sink->append(sink->context,target,got)){fail("file_write");return false;}
+      r.size+=got;count-=got;
+    }
     return true;
   };
   if(chunked) {

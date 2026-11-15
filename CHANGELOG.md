@@ -2,6 +2,8 @@
 
 ### Added
 
+- Experimental Lua API4 bounded download and file-chunk contract with native transfer, failure and fixture tests. Hardware activation remains disabled until atomic storage failure handling is available; a local Connections preview exercises the new contract without loading its entire archive into Lua.
+
 - Lua API v3: asynchronous, permission-controlled HTTPS GET/POST with cancellation and bounded responses. Network apps use the existing Wi-Fi selector; App Settings can revoke network grants and explicitly trust displayed UTC for certificate checks until restart.
 
 ### Security

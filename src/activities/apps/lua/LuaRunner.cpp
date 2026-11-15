@@ -170,6 +170,10 @@ bool LuaRunner::init() {
       }
       if (doc["min_api"].is<int>()) {
         int reqApi = doc["min_api"].as<int>();
+        http_.fileApi = reqApi >= 4;
+        // Storage activation is intentionally blocked: pinned SdFat rename may
+        // fail after mutating directory entries. Do not weaken API4 commit semantics.
+        if(http_.fileApi)http_.configureFileRoot(appDir_);
         if (reqApi > LUA_API_VERSION) {
           char err[128];
           snprintf(err, sizeof(err), "Requires API v%d (firmware has v%d).\nPlease update device firmware.", reqApi,
@@ -1988,6 +1992,9 @@ int LuaRunner::l_hasFeature(lua_State* L) {
 #ifndef SIMULATOR
     supported = true;
 #endif
+  } else if (strcmp(feat, "https_download_file") == 0) {
+    // No production atomic-file backend yet; simulator also fails closed.
+    supported = false;
   } else if (strcmp(feat, "prevent_sleep") == 0 || strcmp(feat, "keep_awake") == 0 || strcmp(feat, "orientation") == 0 ||
       strcmp(feat, "set_orientation") == 0 || strcmp(feat, "full_refresh") == 0 || strcmp(feat, "invert") == 0 ||
       strcmp(feat, "touch") == 0 || strcmp(feat, "version") == 0 || strcmp(feat, "button_hints_landscape") == 0) {

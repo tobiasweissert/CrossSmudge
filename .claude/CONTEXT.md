@@ -22,6 +22,8 @@ Refer to https://freeink.org/llms.txt for guidance.
 
 - SdFat on hardware allows only one open reader per file path at a time. If a fallback needs to reopen the same file, close the first handle before reopening.
 
+- SdFat `FatFile::rename` may return false after directory entries have changed (including final `cacheSync` failure). Do not assume a failed rename leaves source/destination unchanged or remove a possibly aliased source as rollback. Strict download transactions need a proven backend; see `docs/lua-https-v4.md`.
+
 ## Rendering / Reader Pipeline
 
 - `lib/Epub/Epub/Page.cpp`: images must render only in `GfxRenderer::BW`; grayscale passes are text anti-aliasing passes only.

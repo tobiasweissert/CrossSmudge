@@ -1,0 +1,1 @@
+{"id":"cp-connections","name":"Connections preview","version":"0.1.0","description":"Local API4 development preview; atomic storage backend required. No bundled puzzles.","author":"CrossSmudge contributors","min_api":4,"network":{"domains":["raw.githubusercontent.com"]}}

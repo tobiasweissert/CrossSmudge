@@ -1,6 +1,7 @@
 #pragma once
 #include "HttpCore.h"
 #include "AllocationBudget.h"
+#include "DownloadStore.h"
 struct lua_State;
 namespace ink::http {
 struct Job;
@@ -8,6 +9,7 @@ struct Executor {
   void* context;
   void (*run)(void*, Job&);
   bool (*spawn)(void (*)(void*), void*);
+  const char* (*readFile)(const char* root, size_t offset, char*, size_t count, size_t& got, size_t& total) = nullptr;
 };
 struct Job {
   Request request;
@@ -17,6 +19,9 @@ struct Job {
   Executor executor;
   std::atomic<bool> cancel{false}, done{false};
   std::atomic<unsigned> references{1};
+  bool download=false, committed=false;
+  size_t maxBytes=0;
+  char fileRoot[256]{};
   int id=0;
   void release();
 };
@@ -28,6 +33,11 @@ class Session {
   Session& operator=(const Session&)=delete;
   Domains domains;
   bool allowed=false;
+  bool fileApi=false;
+  char fileRoot[256]{};
+  char readBuffer[DownloadChunk]{}; // session-owned: no Lua OOM can strand a file or heap buffer
+  bool configureFileRoot(std::string_view appRoot);
+  const char* readAt(size_t offset, size_t count, size_t& got, size_t& total);
   Job* reserve();
   bool start();
   void discard();

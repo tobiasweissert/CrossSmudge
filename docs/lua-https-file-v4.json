@@ -1,0 +1,29 @@
+{
+  "contract": "lua-https-file-v4",
+  "status": "frozen-for-dependent-client",
+  "api": 4,
+  "manifest_min_api": 4,
+  "feature": "https_download_file",
+  "download": "smudge.http_download{url=HTTPS_URL,max_bytes=INTEGER_1_TO_2097152,timeout_ms=INTEGER_1000_TO_30000}",
+  "options": "Only url, max_bytes, timeout_ms. GET only; no request body, headers, paths or credentials.",
+  "destination": "One firmware-owned download object per full app directory, outside app/read_file/write_file namespaces. Two generations, max 4194344 bytes including metadata; no import or overwrite of old saves.",
+  "completion": "on_http{id,status,kind='download',size=N} only after commit, or {id,status,kind='download',error=CODE}. Never body or filesystem paths. Only HTTP 200 commits.",
+  "read": "smudge.download_read(offset,count) -> binary_string,total_size OR nil,error. Explicit zero-based absolute seek each call; integer count 1..1024, offset 0..2097152; EOF empty string; beyond EOF invalid_offset. No Lua/native persistent reader handle. Busy while any HTTP job owns slot.",
+  "lifecycle": "Same global slot, main-thread dispatch and http_cancel(id) as API3. Cancellation observed before promotion aborts; successful promotion wins later cancellation. Shutdown detaches Lua; native job owns root until drainage.",
+  "security": "API3 domain grant, public DNS binding, trusted UTC, X509 chain/hostname/time, HTTPS443, no redirects/compression/credential headers unchanged. min_api>=4 required for new calls. Simulator fails closed.",
+  "storage": "Private fixed part/0/1 names; sync and close before rename to vacant generation. Failure preserves previous generation. Physical FAT corruption/power-loss atomicity not guaranteed; SD removal may prevent immediate part cleanup, retried at next download.",
+  "errors_added": [
+    "api_required",
+    "storage_unavailable",
+    "file_write",
+    "file_commit",
+    "file_read",
+    "not_found",
+    "invalid_offset",
+    "invalid_options",
+    "http_status"
+  ],
+  "memory": "Reuse existing 8192-byte native result buffer as at most 1024-byte transfer scratch; never whole archive in Lua. Read buffer 1024 native bytes owned by session.",
+  "publication": "local follow-up only; no API3 feature claim; device/independent review required before integration",
+  "activation": "BLOCKED: no production atomic-failure filesystem backend; https_download_file false on hardware and simulator. Portable core and native backend tests implemented."
+}
