@@ -1,12 +1,14 @@
 -- Only device UI, files and time are doubled. HTTP comes from registerApi.
 local host=dofile
-local open=io.open
+local readAsset=TEST_READ_ASSET or function(p,n)
+  local f=assert(io.open('apps/'..APP..'/'..p,'rb'));local data=f:read(n);f:close();return data
+end
 dofile=function(p) assert(p:match('^[a-z]+%.lua$')); return host('apps/'..APP..'/'..p) end
 local files={}
 rendered=''
 smudge={
   read_file=function(p,n)
-    if p:match('^art/lato%-%w+%.bin$') then local f=assert(open('apps/'..APP..'/'..p,'rb'));local data=f:read(n);f:close();return data end
+    if p:match('^art/lato%-%w+%.bin$') then return readAsset(p,n) end
     return files[p] and files[p]:sub(1,n) end,
   write_file=function(p,s) files[p]=s; return true end,
   get_date=function() return {year=2026,month=11,day=15,hour=12,min=0} end,

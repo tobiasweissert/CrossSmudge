@@ -1,6 +1,8 @@
 // Production HTTP registration + actual shipped Lua apps. Synthetic native
 // transport only: this does not claim DNS/TLS/device/network verification.
 #include "LuaHttp.h"
+#include "../../src/activities/apps/lua/LuaRuntime.h"
+#include <fstream>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -55,13 +57,25 @@ static void run(void*,Job& j) {
   j.result.status=200;j.result.size=strlen(body);assert(j.result.size<=MaxBody);memcpy(j.result.body,body,j.result.size);
 }
 static bool spawn(void(*f)(void*),void* p){f(p);return true;}
+static int readAsset(lua_State* L) {
+  const char* path=luaL_checkstring(L,1);
+  if(strncmp(path,"art/",4) || strstr(path,".."))return luaL_error(L,"invalid test asset path");
+  lua_getglobal(L,"APP");const char* app=lua_tostring(L,-1);
+  std::ifstream input(std::string("apps/")+app+"/"+path,std::ios::binary);
+  assert(input);std::string bytes((std::istreambuf_iterator<char>(input)),{});
+  lua_pop(L,1);lua_pushlstring(L,bytes.data(),bytes.size());return 1;
+}
 static void script(lua_State* L,const char* s) {
   if(luaL_dostring(L,s)!=LUA_OK){fprintf(stderr,"%s\n",lua_tostring(L,-1));exit(1);}
 }
 int main(int argc,char** argv) {
   assert(argc==2);
   Heap h; if(const char* limit=getenv("LUA_APP_LIMIT"))h.limit=strtoul(limit,nullptr,10);
-  lua_State* L=lua_newstate(Heap::alloc,&h); assert(L);luaL_openlibs(L);
+  lua_State* L=lua_newstate(Heap::alloc,&h); assert(L);
+  assert(ink::runtime::openEssential(L)==LUA_OK);
+  assert(ink::runtime::openNetwork(L,true)==LUA_OK);
+  script(L,"assert(utf8.len('aé')==2 and io==nil and package==nil and debug==nil)");
+  lua_pushcfunction(L,readAsset);lua_setglobal(L,"TEST_READ_ASSET");
   lua_pushstring(L,argv[1]);lua_setglobal(L,"APP");
   if(luaL_dofile(L,"test/network_apps/bridge.lua")!=LUA_OK){fprintf(stderr,"%s\n",lua_tostring(L,-1));return 1;}
   restrictStandardLibraries(L);

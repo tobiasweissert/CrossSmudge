@@ -4,6 +4,14 @@ import json
 import pathlib
 import re
 import subprocess
+import argparse
+import zipfile
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--owner-overlay', type=pathlib.Path,
+                    help='Verify unpublished owner UI dependencies in their actual SD overlay')
+args = parser.parse_args()
+overlay = zipfile.ZipFile(args.owner_overlay) if args.owner_overlay else None
 
 root = pathlib.Path(__file__).resolve().parents[2]
 catalog = json.loads((root / 'apps/catalog.json').read_text())
@@ -31,16 +39,26 @@ for app in catalog['apps']:
         assert re.fullmatch(r'[A-Za-z0-9_-][A-Za-z0-9_.-]*(/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*', rel), rel
         path = folder / rel
         assert path.is_file() and not path.is_symlink(), path
+    # Owner UI ports are unpublished: their extra modules/assets ship in the
+    # owner-test overlay, without changing the published catalog or versions.
+    packaged = set(files)
+    if overlay is not None and app_id != 'cp-trivia':
+        prefix = f'.crosssmudge/applications/{app_id}/'
+        packaged = {name[len(prefix):] for name in overlay.namelist() if name.startswith(prefix)}
+        assert set(files) <= packaged, (app_id, 'catalog member omitted from overlay')
+        for rel in packaged:
+            assert overlay.read(prefix + rel) == (folder / rel).read_bytes(), (app_id, rel)
+            assert not rel.endswith(('.dat', '.sav', '.bak', '.cache')), rel
     # All code, sprites and data must ship, including dynamically selected files.
     for path in folder.rglob('*'):
         if not path.is_file():
             continue
         rel = path.relative_to(folder).as_posix()
-        if path.suffix in {'.lua', '.raw', '.json'} or rel.startswith(('data/', 'sprites/', 'maps/')):
-            assert rel in files, (app_id, 'missing dependency', rel)
+        if path.suffix in {'.lua', '.raw', '.bin', '.json', '.txt'} or rel.startswith(('data/', 'sprites/', 'maps/')):
+            assert rel in packaged, (app_id, 'missing dependency', rel)
         if path.suffix == '.lua':
             for dep in re.findall(r'''\bdofile\(['"]([^'"]+)['"]\)''', path.read_text()):
-                assert dep in files, (app_id, 'missing module', dep)
+                assert dep in packaged, (app_id, 'missing module', dep)
     if app_id in {'cp-hackernews', 'cp-trivia'}:
         assert app['requires_psram'] is True and app['min_api'] == manifest['min_api'] == 3
 assert len([i for i in ids if i.startswith('cp-') and i not in {'cp-hackernews', 'cp-trivia'}]) == 18

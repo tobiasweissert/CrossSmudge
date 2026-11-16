@@ -4,7 +4,7 @@ def png(source,dest):
  data=source.read_bytes().split(b"\n",3);w,h=map(int,data[1].split());pixels=data[3]
  def chunk(t,d):return struct.pack(">I",len(d))+t+d+struct.pack(">I",zlib.crc32(t+d))
  dest.write_bytes(b"\x89PNG\r\n\x1a\n"+chunk(b"IHDR",struct.pack(">IIBBBBB",w,h,8,0,0,0,0))+chunk(b"IDAT",zlib.compress(b"".join(b"\0"+pixels[y*w:(y+1)*w] for y in range(h))))+chunk(b"IEND",b""))
-R=pathlib.Path(__file__).resolve().parents[2];T=R/'test/minesweeper_graphics';O=pathlib.Path('/root/github/.host-data/crosssmudge/minesweeper-graphics-hold');O.mkdir(exist_ok=True)
+R=pathlib.Path(__file__).resolve().parents[2];T=R/'test/minesweeper_graphics';O=pathlib.Path(os.environ.get('MINESWEEPER_EVIDENCE','/tmp/minesweeper-graphics-hold'));O.mkdir(parents=True,exist_ok=True)
 with tempfile.TemporaryDirectory(dir='/tmp',prefix='mine-test-') as tmp:
  p=pathlib.Path(tmp);s=(R/'test/crossplay_ports/runner.c').read_text();idx=s.index('static const luaL_Reg api[]=');s=s[:idx]+(T/'render.c').read_text()+s[idx:]
  s=s.replace('{"clear",draw}', '{"clear",clear_image},{"bitmap",bitmap_image},{"rect_dither",dither_image}').replace('{"rect",draw}','{"rect",rect_image}')
