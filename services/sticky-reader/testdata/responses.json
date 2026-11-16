@@ -1,0 +1,21 @@
+{
+  "pending": {
+    "v": 1,
+    "state": "pending",
+    "job": "dddddddddddddddddddddddddddddddd",
+    "retry_ms": 500
+  },
+  "cancelled": {
+    "v": 1,
+    "state": "cancelled"
+  },
+  "missing": {
+    "v": 1,
+    "found": false
+  },
+  "unauthorized": {
+    "v": 1,
+    "error": "unauthorized",
+    "retryable": false
+  }
+}
