@@ -2,6 +2,8 @@
 
 ### Added
 
+- Add local APIv3 previews for live Hacker News feed/story/article reading and Open Trivia DB questions, with checked offline data caches and button/touch controls. These are not App Store releases; public-network/device verification and C3 memory qualification remain pending.
+
 - Lua API v3: asynchronous, permission-controlled HTTPS GET/POST with cancellation and bounded responses. Network apps use the existing Wi-Fi selector; App Settings can revoke network grants and explicitly trust displayed UTC for certificate checks until restart.
 
 ### Security
