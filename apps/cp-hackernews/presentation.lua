@@ -34,21 +34,27 @@ end
 function V.thread(s)
  local w,h=smudge.get_bounds();V.hit={};smudge.clear();local article=s.screen=='article';local item=s.selected
  U.text('<',24,32,'b28');hit('back',nil,0,0,64,64);U.text(article and 'Article' or (item.descendants or 0)..' comments',64,32,'b28')
- local lines={}
- local function emit(text,depth,bold)
-  for _,line in ipairs(U.wrap(clean(text),w-48-depth*20,bold and 'b20' or 'r20')) do lines[#lines+1]={text=line,depth=depth,bold=bold} end
+ local count=0
+ local visit
+ local function blank(depth)visit('',depth,false)end
+ local function walk()
+  local function emit(text,depth,bold)
+   U.lines(clean(text),w-48-depth*20,bold and 'b20' or 'r20',function(line)visit(line,depth,bold)end)
+  end
+  if article then
+   emit(item.title,0,true);blank(0)
+   for paragraph in (s.articleText or ''):gmatch('[^\n]+') do emit(paragraph,0,false);blank(0) end
+  else
+   for paragraph in (s.selfText or ''):gmatch('[^\n]+') do emit(paragraph,0,false) end
+   if s.selfText and s.selfText~='' then blank(0) end
+   for _,comment in ipairs(s.comments) do
+    emit(comment.by..' · '..age(comment.time),comment.depth,true)
+    for paragraph in comment.text:gmatch('[^\n]+') do emit(paragraph,comment.depth,false) end
+    blank(comment.depth)
+   end
+  end
  end
- if article then
-  emit(item.title,0,true);lines[#lines+1]={text='',depth=0}
-  for paragraph in (s.articleText or ''):gmatch('[^\n]+') do emit(paragraph,0,false);lines[#lines+1]={text='',depth=0} end
- else
-  for paragraph in (s.selfText or ''):gmatch('[^\n]+') do emit(paragraph,0,false) end
-  if s.selfText and s.selfText~='' then lines[#lines+1]={text='',depth=0} end
-  for _,comment in ipairs(s.comments) do
-  emit(comment.by..' · '..age(comment.time),comment.depth,true)
-  for paragraph in comment.text:gmatch('[^\n]+') do emit(paragraph,comment.depth,false) end
-  lines[#lines+1]={text='',depth=comment.depth}
- end end
+ visit=function()count=count+1 end;walk()
  local top=86
  if not article then
   local title=U.wrap(clean(item.title),w-48,'b28',3)
@@ -56,12 +62,16 @@ function V.thread(s)
   top=top+#title*32+18;U.text((item.score or 0)..' points · by '..(item.by or '?')..' · '..age(item.time),24,top,'r20',nil,false,true);top=top+36
   if item.url then U.button('Read the article',24,top,228,56,true);hit('article',nil,24,top,228,56);top=top+90 end
  end
- local capacity=math.max(1,(h-top-44)//29);V.pages=math.max(1,math.ceil(#lines/capacity));V.page=math.max(1,math.min(V.page,V.pages))
+ local capacity=math.max(1,(h-top-44)//29);V.pages=math.max(1,math.ceil(count/capacity));V.page=math.max(1,math.min(V.page,V.pages))
  U.text(V.page..' of '..V.pages,w-24,32,'r20','right',false,true)
- for row=1,capacity do local line=lines[(V.page-1)*capacity+row];if not line then break end;local y=top+(row-1)*29
-  for depth=1,line.depth do smudge.rect(24+(depth-1)*20,y-10,3,29,true,true) end
-  U.text(line.text,24+line.depth*20,y,line.bold and 'b20' or 'r20')
+ local index=0;local first=(V.page-1)*capacity+1
+ visit=function(text,depth,bold)
+  index=index+1;if index<first or index>=first+capacity then return end
+  local y=top+(index-first)*29
+  for indent=1,depth do smudge.rect(24+(indent-1)*20,y-10,3,29,true,true) end
+  U.text(text,24+depth*20,y,bold and 'b20' or 'r20')
  end
+ walk()
  local status=s.error~='' and s.error or s.loading and 'Loading...' or not article and s.more and 'Swipe up for more comments' or ''
  U.text(U.wrap(clean(status),w-32,'r20',1)[1] or '',w//2,h-20,'r20','center',false,true)
  hit('previous',nil,0,h-44,w//2,44);hit('next',nil,w//2,h-44,w-w//2,44)

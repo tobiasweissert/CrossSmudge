@@ -44,6 +44,8 @@ local function nextComment()
  end
 end
 local function fillComments()
+ -- Cursor and deferred work belong to the next admitted request.
+ if closed or active or pending then return end
  if #S.comments>=target then S.loading=false;S.more=#frames>0 or deferred~=nil;redraw();return end
  if visited>=256 or bytes>=128*1024 then S.error='Thread session limit reached';S.more=false;S.loading=false;redraw();return end
  local id,depth=nextComment();if not id then S.loading=false;S.more=false;redraw();return end

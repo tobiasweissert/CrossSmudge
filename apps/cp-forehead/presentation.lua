@@ -22,7 +22,7 @@ local function menu(g,M,w,h)
  local play=F.box(16,119,w-32,140);F.rect(play,false,false,3)
  local titleSize=F.fit(c[1],w-120,30);F.text(c[1],32,137+(52-F.cap[titleSize])//2,titleSize)
  F.text(c[2],32,201,F.fit(c[2],w-120,14))
- local best=tonumber(g.bestIn:sub((g.category-1)*3+1,g.category*3),16) or 0
+ local best=tonumber(g.bestIn:sub((g.category-1)*3+1,g.category*3)) or 0
  F.text(best>0 and 'BEST '..best or 'NEW',32,228,14)
  for x=0,43 do local dy=math.floor((44-x)/2);smudge.rect(w-76+x,189-dy,1,dy*2+1,true,true) end
  hit(play,4);smudge.rect(16,271,w-32,3,true,true)
@@ -31,10 +31,10 @@ local function menu(g,M,w,h)
  local count=#g.recent//3
  if count==0 then F.center('YOUR SCORES SHOW UP HERE',panel,14)
  else
-  local peak=1;for i=1,count do peak=math.max(peak,tonumber(g.recent:sub((i-1)*3+1,i*3),16) or 0) end
+  local peak=1;for i=1,count do peak=math.max(peak,tonumber(g.recent:sub((i-1)*3+1,i*3)) or 0) end
   local step=(panel.w-52)//16;local left=panel.x+(panel.w-step*16)//2;local base=panel.y+panel.h-26
   smudge.rect(left,base,step*16,1,true,true)
-  for i=1,count do local value=tonumber(g.recent:sub((i-1)*3+1,i*3),16) or 0;local bh=6+value*(panel.h-58)//peak
+  for i=1,count do local value=tonumber(g.recent:sub((i-1)*3+1,i*3)) or 0;local bh=6+value*(panel.h-58)//peak
    local b=F.box(left+(16-count+i-1)*step+3,base-bh,step-6,bh)
    F.rect(b,true,i~=count);F.rect(b,false,false,2)
   end
@@ -50,7 +50,7 @@ local function picker(g,M,w,h)
   F.rect(b,n==g.category,false,1);smudge.bitmap(30,b.y+15,32,32,art[n],n==g.category)
   local title=M.categories[n][1];local size=F.fit(title,w-196,20)
   F.text(title,78,b.y+(62-F.cap[size])//2,size,n==g.category)
-  local best=tonumber(g.bestIn:sub((n-1)*3+1,n*3),16) or 0;local label=best>0 and 'BEST '..best or 'NEW'
+  local best=tonumber(g.bestIn:sub((n-1)*3+1,n*3)) or 0;local label=best>0 and 'BEST '..best or 'NEW'
   F.text(label,w-32-F.width(label,14),b.y+22,14,n==g.category);hit(b,'category',n)
  end
  F.pips(V.hit,w,h-60,pages,V.page,'page')

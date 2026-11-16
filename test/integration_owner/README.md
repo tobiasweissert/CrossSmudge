@@ -33,3 +33,5 @@ offline reopen and networking opt-out/reenable. Check portrait and landscape,
 internal heap/largest block, PSRAM and HTTP-worker watermark. UTC should sync
 automatically and failed certificates must never send HTTP bytes. No EPUB cache
 reset is required. App Store's one-row-per-swipe behavior remains unresolved.
+
+Round 1 gates include `test/repair_round1/run.py` and the current production startup harness. Supply `CP_FIXTURES` with verified feed/item captures and `ARDUINOJSON_INCLUDE_DIR` with ArduinoJson 7.4.2. Run under a Python environment with Pillow (including its child `python3` commands). These are host callback/transport-selection checks, separate from physical Sticky qualification.

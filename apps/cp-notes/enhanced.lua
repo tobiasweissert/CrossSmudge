@@ -1,7 +1,10 @@
 local N=dofile('core.lua');local S=dofile('storage.lua');local F=dofile('graphics.lua')
 local doc,lines,index,selected,screen,choice='',{},1,1,'library',1
+-- Only a card loaded through load() owns the document and journal sequence.
+local loaded=false
 local hits={};local summaries={};local pages={};local viewPage=1;local pageAnchor=0;local closed=false;local original;local offset=0;local notice='';local w,h=480,800;local margin=25;local pageRows=8;local pending=''
 local function save()
+ if not loaded then return true end
  collectgarbage('collect')
  if not S.save(doc) then notice='Save failed. Keep app open and retry.';return false end
  return true
@@ -14,7 +17,7 @@ local function load(index_)
   doc=raw and N.validate(raw) or ''
   if raw and not N.validate(raw) then notice='Import rejected: over 3072 bytes/97 lines or NUL.' end
  end
- lines=N.parse(doc,true);screen='note'
+ lines=N.parse(doc,true);loaded=true;screen='note'
 end
 local function redraw()smudge.request_update()end
 local options={'Resume','Clear checked lines','Convert to checklist','Convert to page','Import from note file','Help','Save and close'}
@@ -22,12 +25,13 @@ local function change(new)
  summaries[index]=nil;pageAnchor=0;viewPage=1;S.last=nil;offset=0;doc=new;lines=nil;collectgarbage('collect');lines=N.parse(doc,true);selected=math.min(selected,#lines);redraw()
 end
 local function operate()
+ if not loaded then screen='library';redraw();return end
  if choice==1 then screen='note'
  elseif choice==2 or choice==5 then pending=choice==2 and 'clear' or 'import';screen='confirm';choice=1
  elseif choice==3 then change(N.tolist(doc,lines));screen='note'
  elseif choice==4 then change(N.strip(doc,lines));screen='note'
  elseif choice==6 then screen='help'
- elseif save() then screen='library';choice=index end
+ elseif save() then loaded=false;screen='library';choice=index end
  redraw()
 end
 function on_init()
@@ -162,7 +166,8 @@ function on_button(btn,pressed)
  if btn=='back' then
   if screen=='library' then closed=true;smudge.exit()
   elseif screen=='note' then screen='menu';choice=1
-  elseif screen=='menu' then if save() then screen='library';choice=index end
+  elseif screen=='menu' then if save() then loaded=false;screen='library';choice=index end
+  elseif screen=='help' and not loaded then screen='library'
   else screen='menu';choice=1 end
  elseif screen=='library' then
   if btn=='up' then choice=(choice-2)%8+1 elseif btn=='down' then choice=choice%8+1
@@ -202,9 +207,9 @@ function on_touch(x,y,event)
  elseif action=='confirm' then choice=value;on_button('confirm',true)
  elseif action=='menu' then on_button('back',true)
  elseif action=='clear' then choice=2;operate()
- elseif action=='resume' then screen='note';redraw()
+ elseif action=='resume' then screen=loaded and 'note' or 'library';redraw()
  elseif action=='help' then screen='help';redraw()
- elseif action=='back' then if doc=='' then screen='library';redraw() else on_button('back',true) end end
+ elseif action=='back' then on_button('back',true) end
 end
 function on_swipe(dir)
  if closed then return end
@@ -215,5 +220,5 @@ function on_swipe(dir)
  else on_button(dir,true) end
 end
 function on_update()end
-function on_exit()if screen~='library' then save() end;closed=true;if original then pcall(smudge.set_orientation,original) end end
+function on_exit()if loaded then save() end;closed=true;if original then pcall(smudge.set_orientation,original) end end
 return {state=function()return doc,lines,screen,index end,hits=function()return hits end,pages=function()return pages,viewPage end}

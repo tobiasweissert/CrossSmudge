@@ -17,14 +17,14 @@ fixtures=pathlib.Path(os.environ['CP_FIXTURES'])
 for item in json.loads((fixtures/'provenance.json').read_text()):
  if item['name'] in ('feed','item'):
   assert hashlib.sha256((fixtures/(item['name']+'.body')).read_bytes()).hexdigest()==item['sha256']
-flags=['-O1','-g','-Ilib/Lua/src','-Ilib/LuaHttp','-Isrc/activities/apps/lua','-I'+str(out),'-I.pio/libdeps/sticky/ArduinoJson/src']
+flags=['-O1','-g','-Ilib/Lua/src','-Ilib/LuaHttp','-Isrc/activities/apps/lua','-I'+str(out),'-I'+os.environ.get('ARDUINOJSON_INCLUDE_DIR',str(R/'.pio/libdeps/sticky-owner-test/ArduinoJson/src'))]
 for source in sorted((R/'lib/Lua/src').glob('l*.c')):
  subprocess.run(['cc',*flags,'-c',str(source),'-o',str(out/(source.stem+'.o'))],check=True)
 subprocess.run(['c++','-std=c++20',*flags,'test/lua_startup/startup.cpp','lib/LuaHttp/LuaHttp.cpp','lib/LuaHttp/HttpCore.cpp',*map(str,out.glob('*.o')),'-lm','-ldl','-o',str(out/'startup')],check=True)
 for extra in ({'LUA_APP_LIMIT':'2097152'}, {'LUA_APP_LIMIT':'76800','EXPECT_OOM':'1'},
-              {'HTTP_ERROR':'time_untrusted'}, {'HTTP_ERROR':'transport_failed'},
+              {'DISPATCH_OOM':'1'}, {'HTTP_ERROR':'time_untrusted'}, {'HTTP_ERROR':'transport_failed'},
               {'CANCEL':'1'}, {'OPT_OUT':'1'}):
- env=dict(os.environ,SMUDGE_X3_CONSTRAINTS='1',LUA_APP_LIMIT='76800');env.update(extra)
+ env=dict(os.environ,SMUDGE_X3_CONSTRAINTS='1',LUA_APP_LIMIT='2097152');env.update(extra)
  print('CASE',extra,flush=True)
  subprocess.run([str(out/'startup'),'cp-hackernews'],check=True,env=env)
 

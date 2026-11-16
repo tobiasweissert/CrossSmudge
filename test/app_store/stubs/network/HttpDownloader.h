@@ -23,6 +23,7 @@ class HttpDownloader {
   static inline std::vector<int> lockDepths;
   static inline std::vector<uint8_t> body = std::vector<uint8_t>(128, 0xa5);
   static inline DownloadError result = OK;
+  static inline bool insecureWouldSucceed = false;
   static inline size_t chunkSize = 31;
   static inline std::function<void()> duringRequest;
   static DownloadError streamUrl(const std::string&url, const DataCallback&cb, ProgressCallback = nullptr, const std::string& = "", const std::string& = "", DownloadOptions opts = DownloadOptions()) {
@@ -37,9 +38,12 @@ class HttpDownloader {
     }
     return OK;
   }
-  static DownloadError downloadToFile(const std::string&url, const std::string&path, ProgressCallback, bool*, const std::string&, const std::string&, DownloadOptions) {
+  static DownloadError downloadToFile(const std::string&url, const std::string&path, ProgressCallback, bool*, const std::string&, const std::string&, DownloadOptions opts) {
     requests.push_back(url);
-    if (result != OK)return result;
+    transports.push_back(opts.transport);
+    if (duringRequest)duringRequest();
+    if (opts.shouldCancel && opts.shouldCancel())return ABORTED;
+    if (result != OK && !(insecureWouldSucceed && opts.transport == Transport::WOLFSSL))return result;
     HalFile f;
     if (!Storage.openFileForWrite("FAKE", path.c_str(), f))return FILE_ERROR;
     bool ok = f.write(body.data(), body.size()) == body.size();

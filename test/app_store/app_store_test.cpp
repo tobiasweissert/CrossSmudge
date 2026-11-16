@@ -32,6 +32,7 @@ struct Fixture {
     HttpDownloader::lockDepths.clear();
     HttpDownloader::duringRequest = nullptr;
     HttpDownloader::result = HttpDownloader::OK;
+    HttpDownloader::insecureWouldSucceed = false;
     HttpDownloader::body.assign(128, 0xa5);
     HttpDownloader::chunkSize = 31;
     app.baseUrl_ = "https://example.invalid/apps/";
@@ -503,7 +504,49 @@ static void updatePreservesUserFiles() {
   }
 }
 
+
+void verifiedStoreTransport() {
+  for (auto outcome : {HttpDownloader::OK, HttpDownloader::HTTP_ERROR, HttpDownloader::ABORTED}) {
+    Fixture f(1);
+    HttpDownloader::result = outcome;
+    // A broken peer could satisfy an unverified client: it must never be tried.
+    HttpDownloader::insecureWouldSucceed = true;
+    const std::string catalog = R"({"apps":[{"id":"fixture-0","name":"Fixture","version":"1.0","files":["main.lua","manifest.json"]}]})";
+    HttpDownloader::body.assign(catalog.begin(), catalog.end());
+    f.app.fetchCatalog();
+    CHECK(HttpDownloader::transports.size() == 1);
+    for (auto t : HttpDownloader::transports) CHECK(t == HttpDownloader::Transport::ESP_HTTP);
+    CHECK(f.app.state_ == (outcome == HttpDownloader::OK ? AppStoreActivity::State::CATALOG_READY : AppStoreActivity::State::ERROR));
+    HttpDownloader::transports.clear();
+    auto& app = f.app.apps_[0];
+    app.files = {"main.lua", "manifest.json"};
+    f.app.installApp(app);
+    CHECK(HttpDownloader::transports.size() == (outcome == HttpDownloader::OK ? 2 : 3));
+    for (auto t : HttpDownloader::transports) CHECK(t == HttpDownloader::Transport::ESP_HTTP);
+    if (outcome != HttpDownloader::OK) {
+      CHECK(f.app.state_ == AppStoreActivity::State::ERROR);
+      CHECK(!Storage.exists("/.crosssmudge/applications/fixture-0/main.lua"));
+      // A later user retry can succeed, still using only the verified client.
+      HttpDownloader::result = HttpDownloader::OK;
+      f.app.installApp(app);
+      CHECK(Storage.exists("/.crosssmudge/applications/fixture-0/main.lua"));
+      for (auto t : HttpDownloader::transports) CHECK(t == HttpDownloader::Transport::ESP_HTTP);
+    }
+  }
+  Fixture f(1);
+  auto& app = f.app.apps_[0];
+  app.files = {"main.lua", "manifest.json"};
+  HttpDownloader::duringRequest = [&]() { f.app.cancelDownload_ = true; };
+  f.app.installApp(app);
+  CHECK(HttpDownloader::transports.size() == 1);
+  CHECK(HttpDownloader::transports[0] == HttpDownloader::Transport::ESP_HTTP);
+  CHECK(!Storage.exists("/.crosssmudge/applications/fixture-0/main.lua"));
+  CHECK(!Storage.exists("/.crosssmudge/applications/fixture-0/manifest.json"));
+  std::printf("PASS authenticated catalog/install/retries/errors/cancel\n");
+}
+
 int main() {
+  verifiedStoreTransport();
   updatePreservesUserFiles();
   sourceRouting();
   corruptedReadback();

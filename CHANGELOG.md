@@ -2,6 +2,9 @@
 
 ### Fixed
 
+- Hacker News reads large articles and comment threads within its Lua heap, and preserves comment order during repeated forward navigation.
+- Notes import help keeps existing cards safe before opening a note; Forehead displays saved scores in decimal.
+
 - HTTPS apps synchronize UTC automatically without manual confirmation and retain certificate checks; PSRAM devices keep Lua allocations out of internal RAM needed by TLS.
 - Hacker News continues loading after a failed story, supports per-row retries, and opens articles directly from story titles; comment badges open discussions.
 - Sticky Five Letters retains its new design on the Back menu and uses darker hint text; Hacker News secondary text is also darker.
@@ -37,6 +40,8 @@
 - Added an explicit Sticky owner-test profile using a matching fork catalog and package origin; standard builds retain the upstream store.
 
 ### Security
+
+- App Store catalog and executable package downloads use authenticated HTTPS on every attempt.
 
 - Confine Lua file access to each app and its saved data, and disable host file/process escape functions. This prevents an offline app from replacing an approved network app or reading unrelated saved credentials. Absolute paths outside these directories are no longer supported.
 

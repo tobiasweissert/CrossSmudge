@@ -50,6 +50,24 @@ function U.wrap(text,width,key,maxlines)
  end
  return lines
 end
+-- Streaming wrapper: the visitor owns at most one line, independent of body size.
+-- Keep the same whitespace, UTF-8 and long-word rules as wrap().
+function U.lines(text,width,key,visit)
+ local current='';key=key or 'r20'
+ local function push()visit(current);current='' end
+ for paragraph in (tostring(text)..'\n'):gmatch('(.-)\n') do
+  for word in paragraph:gmatch('%S+') do
+   if current~='' and U.width(current..' '..word,key)>width then push() end
+   if U.width(word,key)>width then
+    for char in each(word) do
+     if current~='' and U.width(current..char,key)>width then push() end
+     current=current..char
+    end
+   else current=current=='' and word or current..' '..word end
+  end
+  push()
+ end
+end
 function U.round(x,y,w,h,r,fill,white)
  smudge.rounded_rect(math.floor(x),math.floor(y),math.floor(w),math.floor(h),r,fill,not white,2)
 end

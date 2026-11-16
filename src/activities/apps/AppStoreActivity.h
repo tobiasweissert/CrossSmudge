@@ -425,20 +425,11 @@ class AppStoreActivity : public Activity {
     Storage.remove(tmpCatalog.c_str());
 
     HttpDownloader::DownloadOptions options;
-#if defined(FREEINK_NET_WOLFSSL)
-    options.transport = HttpDownloader::Transport::WOLFSSL;
-#endif
+    // Catalogs and executable packages require the CA-verified transport.
+    options.transport = HttpDownloader::Transport::ESP_HTTP;
 
     HttpDownloader::DownloadError err =
         HttpDownloader::downloadToFile(catalogUrl_, tmpCatalog, nullptr, nullptr, "", "", options);
-
-#if defined(FREEINK_NET_WOLFSSL)
-    if (err != HttpDownloader::OK) {
-      LOG_DBG("STORE", "WolfSSL catalog fetch failed (%d), trying ESP_HTTP", err);
-      options.transport = HttpDownloader::Transport::ESP_HTTP;
-      err = HttpDownloader::downloadToFile(catalogUrl_, tmpCatalog, nullptr, nullptr, "", "", options);
-    }
-#endif
 
 #if defined(SIMULATOR)
     if (err != HttpDownloader::OK) {
@@ -804,9 +795,7 @@ class AppStoreActivity : public Activity {
 
       HttpDownloader::DownloadOptions options;
       options.shouldCancel = [this]() { return cancelDownload_; };
-#if defined(FREEINK_NET_WOLFSSL)
-      options.transport = HttpDownloader::Transport::WOLFSSL;
-#endif
+      options.transport = HttpDownloader::Transport::ESP_HTTP;
 
       HttpDownloader::DownloadError err = HttpDownloader::HTTP_ERROR;
 
@@ -838,9 +827,6 @@ class AppStoreActivity : public Activity {
         if (attempt > 0) {
           delay(500);
         }
-#if defined(FREEINK_NET_WOLFSSL)
-        options.transport = (attempt == 1) ? HttpDownloader::Transport::ESP_HTTP : HttpDownloader::Transport::WOLFSSL;
-#endif
         err = HttpDownloader::downloadToFile(fileUrl, destPath, nullptr, &cancelDownload_, "", "", options);
         if (err == HttpDownloader::FILE_ERROR) {
           break;
