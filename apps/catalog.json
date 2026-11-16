@@ -78,7 +78,7 @@
     {
       "id": "browser",
       "name": "Browser",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "author": "CrossSmudge",
       "description": "Direct HTTPS reader with live RSS/Atom feeds, links, search forms and checked offline pages. No scripts or logins.",
       "min_api": 6,
