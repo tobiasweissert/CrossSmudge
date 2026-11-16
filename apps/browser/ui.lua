@@ -12,9 +12,9 @@ end
 function U.text(x,y,s,font,bold,align,color)
  smudge.text(math.floor(x),math.floor(y),tostring(s),font or 'ui12',bold and 'bold' or 'regular',align or 'left',color~=false)
 end
-function U.fit(s,width,font)
+function U.fit(s,width,font,style)
  font=font or 'ui12'
- while #s>0 and smudge.text_width(s,font)>width do
+ while #s>0 and smudge.text_width(s,font,style)>width do
   local at=#s;while at>1 and s:byte(at)>=128 and s:byte(at)<192 do at=at-1 end
   s=s:sub(1,at-1)
  end
@@ -29,7 +29,10 @@ end
 function U.button(label,x,y,w,h,action,filled,value)
  local i=#U.buttons+1; U.buttons[i]={x,y,w,h,action,label,value}
  smudge.rounded_rect(x,y,w,h,math.min(14,h//4),filled or false,U.focus==i and 3 or 1)
- U.text(x+w/2,y+(h-smudge.line_height('ui12'))/2,U.fit(label,w-12),'ui12',true,'center',not filled)
+ U.text(x+w/2,y+(h-smudge.line_height('ui12'))/2,U.fit(label,w-12,'ui12','bold'),'ui12',true,'center',not filled)
+end
+function U.hit(x,y,w,h,action,label)
+ U.buttons[#U.buttons+1]={math.floor(x),math.floor(y),math.floor(w),math.floor(h),action,label or 'Link'}
 end
 function U.footer()
  if U.notice~='' then U.text(U.pad,U.bottom-25,U.fit(U.notice,U.w-2*U.pad,'small'),'small') end
@@ -56,7 +59,7 @@ function U.edit(title,value,limit,done)
  U.buttons={};U.digits=nil
  collectgarbage('collect')
  U.editorDraw=U.editorDraw or dofile('editor.lua')
- U.editor={title=title,value=value or '',limit=limit,done=done,shift=false,numeric=false};U.focus=1;U.redraw()
+ U.editor={title=title,value=value or '',limit=limit,done=done,cursor=#(value or '')+1,shift=false,numeric=false};U.focus=1;U.redraw()
 end
 function U.closeEditor() U.buttons={};U.editor=nil;U.focus=1 end
 function U.editDraw() U.editorDraw(U) end

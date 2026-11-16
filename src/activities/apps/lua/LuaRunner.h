@@ -19,7 +19,7 @@ namespace ink {
 
 class LuaRunner {
  public:
-  static constexpr int LUA_API_VERSION = 3;
+  static constexpr int LUA_API_VERSION = 5;
 
   LuaRunner(GfxRenderer& renderer, MappedInputManager& input, const std::string& appDir, const std::string& appId);
   ~LuaRunner();
@@ -72,6 +72,7 @@ class LuaRunner {
   http::Session http_{http::platformExecutor()};
   bool resolvePath(const char* path, std::string& result) const;
   lua_State* L = nullptr;
+  bool browser_ = false;
   bool requestedExit_ = false;
   bool hasError_ = false;
   bool redrawRequested_ = false;
@@ -89,6 +90,9 @@ class LuaRunner {
   void setError(const char* msg);
 
   // C-to-Lua Bridge functions
+  static int l_browserAdvance(lua_State* L);
+  static int l_browserPath(lua_State* L);
+  static int l_browserImage(lua_State* L);
   static int l_dofile(lua_State* L);
   static int l_clear(lua_State* L);
   static int l_refresh(lua_State* L);

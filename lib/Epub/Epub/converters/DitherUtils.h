@@ -28,3 +28,9 @@ inline uint8_t applyBayerDither4Level(uint8_t gray, int x, int y) {
   if (adjusted < 192) return 2;
   return 3;
 }
+
+// Ordered one-bit output uses only black (0) and white (3), preserving average
+// luminance when the destination is a single BW framebuffer. No scratch buffer.
+inline uint8_t applyBayerDither1Bit(uint8_t gray, int x, int y) {
+  return gray > bayer4x4[y & 3][x & 3] * 16 + 8 ? 3 : 0;
+}

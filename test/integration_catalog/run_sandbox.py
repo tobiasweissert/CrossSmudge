@@ -8,6 +8,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['TMPDIR'],prefix='sandbox-') as 
  w=pathlib.Path(tmp); objects=[]
  for source in sorted((R/'lib/Lua/src').glob('*.c')):
   obj=w/(source.stem+'.o');subprocess.run(['cc','-O1','-I'+str(R/'lib/Lua/src'),'-c',str(source),'-o',str(obj)],check=True);objects.append(str(obj))
+ miniz=w/'miniz.o';subprocess.run(['cc','-O1','-I'+str(R/'lib/miniz/src'),'-c',str(R/'lib/miniz/src/miniz_impl.c'),'-o',str(miniz)],check=True);objects.append(str(miniz))
  for group in ['crossplay_ports','replacement_chess','replacement_sudoku','replacement_solitaire','replacement_wordle']:
   here=R/'test'/group
   source=(here/'runner.c').read_text()
@@ -22,7 +23,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['TMPDIR'],prefix='sandbox-') as 
   source=source.replace(marker,'extern void integration_sandbox(lua_State*); integration_sandbox(L); '+marker,1)
   src=w/(group+'.c');src.write_text(source);obj=w/(group+'.o');binary=w/group
   subprocess.run(['cc','-O1','-I'+str(R/'lib/Lua/src'),'-I'+str(here),'-c',str(src),'-o',str(obj)],check=True)
-  subprocess.run(['c++','-O1','-std=c++20','-I'+str(R/'lib/Lua/src'),'-I'+str(R/'lib/LuaHttp'),str(obj),str(R/'test/integration_catalog/sandbox_adapter.cpp'),str(R/'lib/LuaHttp/LuaHttp.cpp'),str(R/'lib/LuaHttp/HttpCore.cpp'),*objects,'-lm','-ldl','-o',str(binary)],check=True)
+  subprocess.run(['c++','-O1','-std=c++20','-I'+str(R/'lib/Lua/src'),'-I'+str(R/'lib/LuaHttp'),'-I'+str(R/'lib/LuaBrowser'),'-I'+str(R/'lib/Memory'),'-I'+str(R/'lib/miniz/src'),str(obj),str(R/'test/integration_catalog/sandbox_adapter.cpp'),str(R/'lib/LuaHttp/LuaHttp.cpp'),str(R/'lib/LuaHttp/HttpCore.cpp'),str(R/'lib/LuaHttp/HttpGzip.cpp'),str(R/'lib/hal/HalLuaResources.cpp'),*objects,'-lm','-ldl','-o',str(binary)],check=True)
   apps=sorted(p.name for p in (R/'apps').glob('cp-*') if p.name not in ['cp-hackernews','cp-trivia']) if group=='crossplay_ports' else [group.removeprefix('replacement_')]
   for app in apps:
    with tempfile.TemporaryDirectory(dir=w) as fixture:

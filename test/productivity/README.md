@@ -1,10 +1,12 @@
-# Five Lua productivity apps
+# Lua productivity app tests
 
 Run from the repo root:
 
 ```sh
 bash test/productivity/run.sh
 ```
+
+Browser API5 has a separate PSRAM/resource regression suite in `test/browser/run.py`, invoked after the four existing C3 app checks. Browser is not qualified by the76,800-byte profile below.
 
 The runner compiles the vendored Lua with its shipped int32/float32 configuration.
 It checks portrait 480×800 and landscape 800×480 at a 76,800-byte app budget,

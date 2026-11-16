@@ -276,7 +276,8 @@ int pngDrawCallback(PNGDRAW* pDraw) {
 
         uint8_t ditheredGray;
         if (useDithering) {
-          ditheredGray = applyBayerDither4Level(gray, outX, outY);
+          ditheredGray = ctx->config->useMonochromeDither ? applyBayerDither1Bit(gray, outX, outY)
+                                                          : applyBayerDither4Level(gray, outX, outY);
         } else {
           ditheredGray = quantizeGrayTo4Level(gray);
         }

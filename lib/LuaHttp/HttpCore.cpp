@@ -1,4 +1,5 @@
 #include "HttpCore.h"
+#include "HttpGzip.h"
 #include <cstdio>
 #include <cstring>
 #include <initializer_list>
@@ -48,11 +49,12 @@ bool validHost(std::string_view h) {
 bool parseUrl(std::string_view s, Url& u) {
   if(s.size()>512 || s.substr(0,8)!="https://") return false;
   s.remove_prefix(8);
-  auto slash=s.find('/');
+  auto slash=s.find_first_of("/?#");
   auto h=s.substr(0,slash);
   if(!validHost(h)) return false;
   auto p=slash==s.npos ? std::string_view("/") : s.substr(slash);
-  if(p.size()>=sizeof(u.path)) return false;
+  const size_t prefix=p.front()=='/' ? 0 : 1;
+  if(p.size()+prefix>=sizeof(u.path)) return false;
   for(size_t i=0;i<p.size();++i) {
     unsigned char c=p[i];
     if(c<33 || c>126 || c=='\\' || c=='#') return false;
@@ -63,10 +65,49 @@ bool parseUrl(std::string_view s, Url& u) {
     }
   }
   memcpy(u.host,h.data(),h.size()); u.host[h.size()]=0;
-  memcpy(u.path,p.data(),p.size()); u.path[p.size()]=0;
+  if(prefix)u.path[0]='/';
+  memcpy(u.path+prefix,p.data(),p.size()); u.path[p.size()+prefix]=0;
   return true;
 }
+bool resolveRedirect(const Url& base,std::string_view reference,Url& result){
+  // A bounded URL scratch (<1 KiB total with path normalization) is justified
+  // here to avoid a fallible heap allocation while following an untrusted hop.
+  char full[513];int n=-1;
+  if(reference.size()>512)return false;
+  if(reference.substr(0,8)=="https://")n=snprintf(full,sizeof(full),"%.*s",int(reference.size()),reference.data());
+  else if(reference.substr(0,2)=="//")n=snprintf(full,sizeof(full),"https:%.*s",int(reference.size()),reference.data());
+  else if(!reference.empty() && reference.front()=='/')n=snprintf(full,sizeof(full),"https://%s%.*s",base.host,int(reference.size()),reference.data());
+  else if(reference.find(':')==reference.npos || reference.find(':')>reference.find_first_of("/?#")){
+    std::string_view path(base.path);
+    if(!reference.empty() && reference.front()!='#'){
+      path=path.substr(0,path.find('?'));
+      if(reference.front()!='?')path=path.substr(0,path.rfind('/')+1);
+    }
+    n=snprintf(full,sizeof(full),"https://%s%.*s%.*s",base.host,int(path.size()),path.data(),int(reference.size()),reference.data());
+  }
+  if(n<0 || size_t(n)>=sizeof(full))return false;
+  if(char* hash=strchr(full,'#'))*hash=0;
+  if(!parseUrl(full,result))return false;
+  char original[385];memcpy(original,result.path,sizeof(original));
+  auto query=strchr(original,'?');size_t pathLength=query?size_t(query-original):strlen(original);
+  std::string_view input(original,pathLength);size_t used=0;
+  auto removeLast=[&](){while(used && result.path[used-1]!='/')--used;if(used)--used;};
+  while(!input.empty()){
+    if(input.substr(0,3)=="../")input.remove_prefix(3);
+    else if(input.substr(0,2)=="./")input.remove_prefix(2);
+    else if(input.substr(0,3)=="/./")input.remove_prefix(2);
+    else if(input=="/."){input={};result.path[used++]='/';}
+    else if(input.substr(0,4)=="/../"){input.remove_prefix(3);removeLast();}
+    else if(input=="/.."){input={};removeLast();result.path[used++]='/';}
+    else if(input=="." || input=="..")input={};
+    else{size_t end=input.find('/',input.front()=='/'?1:0);if(end==input.npos)end=input.size();memcpy(result.path+used,input.data(),end);used+=end;input.remove_prefix(end);}
+  }
+  if(!used)result.path[used++]='/';
+  if(query){size_t count=strlen(query);memcpy(result.path+used,query,count);used+=count;}
+  result.path[used]=0;return true;
+}
 bool Domains::contains(const char* h) const {
+  if(publicHttps && validHost(h)) return true;
   for(size_t i=0;i<count;++i) if(!strcmp(names[i],h)) return true;
   return false;
 }
@@ -123,27 +164,33 @@ bool resolveAppPath(std::string_view path, std::string_view appRoot, std::string
   out.append(path);
   return true;
 }
-void exchange(const Request& q,Result& r,Scratch& scratch,Io& io,const std::atomic<bool>& cancel) {
-  r.status=0; r.size=0; r.error=nullptr;
+bool resolveAppDirectory(std::string_view path,std::string_view appRoot,std::string_view saveRoot,std::string& out){
+  if(path==appRoot || path==saveRoot){out.assign(path);return true;}
+  return resolveAppPath(path,appRoot,saveRoot,out);
+}
+static void exchangeOne(const Request& q,Result& r,Scratch& scratch,Io& io,const std::atomic<bool>& cancel, const Url& url, uint32_t timeout) {
+  r.status=0; r.size=0; r.error=nullptr; r.location[0]=0; r.contentType[0]=0;
   const uint32_t start=io.millis(io.context);
   auto ok=[&]() {
     if(cancel.load()) {r.error="cancelled";return false;}
-    if(uint32_t(io.millis(io.context)-start)>=q.timeoutMs) {r.error="timeout";return false;}
+    if(uint32_t(io.millis(io.context)-start)>=timeout) {r.error="timeout";return false;}
     return true;
   };
   auto fail=[&](const char* e) {if(!r.error) r.error=e;};
   if(!ok()) return;
-  if(!io.connect(io.context,q.url.host,q.timeoutMs,cancel)) {fail("tls_or_network");io.close(io.context);return;}
+  if(!io.connect(io.context,url.host,timeout,cancel)) {fail("tls_or_network");io.close(io.context);return;}
   struct Close {Io& io; ~Close(){io.close(io.context);}} close{io};
   auto send=[&](const char* p,size_t n) {
     while(n && ok()) {int w=io.write(io.context,p,n);if(w<=0 || size_t(w)>n){fail("write");return false;}p+=w;n-=w;}
     return n==0 && ok();
   };
-  int n=snprintf(scratch.line,sizeof(scratch.line),"%s %s HTTP/1.1\r\n",q.post?"POST":"GET",q.url.path);
+  int n=snprintf(scratch.line,sizeof(scratch.line),"%s %s HTTP/1.1\r\n",q.post?"POST":"GET",url.path);
   if(n<0 || size_t(n)>=sizeof(scratch.line)) {fail("request_limit");return;}
   if(!send(scratch.line,n)) return;
-  n=snprintf(scratch.line,sizeof(scratch.line),"Host: %s\r\n",q.url.host);
-  if(!send(scratch.line,n) || !send("Connection: close\r\nAccept-Encoding: identity\r\n",46)) return;
+  n=snprintf(scratch.line,sizeof(scratch.line),"Host: %s\r\n",url.host);
+  if(!send(scratch.line,n))return;
+  const char* connection=q.browser?"Connection: close\r\nAccept-Encoding: gzip, identity\r\n":"Connection: close\r\nAccept-Encoding: identity\r\n";
+  if(!send(connection,strlen(connection)))return;
   for(size_t i=0;i<q.headerCount;++i) {
     n=snprintf(scratch.line,sizeof(scratch.line),"%s: %s\r\n",q.headers[i].name,q.headers[i].value);
     if(!send(scratch.line,n)) return;
@@ -172,7 +219,7 @@ void exchange(const Request& q,Result& r,Scratch& scratch,Io& io,const std::atom
      !digit(status[9]) || !digit(status[10]) || !digit(status[11]) || (status.size()>12 && status[12]!=' ')) {fail("protocol");return;}
   r.status=(status[9]-'0')*100+(status[10]-'0')*10+status[11]-'0';
   if(r.status<200 || r.status>599) {fail("protocol");return;}
-  size_t length=0;bool hasLength=false,chunked=false;
+  size_t length=0;bool hasLength=false,chunked=false,compressed=false,encodingSeen=false;
   while(line()) {
     std::string_view s(scratch.line); if(s.empty()) break;
     auto colon=s.find(':'); if(colon==s.npos || colon==0 || s[0]==' ' || s[0]=='\t') {fail("protocol");return;}
@@ -181,18 +228,68 @@ void exchange(const Request& q,Result& r,Scratch& scratch,Io& io,const std::atom
     while(!value.empty() && (value.back()==' ' || value.back()=='\t'))value.remove_suffix(1);
     if(equalFold(name,"content-length")) {
       if(hasLength || !decimal(value,length)){fail("protocol");return;} hasLength=true;
-      if(length>MaxBody){fail("body_limit");return;}
+      if(length>(q.browser?q.limit:r.capacity)){fail("body_limit");return;}
     } else if(equalFold(name,"transfer-encoding")) {
       if(chunked || !equalFold(value,"chunked")){fail("protocol");return;}chunked=true;
-    } else if(equalFold(name,"content-encoding") && !equalFold(value,"identity")) {fail("encoding");return;}
+    } else if(q.browser && equalFold(name,"location")) {
+      if(r.location[0] || value.size()>=sizeof(r.location)){fail("redirect_invalid");return;}
+      memcpy(r.location,value.data(),value.size());r.location[value.size()]=0;
+    } else if(q.browser && equalFold(name,"content-type")) {
+      if(value.size()>=sizeof(r.contentType)){fail("header_limit");return;}
+      memcpy(r.contentType,value.data(),value.size());r.contentType[value.size()]=0;
+    } else if(equalFold(name,"content-encoding")) {
+      if(q.browser && encodingSeen){fail("encoding");return;}encodingSeen=true;
+      if(!equalFold(value,"identity")){
+        if(q.browser && equalFold(value,"gzip"))compressed=true;
+        else{fail("encoding");return;}
+      }
+    }
   }
   if(r.error) return;
   if(chunked && hasLength){fail("protocol");return;}
-  if(r.status>=300 && r.status<=399) {fail("redirect_denied");return;}
+  if(r.status>=300 && r.status<=399) {if(!q.browser)fail("redirect_denied");return;}
   if(r.status==204 || r.status==304) return;
+  if(q.browser){
+    if(!hasLength && !chunked){fail("protocol");return;}
+    size_t remaining=hasLength?length:0,wire=0,controls=0,chunks=0;bool done=false,crlf=false;
+    auto framed=[&](char* output,size_t count)->int{
+      if(!ok())return -1;
+      if(done)return 0;
+      if(chunked && !remaining){
+        if(crlf){char pair[2];if(read(pair,1)!=1 || read(pair+1,1)!=1 || pair[0]!='\r' || pair[1]!='\n'){fail("protocol");return -1;}controls+=2;}
+        scratch.headerBytes=0;if(!line())return -1;controls+=scratch.headerBytes;
+        if(++chunks>q.limit+1 || controls>6*q.limit+4096){fail("chunk_limit");return -1;}
+        std::string_view value(scratch.line);value=value.substr(0,value.find(';'));
+        if(!decimal(value,remaining,16)){fail("protocol");return -1;}
+        if(remaining>q.limit-wire){fail("body_limit");return -1;}
+        if(!remaining){
+          scratch.headerBytes=0;
+          while(line() && scratch.line[0])if(!strchr(scratch.line,':')){fail("protocol");return -1;}
+          done=true;return r.error?-1:0;
+        }
+        crlf=true;
+      }
+      if(!remaining){done=true;return 0;}
+      size_t n=count<remaining?count:remaining;int got=read(output,n);
+      if(got<=0 || size_t(got)>n){fail("truncated");return -1;}
+      remaining-=got;wire+=got;
+      if(wire>q.limit){fail("body_limit");return -1;}return got;
+    };
+    struct Adapter {decltype(framed)& read;decltype(ok)& check;} adapter{framed,ok};
+    BodyStream stream{&adapter,[](void* p,char* bytes,size_t n){return static_cast<Adapter*>(p)->read(bytes,n);},
+      [](void* p){return static_cast<Adapter*>(p)->check();}};
+    if(compressed){gzip(stream,r);return;}
+    for(;;){int got=framed(scratch.chunk,sizeof(scratch.chunk));if(got<0)return;if(!got)break;
+      if(size_t(got)>r.capacity-r.size){fail("body_limit");return;}
+      if(r.sink){if(!r.sink(r.sinkContext,scratch.chunk,got)){fail("storage_write");return;}}
+      else memcpy(r.data()+r.size,scratch.chunk,got);
+      r.size+=got;
+    }
+    ok();return;
+  }
   auto bytes=[&](size_t count) {
-    if(count>MaxBody-r.size){fail("body_limit");return false;}
-    while(count) {int got=read(r.body+r.size,count);if(got<=0){fail("truncated");return false;}r.size+=got;count-=got;}
+    if(count>r.capacity-r.size){fail("body_limit");return false;}
+    while(count) {int got=read(r.data()+r.size,count);if(got<=0){fail("truncated");return false;}r.size+=got;count-=got;}
     return true;
   };
   if(chunked) {
@@ -200,8 +297,14 @@ void exchange(const Request& q,Result& r,Scratch& scratch,Io& io,const std::atom
       if(!line()) return;
       size_t chunk;
       // No extensions/trailers in this deliberately narrow initial contract.
-      if(!decimal(scratch.line,chunk,16)){fail("protocol");return;}
-      if(!chunk) {if(!line() || scratch.line[0]) fail("protocol");break;}
+      std::string_view chunkText(scratch.line);
+      if(q.browser)chunkText=chunkText.substr(0,chunkText.find(';'));
+      if(!decimal(chunkText,chunk,16)){fail("protocol");return;}
+      if(!chunk) {
+        if(q.browser) { while(line() && scratch.line[0]) { if(!strchr(scratch.line,':')){fail("protocol");return;} } }
+        else if(!line() || scratch.line[0]) fail("protocol");
+        break;
+      }
       if(!bytes(chunk)) return;
       char crlf[2];if(read(crlf,1)!=1 || read(crlf+1,1)!=1 || crlf[0]!='\r' || crlf[1]!='\n'){fail("protocol");return;}
     }
@@ -209,5 +312,23 @@ void exchange(const Request& q,Result& r,Scratch& scratch,Io& io,const std::atom
   else { fail("protocol"); return; } // ESP TLS cannot distinguish clean close_notify from raw TCP EOF.
 
   ok();
+}
+void exchange(const Request& original,Result& r,Scratch& scratch,Io& io,const std::atomic<bool>& cancel) {
+  if(!original.browser){exchangeOne(original,r,scratch,io,cancel,original.url,original.timeoutMs);return;}
+  // Request scratch is job-owned: avoid copying the 3 KiB request onto the worker stack.
+  // Redirects change only the URL and remain GET, with no credentials or cookies.
+  scratch.current=original.url;
+  const uint32_t start=io.millis(io.context);const uint32_t total=original.timeoutMs;
+  for(unsigned hop=0;;++hop){
+    uint32_t elapsed=io.millis(io.context)-start;
+    if(elapsed>=total){r.error="timeout";return;}
+    exchangeOne(original,r,scratch,io,cancel,scratch.current,total-elapsed);
+    int n=snprintf(r.url,sizeof(r.url),"https://%s%s",scratch.current.host,scratch.current.path);
+    if(n<0 || size_t(n)>=sizeof(r.url)){r.error="redirect_invalid";return;}
+    if(r.error || r.status<300 || r.status>399)return;
+    if(hop>=4){r.error="redirect_limit";return;}
+    if(r.status!=301 && r.status!=302 && r.status!=303 && r.status!=307 && r.status!=308){r.error="redirect_invalid";return;}
+    if(!resolveRedirect(scratch.current,r.location,scratch.current)){r.error="redirect_invalid";return;}
+  }
 }
 } // namespace ink::http

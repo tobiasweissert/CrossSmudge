@@ -2,6 +2,10 @@
 
 ### Fixed
 
+- Browser: correct query-only HTTPS redirects, late-text Find and nested fragment jumps; bound offline and network history together, and preserve photo brightness with browser-only monochrome dithering.
+
+- Guard short JPEG Huffman prefix checks against undefined negative shifts; checked app file writes now report close failures.
+
 - Minesweeper 0.1.4 now uses CrossPlay graphics, fonts and dither; an opt-in Lua long-press callback flags once without digging on release, while other apps keep their existing touch behavior.
 
 - Fixed Hacker News startup and JSON/text decoding by loading native UTF-8 for valid network apps, including offline cache use.
@@ -17,6 +21,9 @@
 - Fixed Solitaire v1.0.1 touch input on reTerminal Sticky: tapping cards now deals, selects, and moves cards; reset confirmation buttons match their drawn bounds, and taps in tableau gaps or below cards are ignored. Other devices retain their existing input behavior and saved games remain compatible.
 
 ### Added
+
+- Browser 0.2.0 owner-test preview: direct public HTTPS, local HTML reader and simplified modes, RSS/Atom news feeds, inline links, GET search forms, bookmarks, checked offline pages, find, font sizes and lazy JPEG/PNG images. Requires PSRAM and firmware API 5; scripts, logins and paywalls remain unsupported.
+- Browser-only native API 5 adds bounded streamed SD resources, verified gzip, HTTPS redirects and explicit PSRAM Lua/decompression budgets and streamed image decoding. Existing API3 app domain and response limits are unchanged.
 
 - Published Flashcards, Habits, Pomodoro, Weather and Browser previews to the fork’s owner-test App Store. All package dependencies and icons are included; Weather and Browser require PSRAM and Lua API v3.
 - Sticky owner test profile with paired fork app downloads, source-identified firmware, and Sticky-only Chess, Sudoku, Solitaire and Wordle replacements that preserve legacy games and saves on other devices.

@@ -1,0 +1,6 @@
+?at=12:30	/a/b?at=12:30
+../done?at=12:30	/done?at=12:30
+https://example.org?at=1230	/?at=1230
+https://example.org#target	/
+next/part:two	/a/next/part:two
+?q=a:b#x:y	/a/b?q=a:b
