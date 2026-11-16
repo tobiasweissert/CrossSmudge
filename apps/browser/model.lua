@@ -9,6 +9,15 @@ function M.decode(s)
   return '&'..e..';'
  end))
 end
+-- A reluctant capture plus trailing %s* can rescan a long internal whitespace
+-- run quadratically in native Lua. Keep preformatted-content trimming linear.
+local function trim(s)
+ local first,last=1,#s
+ local function space(c)return c==32 or c and c>=9 and c<=13 end
+ while first<=last and space(s:byte(first))do first=first+1 end
+ while last>=first and space(s:byte(last))do last=last-1 end
+ return s:sub(first,last)
+end
 local blockTags={p=true,div=true,article=true,main=true,section=true,header=true,footer=true,nav=true,aside=true,blockquote=true,pre=true,li=true,ul=true,ol=true,h1=true,h2=true,h3=true,h4=true,h5=true,h6=true,tr=true,table=true,form=true,figure=true,figcaption=true}
 local void={img=true,br=true,hr=true,meta=true,link=true,input=true,base=true,wbr=true,source=true,area=true,embed=true}
 local suppress={script=true,style=true,noscript=true,svg=true,canvas=true,template=true,iframe=true,object=true}
@@ -50,18 +59,38 @@ local function feed(raw,url)
  if #d.links==0 then return nil,'No readable feed entries'end
  return d
 end
+-- Stylesheet discovery does not construct a throwaway article model. Full
+-- validation and semantic extraction still happen exactly once in parse().
+function M.discover(raw,url)
+ local base=U.resolve(nil,url);local result={stylesheets={},styles={},raw=raw,url=base};local baseSet=false;local bytes=0
+ if not base then return result end
+ local ok,err=T.scan(raw,function(kind,name,a)
+  if kind=='style'and bytes<24576 then local css=name:sub(1,24576-bytes);result.styles[#result.styles+1]=css;bytes=bytes+#css end
+  if kind=='open'and name=='base'and a.href and not baseSet then base=U.resolve(base,M.decode(a.href))or base;baseSet=true end
+  if kind=='open'and name=='link'and (a.rel or ''):lower()=='stylesheet'and a.href and #result.stylesheets<2 then
+   local target=U.resolve(base,M.decode(a.href));if target then
+    if #result.stylesheets==0 then result.styles[#result.styles+1]=false end
+    result.stylesheets[#result.stylesheets+1]=target
+   end
+  end
+ end)
+ if not ok then return nil,err end
+ result.base=base;return result
+end
 function M.parse(raw,url,options)
  options=options or {};url=U.resolve(nil,url or 'https://example.org/')
  local stream=type(raw)=='table'and type(raw.read)=='function'
  if not url or (type(raw)~='string'and not stream)or #raw==0 or #raw>1048576 or (stream and not raw:valid())or (not stream and (not utf8.len(raw)or raw:find('%z')))then return nil,'Invalid or oversized UTF-8 document'end
  if raw:sub(1,2048):lower():find('<rss[%s>]')or raw:sub(1,2048):lower():find('<feed[%s>]')then local ok,d,e=pcall(feed,raw,url);if not ok then return nil,tostring(d)end;return d,e end
- local styles={};local styleBytes=0;local sheetUrls={};local base=url;local baseSet=false
- local ok,err=T.scan(raw,function(kind,name,a)
-  if kind=='style'and styleBytes<24576 then local css=name:sub(1,24576-styleBytes);styles[#styles+1]=css;styleBytes=styleBytes+#css end
-  if kind=='open'and name=='base'and a.href and not baseSet then base=U.resolve(url,M.decode(a.href))or base;baseSet=true end
-  if kind=='open'and name=='link'and (a.rel or ''):lower()=='stylesheet'and a.href and #sheetUrls<2 then local u=U.resolve(base,M.decode(a.href));if u then if #sheetUrls==0 and options.css and styleBytes<24576 then local css=options.css:sub(1,24576-styleBytes);styles[#styles+1]=css;styleBytes=styleBytes+#css end;sheetUrls[#sheetUrls+1]=u end end
- end)
- if not ok then return nil,err end
+ local discovery=options.discovery
+ if not discovery or discovery.raw~=raw or discovery.url~=url then
+  local err;discovery,err=M.discover(raw,url);if not discovery then return nil,err end
+ end
+ local styles={};local styleBytes=0;local sheetUrls=discovery.stylesheets;local base=discovery.base
+ for _,part in ipairs(discovery.styles)do
+  local value=part==false and options.css or part
+  if value and styleBytes<24576 then value=value:sub(1,24576-styleBytes);styles[#styles+1]=value;styleBytes=styleBytes+#value end
+ end
  local css=C.parse(table.concat(styles,'\n'));styles=nil
  local d={title='',url=url,blocks={},links={},images={},forms={},stylesheets=sheetUrls}
  local stack={};local active,bytes,spans= nil,0,0;local title=false;local preferred=false;local form
@@ -154,7 +183,7 @@ function M.parse(raw,url,options)
  local selected={};local seen={};local captions={}
  for _,b in ipairs(d.blocks)do
   local keep=options.reader==false or (not b.clutter and (not preferred or b.rank>=preferredRank))
-  local plain={};for _,r in ipairs(b.spans)do plain[#plain+1]=r.text end;plain=table.concat(plain):match('^%s*(.-)%s*$')
+  local plain={};for _,r in ipairs(b.spans)do plain[#plain+1]=r.text end;plain=trim(table.concat(plain))
   if plain=='•'or plain=='|'then keep=false end
   if b.kind=='figcaption'then if captions[plain]then keep=false else captions[plain]=true end end
   if keep and (#b.spans>0 or b.image or b.form)then

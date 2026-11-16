@@ -38,9 +38,13 @@ function U.footer()
  if U.notice~='' then U.text(U.pad,U.bottom-25,U.fit(U.notice,U.w-2*U.pad,'small'),'small') end
  smudge.button_hints('Back','Select','Prev','Next')
 end
+function U.activate(button)
+ if button.immediate then button[5](button[7])
+ else (U.action or function(f,v)f(v)end)(button[5],button[7])end
+end
 function U.tap(x,y)
- for i,b in ipairs(U.buttons) do
-  if smudge.in_rect(x,y,b[1],b[2],b[3],b[4]) then U.focus=i;b[5](b[7]);U.redraw();return true end
+ for i=#U.buttons,1,-1 do local b=U.buttons[i]
+  if smudge.in_rect(x,y,b[1],b[2],b[3],b[4]) then U.focus=i;U.activate(b);U.redraw();return true end
  end
  if y>=U.h-U.m.button_hints_height then
   local keys={'back','confirm','up','down'};on_button(keys[math.min(4,x*4//U.w+1)],true);return true
@@ -51,7 +55,7 @@ function U.key(key)
  U.focus=math.max(1,math.min(n,U.focus))
  if key=='up' or key=='left' or key=='page_back' then U.focus=(U.focus-2)%n+1
  elseif key=='down' or key=='right' or key=='page_forward' then U.focus=U.focus%n+1
- elseif key=='confirm' then U.buttons[U.focus][5](U.buttons[U.focus][7]) end
+ elseif key=='confirm' then U.activate(U.buttons[U.focus]) end
  U.redraw()
 end
 -- UTF-8 byte caps keep saves and keyboard editing bounded on C3.

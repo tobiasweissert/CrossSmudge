@@ -19,12 +19,16 @@ function T.scan(s,emit)
   if s:sub(lt,lt+3)=='<!--'then local last=s:find('-->',lt+4,true);at=last and last+3 or #s+1
   elseif s:sub(lt,lt+8)=='<![CDATA['then local last=s:find(']]>',lt+9,true);text(lt+9,last and last-1 or #s);at=last and last+3 or #s+1
   else
-   local p,quote=lt+1,nil
-   while p<=#s do local c=s:sub(p,p)
-    if quote then if c==quote then quote=nil end
-    elseif c=='"'or c=="'"then quote=c
-    elseif c=='>'then break end;p=p+1
-    -- Scan oversized attribute tags without retaining their payload.
+   local p
+   if type(s)=='table'then p=s:tagEnd(lt+1)
+   else
+    p=lt+1;local quote
+    while p<=#s do
+     local a=s:find(quote or [=[["'>]]=],p,quote~=nil)
+     if not a then p=#s+1;break end
+     local c=s:sub(a,a);p=a+1
+     if quote then quote=nil elseif c=='>'then p=a;break else quote=c end
+    end
    end
    if p>#s then break end
    local raw=s:sub(lt+1,math.min(p-1,lt+4096));local closing=raw:match('^%s*/')~=nil
@@ -46,7 +50,8 @@ function T.scan(s,emit)
     emit(closing and 'close'or 'open',name,attrs,s:sub(math.max(lt+1,p-32),p-1):match('/%s*$')~=nil)
     if not closing and (name=='script'or name=='style')then
      -- Raw text tags: '<' inside JavaScript/CSS never creates HTML nodes.
-     local a,b=s:find('</%s*'..name:gsub('%a',function(c)return '['..c..c:upper()..']'end)..'%s*>',p+1)
+     local a,b
+     if type(s)=='table'then a,b=s:rawClose(name,p+1)else a,b=s:find('</%s*'..name:gsub('%a',function(c)return '['..c..c:upper()..']'end)..'%s*>',p+1)end
      if name=='style'then emit('style',s:sub(p+1,math.min(p+24576,a and a-1 or #s)))end
      emit('close',name);p=b or #s
     end
