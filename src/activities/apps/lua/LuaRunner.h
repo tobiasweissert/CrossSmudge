@@ -7,6 +7,7 @@
 #include <LuaHttp.h>
 #include <BrowserImage.h>
 #include <HalStorage.h>
+#include "../../../../lib/AirDrop/browser/LuaLaunch.h"
 
 extern "C" {
 #include "lauxlib.h"
@@ -28,6 +29,7 @@ class LuaRunner {
 
   bool init();
   bool loadScript(const std::string& scriptPath);
+  bool setBrowserLaunch(const airdrop::browser::LaunchHandle& launch, uint32_t attempt);
   void shutdown();
 
   // Lifecycle dispatches
@@ -98,6 +100,7 @@ class LuaRunner {
   void setError(const char* msg);
 
   // C-to-Lua Bridge functions
+  airdrop::browser::LuaLaunchBinding launchBinding_;
   static int l_browserList(lua_State* L);
   static int l_browserRead(lua_State* L);
   static int l_browserClose(lua_State* L);

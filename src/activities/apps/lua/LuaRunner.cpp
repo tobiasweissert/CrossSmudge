@@ -252,7 +252,17 @@ bool LuaRunner::resolvePath(const char* path, std::string& result) const {
   return http::resolveAppPath(path, appDir_, saveDir_, result);
 }
 
+bool LuaRunner::setBrowserLaunch(const airdrop::browser::LaunchHandle& launch, uint32_t attempt) {
+  if (!launch || !attempt || !browser_ || !http_.cooperative || !http_.allowed) return false;
+  launchBinding_.launch = launch;
+  launchBinding_.attempt = attempt;
+  return true;
+}
+
 void LuaRunner::shutdown() {
+  if (launchBinding_.launch) {
+    launchBinding_.launch->failAttempt(launchBinding_.attempt, airdrop::browser::LaunchError::ExitedBeforeAck);
+  }
   requestNativeCancel();images_.close();browserFile_.close();browserFilePath_.clear();browserDirectory_.close();browserDirectoryPath_.clear();
   http_.close();
   http_.domains = {};
@@ -263,11 +273,15 @@ void LuaRunner::shutdown() {
   if (s_activeRunner == this) {
     s_activeRunner = nullptr;
   }
+  launchBinding_ = {};
   currentAllocatedBytes_ = 0;
   preventAutoSleep_.store(false, std::memory_order_relaxed);
 }
 
 void LuaRunner::setError(const char* msg) {
+  if (launchBinding_.launch) {
+    launchBinding_.launch->failAttempt(launchBinding_.attempt, airdrop::browser::LaunchError::ScriptFailed);
+  }
   errorMessage_ = (msg ? msg : "Unknown Lua error");
   hasError_.store(true,std::memory_order_release);
   LOG_ERR("LUA", "[%s] %s", appId_.c_str(), errorMessage_.c_str());
@@ -307,6 +321,11 @@ bool LuaRunner::loadScript(const std::string& scriptPath) {
     return false;
   }
 
+  if (launchBinding_.launch && !airdrop::browser::supportsLaunchApi(L)) {
+    launchBinding_.launch->failAttempt(launchBinding_.attempt, airdrop::browser::LaunchError::IncompatibleBrowser);
+    setError(tr(STR_INVALID_BROWSER_CAPABILITY));
+    return false;
+  }
   lua_gc(L, LUA_GCCOLLECT, 0);
   return true;
 }
@@ -505,6 +524,7 @@ void LuaRunner::registerSmudgeApi() {
   http::registerApi(L, http_);
   if(browser_){
    browser::registerWork(L);
+   airdrop::browser::registerLaunchApi(L, launchBinding_);
    lua_pushcfunction(L,l_browserList);lua_setfield(L,-2,"browser_list_files");
    lua_pushcfunction(L,l_browserRead);lua_setfield(L,-2,"browser_read_file");
    lua_pushcfunction(L,l_browserClose);lua_setfield(L,-2,"browser_close_reader");

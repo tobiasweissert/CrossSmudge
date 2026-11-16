@@ -9,6 +9,7 @@
 
 #include <cstddef>
 
+#include "AppCapabilities.h"
 #include "MappedInputManager.h"
 #include "NetworkModeSelectionActivity.h"
 #include "SdCardFontSystem.h"
@@ -76,6 +77,7 @@ void CrossPointWebServerActivity::onEnter() {
   // Reset state
   state = WebServerActivityState::MODE_SELECTION;
   networkMode = NetworkMode::JOIN_NETWORK;
+  airDropHandoff = false;
   isApMode = false;
   connectedIP.clear();
   connectedSSID.clear();
@@ -102,6 +104,16 @@ void CrossPointWebServerActivity::onExit() {
   Activity::onExit();
 
   state = WebServerActivityState::SHUTTING_DOWN;
+
+  // AirDrop owns a separate in-process radio session. This parent is replaced BEFORE
+  // the receiver starts, so its legacy reboot/disconnect policy must not run later
+  // beneath Browser or modify the native receiver's radio ownership.
+  if (airDropHandoff) {
+    stopDnsServer();
+    MDNS.end();
+    stopWebServer();
+    return;
+  }
 
   // Every active WiFi exit already reboots to clear network heap
   // fragmentation. Restart before graceful socket teardown: a stalled browser
@@ -143,7 +155,26 @@ void CrossPointWebServerActivity::onExit() {
   LOG_DBG("WEBACT", "Free heap at onExit end: %d bytes", ESP.getFreeHeap());
 }
 
+bool CrossPointWebServerActivity::handoffAirDrop(const NetworkMode mode) {
+  if (mode != NetworkMode::AIRDROP_RECEIVE) return false;
+  airDropHandoff = true;
+#if CROSSINK_APP_CAP_AIRDROP
+  if (!activityManager.goToAirDropReceive(returnBookPath)) {
+    LOG_ERR("WEBACT", "AirDrop activity allocation rejected");
+    activityManager.returnFromAirDrop(returnBookPath, false);
+  }
+#else
+  // A stale/internal result must never reinterpret an unsupported native mode as AP.
+  LOG_ERR("WEBACT", "AirDrop is not available on this device");
+  activityManager.returnFromAirDrop(returnBookPath, false);
+#endif
+  return true;
+}
+
 void CrossPointWebServerActivity::onNetworkModeSelected(const NetworkMode mode) {
+  if (handoffAirDrop(mode)) return;
+  airDropHandoff = false;
+
   const char* modeName = "Join Network";
   if (mode == NetworkMode::CONNECT_CALIBRE) {
     modeName = "Connect to Calibre";
@@ -189,6 +220,7 @@ void CrossPointWebServerActivity::onNetworkModeSelected(const NetworkMode mode) 
         break;
       case NetworkMode::NEARBY_STATS_SYNC:
       case NetworkMode::NEARBY_BOOK_RECEIVE:
+      case NetworkMode::AIRDROP_RECEIVE:
         break;
     }
     return;

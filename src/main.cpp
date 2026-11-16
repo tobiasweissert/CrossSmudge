@@ -579,17 +579,27 @@ void notifyQuickLockChanged() {
   }
 }
 
+bool exclusivePowerActionPending = false;
+CrossPointSettings::SHORT_PWRBTN exclusivePowerAction = CrossPointSettings::SHORT_PWRBTN::SLEEP;
+QuickLockTrigger exclusivePowerTrigger = QuickLockTrigger::None;
+
 bool handleGlobalPowerButtonAction(const CrossPointSettings::SHORT_PWRBTN action,
                                    const QuickLockTrigger quickLockTrigger) {
+  if (action == CrossPointSettings::SHORT_PWRBTN::QUICK_LOCK && quickLockTrigger == QuickLockTrigger::None) {
+    LOG_ERR("MAIN", "Quick Lock requested without an input trigger");
+    return false;
+  }
+  if (isGlobalPowerButtonAction(action) && activityManager.deferGlobalPowerAction(action)) {
+    exclusivePowerAction = action;
+    exclusivePowerTrigger = quickLockTrigger;
+    exclusivePowerActionPending = true;
+    return true;
+  }
   switch (action) {
     case CrossPointSettings::SHORT_PWRBTN::SLEEP:
       enterDeepSleep();
       return true;
     case CrossPointSettings::SHORT_PWRBTN::QUICK_LOCK:
-      if (quickLockTrigger == QuickLockTrigger::None) {
-        LOG_ERR("MAIN", "Quick Lock requested without an input trigger");
-        return false;
-      }
       buttonShortcutController.toggleQuickLock(millis(), quickLockTrigger,
                                                quickLockTrigger == QuickLockTrigger::LongPower);
       notifyQuickLockChanged();
@@ -1577,6 +1587,16 @@ void loop() {
   // hardware input frame. A shortcut may open an activity that never queries
   // the originating button, so its one-shot release guard must still expire.
   mappedInputManager.update();
+  if (exclusivePowerActionPending) {
+    if (activityManager.deferGlobalPowerAction(exclusivePowerAction)) {
+      activityManager.loop();
+      delay(10);
+      return;
+    }
+    exclusivePowerActionPending = false;
+    (void)handleGlobalPowerButtonAction(exclusivePowerAction, exclusivePowerTrigger);
+    return;
+  }
 #ifdef SIMULATOR
   simulatorHomeKeyInput.update();
 #endif

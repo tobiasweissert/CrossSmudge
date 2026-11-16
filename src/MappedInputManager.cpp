@@ -1,5 +1,10 @@
 #include "MappedInputManager.h"
 
+#include "AppCapabilities.h"
+#if CROSSINK_APP_CAP_AIRDROP
+#include "components/AirDropConsentInput.h"
+#endif
+
 #include <GfxRenderer.h>
 #include <I18n.h>
 
@@ -138,7 +143,13 @@ size_t buttonIndex(MappedInputManager::Button button) { return static_cast<size_
 }  // namespace
 
 void MappedInputManager::update() const {
+#if CROSSINK_APP_CAP_AIRDROP
+  const auto capturedEpoch = airdrop::input::capture.begin();
+#endif
   gpio.update();
+#if CROSSINK_APP_CAP_AIRDROP
+  airdrop::input::capture.end(capturedEpoch);
+#endif
   expireReleaseSuppressions();
 }
 

@@ -1,5 +1,9 @@
 #include "GlobalHomeDispatch.h"
 #include "ActivityManager.h"
+#include <AppCapabilities.h>
+#if CROSSINK_APP_CAP_AIRDROP
+#include "network/AirDropReceiveActivity.h"
+#endif
 
 #include <CrossInkHalFrontlight.h>
 #include <Epub.h>
@@ -572,6 +576,26 @@ void ActivityManager::replaceActivity(std::unique_ptr<Activity>&& newActivity) {
 
 void ActivityManager::goToFileTransfer(std::string returnBookPath) {
   replaceActivity(std::make_unique<CrossPointWebServerActivity>(renderer, mappedInput, std::move(returnBookPath)));
+}
+
+bool ActivityManager::deferGlobalPowerAction(CrossPointSettings::SHORT_PWRBTN action) {
+  return currentActivity && currentActivity->deferGlobalPowerAction(action);
+}
+
+bool ActivityManager::goToAirDropReceive(const std::string& returnBookPath) {
+#if CROSSINK_APP_CAP_AIRDROP
+  auto next = makeUniqueNoThrow<AirDropReceiveActivity>(renderer, mappedInput, returnBookPath);
+  if (!next) { LOG_ERR("AIRDROP", "Activity allocation failed"); return false; }
+  replaceActivity(std::move(next));
+  return true;
+#else
+  return false;
+#endif
+}
+
+void ActivityManager::returnFromAirDrop(const std::string& returnBookPath, bool homeRequested) {
+  if (!homeRequested && !returnBookPath.empty()) goToReader(returnBookPath);
+  else goHome();
 }
 
 bool ActivityManager::goToNearbyBookSend(std::string path, const bool returnToReader) {

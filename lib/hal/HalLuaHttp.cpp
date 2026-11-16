@@ -1,4 +1,5 @@
 #include "HalLuaHttp.h"
+#include "HalAirDropRadio.h"
 #ifndef SIMULATOR
 #include <AppNetworkPolicy.h>
 #include <Arduino.h>
@@ -19,6 +20,8 @@
 namespace {
 std::atomic<TaskHandle_t> budgetTask{nullptr};
 ink::http::AllocationBudget* activeBudget=nullptr;
+std::atomic<TaskHandle_t> receiverBudgetTask{nullptr};
+ink::http::AllocationBudget* receiverBudget=nullptr;
 portMUX_TYPE timeMux=portMUX_INITIALIZER_UNLOCKED;
 int64_t trustedEpoch=0, trustedMono=0;
 // Pin one synchronized anchor; later wall-clock changes cannot move TLS time.
@@ -155,9 +158,11 @@ extern "C" void* __wrap_esp_mbedtls_mem_calloc(size_t n,size_t size) {
   if(!size || n>SIZE_MAX/size)return nullptr;
   auto owner=budgetTask.load(std::memory_order_acquire);
   const bool limited=owner && owner==xTaskGetCurrentTaskHandle();
-  if(limited && !activeBudget->permits(n*size))return nullptr;
+  const auto receiverOwner=receiverBudgetTask.load(std::memory_order_acquire);
+  auto* selected=limited?activeBudget:(receiverOwner&&receiverOwner==xTaskGetCurrentTaskHandle()?receiverBudget:nullptr);
+  if(selected && !selected->permits(n*size))return nullptr;
   void* p=__real_esp_mbedtls_mem_calloc(n,size);
-  if(limited && p && !activeBudget->add(p,heap_caps_get_allocated_size(p))) {
+  if(selected && p && !selected->add(p,heap_caps_get_allocated_size(p))) {
     __real_esp_mbedtls_mem_free(p);return nullptr;
   }
   return p;
@@ -165,7 +170,22 @@ extern "C" void* __wrap_esp_mbedtls_mem_calloc(size_t n,size_t size) {
 extern "C" void __wrap_esp_mbedtls_mem_free(void* p) {
   auto owner=budgetTask.load(std::memory_order_acquire);
   if(owner && owner==xTaskGetCurrentTaskHandle())activeBudget->remove(p);
+  const auto receiverOwner=receiverBudgetTask.load(std::memory_order_acquire);
+  if(receiverOwner&&receiverOwner==xTaskGetCurrentTaskHandle())receiverBudget->remove(p);
   __real_esp_mbedtls_mem_free(p);
+}
+
+namespace HalAirDropRadio {
+bool beginTlsBudget(ink::http::AllocationBudget* budget) {
+  if (!budget || receiverBudgetTask.load(std::memory_order_acquire)) return false;
+  receiverBudget=budget;
+  receiverBudgetTask.store(xTaskGetCurrentTaskHandle(),std::memory_order_release);
+  return true;
+}
+void endTlsBudget() {
+  receiverBudgetTask.store(nullptr,std::memory_order_release);
+  receiverBudget=nullptr;
+}
 }
 
 namespace HalLuaHttp {
