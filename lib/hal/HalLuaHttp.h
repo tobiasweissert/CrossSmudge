@@ -2,11 +2,10 @@
 #include <cstdint>
 #include <string>
 #include <LuaHttp.h>
-// NVS grants are outside Lua's SD filesystem. Trust in UTC is explicit, per boot.
+// NVS opt-out is outside Lua's filesystem. HTTPS obtains UTC from NTP automatically.
 namespace HalLuaHttp {
-bool approved(const std::string& appDir, const ink::http::Domains& domains);
-bool approve(const std::string& appDir, const ink::http::Domains& domains);
-bool revokeAll();
+bool networkEnabled();
+bool setNetworkEnabled(bool enabled);
 struct TimeProposal { int64_t epoch; int64_t monotonicUs; };
 TimeProposal proposeTime();
 bool trustTime(TimeProposal proposal);

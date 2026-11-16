@@ -5,6 +5,7 @@
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
+_Static_assert(sizeof(lua_Integer)==4 && sizeof(lua_Number)==4, "firmware Lua ABI required");
 typedef struct { size_t used, peak, limit; } Heap;
 static void *allocate(void *ctx, void *p, size_t old, size_t n) {
   Heap *h = ctx;

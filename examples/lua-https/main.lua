@@ -22,8 +22,8 @@ function on_http(event)
   request_id = nil
   if event.error then
     message = "Failed: " .. event.error
-    if event.error == "time_untrusted" then
-      message = message .. ". Sync date/time, then trust UTC in App Settings."
+    if event.error == "time_sync_failed" then
+      message = message .. ". Check Wi-Fi and retry time synchronization."
     end
   else
     message = "HTTP " .. event.status .. ": " .. #event.body .. " bytes received from example.com."

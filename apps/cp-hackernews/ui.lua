@@ -7,7 +7,8 @@ function U.draw(title,body,status,hints)
   local pad=m.content_side_padding or 20
   local top=m.header_height+m.top_padding
   local line=smudge.line_height('ui12')
-  local bottom=h-m.button_hints_height
+  local footer=math.max(m.button_hints_height,smudge.has_touch() and line+16 or 0)
+  local bottom=h-footer
   local capacity=math.max(1,math.floor((bottom-top)/line)-3)
   local maxwidth=w-2*pad
   local lines,total={},0
@@ -37,7 +38,8 @@ function U.draw(title,body,status,hints)
   smudge.text(pad,bottom-2*line,label,'ui12')
   if smudge.has_touch() then
     for i,label in ipairs({'Back',hints or 'Menu','Prev','Next'}) do
-      smudge.text((i-1)*w/4+4,h-line,label,'ui12')
+      smudge.rect((i-1)*w//4+2,bottom+2,w//4-4,footer-4,false,1,true)
+      smudge.text((i-1)*w/4+8,bottom+8,label,'ui12')
     end
   else smudge.button_hints('Back',hints or 'Menu','Prev','Next') end
 end
@@ -46,7 +48,8 @@ function U.touch(x,y,event,button)
   if event~='tap' then return end
   local w,h=smudge.get_bounds(); local m=smudge.get_metrics()
   if x<0 or x>=w or y<0 or y>=h then return end
-  if y>=h-m.button_hints_height then
+  local footer=math.max(m.button_hints_height,smudge.has_touch() and smudge.line_height('ui12')+16 or 0)
+  if y>=h-footer then
     button(({'back','confirm','up','down'})[math.floor(x*4/w)+1])
   elseif y>=m.header_height+m.top_padding then
     button(x<w/2 and 'up' or 'down')

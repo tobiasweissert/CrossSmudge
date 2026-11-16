@@ -11,7 +11,7 @@ extern "C" {
 }
 namespace ink::http {
 namespace {
-static_assert(sizeof(Job) <= 16 * 1024, "HTTP native job exceeds its budget");
+static_assert(sizeof(Job) <= MaxBody + 8 * 1024, "HTTP native job exceeds its budget");
 std::atomic<bool> occupied{false};
 std::atomic<unsigned> nextId{0};
 void worker(void* arg) {
@@ -120,7 +120,9 @@ void Job::release(){if(references.fetch_sub(1,std::memory_order_acq_rel)==1){del
 bool Session::busy(){return occupied.load();}
 Job* Session::reserve(){
   if(job_ || occupied.exchange(true))return nullptr;
-  // One bounded ~12 KiB job outlives the activity while cancellation drains. The worker owns a reference.
+  // One bounded job (response + <=8 KiB metadata) outlives cancellation. On
+  // PSRAM boards the configured malloc threshold places this large allocation
+  // in PSRAM; the C3 response stays 8 KiB. The worker owns a reference.
   job_=new(std::nothrow) Job{};
   if(!job_){
 #ifdef ARDUINO_ARCH_ESP32

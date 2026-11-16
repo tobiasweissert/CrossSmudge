@@ -39,6 +39,18 @@ class ApplicationsActivity : public Activity {
     int appCount = static_cast<int>(visibleApps.size());
     if (appCount == 0) return;
 
+    // The menu pages by selection; use the same row count as its icon overlay.
+    const auto swipe = mappedInput.wasSwipe();
+    if (swipe == MappedInputManager::SwipeDir::Up || swipe == MappedInputManager::SwipeDir::Down) {
+      const int delta = swipe == MappedInputManager::SwipeDir::Up ? visibleRowsPerPage() : -visibleRowsPerPage();
+      const int next = std::clamp(selectedIndex + delta, 0, appCount - 1);
+      if (next != selectedIndex) {
+        selectedIndex = next;
+        requestUpdate();
+      }
+      return;
+    }
+
     auto launchSelectedApp = [this]() {
       const auto& app = visibleApps[selectedIndex];
       bool isSetting = (app.name == "App Settings" || app.name == "Settings" || app.name == "App Store");
@@ -99,7 +111,7 @@ class ApplicationsActivity : public Activity {
 
     // Overlay custom 32x32 raw icons ONLY for packages with UIIcon::None
     const int rowStep = metrics.menuRowHeight + metrics.menuSpacing;
-    const int pageItems = std::max(1, (menuHeight + metrics.menuSpacing) / rowStep);
+    const int pageItems = visibleRowsPerPage();
     const int pageStartIndex = (selectedIndex / pageItems) * pageItems;
 
     for (int i = pageStartIndex; i < appCount && i < pageStartIndex + pageItems; ++i) {
@@ -131,6 +143,13 @@ class ApplicationsActivity : public Activity {
 
   int selectedIndex = 0;
   std::vector<AppEntry> visibleApps;
+
+  int visibleRowsPerPage() const {
+    const auto& metrics = UITheme::getInstance().getMetrics();
+    const int startY = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+    const int height = renderer.getScreenHeight() - startY - metrics.buttonHintsHeight - metrics.verticalSpacing;
+    return std::max(1, (height + metrics.menuSpacing) / (metrics.menuRowHeight + metrics.menuSpacing));
+  }
 
   void refreshMenuList() {
     auto& settings = SmudgeSettings::getInstance();

@@ -1,14 +1,55 @@
 ## [Unreleased]
 
+### Fixed
+
+- Hacker News reads large articles and comment threads within its Lua heap, and preserves comment order during repeated forward navigation.
+- Notes import help keeps existing cards safe before opening a note; Forehead displays saved scores in decimal.
+
+- HTTPS apps synchronize UTC automatically without manual confirmation and retain certificate checks; PSRAM devices keep Lua allocations out of internal RAM needed by TLS.
+- Hacker News continues loading after a failed story, supports per-row retries, and opens articles directly from story titles; comment badges open discussions.
+- Sticky Five Letters retains its new design on the Back menu and uses darker hint text; Hacker News secondary text is also darker.
+- Migrated CrossPlay apps use original screen assets, opening screens and supported help/settings layouts, with remaining parity gaps documented per app.
+
+- Applications on touch devices can now page through the app list with vertical swipes.
+- Hourglass on Sticky displays Start/Pause, Reset and adjustment controls, with settings hit targets aligned to the dialog.
+- Sticky Solitaire and Five Letters have new card/grid/keypad layouts; Sudoku uses CrossPlay Jersey masks, its heavy grid and three-by-three digit pad, with long-press pencil input.
+- Hacker News now has a ranked story list, feed tabs, nested comments and paged article reading. PSRAM builds permit bounded HTTP responses up to 64 KiB; other devices retain the 8 KiB cap.
+
+- Minesweeper 0.1.4 now uses CrossPlay graphics, fonts and dither; an opt-in Lua long-press callback flags once without digging on release, while other apps keep their existing touch behavior.
+
+- Fixed Hacker News startup and JSON/text decoding by loading native UTF-8 for valid network apps, including offline cache use.
+
+- Corrected Lua device identification so Sticky apps select their touch controls; X4 Pro and X3 also report their proper identities.
+
+- App Store now fetches missing icons for the visible catalog page and caches validated icons for reuse without reinstalling apps.
+- App Store lists fit the available screen space in portrait and landscape, with bounded text and visible touch navigation.
+- Fixed touch controls on reTerminal Sticky in Desk Stand 1.0.3; other devices retain their existing behavior.
+- Fixed touch controls on reTerminal Sticky in Hourglass 1.0.1; other devices retain their existing behavior.
+- Fixed touch controls on reTerminal Sticky in Water Tracker 1.0.1; other devices retain their existing behavior.
+- Restored a visible, tappable Connect Wi-Fi button and Back control on the App Store offline screen for touch devices. Canceling Wi-Fi setup allows retrying; a successful connection loads the catalog after returning to the store.
+- Fixed Solitaire v1.0.1 touch input on reTerminal Sticky: tapping cards now deals, selects, and moves cards; reset confirmation buttons match their drawn bounds, and taps in tableau gaps or below cards are ignored. Other devices retain their existing input behavior and saved games remain compatible.
+
 ### Added
+- Sticky owner test profile with paired fork app downloads, source-identified firmware, and Sticky-only Chess, Sudoku, Solitaire and Wordle replacements that preserve legacy games and saves on other devices.
 
-- Add local APIv3 previews for live Hacker News feed/story/article reading and Open Trivia DB questions, with checked offline data caches and button/touch controls. These are not App Store releases; public-network/device verification and C3 memory qualification remain pending.
 
-- Lua API v3: asynchronous, permission-controlled HTTPS GET/POST with cancellation and bounded responses. Network apps use the existing Wi-Fi selector; App Settings can revoke network grants and explicitly trust displayed UTC for certificate checks until restart.
+- Added local Jaipur, Sea Salt, Toy Battle, Murdle and Go Lua adaptations with saved play, explicit opponent/content differences and stock-Lua memory-cap tests. The local collection now has 18 adaptations plus four unchanged equivalents; eleven titles remain blocked. Catalog publication awaits parent push and upstream review.
+- Added local Insider, Forehead, Checkers, Wavelength, Hearts, Hex and Battleship Lua adaptations with checked saves and capped runtime tests. Hearts, Hex and Battleship document their smaller opponent strategies. Prepared catalog entries for the 13 working local adaptations; official store availability awaits upstream maintainer merge. The full 33-title collection remains incomplete.
+- Added six local CrossPlay Lua ports for stock v1.6.5.3: Minesweeper, Connect Four, Knucklebones, Yahtzee, decimal Calculator, and app-local Notes. Packages use separate `cp-*` IDs and checked two-slot saves. Per-package parity notes distinguish supported local features from missing Nearby, phone-transfer, sleep-screen, and original presentation features. These are not a complete 33-title collection or an App Store release.
+- Lua API v3: asynchronous, manifest-scoped HTTPS GET/POST with cancellation and bounded responses. Network apps use the existing Wi-Fi selector; App Settings can disable app networking; automatic UTC anchors certificate date checks until restart.
+- Added an explicit Sticky owner-test profile using a matching fork catalog and package origin; standard builds retain the upstream store.
 
 ### Security
 
+- App Store catalog and executable package downloads use authenticated HTTPS on every attempt.
+
 - Confine Lua file access to each app and its saved data, and disable host file/process escape functions. This prevents an offline app from replacing an approved network app or reading unrelated saved credentials. Absolute paths outside these directories are no longer supported.
+
+### Changed
+
+- App networking is enabled by default within declared HTTPS domains, without permission prompts. App Settings provides an explicit disable/enable control; certificate checks and synchronized UTC remain required.
+
+- Add local APIv3 previews for live Hacker News feed/story/article reading and Open Trivia DB questions, with checked offline data caches and button/touch controls. These are not App Store releases; public-network/device verification and C3 memory qualification remain pending.
 
 ## [v1.6.5.3] - 2026-10-06
 

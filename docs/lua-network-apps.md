@@ -38,7 +38,7 @@ Sources consulted 2026-11-15:
 Both packages declare only their actual exact domains and `min_api: 3`. No
 credentials, invented APIs, POSTs, redirects, automatic retries or fallback
 snapshots. The production bridge validates their submitted URLs/options against
-those exact domain grants. Next requests are submitted from `on_update`, never
+those exact manifest domains. Next requests are submitted from `on_update`, never
 inside `on_http`. IDs bind responses to current work, including item identity.
 Exit cancels, clears queued work/data, and ignores subsequent callbacks.
 
@@ -75,7 +75,7 @@ fragmentation. Small passing examples do not establish hardware fit.
 
 Frozen host also requires Wi-Fi before entering network apps. To allow cache
 viewing after canceling that picker, parent must separately review an offline
-entry path with network grants unchanged and explicit offline request failure.
+entry path with network policy unchanged and explicit offline request failure.
 The apps do not silently change this firmware behavior.
 
 ## Exact fixture preparation outside sandbox
