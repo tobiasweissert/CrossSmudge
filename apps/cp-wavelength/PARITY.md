@@ -19,3 +19,9 @@ Hold-to-see is enabled only when `smudge.has_feature('touch_release')` is true. 
 Known gaps: the current core has no original lifetime distribution or boot/session-age marker. The enhanced front door therefore shows genuine saved session totals/last-round points, not invented historical statistics; the original lifetime histogram and stale-evening question remain unported. Lua text measurement/fitting differs from FreeInkUI, and native captures are not pixel-parity or physical e-ink evidence.
 
 Run `python3 test/party_ui/run.py` and `python3 test/party_ui/capture.py`. Asset hashes and original licenses are included. On Sticky, verify the target stays hidden before a hold, disappears on lift/drag/cancellation/Back/Home, and leaves no readable ghost. Exercise both side calls, slots 1/20, practice/normal scores, pause/menu/resume and exit/reopen. No EPUB cache reset is required.
+
+## Parent repair round 1 — exact scored-caption exception
+
+The original painter incorrectly labels scored Teams side calls as practice. Only when `phase == 4` and `round > 0`, the footnote at `(16, h-96, w-32, 29)` now says `SIDE CALL. THIS ROUND SCORES.` using the same original 14 font and placement. Practice retains `PRACTICE ROUND. NOTHING SCORES.` and full-frame native equality. Scored-call pixel assertions replace only the exact union of those two captions' ink pixels and compare the entire resulting frame, with no rectangular mask. Core scoring and journal formats are unchanged. Drawn phase/view ownership prevents a queued old contact or Confirm from becoming the next screen's action.
+
+On Sticky: pick a spectrum, send repeated contacts before refresh, and verify the hidden target still requires hold/release and the clue handoff. Finish practice in Teams; the next side call must say it scores. Exercise touch and Confirm, pause/resume, and reopen a private target behind the pass gate. No cache reset is needed.

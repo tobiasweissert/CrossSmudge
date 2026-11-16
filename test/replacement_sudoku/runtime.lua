@@ -30,7 +30,7 @@ end
 local function digit(d)
   local l=app.layout();taprect(l.keys[d])
 end
-local l=app.layout();taprect(l.difficulty);assert(#app.layout().menu==4);taprect(app.layout().menu[1])
+local l=app.layout();for _=1,4 do taprect(app.layout().difficulty)end;assert(#app.layout().menu==0,'native difficulty cycles in place')
 taprect(app.layout().howto);on_button('back',true);on_draw();assert(not state().closed,'Back in help exited the app')
 assert(files[base..'legacy-state.bak']==legacy and files[base..'state.dat']==legacy)
 assert(state().notice:find('Old save'), 'missing migration notice')
@@ -60,7 +60,8 @@ assert(state().notice=='Check this entry first' and state().value[first]~=answer
 button(3);assert(state().value[first]==answer)
 tapcell(first,'hold');assert(state().value[first]==0,'optional hold adapter failed')
 -- The opt-in long-press callback is the production pencil path.
-button(2);assert(state().hinted and state().notice~='')
+button(2);assert(not state().hinted and state().pendingHint and state().notice~='')
+button(2);assert(state().hinted and not state().pendingHint)
 on_update()
 local baseline=state().elapsed
 now=now+5000;on_update();assert(state().elapsed==baseline+5,'running clock failed')

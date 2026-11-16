@@ -2,6 +2,8 @@
 
 ### Fixed
 
+- Sticky Battleship and Hex keep landscape instructions readable; Hearts and Jaipur require a painted discard confirmation, and Wavelength prevents queued phase skips and labels scored Teams calls truthfully.
+
 - Hacker News reads large articles and comment threads within its Lua heap, and preserves comment order during repeated forward navigation.
 - Notes import help keeps existing cards safe before opening a note; Forehead displays saved scores in decimal.
 
@@ -31,6 +33,8 @@
 
 ### Added
 
+- Sudoku Hint on Sticky highlights an empty target first; a second explicit Hint reveals it. Editing or changing the board clears the pending hint.
+
 - Browser 0.2.1 integrates the local Reader/Simplified browser, images and API6 bounded work/cancellation with current app and HTTPS fixes.
 - Sticky owner test profile with paired fork app downloads, source-identified firmware, and Sticky-only Chess, Sudoku, Solitaire and Wordle replacements that preserve legacy games and saves on other devices.
 
@@ -48,6 +52,19 @@
 - Confine Lua file access to each app and its saved data, and disable host file/process escape functions. This prevents an offline app from replacing an approved network app or reading unrelated saved credentials. Absolute paths outside these directories are no longer supported.
 
 ### Changed
+
+- Sticky Wordle, Trivia, Hacker News, Checkers, Connect Four, Knucklebones, Hearts and Jaipur restore original CrossPlay typography and supported menus, boards and help screens; runtime differences remain documented per title.
+- Sticky Chess restores original menus, board chrome, move lists and settings while retaining underpromotion and saved games.
+- Sticky Go, Hex, Minesweeper and Yahtzee restore original supported menus, boards, lessons and results, including their existing touch controls.
+- Sticky Calculator and Notes restore original typography and supported screens; Notes retains its existing fixed slots and import workflow.
+- Sudoku on Sticky restores original supported menus, boards and illustrated lessons.
+- Sticky Wavelength restores original round views and hold-to-peek controls, with checked records for newly observed rounds.
+- Sticky Murdle restores the original casebook across all64 local cases, including complete clue pages, grid keys, accusations and verdicts.
+- Sticky Sea Salt and Toy Battle restore original boards, cards, illustrated lessons and results while preserving saved games and local rules.
+- Sticky Forehead restores original word cards, category/settings pages and results, including persistent recognition of new zero-score rounds.
+- Sticky Insider restores original private role cards, voting, clock, reports and illustrated rules.
+- Sticky Solitaire restores the original table menu, card fans, selection outline and victory screen while preserving old journals.
+- Sticky Battleship restores the original fleet-placement and target/Fire interface, including second-tap firing, original reports, and usable targeting when resuming older own-fleet saves.
 
 - App networking is enabled by default within declared HTTPS domains, without permission prompts. App Settings provides an explicit disable/enable control; certificate checks and synchronized UTC remain required.
 

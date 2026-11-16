@@ -2,7 +2,7 @@
 local M,S,V=dofile('core.lua'),dofile('storage.lua'),dofile('presentation.lua')
 local g,last,lastSave,closed,notice=nil,0,0,false,''
 local function refresh()smudge.request_update()end
-local function save()local ok=S.save(M.encode(g));notice=ok and '' or 'SAVE FAILED';return ok end
+local function save()local ok=S.save(M.encode(g));if ok and V.persist and not V.persist(g)then notice='CATEGORY RECORD SAVE FAILED';return false end;notice=ok and ''or'SAVE FAILED';return ok end
 local function tick()
  local before=g.phase;local now=smudge.millis();local delta=now-last;last=now
  if delta>=0 and delta<3600000 and M.tick then M.tick(g,delta) end
@@ -11,6 +11,9 @@ local function tick()
 end
 local function activate(hit)
  if not hit then return end
+ -- A failed reset-sidecar clear must become durable before new rounds can
+ -- catch up to its old counter and make stale category bits look current.
+ if V.mustPersistBeforeAction and V.mustPersistBeforeAction(hit.action)and not save()then refresh();return end
  local result=V.act(g,M,hit.action,hit.value)
  if type(result)=='table' then g=result;last=smudge.millis()
  elseif result=='exit' then M.pause(g);if save() then closed=true;smudge.exit() end;return end

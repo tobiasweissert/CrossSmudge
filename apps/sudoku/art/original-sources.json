@@ -1,0 +1,15 @@
+{
+  "repository": "ma-r-s/crossplay",
+  "revision": "d3a49ce8e85f9bd0d3e0c774a54adc267fd7547b",
+  "sources": {
+    "src/apps_local/ui/fonts/toybox_10.h": "2b1485310c1c0b50cf9e5453289a96c96d89d644b89a8d7fe498b10daef40283",
+    "src/apps_local/ui/fonts/toybox_20.h": "845e328963eaf0b35d742948c16add3e75dcaaf1e4cb88ddd2f015e8f1926884",
+    "src/apps_local/ui/fonts/toybox_30.h": "a0803677feab588fe73d1fe3cb9159d9e2008e111111be17f9fcf5e32a861b1e"
+  },
+  "format": "U+0020..00FF records <BBHbbH>, exact12.4 advance,0=ink row masks; calculator mathaliases127/128/129",
+  "sha256": {
+    "original10.bin": "e1d226cf64f4875aa9ace74e2d1bb1ed5bad82c35a9a1cf33a6a29dc5b7ffbe5",
+    "original20.bin": "0ad411d36d9a76de66eaa960eaf03a189a4c9f89a5ded73f53b0275e164614e8",
+    "original30.bin": "b1164997ecdc843cbbc6ecf4500037d72335ac9ff94325dbf84369825026eb67"
+  }
+}

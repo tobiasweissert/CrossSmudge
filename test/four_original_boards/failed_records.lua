@@ -1,0 +1,7 @@
+local M=dofile('core.lua');local read=smudge.read_file;local saves={};local fail=false;local exited=false;smudge.exit=function()exited=true end
+smudge.read_file=function(path,n,o)if saves[path]then return saves[path]:sub((o or 0)+1,(o or 0)+n)end;if path:match('%.dat$')then return nil end;return read(path,n,o)end;smudge.write_file=function(path,v)if fail and path:match('^native%-record')then return false end;saves[path]=v;return true end
+local mines=M.cols==8;local app
+if not mines then local g=M.new(123456);for p=1,2 do for c=1,14 do g.cards[p][c]=0 end end;g.cards[2][1]=-1;g.turn=2;g.rolls=3;g.d={2,2,2,2,2};assert(dofile('storage.lua').save('1|'..M.encode(g)))end
+app=dofile('main.lua');on_init();on_draw();on_button('confirm',true);on_draw()
+if mines then local l=app.layout();on_touch(l.x+l.cell//2,l.y+l.cell//2,'tap');for p=1,80 do if app.state().b[p]&1==0 and app.state().b[p]&2==0 then on_touch(l.x+(p-1)%8*l.cell+l.cell//2,l.y+(p-1)//8*l.cell+l.cell//2,'tap')end end else on_update()end
+on_draw();local encoded=M.encode(app.state());fail=true;on_button('back',true);on_draw();on_button('back',true);on_draw();assert(not exited,'failed optional record write reported successful exit');capture('record-write-failure.pgm');fail=false;on_button('back',true);assert(exited,'retry did not permit exit');app=dofile('main.lua');on_init();on_draw();local R=type(app.records)=='function'and app.records()or app.records;assert(R.played==1 and M.encode(app.state())==encoded);on_exit()

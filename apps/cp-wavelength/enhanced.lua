@@ -1,8 +1,13 @@
+local ok,device=pcall(smudge.get_device)
+if not ok or device~='sticky'then return dofile('legacy_enhanced.lua')end
 -- Original game/save controller with a phase-specific CrossPlay presentation.
 local M,S,V=dofile('core.lua'),dofile('storage.lua'),dofile('presentation.lua')
+local R=dofile('ui_record.lua')
 local g,last,lastSave,closed,notice=nil,0,0,false,''
 local function refresh()smudge.request_update()end
-local function save()local ok=S.save(M.encode(g));notice=ok and '' or 'SAVE FAILED';return ok end
+local function save(begin)
+ local ok=S.save(M.encode(g));if ok then ok=R.save(g,M,V.abandoned,begin)end;notice=ok and ''or'SAVE FAILED';return ok
+end
 local function tick()
  local before=g.phase;local now=smudge.millis();local delta=now-last;last=now
  if delta>=0 and delta<3600000 and M.tick then M.tick(g,delta) end
@@ -11,19 +16,25 @@ local function tick()
 end
 local function activate(hit)
  if not hit then return end
+ local beforePhase=g.phase
+ local begin=hit.action=='fresh'
  local result=V.act(g,M,hit.action,hit.value)
  if type(result)=='table' then g=result;last=smudge.millis()
- elseif result=='exit' then M.pause(g);if save() then closed=true;smudge.exit() end;return end
+ elseif result=='exit' then M.pause(g);if save() then closed=true;V.exit();smudge.exit() end;return end
  V.focus=1
- if smudge.millis()-lastSave>=5000 then save();lastSave=smudge.millis() end
+ if begin or beforePhase~=g.phase or g.phase==5 or smudge.millis()-lastSave>=5000 then save(begin);lastSave=smudge.millis() end
  refresh()
 end
 function on_init()
- g=S.load(M.decode) or M.new(smudge.millis());M.pause(g);last=smudge.millis();closed=false;V.init(g);refresh()
+ g=S.load(M.decode) or M.new(smudge.millis());M.pause(g);last=smudge.millis();closed=false;V.record=R.load(g,M);V.abandoned=R.abandoned;V.init(g);refresh()
 end
 function on_draw()if not closed then V.draw(g,M,notice) end end
 function on_button(button,pressed)
- if not pressed or closed then return end
+ if closed then return end
+ if not pressed then
+  if button=='confirm'and g.phase==2 then V.buttonHeld=false;local was=V.peek;V.peek=V.touchPeek or false;if was and not V.peek then smudge.full_refresh()end;refresh()end
+  return
+ end
  if button~='confirm' and button~='back' then V.keyboard=true end
  if tick() then refresh();return end
  if button=='back' then

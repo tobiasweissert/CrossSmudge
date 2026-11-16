@@ -1,3 +1,6 @@
+-- Keep the pre-parity presentation on every other device/older host.
+local ok,device=pcall(function()return smudge.get_device and smudge.get_device()end)
+if not ok or device~='sticky'then return dofile('legacy_graphics.lua')end
 -- Jersey 25/OFL glyphs repacked losslessly from CrossPlay's 1-bit Epd cuts.
 -- Load once; retain compact strings rather than per-glyph Lua tables.
 local G={}
@@ -12,6 +15,24 @@ function G.width(text,size)
  local width=0
  for i=1,#text do local _,_,advance=record(fonts[size],text:byte(i));width=width+advance end
  return width
+end
+-- Native EpdFont measures ink bounds, including the initial zero origin,
+-- rather than the final glyph advance. Needed by the original status button.
+function G.inkWidth(text,size)
+ local pen,left,right=0,0,0
+ for i=1,#text do
+  local w,_,advance,bearing=record(fonts[size],text:byte(i))
+  if bearing>127 then bearing=bearing-256 end
+  left=math.min(left,pen+bearing);right=math.max(right,pen+bearing+w);pen=pen+advance
+ end
+ return right-left
+end
+function G.status(text,b)
+ -- Original FreeInkUI button: 4px horizontal/2px vertical text inset,
+ -- toybox_20 line advance 42, ascender 34 and capital top 25.
+ smudge.rect(b.x,b.y,b.w,b.h,true,true)
+ G.text(text,b.x+4+(b.w-8-G.inkWidth(text,20))//2,
+  b.y+2+math.max(0,(b.h-4-42)//2)+34-25,20,true)
 end
 function G.text(text,x,y,size,paper)
  local font=fonts[size];local cap=size==30 and 38 or size==20 and 25 or 13

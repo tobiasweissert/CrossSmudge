@@ -1,0 +1,5 @@
+-- Independent reviewer reproduction, extended for repeated mode changes and reopen.
+local app=dofile('main.lua');on_init();on_draw()
+local function tap(action)on_draw();for _,h in ipairs(app.view.hit)do if h.action==action then local b=h.box;on_touch(b.x+b.w//2,b.y+b.h//2,'tap');on_draw();return end end;error('missing '..tostring(action))end
+for round=1,2 do tap(round==1 and'start'or'next');tap('ready');tap(1);on_long_press(240,680);on_touch_release(240,680);tap('clue');tap('dial');tap(3)end
+assert(app.state().round==2 and app.view.record.rounds==1);on_button('back',true);on_draw();assert(app.view.currentView=='menu');local before=app.view.record.rounds;tap('mode');tap('mode');tap('mode');assert(app.view.record.rounds==before,'changing next mode recounted completed round: '..app.view.record.rounds);local points=app.view.record.points;local buckets=table.concat(app.view.record.buckets,',');on_exit();app=dofile('main.lua');on_init();on_draw();assert(app.view.record.rounds==before and app.view.record.points==points and table.concat(app.view.record.buckets,',')==buckets,'mode recount after reopen');on_exit()

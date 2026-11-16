@@ -1,6 +1,6 @@
 -- Direct taps use actual drawn card geometry, with no keyboard fallback.
 smudge.get_device=function() return 'sticky' end
-local app=dofile('main.lua');on_init();on_draw()
+local app=dofile('main.lua');on_init();on_draw();if app.layout().menu then on_button('confirm',true);on_draw()end
 local C=dofile('cp_core.lua')
 local function fixture(piles)
  local g=app.state();g.piles={};g.moves=0;g.history={};g.drawThree=false
@@ -12,13 +12,18 @@ end
 local function tap(p,i)
  local l=app.layout();local col=p>=6 and p-6 or p<=1 and p or p+1
  if l.pileColumns and p<6 then col=l.pileColumns[p] end
- local y=p>=6 and l.tab+(i or math.max(1,#app.state().piles[p]))*l.pileSteps[p]-l.pileSteps[p]+1 or l.top+2
+ local at=i or math.max(1,#app.state().piles[p]);local y=p>=6 and l.tab+(l.pileOffsets and l.pileOffsets[p][at]or(at-1)*l.pileSteps[p])+1 or l.top+2
  on_touch(l.x+col*(l.cw+(l.gap or 6))+l.cw//2,y,'tap');on_draw()
 end
 local function toolbar(i)
  local l=app.layout()
- if l.menuButton and not l.buttons[i] then local b=l.menuButton;on_touch(b.x+b.w//2,b.y+b.h//2,'tap');on_draw() end
- local b=app.layout().buttons[i];on_touch(b.x+b.w//2,b.y+b.h//2,'tap');on_draw()
+ if (i==1 or i==2)and l.menuButton then
+  local m=l.menuButton;on_touch(m.x+2,m.y+2,'tap');on_draw();l=app.layout()
+  local want=i==2
+  if l.drawThree~=want then local mode=l.menu[#l.menu];on_touch(mode.x+2,mode.y+2,'tap');on_draw();l=app.layout()end
+  local b=l.menu[2];on_touch(b.x+2,b.y+2,'tap');on_draw();return
+ end
+ local b=l.buttons[i];assert(b,'actual drawn toolbar action missing');on_touch(b.x+b.w//2,b.y+b.h//2,'tap');on_draw()
 end
 -- Same-card second tap must deselect, not silently reselect and move later.
 local g=fixture({[6]={140}});tap(6);tap(6);tap(7)

@@ -1,0 +1,67 @@
+{
+  "source_repository": "ma-r-s/crossplay",
+  "revision": "d3a49ce8e85f9bd0d3e0c774a54adc267fd7547b",
+  "fonts": {
+    "list_busy": [
+      "toybox_10",
+      "reading_serif_14",
+      "toybox_30"
+    ],
+    "reader": [
+      "reading_serif_11",
+      "reading_serif_14",
+      "reading_serif_bold_16"
+    ]
+  },
+  "native_harness": "actual HackerNewsScreens builders, SDK GfxRendererTarget, EpdFontData masks/kerning, production text width and wrapping; host adapter not physical screenshot",
+  "native_harness_source_sha256": "7a9257a8c716b0a71b6c922367dcfcff442281a71497119d21140d2d27d699f4",
+  "native_models": {
+    "busy": {
+      "headline": "FETCHING THE FRONT PAGE",
+      "message": "",
+      "actionLabel": null
+    },
+    "list": {
+      "title": "HACKER NEWS",
+      "selected": -1,
+      "showingSaved": false,
+      "labels": [
+        "Synthetic story one",
+        "Synthetic story two"
+      ],
+      "values": [
+        "42",
+        "7"
+      ]
+    },
+    "reader": {
+      "title": "Synthetic article",
+      "pageLabel": "1 / 1",
+      "text": "Readable article text.",
+      "canSave": false,
+      "showingComments": false,
+      "swapAvailable": true,
+      "canPagePrev": false,
+      "canPageNext": false
+    }
+  },
+  "sha256": {
+    "busy-480x800.png": "011b7a50dbafd4867aa3c3cd0edbfc52700ae92babb8277a5d2e4228f727c66a",
+    "busy-800x480.png": "422c00741ae5996a41c73feeafaeb7d55cc04d4b70cc7cf9de4381f5b0802f6a",
+    "list-480x800.png": "da956187a57636f1cb8ddcc50573e4e7ca8cb77105d708cc2f7d77434c11cb37",
+    "list-800x480.png": "f5958fd0f46f6ec56c44197255b1727c85c103bce6897954e8a6e8fb4fc14f61",
+    "reader-480x800.png": "9607524c961c518b063135ef9dc6266cb5dfb1f9b7735cc408cd391dce8a3d16",
+    "reader-800x480.png": "a050d18930461165786c3683b2447c2a4b8017ee2838b20546d1cf2ea43d18ec"
+  },
+  "pixel_scope": "Busy and Reader full frames in both orientations. List all pixels outside footer-label text band; native FRONT PAGE/SAVED labels become target TOP/FEEDS because only existing four feeds are supported.",
+  "preserved_sha256": {
+    "reader.lua": "23007ce49a7ae9717c1e7d3b4e8adfa8d824c8afc04f03b7ce966250a2d8cbd4",
+    "model.lua": "37e68b6439fb907c87e79de336baa05e742eca0c2ba97dfa8a5525ff9ae5a826",
+    "cache.lua": "b0c042e109ea39fc21b3d6ac64ac1dd33d3c44b0f56d68bceae8ed78ebd108ca",
+    "json.lua": "7c6f00b1072a721e8ac5a90cad4d079a3e5374c6fca60db5440f4d1c4c6707cc",
+    "design.lua": "9d098da0954dac941e819c0b31f5fcf35a64a3d879d01f5ce54e7f5df21d4786",
+    "manifest.json": "ba71f8f84b5c4563fcda90d73bd47ed339049d7e2e9bc31b78ebc72413d9091e"
+  },
+  "legacy_presentation_sha256": "67f54cd2823847198b23c3944ed71ea63e899c53f6495e641ba5cb292db6de8c",
+  "licenses": "CrossPlay MIT in app/LICENSE; OFL-Jersey25.txt/OFL-NotoSerif.txt for source fonts"
+}

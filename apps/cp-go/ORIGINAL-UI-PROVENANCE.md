@@ -1,0 +1,13 @@
+# Original Go UI
+
+The Sticky presentation calls the existing Lua rules and unchanged core journal. Its board geometry, menu composition, real glyphs and diagrams are transcribed from CrossPlay `d3a49ce8e85f9bd0d3e0c774a54adc267fd7547b`, `src/apps_local/go/` and `src/apps_local/ui/`. Full ASCII Jersey glyphs in `art/nativefont*.bin` are lossless copies of original Toybox font data; `art/native-font-sources.json` pins their source bytes. Existing OFL and CrossPlay licenses apply. Original icon provenance is recorded beside the new assets.
+
+`main.lua` selects these modules only for the actual Sticky device identity with at least 512 KiB Lua capacity. All pre-existing modules and assets remain byte-identical and are used for every nonSticky identity and for constrained heaps. No core, util, storage, manifest, icon.raw or catalog change is part of this presentation.
+
+Production-rendered verification lives in `test/four_original_boards/`: actual compiled Sticky identity, production Lua32, both entry orientations and 2 MiB Lua cap. Immutable original source builders, original SDK and original font rasterization supply the references; no generic replacement art or host font is used. Portrait native comparisons and fitting original landscape screens are exact. The original fixed portrait boards/miniatures/lessons overflow landscape; the Sticky layout fits their actual elements and keeps controls reachable. Landscape differences are measured and disclosed, not called pixel identity.
+
+Nearby is unavailable in the current Lua ABI and opens an explicit unavailable screen. It never advertises fake peers, search, connectivity or records. Optional UI-only checksum journals retain only actual observed completions; earlier unknown lifetime history is not invented. Failure to persist UI records is visible and can be retried; existing core save formats stay intact.
+
+Go and Hex expose their existing fixed port opponents, and explicitly label original strength levels unavailable. Go counting is manual review; the port has no original automatic dead-stone judgment. White selection uses the real core turn routing, with role hints paired to the unchanged core encoding before a successful core save. Unsupported strength/network functions are not emulated.
+
+Hardware still requires device verification: on Sticky, open each title in both orientations, navigate menus/settings/help/results with touch and physical controls, complete a game, save/reopen and retry a failed SD write. For Minesweeper, hold to flag/unflag, then chord a correctly flagged opened number; for Yahtzee, test held dice and Joker-forced scoring. Reopen an existing nonSticky save without resetting its cache. Host checks do not approve physical hardware.

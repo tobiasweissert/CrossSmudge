@@ -4,6 +4,13 @@ local V=dofile('board.lua')
 local G={cell=1,digit=1,notesMode=false,level=0,menu=true,menuIndex=1,notice='',history={},closed=false,elapsed=0,hinted=false,
  recorded=false,hintsUsed=0,newBest=false,counts={0,0,0,0},best={-1,-1,-1,-1}}
 local L={};local journal,dirty,lastTime,lastSave
+-- Pending hints are transient, never serialized. Two scalar revisions bind the
+-- target to this board without retaining a second board or solution snapshot.
+local revision,pendingRevision,pendingTechnique=0,nil,nil
+local function clearHint()
+ if G.pendingHint then G.notice='' end
+ G.pendingHint=nil;pendingRevision=nil;pendingTechnique=nil;revision=revision+1
+end
 local levels={'Easy','Medium','Hard','Expert'}
 local function digits(a) local t={};for i=1,81 do t[i]=tostring(a[i]) end;return table.concat(t) end
 local function array(s) if #s~=81 or s:find('[^0-9]') then return nil end;local a={};for i=1,81 do a[i]=tonumber(s:sub(i,i)) end;return a end
@@ -46,6 +53,7 @@ local function recordResult()
 end
 local function remember(i) if #G.history==24 then table.remove(G.history,1) end;G.history[#G.history+1]={i,G.value[i],G.notes[i]} end
 local function enter(i,note)
+ clearHint()
  if not G.given or G.job or G.solved then return end
  if G.given[i]~=0 then G.digit=G.given[i];refresh();return end
  remember(i)
@@ -55,23 +63,37 @@ local function enter(i,note)
 end
 local function hint()
  if not G.given or G.job or G.solved then return end
- for i=1,81 do if G.value[i]~=0 and G.value[i]~=G.solution[i] then G.cell=i;G.notice='Check this entry first';refresh();return end end
- local h=C.next_hint(G.value,10)
- if h.found then remember(h.cell);G.cell=h.cell;G.value[h.cell]=h.digit;G.notes[h.cell]=0;G.hinted=true;if G.hintsUsed>=0 then G.hintsUsed=math.min(65535,G.hintsUsed+1) end;G.notice=C.names[h.technique];G.solved=solved();recordResult();dirty=true else G.notice='No logical placement found' end
+ local target=G.pendingHint
+ if target and pendingRevision==revision and G.cell==target and G.given[target]==0 and G.value[target]==0 then
+  local technique=pendingTechnique
+  remember(target);G.value[target]=G.solution[target];G.notes[target]=0;clearHint()
+  G.hinted=true;if G.hintsUsed>=0 then G.hintsUsed=math.min(65535,G.hintsUsed+1) end
+  G.notice=C.names[technique];G.solved=solved();recordResult();dirty=true
+ else
+  clearHint()
+  for i=1,81 do if G.value[i]~=0 and G.value[i]~=G.solution[i] then G.cell=i;G.notice='Check this entry first';refresh();return end end
+  local h=C.next_hint(G.value,10)
+  if h.found and G.given[h.cell]==0 and G.value[h.cell]==0 then
+   G.cell=h.cell;G.pendingHint=h.cell;pendingRevision=revision;pendingTechnique=h.technique;G.notice='Hint again reveals digit'
+  else G.notice='No logical placement found' end
+ end
  refresh()
 end
 local function start(level)
+ clearHint()
  lastTime=smudge.millis();G.pendingLevel=level;G.job=C.newGenerator(level,smudge.millis());G.attempts=1;G.menu=false;G.notice='Generating '..levels[level+1]..' (Back cancels)';refresh()
 end
 local function geometry()
  local w,h=smudge.get_bounds();L=V.layout(w,h);return L
 end
 local function action(n)
+ if n~=2 then clearHint() end
  if n==1 then G.notesMode=not G.notesMode elseif n==2 then hint()
  elseif n==3 then local u=table.remove(G.history);if u then G.value[u[1]]=u[2];G.notes[u[1]]=u[3];G.solved=solved();G.newBest=false;dirty=true end
  else G.menu=true;G.menuIndex=1 end;refresh()
 end
 function on_init()
+ clearHint()
  -- Versioned UI journal preserves the first test candidate's game slots for rollback.
  local payload;journal,payload=J.open('sudoku',1024,function(s) return decode(s)~=nil end,'ui-')
  local loaded=payload and decode(payload)
@@ -93,6 +115,7 @@ local function menuSelect()
 end
 function on_button(b,pressed)
  if not pressed or G.closed then return end
+ clearHint()
  if G.job then if b=='back' then G.job=nil;G.notice='Generation canceled';G.menu=not G.given end;refresh();return end
  if V.button(G,b,menuSelect,refresh) then return end
  if G.menu then
@@ -109,7 +132,7 @@ end
 function on_touch(x,y,event)
  if G.closed then return end
  if G.job then if event=='tap' then on_button('back',true) end;return end
- V.touch(L,G,x,y,event,enter,action,menuSelect,refresh)
+ V.touch(L,G,x,y,event,enter,action,menuSelect,refresh,clearHint)
 end
 function on_long_press(x,y)on_touch(x,y,'hold')end
 function on_update()
@@ -131,6 +154,7 @@ function on_update()
  end
 end
 function on_exit()
+ clearHint()
  local dt=smudge.millis()-lastTime
  if not G.job and not G.menu and G.given and not G.solved and dt>=1000 and dt<60000 then G.elapsed=math.min(31536000,G.elapsed+dt//1000);dirty=true end
  G.job=nil;if G.given then dirty=true end;save();G.closed=true

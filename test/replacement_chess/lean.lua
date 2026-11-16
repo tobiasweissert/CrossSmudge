@@ -11,7 +11,7 @@ if app.unsupported then
  assert(reads==0 and writes==0,'unsupported device touched save files')
  print('75KiB unsupported-device refusal passed; chess gameplay NOT supported');return
 end
-on_init();on_draw();collectgarbage('collect')
+on_init();on_draw();if app.layout().start then local b=app.layout().start[1];on_touch(b.x+b.w//2,b.y+b.h//2,'tap');on_draw()end;collectgarbage('collect')
 local l=app.layout()
 on_touch(l.x+4*l.size+l.size//2,l.y+6*l.size+l.size//2,'tap')
 on_touch(l.x+4*l.size+l.size//2,l.y+4*l.size+l.size//2,'tap')

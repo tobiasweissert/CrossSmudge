@@ -1,7 +1,7 @@
 {
   "id": "cp-checkers",
   "name": "Checkers",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "author": "CrossPlay contributors; Lua port",
   "description": "English draughts, mandatory full captures and two-ply opponent. Local only.",
   "entry": "main.lua",

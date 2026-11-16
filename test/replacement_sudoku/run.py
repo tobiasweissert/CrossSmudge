@@ -51,6 +51,13 @@ with tempfile.TemporaryDirectory(prefix="sudoku-verify-", dir=scratch) as temp:
                             stderr=p.stderr, metrics=metrics))
     if not args.legacy_regression:
         for width, height in [(480, 800), (800, 480)]:
+            p = subprocess.run([str(runner), str(HERE / 'hint.lua'), '2097152',
+                                str(width), str(height)], cwd=app,
+                               capture_output=True, text=True, timeout=180)
+            metrics = json.loads(p.stdout.strip().splitlines()[-1]) if p.stdout.strip() else {}
+            results.append(dict(test='hint.lua', width=width, height=height,
+                                returncode=p.returncode, stdout=p.stdout,
+                                stderr=p.stderr, metrics=metrics))
             p = subprocess.run([str(runner), str(HERE / 'runtime.lua'), '2097152',
                                 str(width), str(height)], cwd=app,
                                capture_output=True, text=True, timeout=180)

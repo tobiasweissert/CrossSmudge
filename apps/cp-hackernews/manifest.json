@@ -1,7 +1,7 @@
 {
   "id": "cp-hackernews",
   "name": "Hacker News",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "author": "CrossSmudge contributors",
   "description": "Live Hacker News stories and bounded article reading; APIv3 preview",
   "entry": "main.lua",

@@ -68,15 +68,17 @@ assert(g.solved and g.recorded and g.counts[g.level+1]==1 and g.best[g.level+1]=
 capture('result-best')
 tap(app.layout().grid);on_button('back',true);on_draw();capture('menu-record')
 -- The selected difficulty has no recorded time; do not invent one.
-tap(app.layout().difficulty);tap(app.layout().menu[4]);capture('menu-expert-record')
+for _=1,3 do tap(app.layout().difficulty)end;capture('menu-expert-record')
 -- Return to the solved game's result through its real grid/status controls.
-tap(app.layout().difficulty);tap(app.layout().menu[1]);on_button('back',true);on_draw()
+tap(app.layout().difficulty);on_button('back',true);on_draw()
 assert(not g.menu and g.solved,'could not return to solved grid')
 tap(app.layout().status);capture('result-recorded')
 tap(app.layout().again)
 for i=1,10000 do if not g.job then break end;on_update()end
 assert(g.given and not g.job and not g.solved,'second visual puzzle did not generate')
 now=now+41000;on_update();tap(app.layout().buttons[2])
+assert(not g.hinted and g.hintsUsed==0 and g.pendingHint,'visual preview revealed a digit');capture('hint-highlight')
+tap(app.layout().buttons[2]);capture('hint-reveal')
 assert(g.hinted and g.hintsUsed==1,'visual hint did not use the production action')
 for i=1,81 do if g.given[i]==0 and g.value[i]~=g.solution[i]then
  local l=app.layout();tap(l.keys[g.solution[i]])

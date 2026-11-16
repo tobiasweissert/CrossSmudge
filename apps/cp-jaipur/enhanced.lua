@@ -1,3 +1,5 @@
+local identityOk,identity=pcall(smudge.get_device)
+if not identityOk or identity~='sticky'then return dofile('legacy_enhanced.lua')end
 -- Original market canvas; the existing core validates every committed move.
 local M,S,V,R=dofile('core.lua'),dofile('storage.lua'),dofile('board.lua'),dofile('records.lua')
 local g,closed,savedAt,notice,orientation=nil,false,0,'',nil
@@ -7,10 +9,10 @@ local function save()
 end
 local function act(a)
  local result
- if a=='new'then g=M.new(smudge.millis());V.menu=false;V.clear()
+ if a=='new'then g=M.new(smudge.millis());V.menu=false;V.report=nil;V.clear()
  elseif a=='exit'then result='exit'
- elseif type(a)=='table'then if not M.apply(g,a)then return end;V.clear()
- elseif type(a)=='number'then result=M.act(g,a);V.clear()end
+ elseif type(a)=='table'then local s=g.turn;local before={seat=s,card=a[1]==1 and g.market[a[2]],herd=g.herd[s],points=g.points[s],bonus=g.nb[s]};if not M.apply(g,a)then return end;V.describe(a,before,g);V.clear()
+ elseif type(a)=='number'then result=M.act(g,a);V.report=nil;V.clear()end
  R.observe(M,g);if not R.save()then notice='RECORD SAVE FAILED'end
  if result=='exit'then if save()then closed=true;restore();smudge.exit()end
  elseif smudge.millis()-savedAt>=5000 then save();savedAt=smudge.millis()end

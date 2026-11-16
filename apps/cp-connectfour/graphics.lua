@@ -1,17 +1,37 @@
+local ok,device=pcall(function()return smudge.get_device and smudge.get_device()end)
+if not ok or device~='sticky'then return dofile('legacy_graphics.lua')end
 -- Jersey 25/OFL glyphs repacked losslessly from CrossPlay's 1-bit Epd cuts.
 -- Load once; retain compact strings rather than per-glyph Lua tables.
 local G={}
 local fonts={}
 function G.init()
- for _,size in ipairs({10,20,30}) do fonts[size]=assert(smudge.read_file('art/font'..size..'.bin',20000),'Missing CrossPlay font') end
+ for _,size in ipairs({10,20,30}) do fonts[size]=assert(smudge.read_file('art/nativefont'..size..'.bin',20000),'Missing CrossPlay font') end
 end
 local function record(font,c)
- c=math.max(32,math.min(90,c));return string.byte(font,(c-32)*7+1,(c-32)*7+7)
+ c=math.max(32,math.min(126,c));return string.byte(font,(c-32)*7+1,(c-32)*7+7)
 end
 function G.width(text,size)
  local width=0
  for i=1,#text do local _,_,advance=record(fonts[size],text:byte(i));width=width+advance end
  return width
+end
+-- Native EpdFont measures ink bounds, including the initial zero origin,
+-- rather than the final glyph advance. Needed by the original status button.
+function G.inkWidth(text,size)
+ local pen,left,right=0,0,0
+ for i=1,#text do
+  local w,_,advance,bearing=record(fonts[size],text:byte(i))
+  if bearing>127 then bearing=bearing-256 end
+  left=math.min(left,pen+bearing);right=math.max(right,pen+bearing+w);pen=pen+advance
+ end
+ return right-left
+end
+function G.status(text,b)
+ -- Original FreeInkUI button: 4px horizontal/2px vertical text inset,
+ -- toybox_20 line advance 42, ascender 34 and capital top 25.
+ smudge.rect(b.x,b.y,b.w,b.h,true,true)
+ G.text(text,b.x+4+(b.w-8-G.inkWidth(text,20))//2,
+  b.y+2+math.max(0,(b.h-4-42)//2)+34-25,20,true)
 end
 function G.text(text,x,y,size,paper)
  local font=fonts[size];local cap=size==30 and 38 or size==20 and 25 or 13
@@ -31,15 +51,18 @@ end
 function G.header(title,right)
  local w=smudge.get_bounds();title=string.upper(title);local size=G.width(title,30)<=w-32 and 30 or 20
  smudge.rect(0,0,w,76,true,true);G.text(title,16,(76-(size==30 and 38 or 25))//2,size,true)
- if right then G.text(right,w-16-G.width(right,20),25,20,true)end
+ if right then G.text(right,w-16-G.inkWidth(right,20),36,20,true)end
  smudge.rect(0,80,w,3,true,true)
 end
-function G.ditherDisc(x,y,r,dark)
- for dy=-r,r do local half=math.floor(math.sqrt(r*r-dy*dy));smudge.rect_dither(x-half,y+dy,2*half+1,1,dark)end
+-- Original ToyboxScreen.h half-open scanline disc, not runtime midpoint circle.
+function G.disc(x,y,r,black,dither)
+ for dy=-r,r do local half=math.floor(math.sqrt(r*r-dy*dy))
+  if half>0 then if dither then smudge.rect_dither(x-half,y+dy,2*half,1,black)else smudge.rect(x-half,y+dy,2*half,1,true,black)end end
+ end
 end
+function G.ditherDisc(x,y,r,dark)G.disc(x,y,r,dark,true)end
 function G.ring(x,y,r,filled,weight)
- smudge.circle(x,y,r,true,true)
- if not filled then smudge.circle(x,y,math.max(1,r-(weight or 3)),true,false) end
+ G.disc(x,y,r,true);if not filled then G.disc(x,y,math.max(1,r-(weight or 3)),false)end
 end
 function G.bracket(x,y,w,h,arm,weight,paper)
  for _,dx in ipairs({0,w-arm}) do for _,dy in ipairs({0,h-weight}) do smudge.rect(x+dx,y+dy,arm,weight,true,not paper) end end
@@ -65,7 +88,7 @@ function G.wrap(text,width,size)
  if current~='' then lines[#lines+1]=current end;return lines
 end
 function G.die(x,y,side,value,paper,fixedPip)
- local pip=fixedPip or math.min(9,math.max(3,side//5));local step=side//4;local cx,cy=x+2*step,y+2*step
+ local pip=fixedPip or 9;local step=side//4;local cx,cy=x+2*step,y+2*step
  local positions=fixedPip and {13,side//2-pip//2,side-13-pip}
  local function p(dx,dy)smudge.rect(positions and x+positions[dx+2]or cx+dx*step-pip//2,positions and y+positions[dy+2]or cy+dy*step-pip//2,pip,pip,true,not paper)end
  if value%2==1 then p(0,0)end
@@ -73,10 +96,27 @@ function G.die(x,y,side,value,paper,fixedPip)
  if value>=4 then p(1,-1);p(-1,1)end
  if value==6 then p(-1,0);p(1,0)end
 end
-function G.lessonText(text,x,y,width,size)
- for _,line in ipairs(G.wrap(text,width,size))do G.center(line,x,y,width,size==20 and 42 or 22,size);y=y+(size==20 and 42 or 22)end
- return y
+-- Native DrawTarget text uses ink width and vertically centres the line box.
+function G.nativeText(text,x,y,w,h,size,align,paper,inkCentre)
+ local lines,current={},''
+ if G.inkWidth(text,size)<=w then lines={text}end
+ for word in (#lines>0 and ''or text):gmatch('%S+')do local candidate=current==''and word or current..' '..word
+  if current~=''and G.inkWidth(candidate,size)>w then lines[#lines+1]=current;current=word else current=candidate end
+ end
+ if current~=''then lines[#lines+1]=current end
+ local line=size==30 and 63 or size==20 and 42 or 21;local cap=size==30 and 38 or size==20 and 25 or 13
+ local ascent=size==30 and 51 or size==20 and 34 or 17
+ local top=inkCentre and y+(h-cap)//2 or y+math.max(0,(h-line*#lines)//2)+ascent-cap
+ if #lines==1 and text:match('^%d$')and align~='left'and align~='right'then
+  local gw,gh,_,bearing,gt=record(fonts[size],text:byte());if bearing>127 then bearing=bearing-256 end
+  local ry=inkCentre and y+(h+cap)//2-ascent or y;local rh=inkCentre and line or h
+  if gw<=w and gh<=rh then G.text(text,x+(w-gw)//2-bearing,ry+(rh-gh)//2+gt-cap,size,paper);return end
+ end
+ for i,v in ipairs(lines)do local left=align=='left'and x or align=='right'and x+w-G.inkWidth(v,size)or x+(w-G.inkWidth(v,size))//2
+  G.text(v,left,top+(i-1)*line,size,paper)
+ end
 end
+function G.lessonText(text,x,y,width,size)G.nativeText(text,x,y,width,120,size)end
 function G.menu(items,selected,status)
  local w,h=smudge.get_bounds();local row=math.min(62,(h-150-4*(#items-1))//#items)
  local start=h-16-#items*row-(#items-1)*4;local boxes={}

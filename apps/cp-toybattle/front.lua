@@ -1,8 +1,13 @@
--- Source front-door band order: actual record/position, rule, ornament, doors.
+local ok,device=pcall(smudge.get_device)
+if not ok or device~='sticky'then return dofile('legacy_front.lua')end
+local nearby
 return function(M,g,F,w,h,labels,selected,preview,status)
- F.header(M.title=='Go - local'and 'GO'or'TOY BATTLE');F.text(F.fit(status,w-32,10),16,99,10);smudge.rect(16,128,w-32,3,true,true)
- local width=w>h and(w-48)//2 or w-32;local left=w>h and w-width-16 or 16;local top=h-16-#labels*62-(#labels-1)*4;local boxes={}
- local area={x=16,y=145,w=w>h and left-32 or w-32,h=w>h and h-175 or top-166};preview(M,g,F,area)
- for i,label in ipairs(labels)do local b={x=left,y=top+(i-1)*66,w=width,h=62};boxes[i]=b;smudge.rect(b.x,b.y,b.w,b.h,i==selected,1,true);F.text(F.fit(label,b.w-60,20),b.x+12,b.y+18,20,i==selected);F.center(i==1 and '>'or i==2 and '+'or'?',b.x+b.w-48,b.y+12,36,38,20,i==selected)end
+ F.header('TOY BATTLE');F.native(status or'NO BATTLES YET',{x=16,y=119,w=w-32,h=26},10,'left');smudge.rect(16,151,w-32,3,true,true)
+ local count=#labels;local top=h-16-(count*62+(count-1)*6+12);local area={x=16,y=154,w=w-32,h=top-154-16};preview(M,g,F,area)
+ local boxes={};nearby=nearby or assert(smudge.read_file('art/nearby32.raw',128))
+ for i,label in ipairs(labels)do local b={x=16,y=top+(i-1)*66,w=w-32,h=62};boxes[i]=b;smudge.rect(b.x,b.y,b.w,b.h,i==selected,1,true);F.native(label,{x=b.x+12,y=b.y,w=b.w-24,h=b.h},20,'left',i==selected)
+  if label=='CONTINUE'then F.native(g.medals[1]..'-'..g.medals[2],{x=b.x+12,y=b.y,w=b.w-24,h=b.h},20,'right',i==selected)end
+  if label=='PLAY NEARBY'then smudge.bitmap(b.x+b.w-56,b.y+15,32,32,nearby,i==selected)end
+ end
  return boxes
 end
