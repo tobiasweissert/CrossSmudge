@@ -21,6 +21,7 @@ int main(){
   lua_gc(L,LUA_GCCOLLECT);
   if(!mode)baseline=h.used;
   else {printf("Offline retained baseline %zu, current %zu (delta %zd)\n",baseline,h.used,static_cast<ptrdiff_t>(h.used)-baseline);assert(h.used==baseline);}
+  lua_getglobal(L,"coroutine");assert(lua_isnil(L,-1));lua_pop(L,1);
   size_t before=h.used;assert(ink::runtime::openNetwork(L,false)==LUA_OK);assert(h.used==before);
   lua_getglobal(L,"utf8");assert(lua_isnil(L,-1));lua_pop(L,1);
   if(mode){

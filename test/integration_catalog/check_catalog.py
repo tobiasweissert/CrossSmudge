@@ -68,10 +68,15 @@ print('Owner catalog versions, safe paths and complete runtime dependencies veri
 baseline = json.loads(subprocess.check_output(['git', 'show', '2b40bf110c4e1e01b48346eeb16c501699a629cf:apps/catalog.json'], cwd=root))
 old = {a['id']: a for a in baseline['apps']}
 new = {a['id']: a for a in catalog['apps']}
-assert len(new) == 36 and len(set(new) - set(old)) == 20
+assert len(new) == 37 and len(set(new) - set(old)) == 21
 assert set(old) <= set(new)
 assert {i for i in old if old[i] != new[i]} == set(expected)
 for app in catalog['apps']:
     if app['id'] in expected or app['id'].startswith('cp-'):
         assert not any(path.endswith(('.dat', '.cache', '.bak', '.sav')) for path in app['files'])
-print('36 catalog entries: 20 new, 8 updated, 8 unchanged; no save payloads')
+main = json.loads(subprocess.check_output(['git', 'show', '621719e4f68d8ddf719d470f84be20ad22c11d35:apps/catalog.json'], cwd=root))
+assert {k:v for k,v in new.items() if k != 'browser'} == {a['id']:a for a in main['apps']}
+assert {k:v for k,v in catalog.items() if k != 'apps'} == {k:v for k,v in main.items() if k != 'apps'}
+assert new['browser']['min_api'] == 6 and new['browser']['version'] == '0.2.1'
+assert len(new['browser']['files']) == 13
+print('37 catalog entries; every non-Browser main record and publication metadata preserved; complete API6 Browser; no save payloads')

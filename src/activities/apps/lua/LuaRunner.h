@@ -5,6 +5,8 @@
 #include <functional>
 #include <string>
 #include <LuaHttp.h>
+#include <BrowserImage.h>
+#include <HalStorage.h>
 
 extern "C" {
 #include "lauxlib.h"
@@ -19,7 +21,7 @@ namespace ink {
 
 class LuaRunner {
  public:
-  static constexpr int LUA_API_VERSION = 3;
+  static constexpr int LUA_API_VERSION = 6;
 
   LuaRunner(GfxRenderer& renderer, MappedInputManager& input, const std::string& appDir, const std::string& appId);
   ~LuaRunner();
@@ -43,22 +45,19 @@ class LuaRunner {
   void onSwipe(const char* dir);
   void onExit();
 
-  bool checkAndClearRedrawRequested() {
-    bool r = redrawRequested_;
-    redrawRequested_ = false;
-    return r;
-  }
-
-  bool checkAndClearFullRefreshRequested() {
-    bool r = fullRefreshRequested_;
-    fullRefreshRequested_ = false;
-    return r;
-  }
+  bool checkAndClearRedrawRequested() { return redrawRequested_.exchange(false); }
+  bool checkAndClearFullRefreshRequested() { return fullRefreshRequested_.exchange(false); }
 
   bool shouldExit() const { return requestedExit_; }
   bool hasError() const { return hasError_; }
   const std::string& getErrorMessage() const { return errorMessage_; }
 
+  bool cooperativeBrowser()const{return browser_ && http_.cooperative;}
+  void requestNativeCancel(){
+    renderCancel_.store(true,std::memory_order_relaxed);
+    if(cooperativeBrowser()){http_.requestCancel();images_.requestCancel();}
+  }
+  void clearNativeCancel(){renderCancel_.store(false,std::memory_order_relaxed);}
   bool networkEnabled() const { return http_.allowed; }
   const http::Domains& networkDomains() const { return http_.domains; }
 
@@ -75,10 +74,14 @@ class LuaRunner {
   http::Session http_{http::platformExecutor()};
   bool resolvePath(const char* path, std::string& result) const;
   lua_State* L = nullptr;
-  bool requestedExit_ = false;
-  bool hasError_ = false;
-  bool redrawRequested_ = false;
-  bool fullRefreshRequested_ = false;
+  bool browser_ = false;
+  std::atomic<bool> renderCancel_{false};
+  browser::ImageSession images_;
+  HalFile browserFile_,browserDirectory_;
+  std::string browserDirectoryPath_;
+  std::string browserFilePath_;
+  size_t browserFileOffset_=0;
+  std::atomic<bool> requestedExit_{false},hasError_{false},redrawRequested_{false},fullRefreshRequested_{false};
   bool touchHoldActive_ = false;
   int touchHoldX_ = 0, touchHoldY_ = 0;
   std::atomic<bool> preventAutoSleep_{false};
@@ -95,6 +98,17 @@ class LuaRunner {
   void setError(const char* msg);
 
   // C-to-Lua Bridge functions
+  static int l_browserList(lua_State* L);
+  static int l_browserRead(lua_State* L);
+  static int l_browserClose(lua_State* L);
+  static int l_imageStart(lua_State* L);
+  static int l_imagePoll(lua_State* L);
+  static int l_imageCancel(lua_State* L);
+  static int l_imageBusy(lua_State* L);
+  static int l_imageBlit(lua_State* L);
+  static int l_browserAdvance(lua_State* L);
+  static int l_browserPath(lua_State* L);
+  static int l_browserImage(lua_State* L);
   static int l_dofile(lua_State* L);
   static int l_clear(lua_State* L);
   static int l_refresh(lua_State* L);

@@ -51,6 +51,7 @@ struct JpegContext {
 // File I/O callbacks use pFile->fHandle to access the FsFile*,
 // avoiding the need for global file state.
 void* jpegOpen(const char* filename, int32_t* size) {
+  if(ImageToFramebufferDecoder::cancelled())return nullptr;
   auto f = makeUniqueNoThrow<FsFile>();
   if (!f) {
     LOG_ERR("JPG", "OOM: JPEG file handle (%u free, %u max alloc)", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
@@ -77,7 +78,7 @@ void jpegClose(void* handle) {
 // JPEGs with large headers fail during parsing.
 int32_t jpegRead(JPEGFILE* pFile, uint8_t* pBuf, int32_t len) {
   FsFile* f = reinterpret_cast<FsFile*>(pFile->fHandle);
-  if (!f) return 0;
+  if (!f || ImageToFramebufferDecoder::cancelled()) return 0;
   int32_t bytesRead = f->read(pBuf, len);
   if (bytesRead < 0) return 0;
   pFile->iPos += bytesRead;
@@ -86,7 +87,7 @@ int32_t jpegRead(JPEGFILE* pFile, uint8_t* pBuf, int32_t len) {
 
 int32_t jpegSeek(JPEGFILE* pFile, int32_t pos) {
   FsFile* f = reinterpret_cast<FsFile*>(pFile->fHandle);
-  if (!f) return -1;
+  if (!f || ImageToFramebufferDecoder::cancelled()) return -1;
   if (!f->seek(pos)) return -1;
   pFile->iPos = pos;
   return pos;
@@ -181,7 +182,7 @@ constexpr int32_t FP_MASK = FP_ONE - 1;
 
 int jpegDrawCallback(JPEGDRAW* pDraw) {
   JpegContext* ctx = reinterpret_cast<JpegContext*>(pDraw->pUser);
-  if (!ctx || !ctx->config || !ctx->renderer) return 0;
+  if (ImageToFramebufferDecoder::cancelled() || !ctx || !ctx->config || (!ctx->renderer && !ctx->config->cacheOnly)) return 0;
 
   ImageToFramebufferDecoder::yieldDuringDecode(ctx->lastYieldMs);
 
@@ -200,7 +201,7 @@ int jpegDrawCallback(JPEGDRAW* pDraw) {
   const int32_t invScaleFPX = ctx->invScaleFPX;
   const int32_t fineScaleFPY = ctx->fineScaleFPY;
   const int32_t invScaleFPY = ctx->invScaleFPY;
-  GfxRenderer& renderer = *ctx->renderer;
+
   const int cfgX = ctx->config->x;
   const int cfgY = ctx->config->y;
   const int blockX = pDraw->x;
@@ -229,8 +230,8 @@ int jpegDrawCallback(JPEGDRAW* pDraw) {
   if (dstYStart >= dstYEnd || dstXStart >= dstXEnd) return 1;
 
   // Pre-compute orientation and render-mode state once per callback invocation
-  DirectPixelWriter pw;
-  pw.init(renderer);
+  DirectPixelWriter pw{};
+  if(ctx->renderer)pw.init(*ctx->renderer);
 
   // The cache streams to disk one MCU-row band at a time. Flushing rows below
   // this block (raster order guarantees they are final) repositions the band;
@@ -261,7 +262,8 @@ int jpegDrawCallback(JPEGDRAW* pDraw) {
         uint8_t gray = row[dstX - blockX];
         uint8_t dithered;
         if (useDithering) {
-          dithered = applyBayerDither4Level(gray, outX, outY);
+          dithered = ctx->config->useMonochromeDither ? applyBayerDither1Bit(gray, outX, outY)
+                                                      : applyBayerDither4Level(gray, outX, outY);
         } else {
           dithered = gray / 85;
           if (dithered > 3) dithered = 3;
@@ -320,7 +322,8 @@ int jpegDrawCallback(JPEGDRAW* pDraw) {
 
         uint8_t dithered;
         if (useDithering) {
-          dithered = applyBayerDither4Level(gray, outX, outY);
+          dithered = ctx->config->useMonochromeDither ? applyBayerDither1Bit(gray, outX, outY)
+                                                      : applyBayerDither4Level(gray, outX, outY);
         } else {
           dithered = gray / 85;
           if (dithered > 3) dithered = 3;
@@ -343,7 +346,8 @@ int jpegDrawCallback(JPEGDRAW* pDraw) {
 
         uint8_t dithered;
         if (useDithering) {
-          dithered = applyBayerDither4Level(gray, outX, outY);
+          dithered = ctx->config->useMonochromeDither ? applyBayerDither1Bit(gray, outX, outY)
+                                                      : applyBayerDither4Level(gray, outX, outY);
         } else {
           dithered = gray / 85;
           if (dithered > 3) dithered = 3;
@@ -369,7 +373,8 @@ int jpegDrawCallback(JPEGDRAW* pDraw) {
 
         uint8_t dithered;
         if (useDithering) {
-          dithered = applyBayerDither4Level(gray, outX, outY);
+          dithered = ctx->config->useMonochromeDither ? applyBayerDither1Bit(gray, outX, outY)
+                                                      : applyBayerDither4Level(gray, outX, outY);
         } else {
           dithered = gray / 85;
           if (dithered > 3) dithered = 3;
@@ -402,7 +407,8 @@ int jpegDrawCallback(JPEGDRAW* pDraw) {
 
       uint8_t dithered;
       if (useDithering) {
-        dithered = applyBayerDither4Level(gray, outX, outY);
+        dithered = ctx->config->useMonochromeDither ? applyBayerDither1Bit(gray, outX, outY)
+                                                    : applyBayerDither4Level(gray, outX, outY);
       } else {
         dithered = gray / 85;
         if (dithered > 3) dithered = 3;
@@ -441,6 +447,10 @@ bool JpegToFramebufferConverter::getDimensionsStatic(const std::string& imagePat
 
 bool JpegToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath, GfxRenderer& renderer,
                                                      const RenderConfig& config) {
+  return decode(imagePath, &renderer, config);
+}
+bool JpegToFramebufferConverter::decode(const std::string& imagePath, GfxRenderer* renderer, const RenderConfig& config) {
+  if(ImageToFramebufferDecoder::cancelled() || (!renderer && !config.cacheOnly))return false;
   HeapObject<JPEGDEC> jpeg;
   if (!initJpegDecoder(jpeg, imagePath.c_str())) {
     LOG_ERR("JPG", "Failed to allocate JPEG decoder");
@@ -448,10 +458,10 @@ bool JpegToFramebufferConverter::decodeToFramebuffer(const std::string& imagePat
   }
 
   JpegContext ctx;
-  ctx.renderer = &renderer;
+  ctx.renderer = renderer;
   ctx.config = &config;
-  ctx.screenWidth = renderer.getScreenWidth();
-  ctx.screenHeight = renderer.getScreenHeight();
+  ctx.screenWidth = renderer ? renderer->getScreenWidth() : config.maxWidth;
+  ctx.screenHeight = renderer ? renderer->getScreenHeight() : config.maxHeight;
 
   // Keep exactly one close after every attempted open, including malformed
   // JPEGs where JPEGDEC returns from JPEGInit without closing its file handle.
@@ -541,7 +551,9 @@ bool JpegToFramebufferConverter::decodeToFramebuffer(const std::string& imagePat
   ctx.caching = !config.cachePath.empty();
   if (ctx.caching) {
     const int maxBlockDstRows = (int)(((int64_t)16 * ctx.fineScaleFPY) >> FP_SHIFT) + 2;
-    if (!ctx.cache.begin(config.cachePath, destWidth, destHeight, config.x, config.y, maxBlockDstRows)) {
+    if (!ctx.cache.begin(config.cachePath, destWidth, destHeight, config.x, config.y,
+                         config.cacheOnly && maxBlockDstRows>destHeight?destHeight:maxBlockDstRows,
+                         config.cacheOnly?ImageToFramebufferDecoder::cancelled:nullptr)) {
       LOG_ERR("JPG", "Failed to start cache stream, continuing without caching");
       ctx.caching = false;
     }
@@ -553,7 +565,7 @@ bool JpegToFramebufferConverter::decodeToFramebuffer(const std::string& imagePat
   LOG_DBG("JPG", "Decoded %s: ok=%d time=%ums", imagePath.c_str(), rc == 1,
           static_cast<unsigned>(millis() - decodeStarted));
 
-  if (rc != 1) {
+  if (rc != 1 || ImageToFramebufferDecoder::cancelled()) {
     LOG_ERR("JPG", "Decode failed (rc=%d, lastError=%d)", rc, jpeg->getLastError());
     if (ctx.caching) ctx.cache.abort();
     return false;
@@ -562,10 +574,11 @@ bool JpegToFramebufferConverter::decodeToFramebuffer(const std::string& imagePat
   // Finalize the streamed cache file. Note: a flush failure mid-decode clears
   // ctx.caching (the partial file is dropped), so re-read the flag here.
   if (ctx.caching) {
-    ctx.cache.finalize();
+    bool saved=ctx.cache.finalize();
+    if(config.cacheOnly && !saved)return false;
   }
 
-  return true;
+  return !config.cacheOnly || ctx.caching;
 }
 
 bool JpegToFramebufferConverter::supportsFormat(const std::string& extension) {

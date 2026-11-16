@@ -1,6 +1,11 @@
 #include "LuaHttp.h"
+#include <BrowserMemory.h>
 #include <cstring>
 #include <new>
+#include <cstdlib>
+#if defined(ARDUINO_ARCH_ESP32) && !defined(SIMULATOR)
+#include <esp_heap_caps.h>
+#endif
 #include <initializer_list>
 #ifdef ARDUINO_ARCH_ESP32
 #include <Logging.h>
@@ -11,12 +16,19 @@ extern "C" {
 }
 namespace ink::http {
 namespace {
-static_assert(sizeof(Job) <= MaxBody + 8 * 1024, "HTTP native job exceeds its budget");
+static_assert(sizeof(Job) <= MaxBody + 12 * 1024, "HTTP native job exceeds its budget");
 std::atomic<bool> occupied{false};
 std::atomic<unsigned> nextId{0};
 void worker(void* arg) {
   auto* j=static_cast<Job*>(arg);
-  j->executor.run(j->executor.context,*j);
+  if(j->request.browser && !j->resource.writer)j->result.error="storage_open";
+  else j->executor.run(j->executor.context,*j);
+  if(j->request.browser && !j->result.error && !j->resource.finish()){
+#ifdef ARDUINO_ARCH_ESP32
+    LOG_ERR("LHTTP","Resource close failed");
+#endif
+    j->result.error="storage_close";
+  }
   if(j->cancel.load()) { j->result.error="cancelled";j->result.size=0; }
   j->done.store(true,std::memory_order_release);
   j->release();
@@ -40,9 +52,18 @@ int requestInner(lua_State* L) {
   if(!parseUrl(url,j->request.url))failure="invalid_url";
   else if(!s.domains.contains(j->request.url.host))failure="domain_denied";
   lua_pop(L,1);
+  rawField(L,1,"resource");auto resource=string(L,-1);
+  if(s.domains.publicHttps){
+    if(!lua_isnil(L,-1) && lua_type(L,-1)!=LUA_TSTRING)failure="invalid_resource";
+    if(!resource.empty() && resource!="page" && resource!="css" && resource!="image")failure="invalid_resource";
+    j->request.limit=resource=="css"?24576:resource=="image"?768*1024:BrowserBody;
+    j->result.capacity=j->request.limit;
+  }else if(!lua_isnil(L,-1))failure="invalid_options";
+  lua_pop(L,1);
   rawField(L,1,"method");auto method=string(L,-1);
   if(!lua_isnil(L,-1) && method!="GET" && method!="POST")failure="invalid_method";
-  j->request.post=method=="POST";lua_pop(L,1);
+  j->request.post=method=="POST";
+  if(s.domains.publicHttps && j->request.post)failure="invalid_method";lua_pop(L,1);
   rawField(L,1,"body");auto body=string(L,-1);
   if((!lua_isnil(L,-1) && lua_type(L,-1)!=LUA_TSTRING) || body.size()>MaxUpload || (!j->request.post && !body.empty()))failure="invalid_body";
   else if(!body.empty()){memcpy(j->request.body,body.data(),body.size());j->request.bodySize=body.size();}
@@ -71,12 +92,14 @@ int requestInner(lua_State* L) {
   // Reject unknown option keys so callers cannot mistakenly believe a security/download option worked.
   lua_pushnil(L);while(lua_next(L,1)) {
     auto key=string(L,-2);
-    if(key!="url" && key!="method" && key!="body" && key!="headers" && key!="timeout_ms")failure="invalid_options";
+    if(key!="url" && key!="method" && key!="body" && key!="headers" && key!="timeout_ms" && !(s.domains.publicHttps && key=="resource"))failure="invalid_options";
     lua_pop(L,1);
     if(failure){lua_pop(L,1);break;}
   }
   if(failure){s.discard();return error(L,failure);}
   int id=j->id;
+  if(j->request.browser && !j->resource.begin(s.resourceRoot,j->id)){s.discard();return error(L,"storage_open");}
+  if(j->request.browser){j->result.sinkContext=&j->resource;j->result.sink=[](void* p,const char* bytes,size_t count){return static_cast<Resource*>(p)->append(bytes,count);};}
   if(!s.start()){s.discard();return error(L,"worker_failed");}
   lua_pushinteger(L,id);return 1;
 }
@@ -112,34 +135,85 @@ int deliver(lua_State* L) {
   lua_pushinteger(L,j->id);lua_setfield(L,-2,"id");
   lua_pushinteger(L,j->result.status);lua_setfield(L,-2,"status");
   if(j->result.error){lua_pushstring(L,j->result.error);lua_setfield(L,-2,"error");}
-  else {lua_pushlstring(L,j->result.body,j->result.size);lua_setfield(L,-2,"body");}
+  else if(j->request.browser){
+    lua_pushinteger(L,j->id);lua_setfield(L,-2,"handle");
+    lua_pushinteger(L,j->result.size);lua_setfield(L,-2,"size");
+    // Cache's checked-object checksum is computed during streaming, not in a full Lua copy.
+    lua_pushinteger(L,j->result.checksum);lua_setfield(L,-2,"hash");
+  }else {lua_pushlstring(L,j->result.data(),j->result.size);lua_setfield(L,-2,"body");}
+  if(j->request.browser){
+    lua_pushstring(L,j->result.url);lua_setfield(L,-2,"url");
+    lua_pushstring(L,j->result.contentType);lua_setfield(L,-2,"content_type");
+  }
   lua_call(L,1,0);return 0;
 }
 }
-void Job::release(){if(references.fetch_sub(1,std::memory_order_acq_rel)==1){delete this;occupied.store(false);}}
+void Job::release(){if(references.fetch_sub(1,std::memory_order_acq_rel)==1){free(result.extended);delete this;occupied.store(false);}}
 bool Session::busy(){return occupied.load();}
 Job* Session::reserve(){
   if(job_ || occupied.exchange(true))return nullptr;
-  // One bounded job (response + <=8 KiB metadata) outlives cancellation. On
-  // PSRAM boards the configured malloc threshold places this large allocation
-  // in PSRAM; the C3 response stays 8 KiB. The worker owns a reference.
-  job_=new(std::nothrow) Job{};
-  if(!job_){
+  // One bounded job outlives cancellation: 8 KiB response on C3, 64 KiB on PSRAM.
+  // The worker owns a reference until its native transport/resources finish.
+  Job* allocated=new(std::nothrow) Job{};
+  if(!allocated){
 #ifdef ARDUINO_ARCH_ESP32
     LOG_ERR("LHTTP", "Job allocation failed (%zu bytes)", sizeof(Job));
 #endif
     occupied.store(false);return nullptr;
   }
+  {std::lock_guard<std::mutex> lock(cancelMutex_);job_=allocated;}
+  if(domains.publicHttps && !cooperative && !cleaned_){cleanupResources(resourceRoot);cleaned_=true;}
+  if(domains.publicHttps){job_->request.browser=true;job_->result.capacity=BrowserBody;}
   job_->executor=executor_;
-  job_->id=int(nextId.fetch_add(1)%0x3fffffff)+1;
+  // Retained handles can outlive many requests: avoid an ID collision at wrap.
+  for(unsigned attempt=0;attempt<5;++attempt){
+    job_->id=int(nextId.fetch_add(1)%0x3fffffff)+1;
+    if(!resource(job_->id))break;
+  }
   return job_;
 }
 bool Session::start(){
   job_->references.fetch_add(1);
   if(!executor_.spawn(worker,job_)){job_->release();return false;}return true;
 }
-void Session::discard(){if(job_){job_->release();job_=nullptr;}}
-void Session::close(){allowed=false;if(job_)job_->cancel.store(true);discard();}
+void Session::requestCancel(){std::lock_guard<std::mutex> lock(cancelMutex_);if(job_)job_->cancel.store(true);}
+void Session::discard(){
+ Job* previous;{std::lock_guard<std::mutex> lock(cancelMutex_);previous=job_;job_=nullptr;}
+ if(previous)previous->release(); // File/free/cleanup is deliberately outside the signal lock.
+}
+void Session::close(){requestCancel();cleaned_=false;for(auto& held:resources_){held.id=0;held.body.reset();}allowed=false;discard();}
+bool Session::retain(){
+  if(!job_ || !job_->resource.complete)return false;
+  for(auto& held:resources_)if(!held.id){held.id=job_->id;job_->result.checksum=job_->resource.hash;held.body.take(job_->resource);return true;}
+  return false;
+}
+Resource* Session::resource(int id){for(auto& held:resources_)if(held.id==id)return &held.body;return nullptr;}
+bool Session::releaseResource(int id){for(auto& held:resources_)if(held.id==id){held.body.reset();held.id=0;return true;}return false;}
+namespace {
+int resourceRead(lua_State* L){
+ auto& s=session(L);
+ if(!s.domains.publicHttps || !lua_isinteger(L,1) || !lua_isinteger(L,2) || !lua_isinteger(L,3))return error(L,"invalid_resource");
+ auto* resource=s.resource(lua_tointeger(L,1));auto offset=lua_tointeger(L,2),count=lua_tointeger(L,3);
+ if(!resource || offset<0 || count<0 || count>8192 || size_t(offset)>resource->size)return error(L,"invalid_resource");
+ size_t n=size_t(count)<resource->size-size_t(offset)?size_t(count):resource->size-size_t(offset);
+ // Allocate before opening a native reader: OOM cannot bypass a live SD close.
+ luaL_Buffer buffer;char* bytes=luaL_buffinitsize(L,&buffer,n);size_t got=resource->read(offset,bytes,n);
+ luaL_pushresultsize(&buffer,got);if(got!=n){lua_pop(L,1);return error(L,"storage_read");}return 1;
+}
+int resourceRelease(lua_State* L){auto& s=session(L);lua_pushboolean(L,s.domains.publicHttps && lua_isinteger(L,1) && s.releaseResource(lua_tointeger(L,1)));return 1;}
+int resourceStoreImpl(lua_State* L,bool step){
+ auto& s=session(L);if(!s.domains.publicHttps || !lua_isinteger(L,1))return error(L,"invalid_resource");
+ auto* resource=s.resource(lua_tointeger(L,1));auto name=string(L,2);
+ if(!resource || !safeRelativePath(name) || name.find('/')!=name.npos)return error(L,"invalid_path");
+ // Fixed bounded path scratch; no Lua allocations occur while native files live.
+ char destination[512];int n=snprintf(destination,sizeof(destination),"%s/%.*s",s.resourceRoot,int(name.size()),name.data());
+ if(n<=0 || size_t(n)>=sizeof(destination))return error(L,"invalid_path");
+ if(step){int status=resource->copyStep(destination);if(status<0)return error(L,"storage_copy");lua_pushboolean(L,status==1);return 1;}
+ lua_pushboolean(L,resource->copy(destination));return 1;
+}
+int resourceStore(lua_State* L){return resourceStoreImpl(L,false);}
+int resourceStoreStep(lua_State* L){return resourceStoreImpl(L,true);}
+}
 void restrictStandardLibraries(lua_State* L) {
   for (const char* key : {"loadfile", "io", "package", "require", "debug"}) {
     lua_pushnil(L); lua_setglobal(L, key);
@@ -154,13 +228,29 @@ void restrictStandardLibraries(lua_State* L) {
   lua_getglobal(L, "load"); lua_pushcclosure(L, textOnlyLoad, 1); lua_setglobal(L, "load");
 }
 void registerApi(lua_State* L,Session& s){
+  lua_pushcfunction(L,[](lua_State* state){lua_pushboolean(state,Session::busy());return 1;});lua_setfield(L,-2,"http_busy");
+  lua_pushlightuserdata(L,&s);lua_pushcclosure(L,resourceRead,1);lua_setfield(L,-2,"http_read");
+  lua_pushlightuserdata(L,&s);lua_pushcclosure(L,resourceRelease,1);lua_setfield(L,-2,"http_release");
+  lua_pushlightuserdata(L,&s);lua_pushcclosure(L,resourceStoreStep,1);lua_setfield(L,-2,"http_store_step");
+  lua_pushlightuserdata(L,&s);lua_pushcclosure(L,resourceStore,1);lua_setfield(L,-2,"http_store");
   lua_pushlightuserdata(L,&s);lua_pushcclosure(L,request,1);lua_setfield(L,-2,"http_request");
   lua_pushlightuserdata(L,&s);lua_pushcclosure(L,cancel,1);lua_setfield(L,-2,"http_cancel");
 }
 int dispatch(lua_State* L,Session& s){
   if(!s.ready())return LUA_OK;
+  if(s.job()->request.browser && !s.job()->result.error && !s.retain())s.job()->result.error="resource_limit";
   // The completed slot stays owned through callback/OOM cleanup. Submit the next request in on_update.
   lua_pushcfunction(L,deliver);lua_pushlightuserdata(L,s.job());
-  int status=lua_pcall(L,1,0,0);s.discard();return status;
+  int status=lua_pcall(L,1,0,0);
+  if(status==LUA_ERRMEM && s.job()->request.browser){
+    // Free the large native response before protected delivery of a small error
+    // event. The old document remains Lua-owned and usable after emergency GC.
+    lua_pop(L,1);auto* job=s.job();free(job->result.extended);job->result.extended=nullptr;
+    s.releaseResource(job->id);job->result.error="out_of_memory";job->result.size=0;
+    lua_gc(L,LUA_GCCOLLECT,0);
+    lua_pushcfunction(L,deliver);lua_pushlightuserdata(L,job);status=lua_pcall(L,1,0,0);
+  }
+  if(status!=LUA_OK)s.releaseResource(s.job()->id);
+  s.discard();return status;
 }
 } // namespace ink::http

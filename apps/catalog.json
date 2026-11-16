@@ -930,6 +930,30 @@
         "ui.lua",
         "icon.raw"
       ]
+    },
+    {
+      "id": "browser",
+      "name": "Browser",
+      "version": "0.2.1",
+      "author": "CrossSmudge",
+      "description": "Direct HTTPS reader with live RSS/Atom feeds, links, search forms and checked offline pages. No scripts or logins.",
+      "min_api": 6,
+      "requires_psram": true,
+      "files": [
+        "cache.lua",
+        "css.lua",
+        "editor.lua",
+        "icon.raw",
+        "layout.lua",
+        "main.lua",
+        "manifest.json",
+        "model.lua",
+        "source.lua",
+        "tokenizer.lua",
+        "ui.lua",
+        "url.lua",
+        "work.lua"
+      ]
     }
   ]
 }

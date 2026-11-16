@@ -2,6 +2,7 @@
 #include <HalStorage.h>
 
 #include <cstdint>
+#include <atomic>
 #include <memory>
 #include <string>
 
@@ -20,14 +21,29 @@ struct RenderConfig {
   bool performanceMode = false;
   bool useExactDimensions = false;  // If true, use maxWidth/maxHeight as exact output size (no recalculation)
   std::string cachePath;            // If non-empty, decoder will write pixel cache to this path
+  bool cacheOnly = false;          // Isolated browser worker; no live renderer access.
+  bool useMonochromeDither = false;  // Browser BW output; existing four-level callers keep their behavior.
 };
 
+struct ImageDecodeControl {
+ const std::atomic<bool>* cancel=nullptr;
+ uint32_t start=0,timeout=30000;
+ bool stopped()const;
+};
+class ImageDecodeScope {
+ const ImageDecodeControl* previous;
+ public:
+ explicit ImageDecodeScope(const ImageDecodeControl* control);
+ ~ImageDecodeScope();
+};
 class ImageToFramebufferDecoder {
  public:
   virtual ~ImageToFramebufferDecoder() = default;
 
   virtual bool decodeToFramebuffer(const std::string& imagePath, GfxRenderer& renderer, const RenderConfig& config) = 0;
 
+  virtual bool decodeToCache(const std::string& imagePath, const RenderConfig& config) { return false; }
+  static bool cancelled();
   virtual bool getDimensions(const std::string& imagePath, ImageDimensions& dims) const = 0;
 
   virtual const char* getFormatName() const = 0;

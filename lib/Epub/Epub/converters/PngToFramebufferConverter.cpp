@@ -44,6 +44,7 @@ struct PngContext {
 // File I/O callbacks use pFile->fHandle to access the FsFile*,
 // avoiding the need for global file state.
 void* pngOpenWithHandle(const char* filename, int32_t* size) {
+  if(ImageToFramebufferDecoder::cancelled())return nullptr;
   auto f = makeUniqueNoThrow<FsFile>();
   if (!f) {
     LOG_ERR("PNG", "OOM: PNG file handle (%u free, %u max alloc)", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
@@ -66,13 +67,13 @@ void pngCloseWithHandle(void* handle) {
 
 int32_t pngReadWithHandle(PNGFILE* pFile, uint8_t* pBuf, int32_t len) {
   FsFile* f = reinterpret_cast<FsFile*>(pFile->fHandle);
-  if (!f) return 0;
+  if (!f || ImageToFramebufferDecoder::cancelled()) return 0;
   return f->read(pBuf, len);
 }
 
 int32_t pngSeekWithHandle(PNGFILE* pFile, int32_t pos) {
   FsFile* f = reinterpret_cast<FsFile*>(pFile->fHandle);
-  if (!f) return -1;
+  if (!f || ImageToFramebufferDecoder::cancelled()) return -1;
   return f->seek(pos);
 }
 
@@ -207,7 +208,7 @@ void convertLineToGray(const uint8_t* pPixels, uint8_t* grayLine, int width, int
 
 int pngDrawCallback(PNGDRAW* pDraw) {
   PngContext* ctx = reinterpret_cast<PngContext*>(pDraw->pUser);
-  if (!ctx || !ctx->config || !ctx->renderer || !ctx->grayLineBuffer) return 0;
+  if (ImageToFramebufferDecoder::cancelled() || !ctx || !ctx->config || (!ctx->renderer && !ctx->config->cacheOnly) || !ctx->grayLineBuffer) return 0;
 
   ImageToFramebufferDecoder::yieldDuringDecode(ctx->lastYieldMs);
 
@@ -240,8 +241,8 @@ int pngDrawCallback(PNGDRAW* pDraw) {
   bool useDithering = ctx->config->useDithering;
 
   // Pre-compute orientation and render-mode state once per callback.
-  DirectPixelWriter pw;
-  pw.init(*ctx->renderer);
+  DirectPixelWriter pw{};
+  if(ctx->renderer)pw.init(*ctx->renderer);
 
   for (int dstY = firstDstY; dstY < endDstY; dstY++) {
     ctx->lastDstY = dstY;
@@ -276,7 +277,8 @@ int pngDrawCallback(PNGDRAW* pDraw) {
 
         uint8_t ditheredGray;
         if (useDithering) {
-          ditheredGray = applyBayerDither4Level(gray, outX, outY);
+          ditheredGray = ctx->config->useMonochromeDither ? applyBayerDither1Bit(gray, outX, outY)
+                                                          : applyBayerDither4Level(gray, outX, outY);
         } else {
           ditheredGray = quantizeGrayTo4Level(gray);
         }
@@ -328,6 +330,10 @@ bool PngToFramebufferConverter::getDimensionsStatic(const std::string& imagePath
 
 bool PngToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath, GfxRenderer& renderer,
                                                     const RenderConfig& config) {
+  return decode(imagePath, &renderer, config);
+}
+bool PngToFramebufferConverter::decode(const std::string& imagePath, GfxRenderer* renderer, const RenderConfig& config) {
+  if(ImageToFramebufferDecoder::cancelled() || (!renderer && !config.cacheOnly))return false;
   if (!MemoryBudget::hasHeapForImageDecoder("PNG", "PNG", PNG_DECODER_APPROX_SIZE)) {
     return false;
   }
@@ -340,10 +346,10 @@ bool PngToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath
   }
 
   PngContext ctx;
-  ctx.renderer = &renderer;
+  ctx.renderer = renderer;
   ctx.config = &config;
-  ctx.screenWidth = renderer.getScreenWidth();
-  ctx.screenHeight = renderer.getScreenHeight();
+  ctx.screenWidth = renderer ? renderer->getScreenWidth() : config.maxWidth;
+  ctx.screenHeight = renderer ? renderer->getScreenHeight() : config.maxHeight;
 
   int rc = png->open(imagePath.c_str(), pngOpenWithHandle, pngCloseWithHandle, pngReadWithHandle, pngSeekWithHandle,
                      pngDrawCallback);
@@ -433,7 +439,8 @@ bool PngToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath
   // re-decode on every one of an image page's ~14 render passes.
   ctx.caching = !config.cachePath.empty();
   if (ctx.caching) {
-    if (!ctx.cache.begin(config.cachePath, ctx.dstWidth, ctx.dstHeight, config.x, config.y, 1)) {
+    if (!ctx.cache.begin(config.cachePath, ctx.dstWidth, ctx.dstHeight, config.x, config.y, 1,
+                         config.cacheOnly?ImageToFramebufferDecoder::cancelled:nullptr)) {
       LOG_ERR("PNG", "Failed to start cache stream, continuing without caching");
       ctx.caching = false;
     }
@@ -444,7 +451,7 @@ bool PngToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath
 
   ctx.grayLineBuffer = nullptr;
 
-  if (rc != PNG_SUCCESS) {
+  if (rc != PNG_SUCCESS || ImageToFramebufferDecoder::cancelled()) {
     LOG_ERR("PNG", "Decode failed: %d", rc);
     if (ctx.caching) ctx.cache.abort();
     png->close();
@@ -457,10 +464,11 @@ bool PngToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath
 
   // Finalize the streamed cache (caching may have been cleared on a flush error).
   if (ctx.caching) {
-    ctx.cache.finalize();
+    bool saved=ctx.cache.finalize();
+    if(config.cacheOnly && !saved)return false;
   }
 
-  return true;
+  return !config.cacheOnly || ctx.caching;
 }
 
 bool PngToFramebufferConverter::supportsFormat(const std::string& extension) {

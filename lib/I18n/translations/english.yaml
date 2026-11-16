@@ -856,3 +856,6 @@ STR_LUA_NETWORK_DISABLE: "App networking enabled — disable"
 STR_LUA_NETWORK_ENABLE: "App networking disabled — enable"
 STR_LUA_TRUST_TIME: "Trust this UTC time for HTTPS until restart? Confirm only if correct."
 STR_LUA_NETWORK_ALLOW_BUTTON: "Allow"
+
+STR_BROWSER_REQUIRES_PSRAM: "Browser requires PSRAM and API 5 firmware. Please update device firmware."
+STR_INVALID_BROWSER_CAPABILITY: "Invalid browser capability"

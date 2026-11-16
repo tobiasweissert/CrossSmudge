@@ -39,6 +39,7 @@ struct PixelCache {
   HalFile file;
   std::string cachePathStr;
   bool ok;
+  bool (*cancelled)() = nullptr;
 
   PixelCache()
       : buffer(nullptr),
@@ -60,7 +61,8 @@ struct PixelCache {
 
   // Open the cache file, write the header, and allocate a band buffer big enough
   // to hold the tallest single decode block (maxBlockDstRows output rows).
-  bool begin(const std::string& cachePath, int w, int h, int ox, int oy, int maxBlockDstRows) {
+  bool begin(const std::string& cachePath, int w, int h, int ox, int oy, int maxBlockDstRows, bool (*shouldCancel)() = nullptr) {
+    cancelled = shouldCancel;
     width = w;
     height = h;
     originX = ox;
@@ -125,6 +127,7 @@ struct PixelCache {
     if (newTopRow > height) newTopRow = height;
 
     for (int r = bandStart; r < newTopRow; ++r) {
+      if (cancelled && cancelled()) { abort(); return false; }
       const int idx = r - bandStart;
       const uint8_t* rowPtr = (idx < bandRows) ? (buffer + (size_t)idx * bytesPerRow) : zeroRow;
       if (file.write(rowPtr, (size_t)bytesPerRow) != (size_t)bytesPerRow) {
@@ -147,6 +150,7 @@ struct PixelCache {
       return false;
     }
     for (int r = flushedRows; r < height; ++r) {
+      if (cancelled && cancelled()) { abort(); return false; }
       const int idx = r - bandStart;
       const uint8_t* rowPtr = (idx >= 0 && idx < bandRows) ? (buffer + (size_t)idx * bytesPerRow) : zeroRow;
       if (file.write(rowPtr, (size_t)bytesPerRow) != (size_t)bytesPerRow) {
@@ -155,7 +159,7 @@ struct PixelCache {
         return false;
       }
     }
-    file.close();
+    if (!file.close()) { LOG_ERR("IMG", "Cache close failed"); abort(); return false; }
     ok = false;  // file handed off; nothing left to clean up
     return true;
   }

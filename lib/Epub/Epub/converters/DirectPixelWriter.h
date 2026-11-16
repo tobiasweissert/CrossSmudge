@@ -103,6 +103,7 @@ struct DirectPixelWriter {
   // Must be called after beginRow() for the current row.
   // No bounds checking — caller guarantees coordinates are valid.
   inline void writePixel(int logicalX, uint8_t pixelValue) const {
+    if(!fb)return;
     // Determine whether to draw based on render mode
     bool draw;
     bool state;

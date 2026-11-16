@@ -20,6 +20,7 @@ inline constexpr oflag_t O_RDWR = 1;
 struct HostFileData {
   std::vector<uint8_t> bytes;
   size_t readCalls = 0, readBytes = 0;
+  void (*readGate)(void*)=nullptr;void* gateContext=nullptr;
   size_t readFailAt = std::numeric_limits<size_t>::max();
   size_t failAt = std::numeric_limits<size_t>::max();
 };
@@ -45,6 +46,7 @@ class HalFile : public Print {
 
   int read(void* output, const size_t length) {
     if (!data_) return 0;
+    if(data_->readGate)data_->readGate(data_->gateContext);
     ++data_->readCalls;
     const size_t end = std::min(data_->bytes.size(), data_->readFailAt);
     const size_t readable = std::min(length, end - std::min(cursor_, end));

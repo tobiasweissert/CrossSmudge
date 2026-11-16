@@ -16,9 +16,10 @@
 #include <HalLuaHttp.h>
 #include "activities/network/WifiSelectionActivity.h"
 
-class LuaAppActivity : public Activity {
+template <typename Runner = ink::LuaRunner>
+class LuaAppActivityAdapter : public Activity {
  public:
-  LuaAppActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& appDir,
+  LuaAppActivityAdapter(GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& appDir,
                  const std::string& appName, const std::string& entryScript = "main.lua")
       : Activity(appName.c_str(), renderer, mappedInput),
         appDir_(appDir),
@@ -36,7 +37,7 @@ class LuaAppActivity : public Activity {
   void onEnter() override {
     Activity::onEnter();
     initialOrientation_ = renderer.getOrientation();
-    runner_ = makeUniqueNoThrow<ink::LuaRunner>(renderer, mappedInput, appDir_, appId_);
+    runner_ = makeUniqueNoThrow<Runner>(renderer, mappedInput, appDir_, appId_);
 
     if (!runner_) { LOG_ERR("LUA", "Runner allocation failed"); finish(); return; }
     if (!runner_->init()) {
@@ -46,6 +47,11 @@ class LuaAppActivity : public Activity {
     }
 
     prepareNetwork();
+  }
+
+  bool handleHomeGesture() override {
+    if(runner_ && runner_->cooperativeBrowser())runner_->requestNativeCancel();
+    return false; // ActivityManager's existing global Home path owns navigation.
   }
 
   bool preventAutoSleep() override { return runner_ && runner_->preventAutoSleep(); }
@@ -77,50 +83,63 @@ class LuaAppActivity : public Activity {
       return;
     }
 
+    // Browser render/cache blits must never make the input loop wait for the
+    // Lua mutex. Latch Back out of band, then deliver once VM ownership returns.
+    std::unique_lock<std::mutex> ownership(luaMutex_,std::defer_lock);
+    if(runner_->cooperativeBrowser()){
+      if(mappedInput.wasReleased(MappedInputManager::Button::Back)){
+        pendingBack_=true;runner_->requestNativeCancel();
+      }
+      if(!ownership.try_lock()){
+        // Touch events are one-frame snapshots too. Save one without querying
+        // Lua (hasLongPressHandler would need this mutex), then deliver it once.
+        int x=0,y=0;
+        if(!pendingTap_ && mappedInput.wasScreenTapped(x,y)){
+          pendingTap_=true;pendingTapX_=x;pendingTapY_=y;runner_->requestNativeCancel();
+        }
+        return;
+      }
+      runner_->clearNativeCancel();
+    }else ownership.lock();
     bool buttonHandled = false;
 
-    if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-      std::lock_guard<std::mutex> lock(luaMutex_);
+    if (mappedInput.wasReleased(MappedInputManager::Button::Back) || pendingBack_) {
+      pendingBack_=false;pendingTap_=false;runner_->clearNativeCancel();
       runner_->onButton("back", true);
       buttonHandled = true;
     }
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-      std::lock_guard<std::mutex> lock(luaMutex_);
       runner_->onButton("confirm", true);
       buttonHandled = true;
     }
     if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
-      std::lock_guard<std::mutex> lock(luaMutex_);
       runner_->onButton("left", true);
       buttonHandled = true;
     }
     if (mappedInput.wasReleased(MappedInputManager::Button::Right)) {
-      std::lock_guard<std::mutex> lock(luaMutex_);
       runner_->onButton("right", true);
       buttonHandled = true;
     }
     if (mappedInput.wasReleased(MappedInputManager::Button::Up)) {
-      std::lock_guard<std::mutex> lock(luaMutex_);
       runner_->onButton("up", true);
       buttonHandled = true;
     } else if (mappedInput.wasReleased(MappedInputManager::Button::PageBack)) {
-      std::lock_guard<std::mutex> lock(luaMutex_);
       runner_->onButton("page_back", true);
       buttonHandled = true;
     }
     if (mappedInput.wasReleased(MappedInputManager::Button::Down)) {
-      std::lock_guard<std::mutex> lock(luaMutex_);
       runner_->onButton("down", true);
       buttonHandled = true;
     } else if (mappedInput.wasReleased(MappedInputManager::Button::PageForward)) {
-      std::lock_guard<std::mutex> lock(luaMutex_);
       runner_->onButton("page_forward", true);
       buttonHandled = true;
     }
 
     {
-      std::lock_guard<std::mutex> lock(luaMutex_);
-      buttonHandled = dispatchLuaTouch(mappedInput, *runner_) || buttonHandled;
+      if(pendingTap_){
+        pendingTap_=false;runner_->onTap(pendingTapX_,pendingTapY_);
+        runner_->onTouch(pendingTapX_,pendingTapY_,"tap");buttonHandled=true;
+      }else buttonHandled = dispatchLuaTouch(mappedInput, *runner_) || buttonHandled;
     }
 
     auto swipe = mappedInput.wasSwipe();
@@ -134,13 +153,11 @@ class LuaAppActivity : public Activity {
         dirStr = "left";
       else if (swipe == MappedInputManager::SwipeDir::Right)
         dirStr = "right";
-      std::lock_guard<std::mutex> lock(luaMutex_);
       runner_->onSwipe(dirStr);
       buttonHandled = true;
     }
 
     {
-      std::lock_guard<std::mutex> lock(luaMutex_);
       runner_->onUpdate();
     }
 
@@ -188,6 +205,8 @@ class LuaAppActivity : public Activity {
   }
 
  private:
+  bool pendingBack_=false,pendingTap_=false;
+  int pendingTapX_=0,pendingTapY_=0;
   bool wifiPending_ = false;
   bool ownsWifi_ = false;
   void prepareNetwork() {
@@ -208,7 +227,7 @@ class LuaAppActivity : public Activity {
   std::string appName_;
   std::string entryScript_;
   std::string appId_;
-  std::unique_ptr<ink::LuaRunner> runner_;
+  std::unique_ptr<Runner> runner_;
   std::mutex luaMutex_;
   GfxRenderer::Orientation initialOrientation_ = GfxRenderer::Orientation::Portrait;
 
@@ -236,3 +255,5 @@ class LuaAppActivity : public Activity {
     renderer.displayBuffer();
   }
 };
+
+using LuaAppActivity = LuaAppActivityAdapter<>;

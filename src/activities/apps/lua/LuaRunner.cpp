@@ -5,7 +5,15 @@
 #include <HalStorage.h>
 #include <HalLuaHttp.h>
 #include <HttpManifest.h>
+#include <BrowserImage.h>
+#include <BrowserMemory.h>
+#include <LuaFileRead.h>
+#include <I18n.h>
+#if !defined(SIMULATOR) && defined(BOARD_HAS_PSRAM)
+#include <esp_heap_caps.h>
+#endif
 #include "LuaRuntime.h"
+#include "BrowserWork.h"
 
 #include <chrono>
 #include <cmath>
@@ -90,7 +98,11 @@ void* LuaRunner::customLuaAlloc(void* ud, void* ptr, size_t osize, size_t nsize)
   // Keep the whole PSRAM-backed VM out of internal RAM, including tiny tables
   // and strings. TLS and Wi-Fi still need internal RAM even on PSRAM boards.
 #if defined(ARDUINO_ARCH_ESP32) && defined(BOARD_HAS_PSRAM) && !defined(SIMULATOR)
-  void* newPtr = self->luaHeapUsesPsram_
+  if (self->browser_ && addedBytes && !browser::permitsGrowth(
+          self->currentAllocatedBytes_, addedBytes,
+          heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT),
+          heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT))) return nullptr;
+  void* newPtr = (self->browser_ || self->luaHeapUsesPsram_)
                      ? heap_caps_realloc(ptr, nsize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
                      : realloc(ptr, nsize);
 #else
@@ -112,6 +124,7 @@ void* LuaRunner::customLuaAlloc(void* ud, void* ptr, size_t osize, size_t nsize)
 
 bool LuaRunner::init() {
   shutdown();
+  clearNativeCancel();
   requestedExit_ = false;
   hasError_ = false;
   errorMessage_.clear();
@@ -143,6 +156,29 @@ bool LuaRunner::init() {
 #else
   luaHeapUsesPsram_ = false;
 #endif
+  browser_=false;
+  {
+    std::string path=appDir_+"/manifest.json";
+    HalFile manifest=Storage.open(path.c_str());
+    bool bounded=manifest && manifest.size()<=4096;manifest.close();
+    if(bounded){
+      JsonDocument declaration;String raw=Storage.readFile(path.c_str());
+      if(!deserializeJson(declaration,raw) && declaration["browser"].is<bool>() && declaration["browser"].as<bool>()){
+        if(appId_!="browser" || !declaration["min_api"].is<int>() || declaration["min_api"].as<int>()<5){
+          setError(tr(STR_INVALID_BROWSER_CAPABILITY));return false;
+        }
+#if !defined(BOARD_HAS_PSRAM) && !defined(SIMULATOR)
+        setError(tr(STR_BROWSER_REQUIRES_PSRAM));return false;
+#else
+        browser_=true;http_.cooperative=declaration["min_api"].as<int>()>=6;maxLuaHeapBytes_=browser::LuaLimit;
+#ifdef SIMULATOR
+        const char* constrained=getenv("SMUDGE_X3_CONSTRAINTS");
+        if(constrained && constrained[0]=='1')maxLuaHeapBytes_=75*1024;
+#endif
+#endif
+      }
+    }
+  }
   L = lua_newstate(customLuaAlloc, this);
   LOG_INF("LUA", "[%s] Init with heap limit: %zu bytes, pool=%s", appId_.c_str(), maxLuaHeapBytes_,
           luaHeapUsesPsram_ ? "PSRAM" : "default");
@@ -161,6 +197,7 @@ bool LuaRunner::init() {
     lua_pop(L, 1);
     return false;
   }
+  if (browser_ && browser::openBrowserWork(L) != LUA_OK) { setError(lua_tostring(L, -1)); lua_pop(L, 1); return false; }
   registerSmudgeApi();
 
   http::restrictStandardLibraries(L);
@@ -181,14 +218,16 @@ bool LuaRunner::init() {
         setError("Invalid network declaration");
         return false;
       }
-      if (runtime::openNetwork(L, http_.domains.count != 0) != LUA_OK) {
+      if(browser_)http_.domains.publicHttps=true;
+      if (runtime::openNetwork(L, http_.domains.count != 0 || browser_) != LUA_OK) {
         setError(lua_tostring(L, -1));
         lua_pop(L, 1);
         return false;
       }
-      http_.allowed = http_.domains.count && HalLuaHttp::networkEnabled();
+      http_.allowed = (http_.domains.count || browser_) && HalLuaHttp::networkEnabled();
       // Network apps use a full-path namespace: same-named offline apps in another search root cannot inject saves.
-      if (http_.domains.count) saveDir_ = "/.smudge/network_data" + appDir_;
+      if (http_.domains.count || browser_) saveDir_ = "/.smudge/network_data" + appDir_;
+      if(browser_)snprintf(http_.resourceRoot,sizeof(http_.resourceRoot),"%s",saveDir_.c_str());
       if (doc["prevent_sleep"].is<bool>() && doc["prevent_sleep"].as<bool>()) {
         preventAutoSleep_.store(true, std::memory_order_relaxed);
       }
@@ -214,6 +253,7 @@ bool LuaRunner::resolvePath(const char* path, std::string& result) const {
 }
 
 void LuaRunner::shutdown() {
+  requestNativeCancel();images_.close();browserFile_.close();browserFilePath_.clear();browserDirectory_.close();browserDirectoryPath_.clear();
   http_.close();
   http_.domains = {};
   if (L) {
@@ -228,8 +268,8 @@ void LuaRunner::shutdown() {
 }
 
 void LuaRunner::setError(const char* msg) {
-  hasError_ = true;
   errorMessage_ = (msg ? msg : "Unknown Lua error");
+  hasError_.store(true,std::memory_order_release);
   LOG_ERR("LUA", "[%s] %s", appId_.c_str(), errorMessage_.c_str());
 }
 
@@ -463,6 +503,20 @@ void LuaRunner::onExit() {
 void LuaRunner::registerSmudgeApi() {
   lua_newtable(L);  // table 'smudge' (and 'ink')
   http::registerApi(L, http_);
+  if(browser_){
+   browser::registerWork(L);
+   lua_pushcfunction(L,l_browserList);lua_setfield(L,-2,"browser_list_files");
+   lua_pushcfunction(L,l_browserRead);lua_setfield(L,-2,"browser_read_file");
+   lua_pushcfunction(L,l_browserClose);lua_setfield(L,-2,"browser_close_reader");
+   lua_pushcfunction(L,l_imageStart);lua_setfield(L,-2,"browser_image_start");
+   lua_pushcfunction(L,l_imagePoll);lua_setfield(L,-2,"browser_image_poll");
+   lua_pushcfunction(L,l_imageCancel);lua_setfield(L,-2,"browser_image_cancel");
+   lua_pushcfunction(L,l_imageBusy);lua_setfield(L,-2,"browser_image_busy");
+   lua_pushcfunction(L,l_imageBlit);lua_setfield(L,-2,"browser_image_blit");
+  }
+  lua_pushcfunction(L,l_browserAdvance);lua_setfield(L,-2,"browser_advance");
+  lua_pushcfunction(L,l_browserPath);lua_setfield(L,-2,"browser_path");
+  lua_pushcfunction(L,l_browserImage);lua_setfield(L,-2,"browser_image");
 
   lua_pushcfunction(L, l_clear);
   lua_setfield(L, -2, "clear");
@@ -826,6 +880,12 @@ int LuaRunner::l_textWidth(lua_State* L) {
   auto style = resolveStyle(L, 3);
   int w = s_activeRunner->renderer_.getTextWidth(fontId, text, style);
   lua_pushinteger(L, w);
+  return 1;
+}
+
+int LuaRunner::l_browserAdvance(lua_State* L) {
+  const char* text=luaL_checkstring(L,1);const int font=resolveFont(L,2);auto style=resolveStyle(L,3);
+  lua_pushinteger(L,s_activeRunner && s_activeRunner->browser_ ? s_activeRunner->renderer_.getTextAdvanceX(font,text,style) : 0);
   return 1;
 }
 
@@ -1304,8 +1364,11 @@ int LuaRunner::l_readFile(lua_State* L) {
   size_t maxBytes = (lua_gettop(L) >= 2 && !lua_isnil(L, 2)) ? static_cast<size_t>(lua_tointeger(L, 2)) : 65536;
   size_t offset = (lua_gettop(L) >= 3 && !lua_isnil(L, 3)) ? static_cast<size_t>(lua_tointeger(L, 3)) : 0;
 
+  int status=LUA_OK;
+  {
   std::string fullPath;
   if (!s_activeRunner->resolvePath(path, fullPath)) { lua_pushnil(L); return 1; }
+  if(s_activeRunner->browserFilePath_==fullPath){s_activeRunner->browserFile_.close();s_activeRunner->browserFilePath_.clear();}
   HalFile file;
   if (!Storage.openFileForRead("Lua", fullPath.c_str(), file)) {
     lua_pushnil(L);
@@ -1340,12 +1403,13 @@ int LuaRunner::l_readFile(lua_State* L) {
     return 1;
   }
 
-  // Allocate lua string buffer directly without intermediate Arduino String allocation
-  luaL_Buffer b;
-  char* buf = luaL_buffinitsize(L, &b, sz);
-  size_t bytesRead = file.read(reinterpret_cast<uint8_t*>(buf), sz);
+  browser::FileRead context{&file,sz,[](void* p,char* bytes,size_t count){
+    return static_cast<size_t>(static_cast<HalFile*>(p)->read(reinterpret_cast<uint8_t*>(bytes),count));
+  }};
+  status=browser::protectedRead(L,context);
   file.close();
-  luaL_pushresultsize(&b, bytesRead);
+  } // Destroy the path and file before propagating a protected Lua allocation error.
+  if(status!=LUA_OK)return lua_error(L);
   return 1;
 }
 
@@ -1416,6 +1480,7 @@ int LuaRunner::l_findSection(lua_State* L) {
   std::string fullPath;
   if (!s_activeRunner->resolvePath(path, fullPath)) { lua_pushnil(L); return 1; }
 
+  if(s_activeRunner->browserFilePath_==fullPath){s_activeRunner->browserFile_.close();s_activeRunner->browserFilePath_.clear();}
   HalFile file;
   if (!Storage.openFileForRead("Lua", fullPath.c_str(), file)) {
     if (callbackIdx != 0) lua_pushboolean(L, false);
@@ -1922,6 +1987,7 @@ int LuaRunner::l_writeFile(lua_State* L) {
   std::string fullPath;
   if (!s_activeRunner->resolvePath(path, fullPath)) { lua_pushboolean(L, false); return 1; }
 
+  if(s_activeRunner->browserFilePath_==fullPath){s_activeRunner->browserFile_.close();s_activeRunner->browserFilePath_.clear();}
   HalFile f = Storage.open(fullPath.c_str(), append ? (O_WRONLY | O_CREAT | O_APPEND) : (O_WRONLY | O_CREAT | O_TRUNC));
   if (!f) {
     lua_pushboolean(L, false);
@@ -1929,8 +1995,9 @@ int LuaRunner::l_writeFile(lua_State* L) {
   }
 
   size_t written = f.write(reinterpret_cast<const uint8_t*>(content), len);
-  f.close();
-  lua_pushboolean(L, written == len);
+  const bool closed=f.close();
+  if(written!=len || !closed)LOG_ERR("LUA","App file write/close failed");
+  lua_pushboolean(L, written == len && closed);
   return 1;
 }
 
@@ -1942,6 +2009,7 @@ int LuaRunner::l_deleteFile(lua_State* L) {
   const char* path = luaL_checkstring(L, 1);
   std::string fullPath;
   if (!s_activeRunner->resolvePath(path, fullPath)) { lua_pushboolean(L, false); return 1; }
+  if(s_activeRunner->browserFilePath_==fullPath){s_activeRunner->browserFile_.close();s_activeRunner->browserFilePath_.clear();}
   bool ok = Storage.remove(fullPath.c_str());
   lua_pushboolean(L, ok);
   return 1;
@@ -1952,32 +2020,37 @@ int LuaRunner::l_listFiles(lua_State* L) {
     lua_newtable(L);
     return 1;
   }
-  std::string dirPath = s_activeRunner->appDir_;
-  if (lua_gettop(L) >= 1 && lua_isstring(L, 1)) {
-    const char* sub = lua_tostring(L, 1);
-    if (strlen(sub) > 0 && !s_activeRunner->resolvePath(sub, dirPath)) { lua_newtable(L); return 1; }
-  }
-
-  lua_newtable(L);
-  HalFile dir = Storage.open(dirPath.c_str());
-  if (dir && dir.isDirectory()) {
-    int idx = 1;
-    char name[128];
-    for (HalFile entry = dir.openNextFile(); entry; entry = dir.openNextFile()) {
-      name[0] = '\0';
-      entry.getName(name, sizeof(name));
-      entry.close();
-      if (name[0] != '\0' && name[0] != '.') {
-        size_t len = strlen(name);
-        while (len > 0 && (name[len - 1] == '/' || name[len - 1] == '\\')) {
-          name[--len] = '\0';
-        }
-        lua_pushstring(L, name);
-        lua_rawseti(L, -2, idx++);
+  int status=LUA_OK;
+  {
+    std::string dirPath=s_activeRunner->appDir_;
+    if(lua_gettop(L)>=1 && lua_isstring(L,1)){
+      const char* sub=lua_tostring(L,1);
+      if(strlen(sub)>0 && !http::resolveAppDirectory(sub,s_activeRunner->appDir_,s_activeRunner->saveDir_,dirPath)){
+        lua_newtable(L);return 1;
       }
     }
-    dir.close();
+    HalFile dir=Storage.open(dirPath.c_str());
+    // All Lua allocation happens inside pcall. The outer owner closes the
+    // directory even when table/filename allocation fails via Lua longjmp.
+    lua_pushcfunction(L,[](lua_State* state)->int{
+      auto* directory=static_cast<HalFile*>(lua_touserdata(state,1));
+      lua_newtable(state);
+      if(*directory && directory->isDirectory()){
+        int index=1;char name[128];
+        for(HalFile entry=directory->openNextFile();entry;entry=directory->openNextFile()){
+          name[0]=0;entry.getName(name,sizeof(name));entry.close();
+          if(name[0] && name[0]!='.'){
+            size_t length=strlen(name);
+            while(length && (name[length-1]=='/' || name[length-1]=='\\'))name[--length]=0;
+            lua_pushstring(state,name);lua_rawseti(state,-2,index++);
+          }
+        }
+      }
+      return 1;
+    });
+    lua_pushlightuserdata(L,&dir);status=lua_pcall(L,1,1,0);dir.close();
   }
+  if(status!=LUA_OK)return lua_error(L);
   return 1;
 }
 
@@ -2053,6 +2126,102 @@ int LuaRunner::l_getVersion(lua_State* L) {
   return 1;
 }
 
+int LuaRunner::l_browserList(lua_State* L){
+ if(!s_activeRunner || !s_activeRunner->browser_)return 0;
+ const char* name=luaL_checkstring(L,1);bool reset=lua_toboolean(L,2);auto& self=*s_activeRunner;int status;
+ {
+  std::string path;
+  if(!http::resolveAppDirectory(name,self.appDir_,self.saveDir_,path))return 0;
+  if(reset || path!=self.browserDirectoryPath_){
+   self.browserDirectory_.close();self.browserDirectory_=Storage.open(path.c_str());self.browserDirectoryPath_=path;
+  }
+  lua_pushcfunction(L,[](lua_State* state){
+   auto& owner=*static_cast<LuaRunner*>(lua_touserdata(state,1));lua_newtable(state);bool done=false;
+   for(int i=1;i<=8;++i){
+    char name[128]{};{
+     HalFile entry=owner.browserDirectory_.openNextFile();
+     if(!entry){done=true;entry.close();break;}
+     entry.getName(name,sizeof(name));entry.close();
+    }
+    lua_pushstring(state,name);lua_rawseti(state,-2,i);
+   }
+   lua_pushboolean(state,done);return 2;
+  });lua_pushlightuserdata(L,&self);status=lua_pcall(L,1,2,0);
+ }
+ if(status!=LUA_OK){self.browserDirectory_.close();self.browserDirectoryPath_.clear();return lua_error(L);}
+ if(lua_toboolean(L,-1)){self.browserDirectory_.close();self.browserDirectoryPath_.clear();}return 2;
+}
+int LuaRunner::l_browserRead(lua_State* L){
+ if(!s_activeRunner || !s_activeRunner->browser_){lua_pushnil(L);return 1;}
+ const char* name=luaL_checkstring(L,1);auto count=luaL_checkinteger(L,2),offset=luaL_checkinteger(L,3);
+ if(count<0 || count>8192 || offset<0){lua_pushnil(L);return 1;}
+ auto& self=*s_activeRunner;int status=LUA_OK;
+ {
+  std::string path;
+  if(!self.resolvePath(name,path)){lua_pushnil(L);return 1;}
+  if(path!=self.browserFilePath_ || !self.browserFile_){
+   self.browserFile_.close();self.browserFilePath_.clear();
+   self.browserFile_=Storage.open(path.c_str(),O_RDONLY);self.browserFileOffset_=0;
+   if(!self.browserFile_){LOG_ERR("LUA","Browser cursor open failed");lua_pushnil(L);return 1;}
+   self.browserFilePath_=path;
+  }
+  if(self.browserFileOffset_!=size_t(offset) && !self.browserFile_.seekSet(offset)){
+   LOG_ERR("LUA","Browser cursor seek failed");self.browserFile_.close();self.browserFilePath_.clear();lua_pushnil(L);return 1;
+  }
+  self.browserFileOffset_=offset;
+  browser::FileRead context{&self,size_t(count),[](void* pointer,char* bytes,size_t size){
+   auto& owner=*static_cast<LuaRunner*>(pointer);auto n=owner.browserFile_.read(bytes,size);
+   if(n<0){LOG_ERR("LUA","Browser cursor read failed");return size_t(0);}
+   owner.browserFileOffset_+=n;return size_t(n);
+  }};
+  status=browser::protectedRead(L,context);
+ }
+ if(status!=LUA_OK){self.browserFile_.close();self.browserFilePath_.clear();return lua_error(L);}return 1;
+}
+int LuaRunner::l_browserClose(lua_State* L){
+ if(s_activeRunner){s_activeRunner->browserFile_.close();s_activeRunner->browserFilePath_.clear();s_activeRunner->browserDirectory_.close();s_activeRunner->browserDirectoryPath_.clear();}return 0;
+}
+int LuaRunner::l_imageStart(lua_State* L){
+ const char* source=luaL_checkstring(L,1);const char* output=luaL_checkstring(L,2);
+ int width=luaL_checkinteger(L,3),height=luaL_checkinteger(L,4);const char* err="image_path_or_limit";
+ {
+  std::string path,destination;
+  if(s_activeRunner && s_activeRunner->browser_ && s_activeRunner->resolvePath(source,path) && s_activeRunner->resolvePath(output,destination))
+   err=s_activeRunner->images_.start(path,destination,width,height);
+ }
+ if(err){lua_pushnil(L);lua_pushstring(L,err);return 2;}lua_pushboolean(L,true);return 1;
+}
+int LuaRunner::l_imagePoll(lua_State* L){lua_pushinteger(L,s_activeRunner?s_activeRunner->images_.poll():-1);return 1;}
+int LuaRunner::l_imageCancel(lua_State*){if(s_activeRunner)s_activeRunner->images_.close();return 0;}
+int LuaRunner::l_imageBusy(lua_State* L){lua_pushboolean(L,browser::ImageSession::busy());return 1;}
+int LuaRunner::l_imageBlit(lua_State* L){
+ const char* name=luaL_checkstring(L,1);int v[4];for(int i=0;i<4;++i)v[i]=luaL_checkinteger(L,i+2);
+ bool ok=false;{
+ std::string path;
+ if(s_activeRunner && s_activeRunner->browser_ && s_activeRunner->resolvePath(name,path))
+  ok=s_activeRunner->images_.draw(path,s_activeRunner->renderer_,v[0],v[1],v[2],v[3],s_activeRunner->renderCancel_);
+ }lua_pushboolean(L,ok);return 1;
+}
+
+int LuaRunner::l_browserPath(lua_State* L) {
+  const char* name=luaL_checkstring(L,1);
+  if(!s_activeRunner || !s_activeRunner->browser_ || (name[0] && !http::safeRelativePath(name))){lua_pushnil(L);return 1;}
+  lua_pushfstring(L,"%s/%s",s_activeRunner->saveDir_.c_str(),name);return 1;
+}
+
+int LuaRunner::l_browserImage(lua_State* L) {
+  if(!s_activeRunner || !s_activeRunner->browser_){lua_pushboolean(L,false);return 1;}
+  const char* name=luaL_checkstring(L,1);
+  int v[4];for(int i=0;i<4;++i){
+    if(!lua_isinteger(L,i+2) || lua_tointeger(L,i+2)<0 || lua_tointeger(L,i+2)>4096){lua_pushboolean(L,false);return 1;}
+    v[i]=lua_tointeger(L,i+2);
+  }
+  bool success=false;
+  std::string path;
+  if(s_activeRunner->resolvePath(name,path))success=browser::drawImage(path,s_activeRunner->renderer_,v[0],v[1],v[2],v[3]);
+  lua_pushboolean(L,success);return 1;
+}
+
 int LuaRunner::l_getApiVersion(lua_State* L) {
   lua_pushinteger(L, LUA_API_VERSION);
   return 1;
@@ -2061,7 +2230,9 @@ int LuaRunner::l_getApiVersion(lua_State* L) {
 int LuaRunner::l_hasFeature(lua_State* L) {
   const char* feat = luaL_checkstring(L, 1);
   bool supported = false;
-  if (strcmp(feat, "https_async") == 0) {
+  if(strcmp(feat,"browser_v6")==0){supported=s_activeRunner && s_activeRunner->browser_;}
+  if(strcmp(feat,"browser_v5")==0){supported=s_activeRunner && s_activeRunner->browser_;}
+  else if (strcmp(feat, "https_async") == 0) {
 #ifndef SIMULATOR
     supported = true;
 #endif

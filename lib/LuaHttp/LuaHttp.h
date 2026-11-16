@@ -1,6 +1,8 @@
 #pragma once
 #include "HttpCore.h"
 #include "AllocationBudget.h"
+#include "HttpResource.h"
+#include <mutex>
 struct lua_State;
 namespace ink::http {
 struct Job;
@@ -10,6 +12,7 @@ struct Executor {
   bool (*spawn)(void (*)(void*), void*);
 };
 struct Job {
+  Resource resource;
   Request request;
   Result result;
   Scratch scratch;
@@ -28,16 +31,27 @@ class Session {
   Session& operator=(const Session&)=delete;
   Domains domains;
   bool allowed=false;
+  bool cooperative=false;
+  char resourceRoot[256]{};
+  bool retain();
+  Resource* resource(int id);
+  bool releaseResource(int id);
   Job* reserve();
   bool start();
   void discard();
   void close();
+  // No Lua/I/O/free under this tiny pointer-lifetime lock. Safe during render.
+  void requestCancel();
   bool ready()const{return job_ && job_->done.load(std::memory_order_acquire);}
   Job* job()const{return job_;}
   static bool busy();
  private:
   Executor executor_;
+  bool cleaned_=false;
   Job* job_=nullptr;
+  std::mutex cancelMutex_;
+  struct Held {int id=0;Resource body;};
+  Held resources_[4];
 };
 // Appends functions to the table at stack top; production and host tests share registration.
 void registerApi(lua_State*, Session&);

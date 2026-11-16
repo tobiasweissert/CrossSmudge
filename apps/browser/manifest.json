@@ -1,0 +1,14 @@
+{
+  "id": "browser",
+  "name": "Browser",
+  "version": "0.2.1",
+  "author": "CrossSmudge",
+  "description": "Direct HTTPS reader with live RSS/Atom feeds, links, search forms and checked offline pages. No scripts or logins.",
+  "entry": "main.lua",
+  "min_api": 6,
+  "network": {
+    "domains": []
+  },
+  "browser": true,
+  "requires_psram": true
+}

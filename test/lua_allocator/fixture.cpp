@@ -1,5 +1,7 @@
 // Source-extracted production allocator + real firmware Lua, fake heap capabilities.
 #include <algorithm>
+#include "BrowserMemory.h"
+namespace browser=ink::browser;
 #include <cassert>
 #include <cstdint>
 #include <cstdlib>
@@ -11,7 +13,7 @@ extern "C" {
 #include "lauxlib.h"
 #include "lualib.h"
 }
-constexpr uint32_t MALLOC_CAP_SPIRAM=4, MALLOC_CAP_8BIT=8;
+constexpr uint32_t MALLOC_CAP_SPIRAM=4, MALLOC_CAP_8BIT=8, MALLOC_CAP_INTERNAL=16;
 struct Block {size_t size;bool external;};
 static std::unordered_map<void*,Block> live;
 static bool available=false,fail=false;
@@ -41,12 +43,13 @@ static void* fakeRealloc(void* p,size_t n) {
 static void* heap_caps_realloc(void* p,size_t n,uint32_t caps) {
  ++capsCalls;assert(caps==(MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));return resize(p,n,true);
 }
+static size_t heap_caps_get_free_size(uint32_t caps){return caps&MALLOC_CAP_SPIRAM?externalLimit-externalUsed:1024*1024-internalUsed-extraInternalPressure;}
 static bool psramHeapAvailable(){return available;}
 static struct {uint32_t getFreeHeap(){return 1024*1024-internalUsed-extraInternalPressure;}} ESP;
 class LuaRunner {
  public:
  size_t currentAllocatedBytes_=0,maxLuaHeapBytes_=2*1024*1024;
- bool luaHeapUsesPsram_=false;
+ bool luaHeapUsesPsram_=false, browser_=false;
  static void* customLuaAlloc(void*,void*,size_t,size_t);
  void selectHeap();
 };

@@ -8,6 +8,11 @@ class PngToFramebufferConverter final : public ImageToFramebufferDecoder {
 
   bool decodeToFramebuffer(const std::string& imagePath, GfxRenderer& renderer, const RenderConfig& config) override;
 
+  bool decodeToCache(const std::string& imagePath, const RenderConfig& config) override {
+    return decode(imagePath, nullptr, config);
+  }
+  bool decode(const std::string& imagePath, GfxRenderer* renderer, const RenderConfig& config);
+
   bool getDimensions(const std::string& imagePath, ImageDimensions& dims) const override {
     return getDimensionsStatic(imagePath, dims);
   }

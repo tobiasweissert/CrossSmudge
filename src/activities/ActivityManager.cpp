@@ -1,3 +1,4 @@
+#include "GlobalHomeDispatch.h"
 #include "ActivityManager.h"
 
 #include <CrossInkHalFrontlight.h>
@@ -518,12 +519,7 @@ bool ActivityManager::handleHomeButtonBackOrHome() {
     return false;
   }
 
-  if (currentActivity->handleHomeGesture()) {
-    return true;
-  }
-
-  goHome();
-  return true;
+  return dispatchHomeToActivity(*currentActivity, [this] { goHome(); });
 }
 
 bool ActivityManager::openReaderMenuFromShortcut() {
