@@ -1,9 +1,11 @@
 local C=dofile('cp_core.lua')
 local J=dofile('cp_journal.lua')
+local V=smudge.get_memory().lua_max_kb>=512 and dofile('presentation.lua')or nil
 local G={position=C.start(),history={},cursor=12,mode=1,level=2,notice='',menu=false,menuIndex=1,closed=false}
 local journal,dirty
 local L={}
 local modes={'You: White','You: Black','Two players'}
+local function whiteBottom()return G.mode~=2 and(not V or G.mode~=3 or G.position.whiteToMove)end
 local function key(p) return C.fen(p):match('^(%S+ %S+ %S+ %S+)') end
 local function decode(s)
  local mode,level,fen,history=s:match('^([123]) ([123])\n([^\n]+)\n(.*)$')
@@ -31,14 +33,34 @@ local function status()
 end
 local function aiTurn() return G.mode~=3 and G.position.whiteToMove==(G.mode==2) end
 local function queue()
- if not G.over and aiTurn() and not G.menu then G.job=C.newSearch(G.position,({1,3,4})[G.level],60000);G.notice='Thinking...' end
+ if not G.over and aiTurn() and not G.menu and not G.home then G.job=C.newSearch(G.position,({1,3,4})[G.level],60000);G.notice='Thinking...' end
+end
+local function newGame(home)
+ G.home=home or false;G.hasGame=true;G.menu=false;G.position=C.start();G.history={};G.last=nil;G.selected=nil;G.promotion=nil;G.job=nil;G.hint=nil;dirty=true;status();queue();refresh()
+end
+local function openSettings(home)
+ G.job=nil;G.hint=nil;G.menu=true;G.menuFromHome=home or false;G.home=false
+ G.uiMode=G.mode;G.uiLevel=G.level;G.restartPending=false;G.menuIndex=home and 3 or 2;G.selected=nil;refresh()
+end
+local function closeSettings()
+ local home=G.menuFromHome;local restart=G.uiMode and G.uiMode~=G.mode
+ if G.uiMode and G.uiMode~=G.mode then G.mode=G.uiMode;dirty=true end
+ if G.uiLevel and G.uiLevel~=G.level then G.level=G.uiLevel;dirty=true end
+ G.uiMode=nil;G.uiLevel=nil;G.restartPending=false;G.menu=false;G.home=home
+ if restart then newGame(home)else queue();refresh()end
+end
+local function startAction(i)
+ local kind=G.hasGame and ({'continue','new','nearby','settings'})[i]or({'new','nearby','settings'})[i]
+ if kind=='continue'then G.home=false;queue();refresh()
+ elseif kind=='new'then newGame(false)
+ elseif kind=='settings'then openSettings(true)elseif kind=='nearby'then G.nearbyUnavailable=true;G.home=false;refresh()end
 end
 local function play(m)
  G.history[#G.history+1]=C.fen(G.position);if #G.history>100 then table.remove(G.history,1) end
  C.make(G.position,m);G.last=m;G.selected=nil;G.promotion=nil;G.notice=C.moveString(m);dirty=true;status();queue();refresh()
 end
 local function choose(s)
- if G.job or G.over or G.menu then return end
+ if G.job or G.over or G.menu or G.home then return end
  if G.selected then local choices={}
   for _,m in ipairs(G.moves) do if m.from==G.selected and m.to==s then choices[#choices+1]=m end end
   if #choices==1 then play(choices[1]);return elseif #choices>1 then G.promotion=choices;G.promoIndex=1;refresh();return end
@@ -46,33 +68,37 @@ local function choose(s)
  local q=G.position.squares[s];G.selected=q~=0 and (q&8==0)==G.position.whiteToMove and s or nil;refresh()
 end
 local function geometry()
+ if V then L=V.geometry();return L end
  local w,h=smudge.get_bounds();local m=smudge.get_metrics();local y=m.top_padding+m.header_height+8
  local size=math.min((w-24)//8,(h-y-m.button_hints_height-82)//8)
  L={w=w,h=h,x=(w-size*8)//2,y=y,size=size,footer=h-m.button_hints_height,buttons={}}
  return L
 end
-local function screenSquare(r,c) if G.mode==2 then return r*8+7-c else return (7-r)*8+c end end
+local function screenSquare(r,c) if not whiteBottom()then return r*8+7-c else return (7-r)*8+c end end
 local function menuAction()
  local i=G.menuIndex
- if i==1 then G.menu=false;queue()
- elseif i==2 then G.position=C.start();G.history={};G.last=nil;G.selected=nil;G.menu=false;dirty=true;status();queue()
- elseif i==3 then G.mode=G.mode%3+1;dirty=true
- elseif i==4 then G.level=G.level%3+1;dirty=true
+ if i==1 then if V then closeSettings()else G.menu=false;queue()end
+ elseif i==2 then if V then G.mode=G.uiMode or G.mode;G.level=G.uiLevel or G.level;G.uiMode=nil;G.uiLevel=nil;G.restartPending=false end;newGame(false)
+ elseif i==3 then if V then G.uiMode=(G.uiMode or G.mode)==3 and 1 or 3;G.restartPending=G.uiMode~=G.mode else G.mode=G.mode%3+1;dirty=true end
+ elseif i==4 then if V then G.uiLevel=(G.uiLevel or G.level)%3+1 else G.level=G.level%3+1;dirty=true end
  elseif i==5 then
+  if V and #G.history==0 then refresh();return end
   if #G.history>0 then G.position=C.parseFen(table.remove(G.history));if G.mode~=3 and aiTurn() and #G.history>0 then G.position=C.parseFen(table.remove(G.history)) end;G.last=nil;dirty=true;status() end
   G.menu=false;queue()
- elseif i==6 then if not G.over then G.job=C.newSearch(G.position,2,3000);G.hint=true;G.menu=false;G.notice='Finding hint...' end
- else save();G.closed=true;smudge.exit() end
+ elseif i==8 then if V then if G.uiMode~=3 then G.uiMode=G.uiMode==1 and 2 or 1;G.restartPending=G.uiMode~=G.mode end elseif G.mode~=3 then G.mode=G.mode==1 and 2 or 1;dirty=true end
+ elseif i==9 then if V then V.showHints=not V.showHints end
+ elseif i==6 then if V then closeSettings();G.home=false;G.job=nil end;if not G.over then G.job=C.newSearch(G.position,2,3000);G.hint=true;G.menu=false;G.notice='Finding hint...' end
+ else if V then closeSettings()end;G.job=nil;G.hint=nil;save();G.closed=true;smudge.exit() end
  refresh()
 end
 function on_init()
  journal,G.saved=J.open('chess',11000,function(s) return decode(s)~=nil end)
  if G.saved then local a=decode(G.saved);G.position=a.position;G.history=a.history;G.mode=a.mode;G.level=a.level;G.saved=nil end
  local old,msg=journal:preserve('game',76);if old and journal.sequence==0 then G.notice=msg end
- status();geometry();queue()
+ if V then V.init();G.home=true;G.hasGame=journal.sequence>0;G.startIndex=1 end;status();geometry();queue()
 end
 function on_draw()
- local l=geometry();smudge.clear();smudge.header('Chess',modes[G.mode]..' / '..({'Easy','Medium','Hard'})[G.level])
+ local l=geometry();if V then V.draw(G,C,l,screenSquare);return end;smudge.clear();smudge.header('Chess',modes[G.mode]..' / '..({'Easy','Medium','Hard'})[G.level])
  for r=0,7 do for c=0,7 do local s=screenSquare(r,c);local x,y=l.x+c*l.size,l.y+r*l.size;local q=G.position.squares[s]
   smudge.rect(x,y,l.size,l.size,true,false)
   if (r+c)%2==1 then smudge.rect_dither(x,y,l.size,l.size,false) end
@@ -109,16 +135,25 @@ function on_update()
 end
 function on_button(b,pressed)
  if not pressed or G.closed then return end
+ if V and G.nearbyUnavailable then if b=='back'or b=='confirm'then G.nearbyUnavailable=nil;G.home=true;refresh()end;return end
+ if V and G.home then
+  if b=='back'then G.job=nil;save();G.closed=true;smudge.exit()
+  elseif b=='confirm'then startAction(G.startIndex or 1)
+  else local delta=(b=='up'or b=='left'or b=='page_back')and -1 or 1;G.startIndex=((G.startIndex or 1)-1+delta)%(G.hasGame and 4 or 3)+1;refresh()end;return
+ end
  if G.menu or G.promotion then local n=G.promotion and 4 or 7;local idx=G.promotion and G.promoIndex or G.menuIndex
-  if b=='back' then G.promotion=nil;G.menu=false;queue()
+  if b=='back' then if G.promotion then G.promotion=nil;queue()elseif V then closeSettings()else G.menu=false;queue()end
   elseif b=='confirm' then if G.promotion then play(G.promotion[idx]) else menuAction() end
-  elseif b=='left' or b=='up' or b=='page_back' then idx=(idx-2)%n+1
-  elseif b=='right' or b=='down' or b=='page_forward' then idx=idx%n+1 end
+  elseif b=='left' or b=='up' or b=='page_back' or b=='right' or b=='down' or b=='page_forward' then
+   local delta=(b=='left'or b=='up'or b=='page_back')and -1 or 1
+   if V and not G.promotion then local order={1};for _,v in ipairs(V.order or{2,5,3,4,8,9,6,7})do order[#order+1]=v end;local at=1;for i,v in ipairs(order)do if v==idx then at=i end end;idx=order[(at-1+delta)%#order+1]
+   else idx=(idx-1+delta)%n+1 end
+  end
   if G.promotion then G.promoIndex=idx else G.menuIndex=idx end;refresh();return
  end
- if b=='back' then G.job=nil;G.hint=nil;G.menu=true;G.menuIndex=1;G.selected=nil
+ if b=='back' then G.job=nil;G.hint=nil;G.selected=nil;if V then save();G.home=true;G.hasGame=true;G.startIndex=1 else G.menu=true;G.menuIndex=1 end
  elseif b=='confirm' then choose(G.cursor)
- else local sign=G.mode==2 and -1 or 1
+ else G.buttonCursor=true;local sign=whiteBottom()and 1 or -1
   if b=='up' or b=='page_back' then G.cursor=(G.cursor-sign)%64 elseif b=='down' or b=='page_forward' then G.cursor=(G.cursor+sign)%64
   elseif b=='left' then G.cursor=(G.cursor+8*sign)%64 elseif b=='right' then G.cursor=(G.cursor-8*sign)%64 end
  end
@@ -126,9 +161,19 @@ function on_button(b,pressed)
 end
 function on_touch(x,y,event)
  if event~='tap' or G.closed then return end
- if G.menu or G.promotion then for i,b in ipairs(L.buttons) do if x>=b.x and x<b.x+b.w and y>=b.y and y<b.y+b.h then if G.promotion then play(G.promotion[i]) else G.menuIndex=i;menuAction() end;return end end;return end
+ if V and G.nearbyUnavailable then local b=L.unavailable;if b and x>=b.x and x<b.x+b.w and y>=b.y and y<b.y+b.h then G.nearbyUnavailable=nil;G.home=true;refresh()end;return end
+ if V and G.home then for i,b in ipairs(L.start or{})do if x>=b.x and x<b.x+b.w and y>=b.y and y<b.y+b.h then startAction(i);return end end;return end
+ if V and not G.menu and not G.promotion and(L.start or L.whiteBottom~=whiteBottom())then return end
+ if G.menu or G.promotion then for i,b in pairs(L.buttons) do if x>=b.x and x<b.x+b.w and y>=b.y and y<b.y+b.h then if G.promotion then play(G.promotion[i]) else G.menuIndex=i;menuAction() end;return end end;return end
+ if V then
+  G.buttonCursor=false
+  if L.gear and x>=L.gear.x and x<L.gear.x+L.gear.w and y>=0 and y<76 then openSettings(false);return end
+  if G.over and x>=16 and x<L.w-16 and y>=L.footer and y<L.footer+52 then newGame(false);return end
+  if y>=L.footer then return end
+ end
  if y>=L.footer then on_button(({'back','confirm','left','right'})[math.min(4,x*4//L.w+1)],true);return end
  local c,r=(x-L.x)//L.size,(y-L.y)//L.size;if c>=0 and c<8 and r>=0 and r<8 then G.cursor=screenSquare(r,c);choose(G.cursor) end
 end
+function on_swipe(direction)if G.menu or G.home then on_button(direction,true)end end
 function on_exit() G.job=nil;G.hint=nil;save();G.closed=true end
-return {core=C,state=function() return G end,layout=function() return L end}
+return {core=C,hints=function()return V and V.showHints or false end,state=function() return G end,layout=function() return L end}

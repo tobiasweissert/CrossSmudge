@@ -7,7 +7,7 @@ Original rules: `CrossPlay/src/apps_local/calculator/CalcEngine.h and CalcFormat
 
 Supported: Immediate decimal execution; 16 working/10 display digits; +/-; contextual percent; operator replacement; repeated equals; CE/AC/backspace; error lock; original display subnormal quantum and exponent limits tested against decNumber. App-local resume is added.
 
-Gaps and changes: Original custom fonts and graphical styles are not ported. This is a new decimal-string implementation, not the native decNumber library. 491 differential key sequences passed; that is substantial evidence, not exhaustive proof over every decimal input.
+Gaps and changes: The constrained-host path retains the compact frontend; PSRAM hosts use the original presentation described below. This is a new decimal-string implementation, not the native decNumber library. 491 differential key sequences passed; that is substantial evidence, not exhaustive proof over every decimal input.
 
 Controls: Arrow keys select a keypad cell; Confirm presses it. Touch a key to press it. Menu then Confirm saves and exits. A labeled Menu touch target is near the top right in both orientations. Physical Back also opens the menu. Page buttons are mapped to Up/Down where the firmware sends those names.
 
@@ -18,3 +18,11 @@ Validation: vendored **stock Lua 5.4 with int32/float32**, all 71 stock API keys
 Install: extract the per-app ZIP into SD `/.crosssmudge/applications/`, producing `cp-calculator/manifest.json` and `main.lua`, or upload that individual ZIP in stock Web Transfer /applications. If that app ID already exists, stop and back it up; do not overwrite its journals. Do not upload the combined collection ZIP to the one-app web uploader.
 
 Hardware check: on the Sticky running the delivered v1.6.5.3 firmware, launch CP Calculator; test both touch and buttons, Menu/Cancel/New as applicable, rotate using firmware settings and relaunch, save/exit/reopen, then sleep/wake and reopen. Expect the same saved state, no Application Error, and no changes to other app saves. No EPUB cache reset is required. Physical e-ink redraw latency, long AI turns and heap/PSRAM availability still need observation.
+
+## Original-screen presentation on PSRAM hosts
+
+At 512 KiB or more, the frontend ports the original TOYBOX black header, measured pending/number bands, original calculator Jersey cuts (20/26/28/34/44/56), five-row keypad, 12px gutters, 2px digit/6px operator borders and filled equals. Multiplication, division and minus use the actual source glyph masks. Original core/decimal/storage files are unchanged; the original compact controller is kept below the gate. Arrow/Confirm input remains available with a focus inset shown after keyboard navigation. Back saves/exits, matching the original. Long-press the display for the extra resume/clear-entry/save menu.
+
+Differences: glyph advances are rounded to pixels rather than the native FreeInkUI pipeline. The pending line shows the stored accumulator and operator; richer original pending-expression wording is unavailable from the current core. The source engine remains the existing tested decimal-string implementation. These are native bitmap-command previews, not a claim of pixel-identical device rendering.
+
+Run `python3 test/utility_ui/run.py` and `python3 test/utility_ui/capture.py`; provenance and mask hashes are in `art/sources.json`, with the OFL notice retained. On hardware, check each key including DEL, contextual percent, sign, repeated equals and divide-by-zero; inspect long results and save/reopen.

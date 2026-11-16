@@ -1,0 +1,7 @@
+{
+  "src/apps_local/ui/fonts/toybox_10.h": "2b1485310c1c0b50cf9e5453289a96c96d89d644b89a8d7fe498b10daef40283",
+  "src/apps_local/ui/fonts/toybox_14.h": "376246455b89712078a3d76f403ba7fed186af52ef66c55e64e06959a92982f2",
+  "src/apps_local/ui/fonts/toybox_20.h": "845e328963eaf0b35d742948c16add3e75dcaaf1e4cb88ddd2f015e8f1926884",
+  "src/apps_local/ui/fonts/toybox_30.h": "a0803677feab588fe73d1fe3cb9159d9e2008e111111be17f9fcf5e32a861b1e",
+  "src/apps_local/cards/CardSuits.h": "d1f427b3a19e39e09a94de9d0031ed94448f79a73d4090315a70c4a66440ceec"
+}

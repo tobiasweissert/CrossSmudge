@@ -1,0 +1,7 @@
+{
+  "revision": "d3a49ce8e85f9bd0d3e0c774a54adc267fd7547b",
+  "path": "src/apps_local/murdle/MurdleCast.cpp",
+  "source_sha256": "23e344048c875d5680141d3035052301fe9bbf3d84d0ad4551c038bb9af71d60",
+  "output_sha256": "841d9e8babb28a0650b88b7869508bb6490768c0e67d9d2e211b99ec0f239dd3",
+  "license": "LICENSE-CrossPlay.txt"
+}

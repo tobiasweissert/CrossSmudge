@@ -1,0 +1,10 @@
+{
+  "src/apps_local/ui/fonts/toybox_14.h": "376246455b89712078a3d76f403ba7fed186af52ef66c55e64e06959a92982f2",
+  "src/apps_local/calculator/fonts/calc_jersey_20.h": "7b3981e29d6f76ea407dbafa92e9cc917580cf336a89993bdfd47c7fedea0661",
+  "src/apps_local/calculator/fonts/calc_jersey_26.h": "1364f6f64a8e2ca919558b8fadc898e3c0481a190090b06cffdd70a2ca2591d0",
+  "src/apps_local/calculator/fonts/calc_jersey_28.h": "56d9d39719bff78d19dc6affdc6fdf7a776f1fd60e9296bbb0eb4202b6b13639",
+  "src/apps_local/ui/fonts/toybox_30.h": "a0803677feab588fe73d1fe3cb9159d9e2008e111111be17f9fcf5e32a861b1e",
+  "src/apps_local/calculator/fonts/calc_jersey_34.h": "a0b717ea97ba319f95a770a4ef6fbebdc045e9f82f28e391a2537237d2a689f7",
+  "src/apps_local/calculator/fonts/calc_jersey_44.h": "679d472a78434e98fcf91bdad49e610da0b655368e6b73c7a72e35fe60fc2a75",
+  "src/apps_local/calculator/fonts/calc_jersey_56.h": "631f62156f53f7f209b8628f9568a112c25eda9a08bbde5dfea2aea798c0ea49"
+}

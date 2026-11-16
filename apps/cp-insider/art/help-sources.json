@@ -1,0 +1,62 @@
+{
+  "reference": "d3a49ce8e85f9bd0d3e0c774a54adc267fd7547b",
+  "license": "MIT LICENSE-CrossPlay.txt and bundled OFL-Jersey25.txt",
+  "component_only": true,
+  "diagrams": {
+    "help-diagram-1.raw": {
+      "rect": [
+        16,
+        169,
+        448,
+        234
+      ],
+      "sha256": "625422f3d64d389af3c7afc8a47ae4979089a1b52bf8412017bb0c27f372aeea",
+      "original_source": "src/apps_local/insider/InsiderScreens.cpp::buildTutorial",
+      "native_capture_sha256": "7fabf8dceec1696a56c5f648ae7df45d3e9b53f368b63d564d4e74b48962028c"
+    },
+    "help-diagram-2.raw": {
+      "rect": [
+        16,
+        249,
+        448,
+        128
+      ],
+      "sha256": "8e75e527df660ab6d9834e36eb7e1a91b2210718dc8f299251587156f31f0482",
+      "original_source": "src/apps_local/insider/InsiderScreens.cpp::buildTutorial",
+      "native_capture_sha256": "8cecb5bcd82eaba709b9ce8c52662f993a8a1e7fd4fbf97f06fc677dd6c6d33b"
+    },
+    "help-diagram-3.raw": {
+      "rect": [
+        16,
+        219,
+        448,
+        150
+      ],
+      "sha256": "f380e0092419f57dec62b897cf79e75a102dbc7d72e87836ca948ab2b9e04c42",
+      "original_source": "src/apps_local/insider/InsiderScreens.cpp::buildTutorial",
+      "native_capture_sha256": "3fc28c5769882ab482f3184cccc38332031c4e58f53a9e029b34a2486f680aee"
+    },
+    "help-diagram-4.raw": {
+      "rect": [
+        16,
+        269,
+        448,
+        84
+      ],
+      "sha256": "86dc05d9d4da2a5c90094c059b07ef7dee46d7c1b483e26eb0c8ce34e0e5f548",
+      "original_source": "src/apps_local/insider/InsiderScreens.cpp::buildTutorial",
+      "native_capture_sha256": "07be9786be315c01e3670fdcae32fabc5ded7b67b477efc817feff40754e870e"
+    },
+    "help-diagram-5.raw": {
+      "rect": [
+        16,
+        169,
+        448,
+        320
+      ],
+      "sha256": "a168adc441188b753825e08d200959bf0800875c0f44ae588b65e18ca0d1d1bb",
+      "original_source": "src/apps_local/insider/InsiderScreens.cpp::buildTutorial",
+      "native_capture_sha256": "e99a622822b89aae21e1c7f3b6c322657760f169e65db18f44464f64d8b78a2f"
+    }
+  }
+}

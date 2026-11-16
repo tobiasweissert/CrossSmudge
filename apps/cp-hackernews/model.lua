@@ -1,5 +1,11 @@
 local J=dofile('json.lua')
 local M={}
+function M.children(t)
+ if t==nil then return {} end
+ if type(t)~='table' or #t>500 then return end
+ for k,v in pairs(t) do if math.type(k)~='integer' or k<1 or k>#t or math.type(v)~='integer' or v<1 then return end end
+ return t
+end
 function M.ids(raw)
   local t=J.decode(raw)
   if type(t)~='table' or #t<1 or #t>500 then return end
@@ -17,7 +23,19 @@ function M.item(raw)
   for _,key in ipairs({'url','text','by'}) do
     if t[key]~=nil and type(t[key])~='string' then return end
   end
+  for _,key in ipairs({'score','time','descendants'}) do
+    if t[key]~=nil and (math.type(t[key])~='integer' or t[key]<0) then return end
+  end
+  if not M.children(t.kids) then return end
   return t
+end
+function M.comment(raw)
+ local t=J.decode(raw)
+ if type(t)~='table' or math.type(t.id)~='integer' or t.id<1 then return end
+ if t.deleted or t.dead then return {id=t.id,deleted=true,kids=M.children(t.kids) or {}} end
+ if t.time~=nil and (math.type(t.time)~='integer' or t.time<0) then return end
+ if t.type~='comment' or type(t.text)~='string' or #t.text>8192 or type(t.by)~='string' or not M.children(t.kids) then return end
+ return t
 end
 function M.plain(s)
   s=(s or ''):gsub('<[Pp][^>]*>','\n'):gsub('<[^>]*>','')
