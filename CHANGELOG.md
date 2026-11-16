@@ -2,7 +2,7 @@
 
 ### Fixed
 
-- HTTPS apps synchronize UTC automatically; PSRAM devices keep Lua allocations out of internal RAM needed by TLS.
+- HTTPS apps synchronize UTC automatically without manual confirmation and retain certificate checks; PSRAM devices keep Lua allocations out of internal RAM needed by TLS.
 - Hacker News continues loading after a failed story, supports per-row retries, and opens articles directly from story titles; comment badges open discussions.
 - Sticky Five Letters retains its new design on the Back menu and uses darker hint text; Hacker News secondary text is also darker.
 - Migrated CrossPlay apps use original screen assets, opening screens and supported help/settings layouts, with remaining parity gaps documented per app.
@@ -33,7 +33,7 @@
 - Added local Jaipur, Sea Salt, Toy Battle, Murdle and Go Lua adaptations with saved play, explicit opponent/content differences and stock-Lua memory-cap tests. The local collection now has 18 adaptations plus four unchanged equivalents; eleven titles remain blocked. Catalog publication awaits parent push and upstream review.
 - Added local Insider, Forehead, Checkers, Wavelength, Hearts, Hex and Battleship Lua adaptations with checked saves and capped runtime tests. Hearts, Hex and Battleship document their smaller opponent strategies. Prepared catalog entries for the 13 working local adaptations; official store availability awaits upstream maintainer merge. The full 33-title collection remains incomplete.
 - Added six local CrossPlay Lua ports for stock v1.6.5.3: Minesweeper, Connect Four, Knucklebones, Yahtzee, decimal Calculator, and app-local Notes. Packages use separate `cp-*` IDs and checked two-slot saves. Per-package parity notes distinguish supported local features from missing Nearby, phone-transfer, sleep-screen, and original presentation features. These are not a complete 33-title collection or an App Store release.
-- Lua API v3: asynchronous, manifest-scoped HTTPS GET/POST with cancellation and bounded responses. Network apps use the existing Wi-Fi selector; App Settings can disable app networking and explicitly trust displayed UTC for certificate checks until restart.
+- Lua API v3: asynchronous, manifest-scoped HTTPS GET/POST with cancellation and bounded responses. Network apps use the existing Wi-Fi selector; App Settings can disable app networking; automatic UTC anchors certificate date checks until restart.
 - Added an explicit Sticky owner-test profile using a matching fork catalog and package origin; standard builds retain the upstream store.
 
 ### Security
@@ -42,7 +42,7 @@
 
 ### Changed
 
-- App networking is enabled by default within declared HTTPS domains, without permission prompts. App Settings provides an explicit disable/enable control; certificate checks and verified UTC remain required.
+- App networking is enabled by default within declared HTTPS domains, without permission prompts. App Settings provides an explicit disable/enable control; certificate checks and synchronized UTC remain required.
 
 - Add local APIv3 previews for live Hacker News feed/story/article reading and Open Trivia DB questions, with checked offline data caches and button/touch controls. These are not App Store releases; public-network/device verification and C3 memory qualification remain pending.
 
