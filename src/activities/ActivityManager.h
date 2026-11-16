@@ -109,6 +109,8 @@ class ActivityManager {
 
   // goTo... functions are convenient wrapper for replaceActivity()
   void goToFileTransfer(std::string returnBookPath = {});
+  bool goToAirDropReceive(const std::string& returnBookPath = {});
+  void returnFromAirDrop(const std::string& returnBookPath, bool homeRequested);
   void goToCalibreWireless(const std::string& returnBookPath = {});
   void goToJoinNetworkFileTransfer(const std::string& returnBookPath = {});
   void goToHotspotFileTransfer(const std::string& returnBookPath = {});
@@ -140,6 +142,7 @@ class ActivityManager {
   void popActivity();
 
   bool preventAutoSleep() const;
+  bool deferGlobalPowerAction(CrossPointSettings::SHORT_PWRBTN action);
   bool requiresExclusiveStorageLoop() const;
   // The active activity has an open modal that owns all global shortcuts and
   // gestures until it is dismissed.

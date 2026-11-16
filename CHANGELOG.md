@@ -2,6 +2,8 @@
 
 ### Fixed
 
+- AirDrop can receive a new file after retaining an interrupted transfer, and consent requires a fresh touch or Confirm press after the offer finishes painting.
+
 - Sticky Battleship and Hex keep landscape instructions readable; Hearts and Jaipur require a painted discard confirmation, and Wavelength prevents queued phase skips and labels scored Teams calls truthfully.
 
 - Hacker News reads large articles and comment threads within its Lua heap, and preserves comment order during repeated forward navigation.
@@ -32,6 +34,8 @@
 - Fixed Solitaire v1.0.1 touch input on reTerminal Sticky: tapping cards now deals, selects, and moves cards; reset confirmation buttons match their drawn bounds, and taps in tableau gaps or below cards are ignored. Other devices retain their existing input behavior and saved games remain compatible.
 
 ### Added
+
+- Sticky File Transfer gains a native AirDrop receiver with per-transfer consent, bounded EPUB/UTF-8 text saves to Inbox, and Safari links handed to the installed Browser after cooperative radio shutdown. Native iOS/macOS and repeated hardware switching remain qualification gates.
 
 - Sudoku Hint on Sticky highlights an empty target first; a second explicit Hint reveals it. Editing or changing the board clears the pending hint.
 

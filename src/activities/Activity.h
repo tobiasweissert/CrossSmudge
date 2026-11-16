@@ -55,6 +55,9 @@ class Activity {
 
   virtual bool skipLoopDelay() { return false; }
   virtual bool preventAutoSleep() { return false; }
+  // Exclusive transports can cooperatively release ownership before main
+  // executes a power shortcut (including sleep or a network restart route).
+  virtual bool deferGlobalPowerAction(CrossPointSettings::SHORT_PWRBTN) { return false; }
   // While true, main-loop global controls and activity replacement are
   // suspended so an exclusive storage owner cannot race the filesystem.
   virtual bool requiresExclusiveStorageLoop() const { return false; }

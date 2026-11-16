@@ -1,4 +1,5 @@
 -- Lua-first local e-ink browser. Direct HTTPS; no proxy, scripts or credentials.
+browser_launch_api=1 -- Native optional launch handshake; older installed packages fail closed.
 local U,M,C,L,URL=dofile('ui.lua'),dofile('model.lua'),dofile('cache.lua'),dofile('layout.lua'),dofile('url.lua')
 local S={status='Direct HTTPS • no scripts or logins',page=1,anchors={{b=1,s=1,p=1}},reader=true,font=0,history={},cursor=0,generation=0}
 local Source=dofile('source.lua')
@@ -16,6 +17,7 @@ local function input(event)
 end
 local completion -- One owned event waits behind ordinary UI work; HTTP has one active slot.
 local cache,active,pending,staged,closed,screen,menuPage,zoom,form,findText
+local startupComplete,launchChecked=false,false
 local defaults={'https://feeds.bbci.co.uk/news/world/rss.xml','https://www.theguardian.com/world/rss','https://www.tagesschau.de/xml/rss2/'}
 local function redraw()U.redraw()end
 local function reset(anchor)S.page=1;S.anchors={anchor or {b=1,s=1,p=1}};S.next=nil;S.layoutKey=nil;S.prepared=nil;U.focus=1 end
@@ -117,11 +119,11 @@ local function fragment(target)
 end
 open=function(target,mode,index)
  target=URL.resolve(S.url,target)
- if not target then S.status='Use a public HTTPS address (max 512 bytes)';redraw();return end
- if fragment(target)then screen=nil;redraw();return end
+ if not target then S.status='Use a public HTTPS address (max 512 bytes)';redraw();return false end
+ if fragment(target)then screen=nil;redraw();return true end
  cancel();pending={url=URL.wire(target),target=target,kind='page',mode=mode or 'push',index=index,generation=S.generation,reader=S.reader,font=S.font}
  if mode=='history'and S.history[index]then local view=S.history[index];if view.reader~=nil then pending.reader=view.reader end;pending.font=view.font or S.font end
- S.status='Queued • Back cancels';screen=nil;zoom=nil;redraw()
+ S.status='Queued • Back cancels';screen=nil;zoom=nil;redraw();return true
 end
 local function address()
  U.edit('Address / search',S.url or '',512,function(text)
@@ -182,13 +184,15 @@ local function finish(body,job,css,candidate,event,discovery)
  local status=S.status;W.stage('Cleaning cache');if committed and not S.rollbackView then cache:clearImages()end;cache:cleanup();S.status=status;redraw()
 end
 function on_init()
+ startupComplete=false;launchChecked=false
  closed=false;active=nil;pending=nil;staged=nil;screen=nil;zoom=nil;menuPage=1
  S={status='Direct HTTPS • no scripts/logins/paywall bypass',page=1,anchors={{b=1,s=1,p=1}},reader=true,font=0,history={},cursor=0,generation=0}
- if not smudge.has_feature('browser_v6')then S.status='Please update firmware: Browser needs API 6 + PSRAM';closed=true;redraw();return end
+ if not smudge.has_feature('browser_v6')then S.status='Please update firmware: Browser needs API 6 + PSRAM';closed=true;if smudge.fail_launch_url then smudge.fail_launch_url()end;redraw();return end
  queue(function()
  awaitDrain();cache=C.open(W,hasResources);W.stage('Reading cache');cache:cleanup();cache:clearImages();if #cache.sources==0 then cache.sources=defaults end
  if cache.entries[1]then restore(cache.entries[1],'push')end
  if cache.uncertain then S.status='SD cache read-only • check SD before reopening'end
+ startupComplete=true
  end,'Reading cache')
  redraw()
 end
@@ -202,10 +206,24 @@ function on_update()
  if closed then return end
  if W.busy()then
   local done,err=W.step()
-  if done==nil then cancel();S.status='Page kept • '..tostring(err);redraw()
+  if done==nil then cancel();if not startupComplete and smudge.fail_launch_url then smudge.fail_launch_url()end;S.status='Page kept • '..tostring(err);redraw()
   elseif not done then if S.workStage~=W.job.stage then S.workStage=W.job.stage;redraw()end
   else redraw()end
   return
+ end
+ -- Cache restore owns startup. Only then take the one-shot native payload,
+ -- enqueue through normal navigation, and acknowledge that concrete queue entry.
+ if startupComplete and not launchChecked then
+  launchChecked=true
+  if smudge.take_launch_url and smudge.ack_launch_url then
+   local target,token=smudge.take_launch_url()
+   if target then
+    if type(target)=='string'and #target<=512 and target:sub(1,8)=='https://'and open(target)then
+     if not smudge.ack_launch_url(token)then cancel();S.status='Cancelled • page kept';redraw()end
+    elseif smudge.fail_launch_url then smudge.fail_launch_url()end
+    return
+   end
+  end
  end
  if completion then
   local e=completion;completion=nil;W.start(function()receiveCompletion(e)end,'Reading page');return
@@ -458,4 +476,4 @@ function on_swipe(dir)
  if U.editor or screen or zoom then return end
  if dir=='left'or dir=='up'then turn(1)elseif dir=='right'or dir=='down'then turn(-1)end
 end
-function on_exit()remember();closed=true;cancel();layoutRequest=nil end
+function on_exit()remember();closed=true;cancel();layoutRequest=nil;if smudge.fail_launch_url then smudge.fail_launch_url()end end

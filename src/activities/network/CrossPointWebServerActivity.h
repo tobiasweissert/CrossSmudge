@@ -35,6 +35,7 @@ class CrossPointWebServerActivity final : public Activity {
   bool hasInitialNetworkMode = false;
   NetworkMode initialNetworkMode = NetworkMode::JOIN_NETWORK;
   bool networkBootReady = false;
+  bool airDropHandoff = false;  // The native receiver replaces this inactive menu parent.
 
   // Network mode
   NetworkMode networkMode = NetworkMode::JOIN_NETWORK;
@@ -64,6 +65,7 @@ class CrossPointWebServerActivity final : public Activity {
   void renderWifiIndicator(int subHeaderTop) const;
   bool exitRequested() const;
 
+  bool handoffAirDrop(NetworkMode mode);
   void onNetworkModeSelected(NetworkMode mode);
   void onWifiSelectionComplete(bool connected);
   void startAccessPoint();

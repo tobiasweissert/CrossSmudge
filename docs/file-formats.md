@@ -816,3 +816,33 @@ the card to the host. Manage Fonts performs a full rescan; alternatively remove
 this cache to force reinspection after external same-length font changes.
 
 EPUB layout cache versions and identities are unchanged by this catalog.
+
+## `/Inbox/.airdrop/<nonce>/phase.1` through `phase.4`
+
+### Version 1
+
+Native AirDrop writes four exclusive immutable 512-byte publication records:
+Receiving, CompleteStaged, PublishAttempted and PublishedVerified. `payload.part`
+stays in this hidden session directory until one no-overwrite rename into Inbox.
+These records do not change any EPUB cache format.
+
+| Offset | Field |
+| --- | --- |
+| 0 | Eight-byte magic `ADSTG001` |
+| 8 | Version byte `1` |
+| 9 | Phase byte `1`..`4` |
+| 12 | Little-endian 32-bit payload size, at most 30,000,000 |
+| 16 | 32-byte SHA256; zero during Receiving |
+| 64 | Safe UTF-8 filename, zero-terminated in 121 bytes |
+| 185 | Final path, zero-terminated in 192 bytes |
+| 400 | 32 lowercase hex bytes identifying the 128-bit nonce |
+| 508 | Little-endian CRC32 of bytes 0..507 |
+
+Unused bytes are zero. Recovery reconstructs paths and validates phase order,
+identity, bounds, digest consistency and CRC. A phase3 record without a checked
+phase4 receipt means publication uncertainty. Rename failure may already have
+created shared-cluster aliases: neither possible path is deleted or retried.
+Recovery is read-only; matching file hashes do not prove independent ownership.
+A valid terminal receipt is historical evidence, not a claim that its book
+still exists or is unchanged. See `lib/AirDrop/storage/README.md` for the
+publication, validation, inventory limits and physical/exFAT qualification scope.

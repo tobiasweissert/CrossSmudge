@@ -13,7 +13,8 @@ enum class NetworkMode {
   CREATE_HOTSPOT,
   USB_DRIVE,
   NEARBY_BOOK_RECEIVE,
-  NEARBY_STATS_SYNC
+  NEARBY_STATS_SYNC,
+  AIRDROP_RECEIVE  // Append only: existing boot/result enum values remain stable.
 };
 
 /**

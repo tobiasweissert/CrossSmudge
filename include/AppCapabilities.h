@@ -1,5 +1,13 @@
 #pragma once
 
+// Native AWDL backend is qualified only for reTerminal Sticky. No radio code
+// is retained by constrained C3 or other S3 device images.
+#if defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+#define CROSSINK_APP_CAP_AIRDROP 1
+#else
+#define CROSSINK_APP_CAP_AIRDROP 0
+#endif
+
 // The app deliberately has a build-time touch capability, separate from a
 // runtime probe. Button-only images must not retain the touch UI merely because
 // the shared source tree also builds for Sticky.
