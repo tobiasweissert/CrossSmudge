@@ -1,0 +1,24 @@
+{
+  "reference": "d3a49ce8e85f9bd0d3e0c774a54adc267fd7547b",
+  "sources": {
+    "src/apps_local/seasalt/SeaSaltScreens.cpp": "c6c3d40367e22a8eaf0e8009afedb5d462c23c9a8d526b8e170487a8b45e3671"
+  },
+  "assets": {
+    "nearby32.raw": "a3b07b9c6d03eab96a5ec580607d8737f7ef690f5eeb8de2d0e34a93b76b58d5",
+    "ss_m_asterisk_native20.raw": "b0592d93129002728a4b48772be12053e89cb420d677b1c2acdcf5f64ba6ad5d",
+    "ss_m_circle_native20.raw": "22e2bd702454bc9b7960cec119a6ab6bf15d6dd6337f48506e28279c8983277b",
+    "ss_m_circle_o_native20.raw": "1a27513cd509012bd81f09e890fa63e318f1a063541df12ed2fcdc81ccc7ff61",
+    "ss_m_diamond_native20.raw": "9ec9d9b369b43712d5cdb0fa1968fa9cd37070101981d5bdd613ddd19df16e73",
+    "ss_m_diamond_o_native20.raw": "6adf1e4d2e75a99689ce340f6fd748e104965cf420871a652907b084788170d0",
+    "ss_m_plus_native20.raw": "563b05be75084f46c31eb48c359cd800b8c96b06195eb23a0875e2ab6d989d08",
+    "ss_m_square_native20.raw": "e57195ef2f59120855fab55c99b100cfc8d5ca64f5d70ca0f1152499e76a4b34",
+    "ss_m_square_o_native20.raw": "9b6601258e98b2c5ba486d109e13a2e96856f7c3b12b433d0db98620848af46f",
+    "ss_m_triangle_native20.raw": "b2dd833edbfb256f1908fc6a4877ca20504e79227130d48a4295ed20f102aeb3",
+    "ss_m_triangle_o_native20.raw": "5558369f3f2f841abdf7477333d0b9581109dd6bf5fcc49833dd8be9236a8c1d",
+    "ss_m_x_native20.raw": "3561ce5f273c270f162bb43568fb7ffeacb3df0460f1b3b2e9c59deef460e1dc",
+    "toybox_10.bin": "3c7a506df2363117838f0acb056e0f068f40a45efc364bd22e7950a948393c6b",
+    "toybox_14.bin": "74ca92feec9d336ec2c50fba3ddd9c3c0a4500b116aaa83556bee71347adfdc6",
+    "toybox_20.bin": "48abc72cfa2a32dcba46702a30cd931c85ff16f712b66faa89602d3d3632b3e0",
+    "toybox_30.bin": "c83667b14d2b49a172f51d05b3f014e17ad365baed02d77cc9c0308923fd38f1"
+  }
+}

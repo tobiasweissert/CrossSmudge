@@ -1,0 +1,4 @@
+local body='65535|65535|0,1,2,3,65529|0|fixture';local hash=7;for i=1,#body do hash=(hash*31+body:byte(i))%65521 end;assert(smudge.write_file('ui-observed-a.dat','WU1:1:'..hash..'\n'..body))
+local app=dofile('main.lua');on_init();on_draw();assert(app.view.record.rounds==65535 and app.view.record.points==65535);capture('max-record.pgm');dofile('export_wave.lua')(app,'max-record')
+local function tap(action)on_draw();for _,h in ipairs(app.view.hit)do if h.action==action then local b=h.box;on_touch(b.x+b.w//2,b.y+b.h//2,'tap');on_draw();return end end;error('missing '..tostring(action))end
+for n=1,2 do tap(n==1 and'start'or'next');tap('ready');tap(1);on_long_press(240,680);on_touch_release(240,680);tap('clue');tap('dial');tap(3)end;assert(app.view.record.rounds==65535 and app.view.record.points==65535);on_button('back',true);tap('summary');capture('max-summary.pgm');dofile('export_wave.lua')(app,'max-summary');on_exit()

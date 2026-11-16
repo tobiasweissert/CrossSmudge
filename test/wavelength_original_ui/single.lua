@@ -1,0 +1,3 @@
+local M=dofile('core.lua');local g=M.new(8787)
+for i=1,M.count-1 do if g.phase==0 then M.act(g,2)else M.act(g,1)end;M.act(g,1);M.act(g,1);M.act(g,3);assert(g.phase==5)end;M.act(g,1);assert(g.phase==1 and g.b==0 and M.decode(M.encode(g)))
+assert(dofile('storage.lua').save(M.encode(g)));local app=dofile('main.lua');on_init();on_draw();capture('one-left.pgm');dofile('export_wave.lua')(app,'one-left');assert(#app.view.hit==1);local h=app.view.hit[1].box;on_touch(h.x+h.w//2,h.y+h.h//2,'tap');on_draw();assert(app.state().phase==2);capture('one-left-peek.pgm');dofile('export_wave.lua')(app,'one-left-peek');on_exit()

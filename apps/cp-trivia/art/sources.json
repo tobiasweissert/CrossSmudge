@@ -1,0 +1,18 @@
+{
+  "repository": "ma-r-s/crossplay",
+  "revision": "d3a49ce8e85f9bd0d3e0c774a54adc267fd7547b",
+  "sources": {
+    "src/apps_local/ui/fonts/toybox_14.h": "376246455b89712078a3d76f403ba7fed186af52ef66c55e64e06959a92982f2",
+    "src/apps_local/ui/fonts/toybox_30.h": "a0803677feab588fe73d1fe3cb9159d9e2008e111111be17f9fcf5e32a861b1e",
+    "src/apps_local/ui/fonts/reading_serif_14.h": "7f853b00905b2ab590138f1f2dbe92868c3204d35cab55f579847e2bd5412685",
+    "site/assets/fonts/OFL-Jersey25.txt": "436d5836064cec796c7ddde6fb4faeabdb6f2f17443a24a30d0c38b75d13f922",
+    "lib/EpdFont/builtinFonts/source/NotoSerif/OFL.txt": "be2f3f8727ac2e18b714ad1c4336d4ddb3f3adbeb9a7f70bfab74d21f4d2b3fb"
+  },
+  "format": "224 U+0020..00FF records <BBHbbH>; 12.4 advances; unchanged row masks with 0=ink; serif kerning left/right maps256 plus signed36x30 matrix",
+  "output_sha256": {
+    "reading_serif_14-kern.bin": "a5feff59e2078e526bc608d03a5d4893632d54ca90e53bfc9a03c499776dd487",
+    "reading_serif_14.bin": "e6d8891f929396b20c283c3a34e32413f77c7ef7a26cdfb8dcd732a58ec9430b",
+    "toybox_30.bin": "b1164997ecdc843cbbc6ecf4500037d72335ac9ff94325dbf84369825026eb67",
+    "toybox_14.bin": "f8c7946500aceb100c7bc05fa845bff4218650e77bc5123542e70fe76035b108"
+  }
+}

@@ -33,6 +33,14 @@ for compressed,name in [(False,'stored'),(True,'zlib')]:
     body=zlib.compress(archive)if compressed else archive
     word=len(body)|(0 if compressed else 0x80000000)
     (OUT/(name+'.dvzip')).write_bytes(struct.pack('>I',word)+body+b'\0\0\0\0')
+# Split DVZip records across the file, trailer and padding independently of HTTP.
+for compressed,name in [(False,'stored'),(True,'zlib')]:
+    for cut in [1,89,len(archive)-1]:
+        records=b''
+        for part in [archive[:cut],archive[cut:]+b'\0'*7]:
+            encoded=zlib.compress(part) if compressed else part
+            records+=struct.pack('>I',len(encoded)|(0 if compressed else 0x80000000))+encoded
+        (OUT/(f'{name}-{cut}.dvzip')).write_bytes(records+b'\0'*4)
 sources=['lib/AirDrop/session/Session.h','lib/AirDrop/session/Session.cpp','lib/AirDrop/core/Offer.h','lib/AirDrop/core/Offer.cpp','lib/AirDrop/core/HttpRequest.h','lib/AirDrop/core/HttpRequest.cpp','lib/AirDrop/core/Consent.h','lib/AirDrop/core/Consent.cpp','lib/AirDrop/stream/StreamDecoder.h','lib/AirDrop/stream/StreamDecoder.cpp','lib/miniz/src/miniz_impl.c']
 sourceHashes={p:hashlib.sha256((ROOT/p).read_bytes()).hexdigest()for p in sources}
 (OUT/'source.json').write_text(json.dumps(sourceHashes,indent=2)+'\n')

@@ -26,7 +26,18 @@ local function typeWord(w)
  for ch in w:gmatch('.') do for i,key in ipairs(labels)do if key==ch then tap(i);break end end end
 end
 local function menu(n)
- on_button('back',true);on_draw();local l=app.layout();local b=l.menu and l.menu[n];on_touch(b and b.x+2 or l.mx+10,b and b.y+2 or l.my+10+(n-1)*38,'tap');on_draw()
+ on_button('back',true);on_draw();local l=app.layout()
+ if l.hero then
+  if n==2 then on_touch(l.hero.x+2,l.hero.y+2,'tap');on_draw();return end
+  assert(n==3,'fixture only opens previous date or today')
+  local b=l.menu[2];on_touch(b.x+2,b.y+2,'tap');on_draw()
+  local wanted=app.state().day-1
+  for _,day in ipairs(app.layout().calendar.cells)do
+   if day.index==wanted then assert(day.available,'prior imported day missing');on_touch(day.x+day.w//2,day.y+day.h//2,'tap');on_draw();return end
+  end
+  error('prior day absent from original archive calendar')
+ end
+ local b=l.menu and l.menu[n];on_touch(b and b.x+2 or l.mx+10,b and b.y+2 or l.my+10+(n-1)*38,'tap');on_draw()
 end
 tap(1);assert(app.state().game.typing=='Q','physical dispatch typed twice');tap(20)
 typeWord('ZZZZZ');tap(28);assert(#app.state().game.rows==0 and app.state().game.typing=='ZZZZZ');tap(29)

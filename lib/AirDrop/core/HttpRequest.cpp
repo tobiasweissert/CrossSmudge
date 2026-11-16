@@ -61,7 +61,7 @@ BodyDecoder::BodyDecoder(const HttpRequest& r,uint64_t maxBody,uint64_t maxWire)
   if(framing==Framing::ContentLength&&r.length<=bodyLimit&&r.length<=wireLimit){remaining=r.length;phase=remaining?Phase::Data:Phase::Done;}
   else if(framing==Framing::Chunked)phase=Phase::Size;
 }
-BodyState BodyDecoder::feed(const uint8_t* data,size_t size,size_t& consumed,BodySink sink,void* ctx) {
+BodyState BodyDecoder::feed(const uint8_t* data,size_t size,size_t& consumed,BodySink sink,void* ctx,bool stopAtChunkBoundary) {
   consumed=0;
   while(consumed<size&&phase!=Phase::Done&&phase!=Phase::Failed){
     if(phase==Phase::Data){
@@ -80,7 +80,10 @@ BodyState BodyDecoder::feed(const uint8_t* data,size_t size,size_t& consumed,Bod
       case Phase::Size:{int v=hex(c);if(v>=0){if(digits>=16||chunk>(std::numeric_limits<uint64_t>::max()-v)/16){phase=Phase::Failed;break;}chunk=chunk*16+v;++digits;}else if(c=='\r'&&digits){phase=Phase::SizeLf;}else phase=Phase::Failed;break;}
       case Phase::SizeLf:if(c!='\n'||++chunks>16384||chunk>bodyLimit-payload){phase=Phase::Failed;break;}remaining=chunk;phase=chunk?Phase::Data:Phase::EndCr;chunk=0;digits=0;break;
       case Phase::DataCr:phase=c=='\r'?Phase::DataLf:Phase::Failed;break;
-      case Phase::DataLf:phase=c=='\n'?Phase::Size:Phase::Failed;break;
+      case Phase::DataLf:
+        phase=c=='\n'?Phase::Size:Phase::Failed;
+        if(phase==Phase::Size&&stopAtChunkBoundary)return BodyState::ChunkBoundary;
+        break;
       case Phase::EndCr:phase=c=='\r'?Phase::EndLf:Phase::Failed;break;
       case Phase::EndLf:phase=c=='\n'?Phase::Done:Phase::Failed;break;
       default:phase=Phase::Failed;break;

@@ -2,6 +2,10 @@
 
 ### Fixed
 
+- AirDrop rejects truncated HTTP uploads and invalid data inside the declared body, while preserving native senders that omit the final HTTP chunk at a validated archive boundary.
+
+- Sticky Battleship and Hex keep landscape instructions readable; Hearts and Jaipur require a painted discard confirmation, and Wavelength prevents queued phase skips and labels scored Teams calls truthfully.
+
 - Inbox lists received PDFs and other file types even when the reader cannot open them; selecting these files opens their file actions.
 - AirDrop finishes a validated archive without waiting for the Mac's final HTTP chunk, and drains buffered upload data without an extra delay per span.
 - AirDrop shows received-file progress against the offered file size, followed by a separate verification and saving stage.
@@ -45,6 +49,8 @@
 
 ### Added
 
+- Sudoku Hint on Sticky highlights an empty target first; a second explicit Hint reveals it. Editing or changing the board clears the pending hint.
+
 - Dedicated AirDrop icon in File Transfer.
 - Sticky File Transfer gains a native AirDrop receiver with per-transfer consent, bounded regular-file saves to Inbox, and Safari links handed to the installed Browser after cooperative radio shutdown. Native iOS/macOS and repeated hardware switching remain qualification gates.
 
@@ -65,6 +71,19 @@
 - Confine Lua file access to each app and its saved data, and disable host file/process escape functions. This prevents an offline app from replacing an approved network app or reading unrelated saved credentials. Absolute paths outside these directories are no longer supported.
 
 ### Changed
+
+- Sticky Wordle, Trivia, Hacker News, Checkers, Connect Four, Knucklebones, Hearts and Jaipur restore original CrossPlay typography and supported menus, boards and help screens; runtime differences remain documented per title.
+- Sticky Chess restores original menus, board chrome, move lists and settings while retaining underpromotion and saved games.
+- Sticky Go, Hex, Minesweeper and Yahtzee restore original supported menus, boards, lessons and results, including their existing touch controls.
+- Sticky Calculator and Notes restore original typography and supported screens; Notes retains its existing fixed slots and import workflow.
+- Sudoku on Sticky restores original supported menus, boards and illustrated lessons.
+- Sticky Wavelength restores original round views and hold-to-peek controls, with checked records for newly observed rounds.
+- Sticky Murdle restores the original casebook across all64 local cases, including complete clue pages, grid keys, accusations and verdicts.
+- Sticky Sea Salt and Toy Battle restore original boards, cards, illustrated lessons and results while preserving saved games and local rules.
+- Sticky Forehead restores original word cards, category/settings pages and results, including persistent recognition of new zero-score rounds.
+- Sticky Insider restores original private role cards, voting, clock, reports and illustrated rules.
+- Sticky Solitaire restores the original table menu, card fans, selection outline and victory screen while preserving old journals.
+- Sticky Battleship restores the original fleet-placement and target/Fire interface, including second-tap firing, original reports, and usable targeting when resuming older own-fleet saves.
 
 - AirDrop accepts any regular file type, including PDFs, images, fonts, archives, scripts and extensionless files, preserving the original bytes in Inbox. The 30 MB and one-file limits remain.
 

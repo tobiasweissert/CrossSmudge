@@ -54,13 +54,15 @@ bool body(Workspace& w,bool upload){
     if(!more(w)){
       if(upload){char detail[192];snprintf(detail,sizeof detail,"Upload input stopped: %s; wire=%llu body=%llu file=%u",w.readError?w.readError:"session expired",(unsigned long long)decoder.wireBytes(),(unsigned long long)decoder.payloadBytes(),unsigned(w.decoder.payloadBytes()));w.backend->failure(w.backend->context,detail);}
       return false;
-    }size_t consumed=0;auto state=decoder.feed(w.input+w.begin,w.end-w.begin,consumed,upload?archive:metadata,&w);w.begin+=consumed;
+    }size_t consumed=0;auto state=decoder.feed(w.input+w.begin,w.end-w.begin,consumed,upload?archive:metadata,&w,upload);w.begin+=consumed;
     if(upload)w.backend->progress(w.backend->context,decoder.wireBytes(),w.decoder.payloadBytes());
     if(state==BodyState::Error){if(upload)w.backend->failure(w.backend->context,"Upload HTTP body or archive rejected");return false;}
-    // Apple senders can leave the HTTP last chunk pending until our response.
-    // Require the full manifest/trailer and a validated DVZip record boundary;
-    // this connection is closed after publication, never parsed for reuse.
-    if(upload&&w.decoder.archiveComplete())return true;
+    // Native compatibility cutoff: the first complete consented archive at a
+    // validated nonzero HTTP chunk DATA-END+CRLF. feed stops AT that boundary,
+    // so later chunks/bytes are abandoned whether coalesced or still unread.
+    // serve returns after a closing response; Receiver closes this TLS socket.
+    // Content-Length never uses this exception and must consume its full body.
+    if(upload&&state==BodyState::ChunkBoundary&&w.decoder.archiveComplete())return true;
     if(state==BodyState::WouldBlock)w.io->wait(w.io->context);
   }
   return true;

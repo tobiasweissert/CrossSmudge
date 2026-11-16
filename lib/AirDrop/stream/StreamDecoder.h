@@ -47,9 +47,11 @@ class Decoder {
   bool reset(const Manifest& manifest, Sink sink);
   Status feed(const uint8_t* input, size_t length, size_t& consumed);
   // Native AirDrop may omit the HTTP last chunk. Only a complete record with
-  // the exact manifest and CPIO trailer can authorize publication and close.
+  // the exact manifest and CPIO trailer is a candidate; the HTTP caller must
+  // also validate its explicit framing/cutoff before publication and close.
   bool archiveComplete() const;
-  // Call after HTTP completion or archiveComplete(), never on silence alone.
+  // Call after HTTP completion or a validated HTTP chunk-data+CRLF cutoff
+  // with archiveComplete(), never on silence/EOF or an arbitrary read boundary.
   // Complete authorizes storage final validation, never sender success itself.
   Status finish();
   const char* error() const { return error_; }

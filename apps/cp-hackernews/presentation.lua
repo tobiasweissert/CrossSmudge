@@ -1,3 +1,5 @@
+-- Sticky selects the original native presentation; other devices retain this exact legacy body.
+if smudge.get_device and smudge.get_device()=='sticky'then return dofile('sticky_presentation.lua')end
 local U=dofile('design.lua');local V={page=1,pages=1,hit={}}
 function V.init()U.init()end
 local function clean(s)return (tostring(s or ''):gsub('’',"'"):gsub('“','"'):gsub('”','"'):gsub('—','-'):gsub('–','-'))end

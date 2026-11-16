@@ -1,0 +1,5 @@
+local w,h=smudge.get_bounds();local before=smudge.get_orientation()
+smudge.set_orientation('portrait');assert(select(1,smudge.get_bounds())==480 and select(2,smudge.get_bounds())==800)
+smudge.set_orientation('landscape_ccw');assert(select(1,smudge.get_bounds())==800 and select(2,smudge.get_bounds())==480)
+smudge.set_orientation(before);assert(select(1,smudge.get_bounds())==w and select(2,smudge.get_bounds())==h)
+print('Production orientation binding swaps and restores logical bounds')

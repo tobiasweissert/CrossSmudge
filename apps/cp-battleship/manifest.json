@@ -1,7 +1,7 @@
 {
   "id": "cp-battleship",
   "name": "Battleship",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "author": "CrossPlay contributors; Lua port",
   "description": "Place a five-ship fleet and play a local hunt-and-target computer opponent.",
   "entry": "main.lua",

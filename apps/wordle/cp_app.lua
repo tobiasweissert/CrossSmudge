@@ -194,4 +194,4 @@ function on_update()
  if not G.closed then save();if resultsDirty then if resultJournal:write(resultPayload()) then resultsDirty=false else G.notice='Result save failed; retrying' end end end
 end
 function on_exit() save();if resultsDirty then resultJournal:write(resultPayload()) end;G.closed=true end
-return {core=C,resultOffset=function() return resultStart end,state=function() return G end,layout=function() return L end}
+return {core=C,begin=begin,resultOffset=function() return resultStart end,state=function() return G end,layout=function() return L end}

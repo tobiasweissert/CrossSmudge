@@ -29,13 +29,16 @@ class RequestParser {
 };
 enum class SinkResult : uint8_t { Consumed, WouldBlock, Error };
 using BodySink = SinkResult (*)(void*, const uint8_t*, size_t);
-enum class BodyState : uint8_t { NeedMore, Complete, WouldBlock, Error };
+enum class BodyState : uint8_t { NeedMore, Complete, WouldBlock, Error, ChunkBoundary };
 // Constant storage, independent of HTTP chunk/body size. Sink calls are <=2048 bytes.
 // Caller owns absolute transport deadline and checks stop between feed/read calls.
 class BodyDecoder {
  public:
   explicit BodyDecoder(const HttpRequest& request, uint64_t maxBody = 70000000, uint64_t maxWire = 72000000);
-  BodyState feed(const uint8_t* data, size_t size, size_t& consumed, BodySink sink, void* context);
+  BodyState feed(const uint8_t* data, size_t size, size_t& consumed, BodySink sink, void* context, bool stopAtChunkBoundary = false);
+  // Opt-in feed stops immediately after each nonzero chunk data+CRLF, even
+  // with coalesced input. ChunkBoundary is not HTTP completion; strict callers
+  // keep the default and require the zero chunk. No bytes after it are consumed.
   bool complete() const { return phase == Phase::Done; }
   uint64_t payloadBytes() const { return payload; }
   uint64_t wireBytes() const { return wire; }

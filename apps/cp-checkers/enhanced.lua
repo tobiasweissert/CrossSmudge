@@ -1,3 +1,5 @@
+local ok,device=pcall(function()return smudge.get_device and smudge.get_device()end)
+if not ok or device~='sticky'then return dofile('legacy_enhanced.lua')end
 -- Stock v1.6.5.3 UI adapter. Tap signature is (x,y,event), per LuaRunner.cpp.
 local U={}
 local V=dofile('presentation.lua')
@@ -19,9 +21,10 @@ function U.install(M)
  local function save()
   local ok=S.save(tostring(mode)..'|'..M.encode(g))
   if not ok then notice='SAVE FAILED - try Save and exit again' end
-  if ok then V.saved=true end;return ok
+  if ok then V.saved=true;ok=V.persist(M,g);if not ok then notice='RECORD SAVE FAILED - TRY AGAIN'end end;return ok
  end
  local function refresh()smudge.request_update()end
+ local function again()if not save()then return false end;g=M.new(smudge.millis());cursor=1;menu=1;flag=false;screen='board';notice='';search=nil;return true end
  local function act()
   if screen~='board' or (not M.solo and mode==1 and g.turn==2) then return end
   local x=(cursor-1)%M.cols+1;local y=(cursor-1)//M.cols+1
@@ -36,7 +39,7 @@ function U.install(M)
   refresh()
  end
  function on_init()
-  V.init();geometry()
+  V.init(M);geometry()
   local loaded=S.load(function(p)
    local m,data=p:match('^([12])|(.*)$');if not m then return nil end
    local value=M.decode(data);if not value then return nil end
@@ -50,7 +53,7 @@ function U.install(M)
  end
  function on_button(btn,pressed)
   if not pressed then return end
-  local nav,id=V.button(screen,btn);if nav then if nav=='activate'then menu=id;select_menu()end; if nav=='done'then screen='menu';menu=1 end;refresh();return end
+  local nav,id=V.button(screen,btn);if nav then if nav=='activate'then menu=id;select_menu()elseif nav=='nearby'then screen='nearby'end; if nav=='done'then screen='menu';menu=1 end;refresh();return end
   if btn=='page_back' then btn='up' elseif btn=='page_forward' then btn='down' end
   if btn=='back' then
    search=nil
@@ -69,7 +72,10 @@ function U.install(M)
     menu=1
    end
   elseif screen=='board' then
-   if btn=='left' then cursor=(cursor-2)%(M.cols*M.rows)+1
+   if g.status~=0 then
+    if btn=='confirm'then if menu==2 then if save()then screen='menu';menu=1 end else again()end
+    elseif btn=='up'or btn=='down'or btn=='left'or btn=='right'then menu=3-menu end
+   elseif btn=='left' then cursor=(cursor-2)%(M.cols*M.rows)+1
    elseif btn=='right' then cursor=cursor%(M.cols*M.rows)+1
    elseif btn=='up' then cursor=(cursor-1-M.cols)%(M.cols*M.rows)+1
    elseif btn=='down' then cursor=(cursor-1+M.cols)%(M.cols*M.rows)+1
@@ -82,11 +88,12 @@ function U.install(M)
   if event~='tap' then return end
   local kind,id=V.touch(x,y)
   if kind=='back' then on_button('back',true)
+  elseif kind=='nearby'then screen='nearby';refresh()
   elseif kind=='menu' then menu=id;select_menu()
   elseif kind=='confirm' then menu=id;on_button('confirm',true)
   elseif kind=='cell' then cursor=id;act()
   elseif kind=='aim' then cursor=id;refresh()
-  elseif kind=='new' then pending=mode;screen='confirm';menu=1;refresh()
+  elseif kind=='new' then again();refresh()
   elseif kind=='action' then menu=id;select_menu()
   else refresh() end
  end
@@ -102,5 +109,6 @@ function U.install(M)
  end
  function on_swipe(direction)on_button(direction,true)end
  function on_exit()save();search=nil end
+ return {state=function()return g end,layout=V.layout,records=V.records,screen=function()return screen end}
 end
 return U

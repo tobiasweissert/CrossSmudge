@@ -1,0 +1,25 @@
+{
+  "repository": "ma-r-s/crossplay",
+  "revision": "d3a49ce8e85f9bd0d3e0c774a54adc267fd7547b",
+  "sources": {
+    "src/apps_local/calculator/fonts/calc_jersey_20.h": "7b3981e29d6f76ea407dbafa92e9cc917580cf336a89993bdfd47c7fedea0661",
+    "src/apps_local/calculator/fonts/calc_jersey_26.h": "1364f6f64a8e2ca919558b8fadc898e3c0481a190090b06cffdd70a2ca2591d0",
+    "src/apps_local/calculator/fonts/calc_jersey_28.h": "56d9d39719bff78d19dc6affdc6fdf7a776f1fd60e9296bbb0eb4202b6b13639",
+    "src/apps_local/calculator/fonts/calc_jersey_34.h": "a0b717ea97ba319f95a770a4ef6fbebdc045e9f82f28e391a2537237d2a689f7",
+    "src/apps_local/calculator/fonts/calc_jersey_44.h": "679d472a78434e98fcf91bdad49e610da0b655368e6b73c7a72e35fe60fc2a75",
+    "src/apps_local/calculator/fonts/calc_jersey_56.h": "631f62156f53f7f209b8628f9568a112c25eda9a08bbde5dfea2aea798c0ea49",
+    "src/apps_local/ui/fonts/toybox_14.h": "376246455b89712078a3d76f403ba7fed186af52ef66c55e64e06959a92982f2",
+    "src/apps_local/ui/fonts/toybox_30.h": "a0803677feab588fe73d1fe3cb9159d9e2008e111111be17f9fcf5e32a861b1e"
+  },
+  "format": "U+0020..00FF records <BBHbbH>, exact12.4 advance,0=ink row masks; calculator mathaliases127/128/129",
+  "sha256": {
+    "original56.bin": "ab974eabd8b5b747abcc82548c1d24b06760b7d0f511283da25b71b8e965dd9e",
+    "original44.bin": "a51ac4b325727e6aa5299b29aa7ba2ee07dc44d24b7f9c175ef4b559938e6b73",
+    "original34.bin": "7d90850abb643ea81382f4d7e06bf1b9939fbde002c27e045d76ff76c326ecd3",
+    "original28.bin": "de5463d740b42431d21fc6886f162ec52ec6743b3322ccb0098e0116bfaf562f",
+    "original26.bin": "1cf70e291e0e1d4f8ac4d43573e3e33ce6aa2275a43fb1423e28a7603a23207e",
+    "original20.bin": "44c5c4bc1f85d5215fe8429f72b492e8915b9f89077bd25a6387a291da1d706c",
+    "original14.bin": "f8c7946500aceb100c7bc05fa845bff4218650e77bc5123542e70fe76035b108",
+    "original30.bin": "b1164997ecdc843cbbc6ecf4500037d72335ac9ff94325dbf84369825026eb67"
+  }
+}

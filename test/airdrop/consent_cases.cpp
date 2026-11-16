@@ -45,6 +45,18 @@ int main(){
   }
   const std::string chunk="3\r\nabc\r\n2\r\nde\r\n0\r\n\r\n";
   for(size_t split=0;split<=chunk.size();++split){BodyDecoder d(r);size_t n=0;uint64_t total=0;auto a=d.feed(reinterpret_cast<const uint8_t*>(chunk.data()),split,n,sum,&total);assert(a==BodyState::NeedMore||a==BodyState::Complete);assert(n==split);a=d.feed(reinterpret_cast<const uint8_t*>(chunk.data()+split),chunk.size()-split,n,sum,&total);assert(a==BodyState::Complete&&d.complete()&&total==5);}
+  // Opt-in yields at each validated data+CRLF boundary, never an arbitrary feed end.
+  for(size_t split=1;split<=chunk.size();++split){
+    BodyDecoder d(r);size_t at=0;uint64_t total=0;unsigned boundaries=0;
+    while(at<chunk.size()){
+      size_t n=0;auto state=d.feed(reinterpret_cast<const uint8_t*>(chunk.data()+at),std::min(split,chunk.size()-at),n,sum,&total,true);at+=n;
+      assert(n&&state!=BodyState::Error);
+      if(state==BodyState::ChunkBoundary){++boundaries;assert(!d.complete());assert(at==(boundaries==1?8:15));}
+    }
+    assert(d.complete()&&boundaries==2&&total==5);
+  }
+  // Default callers require a full strict zero chunk, including its final LF.
+  for(size_t end=8;end<chunk.size();++end){BodyDecoder d(r);size_t used=0;uint64_t total=0;assert(d.feed(reinterpret_cast<const uint8_t*>(chunk.data()),end,used,sum,&total)==BodyState::NeedMore);assert(!d.complete()&&used==end);}
   BodyDecoder backpressure(r);size_t n=0;uint64_t total=0;assert(backpressure.feed(reinterpret_cast<const uint8_t*>(chunk.data()),chunk.size(),n,blocked,nullptr)==BodyState::WouldBlock&&n==3);assert(backpressure.feed(reinterpret_cast<const uint8_t*>(chunk.data()+n),chunk.size()-n,n,sum,&total)==BodyState::Complete&&total==5);
   // A giant HTTP chunk is delivered through constant-sized slices, never staged whole.
   BodyDecoder huge(r,30000000,30001000);std::string header="1c9c380\r\n";assert(huge.feed(reinterpret_cast<const uint8_t*>(header.data()),header.size(),n,sum,&total)==BodyState::NeedMore);std::vector<uint8_t> block(8192,7);total=0;

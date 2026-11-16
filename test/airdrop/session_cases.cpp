@@ -23,7 +23,8 @@ struct Harness {
   bool responseCloses=false;
   Offer offered{};OfferIdentity identity{},queued{};
   uint64_t clock=1000,sequence=0,requestOffset=0,deadline=0;
-  size_t position=0,split=2048;
+  size_t position=0,split=2048,readBoundary=0;
+  unsigned cancelOnWait=0,disconnectOnWait=0;
   unsigned reads=0,waits=0,pendingCount=0,decisionCalls=0,fileBegins=0,finishes=0,cancels=0,appendCalls=0,handovers=0;
   int answer=1;
   unsigned answerAfter=3,blockCount=0,wouldBlockEvery=0;
@@ -33,9 +34,9 @@ struct Harness {
   static Harness& self(void* p){return *static_cast<Harness*>(p);}
   static int read(void* p,uint8_t* out,size_t cap){auto& h=self(p);++h.reads;if(h.wouldBlockEvery&&h.reads%h.wouldBlockEvery==0)return 0;
     if(h.position==h.input.size())return h.eofDisconnect?-1:0;
-    size_t n=std::min({cap,h.split,h.input.size()-h.position});std::memcpy(out,h.input.data()+h.position,n);h.position+=n;return int(n);
+    size_t n=std::min({cap,h.split,h.input.size()-h.position});if(h.position<h.readBoundary)n=std::min(n,h.readBoundary-h.position);std::memcpy(out,h.input.data()+h.position,n);h.position+=n;return int(n);
   }
-  static bool write(void* p,const uint8_t* data,size_t n,uint64_t deadline){auto& h=self(p);assert(h.clock<deadline);if(h.writeFail)return false;
+  static bool write(void* p,const uint8_t* data,size_t n,uint64_t deadline){auto& h=self(p);if(h.clock>=deadline)return false;assert(h.clock<deadline);if(h.writeFail)return false;
     std::string value(reinterpret_cast<const char*>(data),n);
     if(value.find("Connection: close\r\n")!=std::string::npos)h.responseCloses=true;
     if(value.rfind("HTTP/1.1 ",0)==0){int code=std::stoi(value.substr(9,3));h.codes.push_back(code);h.events.push_back("http:"+std::to_string(code));if(code==200&&h.slowAcceptedUrl)h.clock=h.deadline+1;}
@@ -45,6 +46,8 @@ struct Harness {
   static bool alive(void* p){return self(p).peerAlive;}
   static uint64_t now(void* p){return self(p).clock;}
   static void wait(void* p){auto& h=self(p);++h.waits;h.clock+=h.waitMs;
+    if(h.cancelOnWait&&h.waits>=h.cancelOnWait)h.stop=true;
+    if(h.disconnectOnWait&&h.waits>=h.disconnectOnWait)h.peerAlive=false;
     if(h.cancelBeforeDecision&&h.pendingCount&&h.decisionCalls>=3)h.stop=true;
   }
   static bool cancelled(void* p){return self(p).stop;}
@@ -87,8 +90,10 @@ const std::string uploadHeaders="Content-Type: application/x-cpio\r\nTransferID:
 int failures=0;
 #define CHECK(test, condition) do{if(!(condition)){std::fprintf(stderr,"FAIL %s line%d: %s\n",test,__LINE__,#condition);++failures;}}while(false)
 }
+#include "session_framing_cases.inc"
 int main(int argc,char** argv){
   assert(argc==2);std::string root=argv[1];auto url=load(root,"url.plist"),file=load(root,"file.plist"),legacy=load(root,"file-noid.plist"),stored=load(root,"stored.dvzip"),compressed=load(root,"zlib.dvzip");
+  framingCases(root,file);
   {Harness h;h.input=request("/Discover",{});h.serve();
     CHECK("discovery closes promptly for separate Ask",h.responseCloses&&h.count(200)==1&&h.waits==0&&h.pendingCount==0);
     h.reconnect(request("/Ask",file));add(h.input,request("/Upload",stored,uploadHeaders));h.serve(2);
