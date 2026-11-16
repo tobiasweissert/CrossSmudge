@@ -22,6 +22,7 @@ namespace fui=freeink::ui;
 constexpr fui::ActionId Accept=1,Decline=2,Cancel=3,Retry=4;
 constexpr uint64_t PaintIntervalMs=1200;
 #define LOG_ERR(...) ((void)0)
+#define LOG_INF(...) ((void)0)
 namespace CrossPointSettings {enum class SHORT_PWRBTN {SLEEP};}
 static std::mutex renderMutex,paintMutex;
 static std::condition_variable paintCv;
@@ -124,7 +125,8 @@ struct AirDropReceiveActivity {
 #endif
  uint64_t lastPaintRequestMs_=0;std::string returnBookPath_;
  struct Launch{void cancel(){}};Launch* launch_=nullptr;
- void requestUpdate(){}void resolveHandoff(bool){}void retryReceiver(){}void startBrowserHandoff(){}
+ unsigned updateRequests=0;
+ void requestUpdate(){++updateRequests;}void resolveHandoff(bool){}void retryReceiver(){}void startBrowserHandoff(){}
  static void action(const fui::ActionEvent&,void*);
  void decide(bool);void buildScreen(UiApp::ScreenType&);void render(RenderLock&&);void loop();
  void beginLeaving(bool);bool handleHomeGesture();bool deferGlobalPowerAction(CrossPointSettings::SHORT_PWRBTN);
@@ -215,5 +217,18 @@ int main(){
   if(reason==4)a.deferGlobalPowerAction(CrossPointSettings::SHORT_PWRBTN::SLEEP);
   capture(a,false,true);route(a);assert(decisions==n);
  }
- std::puts("PASS production capture/build/paint/SDK/loop/decision: queued and held inputs, concurrent paint lock, offer/epoch/deadline revocation, Back/Home/power, fresh Accept/Decline/Confirm");
+ // The timer must not repaint an unchanged offer and discard a touch in progress.
+ {AirDropReceiveActivity a;configure(a);paint(a);neutral(a);
+  capture(a,true,false,true);route(a);const auto updates=a.updateRequests;const int n=decisions;
+  a.status_.nowMs=2000;capture(a,false,false,true);route(a);assert(a.updateRequests==updates);
+  capture(a,false,true);route(a);assert(decisions==n+1&&accepted);
+ }
+ // Short input sequences may complete between main-loop polls.
+ for(int edge=0;edge<3;++edge){AirDropReceiveActivity a;configure(a);paint(a);neutral(a);int n=decisions;
+  if(edge==0)capture(a,false,true,false);
+  if(edge==1)capture(a,true,true,false);
+  if(edge==2)capture(a,false,false,false,false,true);
+  route(a);assert(decisions==n+1&&accepted);
+ }
+ std::puts("PASS production capture/build/paint/SDK/loop/decision: queued and held inputs, concurrent paint lock, offer/epoch/deadline revocation, Back/Home/power, fresh Accept/Decline/Confirm and short taps");
 }

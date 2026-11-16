@@ -12,6 +12,7 @@ import tempfile
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SDK_GENERATOR = PROJECT_ROOT / "freeink-sdk/libs/assets/Icons/tools/gen_icons.py"
 SVG_DIRS = {
+    "crosssmudge": PROJECT_ROOT / "src/components/icons/svg",
     "lucide": PROJECT_ROOT / "freeink-sdk/libs/assets/Icons/lucide/icons",
     "tabler": PROJECT_ROOT / "assets/tabler-icons/icons/outline",
     "tabler-filled": PROJECT_ROOT / "assets/tabler-icons/icons/filled",
@@ -101,9 +102,10 @@ def main():
     # The SDK generator accepts any single-colour SVGs, but its generated
     # comments currently name Lucide. Keep firmware headers accurate without
     # changing the SDK implementation.
-    if args.library in ("tabler", "tabler-filled"):
+    if args.library in ("tabler", "tabler-filled", "crosssmudge"):
+        library_name = "CrossSmudge" if args.library == "crosssmudge" else "Tabler"
         generated = output.read_text()
-        output.write_text(generated.replace("Lucide", "Tabler").replace("lucide:", "tabler:"))
+        output.write_text(generated.replace("Lucide", library_name).replace("lucide:", library_name.lower() + ":"))
 
 
 if __name__ == "__main__":

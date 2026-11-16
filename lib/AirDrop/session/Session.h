@@ -40,6 +40,7 @@ struct Workspace {
   uint64_t requestStart=0,deadline=0,lastProgress=0;
   Io* io=nullptr;
   Backend* backend=nullptr;
+  const char* readError=nullptr;
   bool upload=false;
 };
 // One live TLS connection per invocation. Files require this same consenting TLS

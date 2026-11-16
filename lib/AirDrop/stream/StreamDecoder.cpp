@@ -56,7 +56,7 @@ bool safeUtf8(const char* s, size_t n) {
       point = (point << 6) | (c & 0x3f);
     }
     if (point < minimum || point > 0x10ffff || (point >= 0xd800 && point <= 0xdfff)) return false;
-    if (point < 0x20 || (point >= 0x7f && point <= 0x9f) || point == 0x200e || point == 0x200f ||
+    if (point < 0x20 || (point >= 0x7f && point <= 0x9f) || point == 0x200e || point == 0x200f || point == 0x2028 || point == 0x2029 || point == 0xfeff ||
         (point >= 0x202a && point <= 0x202e) || (point >= 0x2066 && point <= 0x2069)) return false;
   }
   return true;
@@ -64,13 +64,14 @@ bool safeUtf8(const char* s, size_t n) {
 }  // namespace
 
 bool safeName(const char* name, size_t length) {
-  if (!name || length == 0 || length > kMaxName || name[0] == '.' || name[length - 1] == '.' ||
+  if (!name || length == 0 || length > kMaxName || (name[0] == '.' || name[0] == ' ') || name[length - 1] == '.' ||
       name[length - 1] == ' ' || !safeUtf8(name, length)) return false;
   size_t stem = length;
   for (size_t i = 0; i < length; ++i) {
     const char c = name[i];
     if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|')
       return false;
+    if (c == '.' && i && (name[i - 1] == ' ' || name[i - 1] == '.')) return false;
     if (c == '.' && stem == length) stem = i;
   }
   if (!stem || name[stem - 1] == ' ' || name[stem - 1] == '.') return false;
@@ -78,8 +79,7 @@ bool safeName(const char* name, size_t length) {
       insensitive(name, stem, "nul")) return false;
   if (stem == 4 && (insensitive(name, 3, "com") || insensitive(name, 3, "lpt")) && name[3] >= '1' && name[3] <= '9')
     return false;
-  return (length > 4 && insensitive(name + length - 4, 4, ".txt")) ||
-         (length > 5 && insensitive(name + length - 5, 5, ".epub"));
+  return true;
 }
 
 Status Decoder::fail(const char* reason) {
@@ -154,17 +154,18 @@ bool Decoder::admitName() {
     return true;
   }
   if (!std::strcmp(name, ".")) {
-    if (rootSeen_ || (memberMode_ & kTypeMask) != kDirectory || memberSize_ ||
-        (memberLinks_ != 1 && memberLinks_ != 2)) {
-      fail("invalid root wrapper"); return false;
-    }
+    // The sender's directory link count describes its source filesystem,
+    // not the number of files in this archive. This empty wrapper is discarded.
+    if (rootSeen_) { fail("duplicate root wrapper"); return false; }
+    if ((memberMode_ & kTypeMask) != kDirectory) { fail("non-directory root wrapper"); return false; }
+    if (memberSize_) { fail("nonempty root wrapper"); return false; }
     rootSeen_ = true;
     endMember();
     return true;
   }
   if (name[0] == '.' && name[1] == '/') name += 2;
-  if ((memberMode_ & kTypeMask) != kRegular || memberLinks_ != 1 || (memberMode_ & 07111)) {
-    fail("nonregular, linked or executable member"); return false;
+  if ((memberMode_ & kTypeMask) != kRegular || memberLinks_ != 1) {
+    fail("nonregular or linked member"); return false;
   }
   currentFile_ = false;
   if (!std::strcmp(memberName_, manifest_.archivePath)) {
@@ -309,13 +310,18 @@ Status Decoder::feed(const uint8_t* input, const size_t length, size_t& consumed
   }
 }
 
+bool Decoder::archiveComplete() const {
+  return initialized_ && !recordRemaining_ && !recordHeaderBytes_ && !pendingBytes_ &&
+         (!compressed_ || inflateDone_) && cpioState_ == CpioState::Trailer && fileSeen_ &&
+         payloadBytes_ == manifest_.size;
+}
+
 Status Decoder::finish() {
   if (!initialized_) return Status::Error;
   if (cancelled()) return fail("cancelled");
   const auto drained = drain();
   if (drained != Status::Progress) return drained;
-  if (recordRemaining_ || recordHeaderBytes_ || (compressed_ && !inflateDone_) ||
-      cpioState_ != CpioState::Trailer || !fileSeen_ || payloadBytes_ != manifest_.size)
+  if (!archiveComplete())
     return fail("incomplete DVZip/archive/manifest");
   done_ = true;
   return Status::Complete;

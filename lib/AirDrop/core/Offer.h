@@ -16,7 +16,6 @@ struct Offer {
   char host[128]{};
   char filename[121]{};
   char archivePath[244]{};
-  char fileType[65]{};
   char transferId[37]{};
   uint32_t fileSize = 0;
 };

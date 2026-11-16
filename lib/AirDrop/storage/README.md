@@ -9,7 +9,7 @@ implementation against a synthetic sparse block device.
 Call `begin(name,size)` only after this transfer's explicit Accept. It reserves
 one opaque 128-bit session under `/Inbox/.airdrop/<nonce>/`, writes a checked
 Receiving record, and creates `payload.part` with `O_CREAT|O_EXCL|O_RDWR`.
-Safe `.txt` and `.epub` payloads are limited to decimal 30,000,000 bytes. A 1 MiB
+Regular files of any type, including extensionless names, are limited to decimal 30,000,000 bytes. A 1 MiB
 free-space reserve is advisory; every actual write/sync/close is still checked.
 The original name never selects a directory or executable installation path.
 
@@ -24,17 +24,11 @@ Target allocation/stack high-water and physical SD latency remain device gates.
 
 After the stream decoder proves archive/framing completion, `finish` checks
 payload length, completes the incoming SHA256, syncs and closes staging, and
-reopens it for exact length/hash readback. Text must be well-formed UTF-8 with
-no NUL or unsupported ASCII controls; multibyte characters can span chunks.
-EPUB validation is bounded ZIP/OCF structural validation, with no extraction:
-first uncompressed `mimetype`, consistent local/central headers and file bounds,
-nonencrypted methods 0/8, container.xml and an OPF member, no traversal paths,
-4096-entry/2 MiB central-directory limits, <=64 MiB expanded per entry and
-<=256 MiB expanded aggregate. EOCD lookup examines only the final 65,557 bytes,
-with <=32 candidate signatures. It does not parse XML semantics or decompress
-all ZIP members to establish every member CRC. Inputs failing these structural or UTF-8 checks
-never reach publication. Internal ZIP member CRC/content validation is still
-a reader concern; this boundary does not prove every EPUB member is readable.
+reopens it for exact length/hash readback. Payload bytes remain opaque regardless
+of extension or sender UTI: PDFs, images,
+fonts, archives, scripts and arbitrary binary files are saved unchanged, without
+execution, extraction or installation. Content interpretation belongs to the app
+that later opens the file. Empty files are supported.
 
 Final names are `/Inbox/<stem> (AirDrop <nonce>)<extension>`. Existing files are
 never overwritten or removed. A healthy checked parent-directory scan must
@@ -65,7 +59,7 @@ independent cluster ownership. Such a session requires explicit SD repair.
 `inspect(token)` is read-only and rehashes content. `inspectJournal(token)` checks
 all journal identities/order/CRC/digest consistency but treats phase 4 only as
 a historical durable terminal receipt, so normal entry need not reread every
-previous 30 MB book. It does not claim the payload still exists or is unchanged.
+previous 30 MB file. It does not claim the payload still exists or is unchanged.
 The HAL's sequential recovery iterator is bounded to 256 session directories;
 call index 256 for the final EOF/quota probe. Unreadable/excessive/unrecognized
 inventory produces an explicit failure rather than false absence.
@@ -75,7 +69,7 @@ a racing begin/recovery call. Only `requestCancel` crosses tasks; all other sink
 methods, including file close, run on the SD/listener owner. Join the owner
 before destruction. Cancel/failure retain prepublication `.part` files and
 records rather than risking destructive cleanup after an SD fault. These are
-hidden staging candidates, never final `.epub`/`.txt` books. No global SD latch
+hidden staging candidates, never final received files. No global SD latch
 or mutation of other apps, saves, caches, readers or transfer modes occurs.
 
 Tests: `python3 test/airdrop/storage_run.py [--sanitize]` runs the production

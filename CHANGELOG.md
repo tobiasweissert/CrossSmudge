@@ -2,6 +2,18 @@
 
 ### Fixed
 
+- Inbox lists received PDFs and other file types even when the reader cannot open them; selecting these files opens their file actions.
+- AirDrop finishes a validated archive without waiting for the Mac's final HTTP chunk, and drains buffered upload data without an extra delay per span.
+- AirDrop shows received-file progress against the offered file size, followed by a separate verification and saving stage.
+- AirDrop accepts the sender's empty CPIO root-directory metadata without assuming its filesystem link count is one or two.
+- AirDrop radio queues publish and release frame slots with atomic ordering across ESP32-S3 cores.
+
+- AirDrop discovery bounds received IPv6 data to its declared length so Wi-Fi trailer bytes do not suppress valid mDNS replies.
+- AirDrop can retry after an interrupted upload without cancelling its entire receiver; empty-file success and Unicode filename checks remain consistent, and Browser launch acknowledgements reject wrapped tokens.
+
+- AirDrop no longer rejects an approved Mac upload because its MIME header differs from the receiver's exact string list; the streamed archive remains validated before saving.
+- AirDrop releases discovery connections before the Mac's transfer request, keeps Accept/Decline touch controls stable while awaiting a decision, and keeps listening after a failed request.
+- Sticky AirDrop uses PSRAM for its bounded TLS buffers so opening the receiver does not fail the internal-memory check after Wi-Fi starts.
 - AirDrop can receive a new file after retaining an interrupted transfer, and consent requires a fresh touch or Confirm press after the offer finishes painting.
 
 - Hacker News reads large articles and comment threads within its Lua heap, and preserves comment order during repeated forward navigation.
@@ -33,7 +45,8 @@
 
 ### Added
 
-- Sticky File Transfer gains a native AirDrop receiver with per-transfer consent, bounded EPUB/UTF-8 text saves to Inbox, and Safari links handed to the installed Browser after cooperative radio shutdown. Native iOS/macOS and repeated hardware switching remain qualification gates.
+- Dedicated AirDrop icon in File Transfer.
+- Sticky File Transfer gains a native AirDrop receiver with per-transfer consent, bounded regular-file saves to Inbox, and Safari links handed to the installed Browser after cooperative radio shutdown. Native iOS/macOS and repeated hardware switching remain qualification gates.
 
 - Browser 0.2.1 integrates the local Reader/Simplified browser, images and API6 bounded work/cancellation with current app and HTTPS fixes.
 - Sticky owner test profile with paired fork app downloads, source-identified firmware, and Sticky-only Chess, Sudoku, Solitaire and Wordle replacements that preserve legacy games and saves on other devices.
@@ -52,6 +65,8 @@
 - Confine Lua file access to each app and its saved data, and disable host file/process escape functions. This prevents an offline app from replacing an approved network app or reading unrelated saved credentials. Absolute paths outside these directories are no longer supported.
 
 ### Changed
+
+- AirDrop accepts any regular file type, including PDFs, images, fonts, archives, scripts and extensionless files, preserving the original bytes in Inbox. The 30 MB and one-file limits remain.
 
 - App networking is enabled by default within declared HTTPS domains, without permission prompts. App Settings provides an explicit disable/enable control; certificate checks and synchronized UTC remain required.
 

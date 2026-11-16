@@ -51,12 +51,14 @@ class ConsentGate {
       if (!contact && !down && !released) touchReady_ = true;
     } else {
       if (down && contact) touchStarted_ = true;
-      touch = touchStarted_ && (down || contact || released);
+      // The adapter may report only a completed tap (or both edges together).
+      // A neutral frame after this paint proves it is not a pre-paint contact.
+      touch = released || (touchStarted_ && (down || contact));
       if (released || !contact) touchStarted_ = false;
     }
     if (!confirmReady_) {
       if (!confirmHeld && !confirmPressed) confirmReady_ = true;
-    } else if (confirmHeld && confirmPressed) {
+    } else if (confirmPressed) {
       confirm = true;
       confirmReady_ = false;
     }

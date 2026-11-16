@@ -80,6 +80,8 @@ def packet(dns,source=src,destination=dst,hop=255):
 cases={}
 def put(k,dns,emit=0,**kw):cases[k]=(packet(dns,**kw),emit)
 good=query([question('_airdrop._tcp.local')]);put('service-ptr',good,1)
+cases['service-with-fcs']=(packet(good)+b'\x12\x34\x56\x78',1)
+cases['service-with-link-padding']=(packet(good)+bytes(16),1)
 put('service-any',query([question('_airdrop._tcp.local',255)]),1)
 put('own-srv',query([question(instance,33)]),1);put('own-txt',query([question(instance,16)]),1)
 put('host-aaaa',query([question(host,28)]),1);put('host-a-negative',query([question(host,1)]),1)

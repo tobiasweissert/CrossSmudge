@@ -923,6 +923,8 @@ static void handle_data(const uint8_t *pl, uint16_t len) {
   if (p < 0 || p + 48 > len) return;
   const uint8_t *ip = &pl[p];
   if ((ip[0] >> 4) != 6) return;
+  const int iplen = (int)awdl_ip6_packet_length(ip, (size_t)len - (size_t)p);
+  if (iplen < 48 || iplen > 1500) return;
   uint8_t nh = ip[6];
   const uint8_t *src = &ip[8];
   if (src[0] == 0xfe && src[1] == 0x80 && !g_diag.peer_ll_valid) {
@@ -938,7 +940,6 @@ static void handle_data(const uint8_t *pl, uint16_t len) {
   // than tidy. The RX tap needs it, and an mDNS query to ff02::fb satisfies none of
   // for_us, sol_node or all_nodes -- so computed inside that branch it would be invisible
   // to exactly the traffic the tap exists for.
-  const int iplen = (int)len - (int)(ip - pl);
   // R = received by the ESP frame task, before netif delivery and the AirDrop tap.
   trace_ip('R', pl + 10, ip, (size_t)iplen, 0);
   {
@@ -2389,8 +2390,8 @@ void awdl_tick_read(struct AwdlTick *out) { *out = g_tick; }
 void awdl_diag_read(struct AwdlDiag *out, bool clear_maxima) {
   /* Three counters live in objects of their own and are folded in here rather than
      published separately: two ring cursors and the PLL's re-seed pair. */
-  g_diag.ring_drop  = g_ring_cur.drops;
-  g_diag.dump_drop  = g_dump_proc.cur.drops;
+  g_diag.ring_drop  = __atomic_load_n(&g_ring_cur.drops, __ATOMIC_RELAXED);
+  g_diag.dump_drop  = __atomic_load_n(&g_dump_proc.cur.drops, __ATOMIC_RELAXED);
   g_diag.pll_relock = g_pll.n_relock;
   g_diag.pll_out    = g_pll.n_out;
   *out = g_diag;

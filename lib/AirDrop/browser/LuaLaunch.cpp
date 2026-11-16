@@ -17,7 +17,7 @@ int take(lua_State* state) {
 int acknowledge(lua_State* state) {
   auto* value = binding(state);
   lua_Integer token = luaL_checkinteger(state,1);
-  bool accepted = value && value->launch && token > 0 && static_cast<uint32_t>(token) == value->attempt &&
+  bool accepted = value && value->launch && token > 0 && token == static_cast<lua_Integer>(value->attempt) &&
                   value->launch->acknowledge(value->attempt);
   lua_pushboolean(state,accepted);return 1;
 }

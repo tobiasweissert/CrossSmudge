@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 
 parser = argparse.ArgumentParser()
@@ -17,12 +18,20 @@ if args.sanitize:
 with tempfile.TemporaryDirectory(prefix='airdrop-stream-') as tmp:
     obj = str(Path(tmp) / 'miniz.o')
     exe = str(Path(tmp) / 'stream-test')
+    native = []
+    if sys.platform == 'darwin':
+        source = Path(tmp) / 'native-source'
+        source.mkdir()
+        (source / 'book.txt').write_bytes(b'abc')
+        archive = Path(tmp) / 'native.cpio'
+        subprocess.run(['/usr/bin/ditto','-c','--norsrc','.',str(archive)],cwd=source,check=True)
+        native = [str(archive)]
     commands = [
         ['cc', '-std=c11', *flags, '-Ilib/miniz/src', '-c', 'lib/miniz/src/miniz_impl.c', '-o', obj],
         ['c++', '-std=c++20', '-Wall', '-Wextra', '-Werror', *flags,
          '-Ilib/AirDrop/stream', '-Ilib/miniz/src', 'test/airdrop/stream_test.cpp',
          'lib/AirDrop/stream/StreamDecoder.cpp', obj, '-lz', '-o', exe],
-        [exe],
+        [exe,*native],
     ]
     # LSan cannot inspect tasks under this sandbox's tracing. ASan and UBSan
     # remain enabled; the codec owns no dynamic allocations.

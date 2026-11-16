@@ -22,7 +22,7 @@ int hex(unsigned char c) {
   return c >= 'a' && c <= 'f' ? c - 'a' + 10 : -1;
 }
 bool textCodepoint(uint32_t cp) {
-  return cp >= 32 && cp != 127 && !(cp >= 0x80 && cp <= 0x9f) && cp != 0x2028 && cp != 0x2029 &&
+  return cp >= 32 && cp != 127 && cp != 0x200e && cp != 0x200f && !(cp >= 0x80 && cp <= 0x9f) && cp != 0x2028 && cp != 0x2029 &&
          !(cp >= 0x202a && cp <= 0x202e) && !(cp >= 0x2066 && cp <= 0x2069) && cp != 0xfeff;
 }
 // Strict UTF-8, excluding controls and direction overrides in displayed metadata.
@@ -276,9 +276,9 @@ bool validateUrl(std::string_view url, char* host, size_t capacity) {
 }
 bool safeFilename(std::string_view name) {
   if(!safeComponent(name))return false;
-  auto dot=name.rfind('.');if(dot==name.npos||!dot)return false;
-  if(name[dot-1]==' '||name[dot-1]=='.')return false; // Match FAT-safe stream/publication admission before consent.
-  return foldEqual(name.substr(dot),".epub") || foldEqual(name.substr(dot),".txt");
+  if(name.front()=='.')return false;
+  for(size_t i=1;i<name.size();++i)if(name[i]=='.'&&(name[i-1]==' '||name[i-1]=='.'))return false;
+  return true;
 }
 // Fixed scalar/object descriptors use ~496 bytes in the host -Os stack report.
 // Unlike a DOM or recursive graph walk, this frame does not grow with Ask size/depth;
@@ -303,12 +303,8 @@ bool parseOffer(const uint8_t* body, size_t size, Offer& out, OfferScratch& scra
   } else {
     uint64_t file=p.ref(f,0),v=0; error=ParseError::Metadata;
     if(!p.field(file,"FileName",v)||!p.string(v,out.filename,sizeof out.filename)||!safeFilename(out.filename)){error=ParseError::Filename;return false;}
-    if(!p.field(file,"FileType",v)||!p.string(v,out.fileType,sizeof out.fileType)||!out.fileType[0])return false;
-    auto name=std::string_view(out.filename);auto ext=name.substr(name.rfind('.'));
-    bool data=std::strcmp(out.fileType,"public.data")==0;
-    bool compatible=foldEqual(ext,".epub")?std::strcmp(out.fileType,"org.idpf.epub-container")==0:
-        (std::strcmp(out.fileType,"public.plain-text")==0||std::strcmp(out.fileType,"public.text")==0||std::strcmp(out.fileType,"public.utf8-plain-text")==0);
-    if(!data&&!compatible){error=ParseError::Unsupported;return false;}
+    auto name=std::string_view(out.filename);
+    // Sender FileType does not gate receipt; all regular payloads are opaque.
     uint64_t amount=0;if(!p.field(file,"FileSize",v)||!p.integer(v,amount)||amount>MaxFileBytes){error=ParseError::Size;return false;}out.fileSize=static_cast<uint32_t>(amount);
     if(!p.field(file,"FileIsDirectory",v)||!p.boolean(v,false)){error=ParseError::Unsupported;return false;}
     if(p.field(file,"ShouldConvertMediaFormats",v)&&!p.boolean(v,false)){error=ParseError::Unsupported;return false;}

@@ -53,10 +53,11 @@ struct Context {
   mbedtls_net_context net;
   int listener=-1,client=-1;
   AwdlIdentity address{};
+  AwdlDiag linkStats{}; // Reuse the owner's PSRAM workspace, not a large task-stack snapshot.
   sockaddr_in6 peer{};
   char interfaceName[8]{};
   uint64_t generation=0,connections=0,offers=0,lastDraw=0;
-  bool tlsInitialized=false,budgetBound=false,failed=false,url=false,radioOwned=false,discoveryOwned=false;
+  bool tlsInitialized=false,budgetBound=false,failed=false,url=false,fileCommitted=false,radioOwned=false,discoveryOwned=false;
 };
 // The session's ~50KiB decoder/parser workspace must not use a 32KiB TLS stack.
 // Allocate once in S3 PSRAM, retain through stop, and explicitly destroy after join.
@@ -73,15 +74,21 @@ bool write(void* p,const uint8_t* data,size_t length,uint64_t deadline){auto& c=
 uint64_t now(void*){return clockMs();}
 void cooperativeWait(void* p){wait(*static_cast<Context*>(p));}
 bool cancelled(void*){return stop.load(std::memory_order_acquire);}
-void pending(void*,const Offer& offer,const OfferIdentity& token,uint64_t deadline){portENTER_CRITICAL(&statusMux);status.offer=offer;status.identity=token;status.deadlineMs=deadline;status.state=State::Pending;decisionValue=0;decisionResolved=false;++status.revision;portEXIT_CRITICAL(&statusMux);}
+void pending(void*,const Offer& offer,const OfferIdentity& token,uint64_t deadline){portENTER_CRITICAL(&statusMux);status.offer=offer;status.identity=token;status.deadlineMs=deadline;status.state=State::Pending;decisionValue=0;decisionResolved=false;++status.revision;portEXIT_CRITICAL(&statusMux);LOG_INF("AIRDROP","Offer %llu awaiting consent (%u bytes)",static_cast<unsigned long long>(token.offer),unsigned(offer.fileSize));}
 int decision(void*,const OfferIdentity& token){int result=0;portENTER_CRITICAL(&statusMux);if(decisionValue&&equal(token,decisionToken)){result=decisionValue;decisionValue=0;}portEXIT_CRITICAL(&statusMux);return result;}
-bool beginFile(void* p,const Offer& offer){auto& c=*static_cast<Context*>(p);state(State::Receiving);c.storage.setDeadlineMs(c.protocol.deadline);return c.storage.begin(offer.filename,offer.fileSize);}
+bool beginFile(void* p,const Offer& offer){auto& c=*static_cast<Context*>(p);state(State::Receiving);c.fileCommitted=false;c.storage.setDeadlineMs(c.protocol.deadline);const bool ok=c.storage.begin(offer.filename,offer.fileSize);if(ok)LOG_INF("AIRDROP","SD staging started (%u bytes)",unsigned(offer.fileSize));else LOG_ERR("AIRDROP","SD staging failed: %s",c.storage.error());return ok;}
 stream::WriteResult append(void* p,const uint8_t* data,size_t size){auto& c=*static_cast<Context*>(p);return c.storage.append(data,size)?stream::WriteResult::Consumed:stream::WriteResult::Error;}
-bool finishFile(void* p){auto& c=*static_cast<Context*>(p);state(State::Publishing);bool ok=c.storage.finish();portENTER_CRITICAL(&statusMux);if(ok){status.committedBytes=c.storage.committedBytes();strlcpy(status.savedPath,c.storage.savedPath(),sizeof status.savedPath);status.state=State::Success;}else{status.publicationUncertain=c.storage.state()==storage::State::Uncertain;status.state=State::Error;}++status.revision;portEXIT_CRITICAL(&statusMux);if(!ok)failure(c,c.storage.error());return ok;}
-void cancelFile(void* p){static_cast<Context*>(p)->storage.cancel();}
+bool finishFile(void* p){auto& c=*static_cast<Context*>(p);LOG_INF("AIRDROP","Upload archive complete; verifying SD save");state(State::Publishing);bool ok=c.storage.finish();portENTER_CRITICAL(&statusMux);if(ok){c.fileCommitted=true;status.committedBytes=c.storage.committedBytes();strlcpy(status.savedPath,c.storage.savedPath(),sizeof status.savedPath);status.state=State::Success;}else{status.publicationUncertain=c.storage.state()==storage::State::Uncertain;status.state=State::Error;}++status.revision;portEXIT_CRITICAL(&statusMux);if(!ok)failure(c,c.storage.error());else LOG_INF("AIRDROP","Saved %u bytes to %s",unsigned(c.storage.committedBytes()),c.storage.savedPath());return ok;}
+void cancelFile(void* p){static_cast<Context*>(p)->storage.abortTransfer();}
 void progress(void* p,uint64_t wire,uint64_t payload){auto& c=*static_cast<Context*>(p);auto t=clockMs();if(t-c.lastDraw<500&&payload!=c.protocol.consent.offer().fileSize)return;c.lastDraw=t;portENTER_CRITICAL(&statusMux);status.wireBytes=wire;status.payloadBytes=payload;status.committedBytes=0;++status.revision;portEXIT_CRITICAL(&statusMux);}
 void urlAccepted(void* p,const Offer&,const OfferIdentity&){auto& c=*static_cast<Context*>(p);c.url=true;stop.store(true,std::memory_order_release);}
-void protocolFailure(void* p,const char* text){failure(*static_cast<Context*>(p),text);}
+void protocolFailure(void* p,const char* text){
+  auto& c=*static_cast<Context*>(p);
+  LOG_ERR("AIRDROP","Request failed: %s",text);
+  // A bad request or disconnected sender owns only this connection. Storage
+  // failures already latch c.failed and publication uncertainty separately.
+  if(!c.failed)state(State::Listening);
+}
 bool preparePsa() {
   // PSA owns a persistent process-wide cache and lazily allocated volatile-slot
   // slice. Initialise them BEFORE task-scoped TLS accounting, without tearing
@@ -105,7 +112,9 @@ bool preparePsa() {
 }
 bool initTls(Context& c){
   if(!preparePsa()){failure(c,"PSA initialization failed");return false;}
-  if(heap_caps_get_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT)<96*1024||heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT)<40*1024){failure(c,"TLS internal heap admission failed");return false;}
+  // The owner-scoped HAL allocator places AirDrop TLS in PSRAM, not the
+  // internal heap already occupied by Wi-Fi and the three receiver tasks.
+  if(heap_caps_get_free_size(MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)<96*1024||heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)<40*1024){failure(c,"TLS PSRAM admission failed");return false;}
   c.budgetBound=HalAirDropRadio::beginTlsBudget(&c.budget);if(!c.budgetBound){failure(c,"TLS budget already owned");return false;}
   mbedtls_ssl_init(&c.ssl);mbedtls_ssl_config_init(&c.config);mbedtls_x509_crt_init(&c.certificate);mbedtls_pk_init(&c.key);mbedtls_entropy_init(&c.entropy);mbedtls_ctr_drbg_init(&c.random);mbedtls_net_init(&c.net);c.tlsInitialized=true;
   static const unsigned char personalization[]="CrossSmudge AirDrop";
@@ -160,16 +169,21 @@ void worker(void* p){auto& c=*static_cast<Context*>(p);workerHandle.store(xTaskG
   if(stop.load(std::memory_order_acquire))goto cleanup;
   if(!initTls(c)||!listen(c)||!(c.discoveryOwned=discovery::start())){failure(c,"Native receiver startup failed");goto cleanup;}
   state(State::Listening);
+  LOG_INF("AIRDROP","Listening on AWDL port 8770");
   {const uint64_t visibleUntil=clockMs()+600000;
   while(!stop.load(std::memory_order_acquire)&&!c.failed&&clockMs()<visibleUntil){
     socklen_t size=sizeof c.peer;c.client=accept(c.listener,reinterpret_cast<sockaddr*>(&c.peer),&size);
     if(c.client<0){if(errno!=EAGAIN&&errno!=EWOULDBLOCK){failure(c,"Listener accept failed");break;}vTaskDelay(pdMS_TO_TICKS(20));continue;}
     const auto* peerBytes=reinterpret_cast<const uint8_t*>(&c.peer.sin6_addr);
     if(size!=sizeof c.peer||peerBytes[0]!=0xfe||(peerBytes[1]&0xc0)!=0x80||!nonblocking(c.client)||!bindInterface(c.client,c.interfaceName)){closeFd(c.client);continue;}
-    mbedtls_ssl_session_reset(&c.ssl);c.net.fd=c.client;mbedtls_ssl_set_bio(&c.ssl,&c.net,mbedtls_net_send,mbedtls_net_recv,nullptr);
-    {uint64_t deadline=clockMs()+15000;int result=MBEDTLS_ERR_SSL_WANT_READ;while(!stop.load()&&clockMs()<deadline&&(result==MBEDTLS_ERR_SSL_WANT_READ||result==MBEDTLS_ERR_SSL_WANT_WRITE)){result=mbedtls_ssl_handshake(&c.ssl);if(result)wait(c);}if(result){closeFd(c.client);continue;}}
+    {const int reset=mbedtls_ssl_session_reset(&c.ssl);if(reset){LOG_ERR("AIRDROP","TLS session reset failed: %d",reset);closeFd(c.client);continue;}}c.net.fd=c.client;mbedtls_ssl_set_bio(&c.ssl,&c.net,mbedtls_net_send,mbedtls_net_recv,nullptr);
+    {uint64_t deadline=clockMs()+15000;int result=MBEDTLS_ERR_SSL_WANT_READ;while(!stop.load()&&clockMs()<deadline&&(result==MBEDTLS_ERR_SSL_WANT_READ||result==MBEDTLS_ERR_SSL_WANT_WRITE)){result=mbedtls_ssl_handshake(&c.ssl);if(result)wait(c);}if(result){LOG_ERR("AIRDROP","TLS handshake failed: %d",result);closeFd(c.client);continue;}}
     c.protocol.identity={};c.protocol.identity.generation=c.generation;c.protocol.identity.session=++c.connections;c.protocol.identity.connection=c.connections;c.protocol.identity.interfaceIndex=awdl_netif_index();memcpy(c.protocol.identity.peer,peerBytes,16);
+    LOG_INF("AIRDROP","TLS connection %llu ready",static_cast<unsigned long long>(c.connections));
     {session::Io io{&c,read,write,alive,now,cooperativeWait};session::Backend backend{&c,cancelled,pending,decision,beginFile,append,finishFile,cancelFile,progress,urlAccepted,protocolFailure};session::serve(c.protocol,io,backend,c.protocol.identity,c.offers);}
+    LOG_INF("AIRDROP","Connection %llu finished; consent=%u",static_cast<unsigned long long>(c.connections),unsigned(c.protocol.consent.state()));
+    awdl_diag_read(&c.linkStats,false);
+    LOG_INF("AIRDROP","AWDL totals: rx=%u ringDrop=%u tx=%u txDrop=%u retry=%u exhausted=%u",unsigned(c.linkStats.netif_rx),unsigned(c.linkStats.ring_drop),unsigned(c.linkStats.netif_tx_sent),unsigned(c.linkStats.netif_txq_drop),unsigned(c.linkStats.netif_retry_queued),unsigned(c.linkStats.netif_retry_exhausted));
     (void)mbedtls_ssl_close_notify(&c.ssl);closeFd(c.client);c.net.fd=-1;
     if(!c.failed&&!c.url&&!stop.load()&&status.state!=State::Success)state(State::Listening);
   }}
@@ -179,7 +193,7 @@ cleanup:
   if(c.radioOwned){awdl_request_stop();const uint64_t deadline=clockMs()+5000;while(!awdl_is_stopped()){auto result=awdl_poll_stop();if(result!=ESP_OK&&result!=ESP_ERR_TIMEOUT)LOG_ERR("AIRDROP","Radio release retained ownership: %d",result);if(clockMs()>=deadline){portENTER_CRITICAL(&statusMux);status.ownershipUncertain=true;status.state=State::Error;++status.revision;portEXIT_CRITICAL(&statusMux);}vTaskDelay(pdMS_TO_TICKS(100));}}
   if(c.budget.used()){failure(c,"TLS allocations retained after cleanup");portENTER_CRITICAL(&statusMux);status.ownershipUncertain=true;++status.revision;portEXIT_CRITICAL(&statusMux);while(true)vTaskDelay(pdMS_TO_TICKS(1000));}
   LOG_INF("AIRDROP","Stopped heap=%u largest=%u PSRAM=%u stackMin=%u",unsigned(heap_caps_get_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT)),unsigned(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT)),unsigned(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)),unsigned(uxTaskGetStackHighWaterMark(nullptr)));
-  portENTER_CRITICAL(&statusMux);status.ownershipUncertain=false;status.state=c.failed?State::Error:c.url?State::UrlReady:status.committedBytes?State::Success:State::Stopped;++status.revision;portEXIT_CRITICAL(&statusMux);
+  portENTER_CRITICAL(&statusMux);status.ownershipUncertain=false;status.state=c.failed?State::Error:c.url?State::UrlReady:c.fileCommitted?State::Success:State::Stopped;++status.revision;portEXIT_CRITICAL(&statusMux);
   workerHandle.store(nullptr,std::memory_order_release);running.store(false,std::memory_order_release);vTaskDelete(nullptr);
 }
 }

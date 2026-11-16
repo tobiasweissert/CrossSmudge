@@ -19,7 +19,7 @@ assert not re.search(r'silentRestart|ESP\.restart|esp_restart|vTaskDelete',sourc
 with tempfile.TemporaryDirectory(prefix='airdrop-ui-lifecycle-')as td:
  td=Path(td);(td/'ui_lifecycle_extracted.inc').write_text('\n'.join(methods))
  cmd=['g++','-std=c++20','-g','-O1','-Wall','-Wextra','-Werror','-I'+str(root/'src'),'-I'+str(root/'lib/AirDrop'),'-I'+str(td),str(root/'test/airdrop/ui_lifecycle_test.cpp'),str(root/'lib/AirDrop/browser/BrowserLaunch.cpp'),str(root/'lib/AirDrop/core/Offer.cpp'),'-o',str(td/'test')]
- if args.sanitize:cmd[1:1]=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-no-pie']
+ if args.sanitize:cmd[1:1]=['-fsanitize=address,undefined','-fno-omit-frame-pointer',*(['-no-pie'] if os.name!='nt' and os.uname().sysname!='Darwin' else [])]
  subprocess.run(cmd,check=True);subprocess.run([str(td/'test')],check=True)
  print(json.dumps({'exit':0,'production_sha256':hashlib.sha256(source.encode()).hexdigest(),'methods':names,'sanitized':args.sanitize}))
 

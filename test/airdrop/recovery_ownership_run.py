@@ -16,18 +16,19 @@ cpp=r'''
 #undef main
 #include <atomic>
 #define LOG_ERR(...) ((void)0)
-void esp_fill_random(void* p,size_t n){std::memset(p,9,n);}
+static unsigned nonceByte=9;
+void esp_fill_random(void* p,size_t n){std::memset(p,nonceByte,n);}
 namespace airdrop::storage {
 class HalStorageSink {
  StorageSink sink_;
  public:
  std::vector<std::string> tokens;
  explicit HalStorageSink(Files& f):sink_(f){}
- bool begin(const char*,uint32_t);bool logged(bool);State inspect(const char*);State inspectJournal(const char*);
+ void abortTransfer();bool begin(const char*,uint32_t);bool logged(bool);State inspect(const char*);State inspectJournal(const char*);
  bool append(const uint8_t*p,size_t n){return sink_.append(p,n);}bool finish(){return sink_.finish();}
  bool recoveryToken(unsigned i,char token[33],bool&ok){ok=true;if(i>=tokens.size())return false;std::memcpy(token,tokens[i].c_str(),33);return true;}
 };
-'''+ '\n'.join(method(hal,m)for m in ['bool HalStorageSink::logged(', 'bool HalStorageSink::begin(', 'State HalStorageSink::inspect(', 'State HalStorageSink::inspectJournal('])+r'''
+'''+ '\n'.join(method(hal,m)for m in ['void HalStorageSink::abortTransfer(', 'bool HalStorageSink::logged(', 'bool HalStorageSink::begin(', 'State HalStorageSink::inspect(', 'State HalStorageSink::inspectJournal('])+r'''
 }
 namespace storage=airdrop::storage;
 std::atomic<bool> stop{false};struct {bool publicationUncertain=false;} status;int statusMux;
@@ -65,6 +66,11 @@ int main(){
  auto aliases=uncertain.files;StorageSink fresh(uncertain);assert(fresh.inspect("01020304050000000000000000000000")==State::Uncertain);
  assert(!fresh.begin("next.txt",3,complete));assert(!fresh.begin("next.txt",3,complete));
  assert(fresh.inspect("07000000000000000000000000000000")==State::Uncertain);assert(uncertain.files==aliases);
+ // An interrupted connection closes its stage without cancelling the whole owner.
+ MemoryFiles interrupted;Context retry(interrupted);assert(retry.storage.begin("first.bin",3));
+ assert(retry.storage.append(bytes,1));retry.storage.abortTransfer();auto partial=interrupted.files;
+ nonceByte=10;assert(retry.storage.begin("second.bin",3));assert(retry.storage.append(bytes,3));assert(retry.storage.finish());
+ for(const auto&[path,data]:partial)assert(interrupted.files.at(path)==data);
  std::puts("PASS actual worker + HalStorageSink/core recovery: phase1 last, fresh nonce publish, old bytes preserved, live writer and uncertainty refused");
 }
 '''

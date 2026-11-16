@@ -47,7 +47,9 @@ prelude=(ROOT/'test/airdrop/session_receiver_prelude.inc').read_text()
 # SDK structure/constants precede fake setsockopt; all behavior functions remain exact production text.
 prelude=prelude.replace('static unsigned socketCalls=0;',layout+'\nstatic unsigned socketCalls=0;')
 parts=[prelude,text[text.index('int decisionValue=0;'):text.index('uint64_t clockMs()')]]
-for name in ['bool equal(','void state(','void failure(','void closeFd(','bool preparePsa(','bool initTls(','bool bindInterface(','bool listen(','void freeTls(','void pending(','int decision(']:parts.append(function(name))
+for name in ['bool equal(','void state(','void failure(','void protocolFailure(','void closeFd(','bool finishFile(','bool preparePsa(','bool initTls(','bool bindInterface(','bool listen(','void freeTls(','void pending(','int decision(']:parts.append(function(name))
+cleanup_line=next(line for line in text.splitlines() if 'status.ownershipUncertain=false;status.state=' in line)
+parts.append('void completeStatus(Context& c){'+cleanup_line+'}')
 parts+=['}\n',function('Receiver& Receiver::instance()'),function('bool Receiver::decide('),'}\n']
 # Suffix closes the namespace itself; strip its two initial closes since production/public pieces did so.
 suffix=(ROOT/'test/airdrop/session_receiver_cases.inc').read_text().split('int main',1)[1]
@@ -63,7 +65,7 @@ manifest={'production':{'path':str(source.relative_to(ROOT)),'sha256':hashlib.sh
 flags=['-O1','-g','-fno-omit-frame-pointer']
 if args.sanitize:flags+=['-fsanitize=address,undefined']
 commands=[['c++','-std=c++20',*flags,'-Ilib/AirDrop','-Ilib/LuaHttp',str(cpp),'-o',str(OUT/'receiver')]]
-commands +=[[str(OUT/'receiver'),case]for case in ['queue','bind','listen','listen-interface-fail','listen-bind-fail','cold','psa-fail','import-fail','destroy-fail','tls:mbedtls_ctr_drbg_seed','tls:mbedtls_x509_crt_parse_der','tls:mbedtls_pk_parse_key','tls:mbedtls_ssl_config_defaults','tls:mbedtls_ssl_conf_own_cert','tls:mbedtls_ssl_setup']]
+commands +=[[str(OUT/'receiver'),case]for case in ['empty-file','request-failure','queue','bind','listen','listen-interface-fail','listen-bind-fail','cold','psa-fail','import-fail','destroy-fail','tls:mbedtls_ctr_drbg_seed','tls:mbedtls_x509_crt_parse_der','tls:mbedtls_pk_parse_key','tls:mbedtls_ssl_config_defaults','tls:mbedtls_ssl_conf_own_cert','tls:mbedtls_ssl_setup']]
 env=dict(os.environ,ASAN_OPTIONS='detect_leaks=0',UBSAN_OPTIONS='halt_on_error=1')
 receipts=[]
 with(OUT/'commands.log').open('w')as log:

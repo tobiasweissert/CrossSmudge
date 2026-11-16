@@ -22,6 +22,12 @@ static void oldIntact(StorageDisk& disk) {
   }
 }
 int main() {
+  {
+    StorageDisk blank;uint8_t scratch[512];FatFormatter format;assert(format.format(&blank,scratch));
+    auto owner=std::make_unique<FatVolume>();assert(owner->begin(&blank,false));
+    StorageFatFiles files(*owner,blank);StorageSink sink(files);assert(transfer(sink));
+    std::puts("PASS first upload creates Inbox and hidden staging on an empty FAT volume");
+  }
   StorageDisk disk; uint8_t sector[512]; FatFormatter formatter; assert(formatter.format(&disk, sector));
   {
     auto owner = std::make_unique<FatVolume>(); auto& volume = *owner; assert(volume.begin(&disk, false)); assert(volume.mkdir("/apps")); assert(volume.mkdir("/Inbox"));

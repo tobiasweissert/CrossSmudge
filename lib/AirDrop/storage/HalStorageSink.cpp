@@ -52,37 +52,42 @@ PathState HalFiles::stat(const char* path, uint32_t& size) {
   if (parentLength) { std::memcpy(parent_, path, parentLength); parent_[parentLength] = 0; }
   else std::strcpy(parent_, "/");
   HalFile directory = Storage.open(parent_, O_RDONLY);
-  if (!directory || !directory.isDirectory()) { directory.close(); return PathState::Unreadable; }
+  if (!directory || !directory.isDirectory()) { LOG_ERR("AIRDROP", "Cannot scan SD parent %s for %s",parent_,path);directory.close(); return PathState::Unreadable; }
   PathState result = PathState::Missing;
   bool ended = false;
   for (unsigned count = 0; count < 8192; ++count) {
-    if (cancelled()) { result = PathState::Unreadable; ended = true; break; }
+    if (cancelled()) { LOG_ERR("AIRDROP","SD scan cancelled: %s",path);result = PathState::Unreadable; ended = true; break; }
     HalFile child = directory.openNextFile();
     if (!child) {
       const bool healthy = !directory.iterationFailed() && !directory.allocationFailed();
+      if(!healthy)LOG_ERR("AIRDROP","SD directory iteration failed: %s",parent_);
       child.close(); result = healthy ? PathState::Missing : PathState::Unreadable;
       ended = true; break;
     }
     const size_t n = child.getName(entryName_, sizeof entryName_);
     const bool matches = n && n < sizeof entryName_ && equalName(entryName_, slash + 1);
-    if (!n || n >= sizeof entryName_) result = PathState::Unreadable;
+    if (!n || n >= sizeof entryName_) {LOG_ERR("AIRDROP","SD entry name unreadable in %s (length=%u)",parent_,unsigned(n));result = PathState::Unreadable;}
     else if (matches) {
       const uint64_t bytes = child.fileSize64();
       result = child.isDirectory() ? PathState::Directory : (bytes <= UINT32_MAX ? PathState::File : PathState::Unreadable);
       if (result == PathState::File) size = static_cast<uint32_t>(bytes);
     }
-    if (!child.close()) result = PathState::Unreadable;
+    if (!child.close()) {LOG_ERR("AIRDROP","SD entry close failed in %s",parent_);result = PathState::Unreadable;}
     if (matches || result == PathState::Unreadable) { ended = true; break; }
     vTaskDelay(1);
   }
   if (!ended) result = PathState::Unreadable;
-  if (!directory.close()) result = PathState::Unreadable;
+  if (!directory.close()) {LOG_ERR("AIRDROP","SD parent close failed: %s",parent_);result = PathState::Unreadable;}
+  LOG_INF("AIRDROP","SD path %s: state=%u",path,unsigned(result));
   return result;
 }
 bool HalFiles::mkdirExclusive(const char* path) {
   // SdFat mkdir returns false for an existing directory. Never recursively
   // create through an unvalidated sender path; core paths are locally derived.
-  return !cancelled() && Storage.mkdir(path, false);
+  const bool ok=!cancelled() && Storage.mkdir(path, false);
+  if(ok)LOG_INF("AIRDROP","SD mkdir %s: ok",path);
+  else LOG_ERR("AIRDROP","SD mkdir failed: %s",path);
+  return ok;
 }
 bool HalFiles::createStageExclusive(const char* path) {
   if (stage_ || cancelled()) return false;
@@ -186,6 +191,7 @@ bool HalStorageSink::begin(const char* name, uint32_t size) {
 bool HalStorageSink::append(const uint8_t* bytes, size_t length) { return logged(sink_.append(bytes, length)); }
 bool HalStorageSink::finish() { return logged(sink_.finish()); }
 void HalStorageSink::cancel() { files_.requestCancel(); sink_.cancel(); }
+void HalStorageSink::abortTransfer() { sink_.cancel(); }
 State HalStorageSink::inspect(const char* token) {
   const auto result = sink_.inspect(token);
   if (result == State::Uncertain || result == State::Failed) logged(false);

@@ -121,11 +121,20 @@ bool isSupportedBrowserFile(std::string_view filename) {
          FsHelpers::hasBmpExtension(filename) || FsHelpers::hasPngExtension(filename);
 }
 
-bool acceptCommon(const char* name, bool isDir) {
+bool acceptInbox(const char* name, bool) {
   if (isMacOSMetadataEntry(name) || isWindowsMetadataEntry(name) || (!SETTINGS.showHiddenFiles && name[0] == '.')) {
     return false;
   }
-  return isDir || isSupportedBrowserFile(name);
+  return true;
+}
+
+bool acceptCommon(const char* name, bool isDir) {
+  return acceptInbox(name, isDir) && (isDir || isSupportedBrowserFile(name));
+}
+
+bool isInboxPath(std::string_view path) {
+  while (path.size() > 1 && path.back() == '/') path.remove_suffix(1);
+  return equalsIgnoreCase(path, "/Inbox");
 }
 
 bool acceptFirmware(const char* name, bool isDir) {
@@ -224,7 +233,8 @@ bool FileBrowserActivity::loadFilesIntoVector(size_t cap, bool& overflow) {
   }
 
   const auto accept =
-      mode == Mode::PickFirmware ? acceptFirmware : (mode == Mode::PickDirectory ? acceptDirectory : acceptCommon);
+      mode == Mode::PickFirmware ? acceptFirmware : (mode == Mode::PickDirectory ? acceptDirectory :
+          (isInboxPath(basepath) ? acceptInbox : acceptCommon));
 
   files.reserve(std::min<size_t>(cap, INDEX_THRESHOLD));
   for (auto file = root.openNextFile(); file; file = root.openNextFile()) {
@@ -307,7 +317,8 @@ void FileBrowserActivity::loadFilesLocked() {
     GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
 
     const auto accept =
-        mode == Mode::PickFirmware ? acceptFirmware : (mode == Mode::PickDirectory ? acceptDirectory : acceptCommon);
+        mode == Mode::PickFirmware ? acceptFirmware : (mode == Mode::PickDirectory ? acceptDirectory :
+            (isInboxPath(basepath) ? acceptInbox : acceptCommon));
     if (fileIndex->open(basepath.c_str(), accept)) {
       usingIndex = true;
       return;
@@ -1065,6 +1076,8 @@ void FileBrowserActivity::activateSelected() {
   }
   if (isDirectory) {
     requestUpdate();
+  } else if (!isSupportedBrowserFile(entry)) {
+    showFileActionMenu(entry, false);
   } else {
     onSelectBook(fullPath);
   }

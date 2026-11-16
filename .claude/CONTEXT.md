@@ -21,6 +21,8 @@ Refer to https://freeink.org/llms.txt for guidance.
 ## Real Hardware / Storage
 
 - SdFat on hardware allows only one open reader per file path at a time. If a fallback needs to reopen the same file, close the first handle before reopening.
+- AirDrop saves all regular file types to `/Inbox`; its browser listing must use the Inbox filter in both vector and FileIndex paths. The normal book filter hides PDFs and other received formats even when SD publication succeeded.
+- Missing AirDrop prompts: compare device offer logs with Mac `sharingd` network logs. Discovery can succeed while `/Ask` fails locally with `No network route`; that is not evidence of a consent/UI failure. A sender sharing-service restart restored a prompt in one hardware trial.
 
 ## Rendering / Reader Pipeline
 

@@ -64,6 +64,7 @@ class HalStorageSink {
   void requestCancel() { files_.requestCancel(); }
   void setDeadlineMs(uint64_t deadline) { files_.setDeadlineMs(deadline); }
   void cancel();
+  void abortTransfer(); // Close only this stage; keep the receiver available for a new consent/nonce.
   State state() const { return sink_.state(); }
   const char* error() const { return sink_.error(); }
   const char* savedPath() const { return sink_.savedPath(); }

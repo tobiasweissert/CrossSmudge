@@ -1,5 +1,6 @@
 // Hardware/crypto/socket boundaries only. Bodies tested below are extracted verbatim.
 #include "Receiver.h"
+#include "storage/StorageSink.h"
 #include "AllocationBudget.h"
 #include <atomic>
 #include <cassert>
@@ -11,13 +12,14 @@
 #include <algorithm>
 #include <cstdio>
 #define LOG_ERR(...) ((void)0)
+#define LOG_INF(...) ((void)0)
 #define portENTER_CRITICAL(...) ((void)0)
 #define portEXIT_CRITICAL(...) ((void)0)
 constexpr int PSA_SUCCESS=0,PSA_KEY_TYPE_RAW_DATA=1;
 using psa_key_id_t=uint32_t;
 struct psa_key_attributes_t{int value;};
 #define PSA_KEY_ATTRIBUTES_INIT {0}
-constexpr int MALLOC_CAP_INTERNAL=1,MALLOC_CAP_8BIT=2,MBEDTLS_SSL_IS_SERVER=1,MBEDTLS_SSL_TRANSPORT_STREAM=2,MBEDTLS_SSL_PRESET_DEFAULT=3,MBEDTLS_SSL_VERIFY_NONE=0,MBEDTLS_SSL_VERSION_TLS1_2=12;
+constexpr int MALLOC_CAP_INTERNAL=1,MALLOC_CAP_8BIT=2,MALLOC_CAP_SPIRAM=4,MBEDTLS_SSL_IS_SERVER=1,MBEDTLS_SSL_TRANSPORT_STREAM=2,MBEDTLS_SSL_PRESET_DEFAULT=3,MBEDTLS_SSL_VERIFY_NONE=0,MBEDTLS_SSL_VERSION_TLS1_2=12;
 static unsigned imports=0,destroys=0,maxLive=0,resets=0,budgetBinds=0,budgetEnds=0,initCalls=0;
 static int importFailure=0,destroyFailure=0;
 static bool psaFailure=false,psaReady=false,volatileReady=false;
@@ -42,8 +44,8 @@ namespace HalAirDropRadio {
 bool beginTlsBudget(ink::http::AllocationBudget* budget){calls.push_back("budget-begin");assert(!activeBudget);activeBudget=budget;++budgetBinds;return true;}
 void endTlsBudget(){calls.push_back("budget-end");assert(activeBudget);activeBudget=nullptr;++budgetEnds;}
 }
-size_t heap_caps_get_free_size(int){return 200*1024;}
-size_t heap_caps_get_largest_free_block(int){return 80*1024;}
+size_t heap_caps_get_free_size(int caps){assert(caps==(MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));return 200*1024;}
+size_t heap_caps_get_largest_free_block(int caps){assert(caps==(MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));return 80*1024;}
 int mbedtls_entropy_func(void*,unsigned char*,size_t){return 0;}
 int mbedtls_ctr_drbg_random(void*,unsigned char*,size_t){return 0;}
 static int call(const char* name){calls.emplace_back(name);return failName==name?1:0;}
@@ -79,6 +81,7 @@ static unsigned socketCalls=0;
 static bool reused=false,boundInterface=false,interfaceFailure=false,socketBindFailure=false;
 struct sockaddr {};
 struct sockaddr_in6 {int sin6_family=0;uint16_t sin6_port=0;uint32_t sin6_scope_id=0;uint8_t sin6_addr[16]{};};
+#undef htons
 uint16_t htons(uint16_t n){return uint16_t((n>>8)|(n<<8));}
 constexpr int AF_INET6=10,SOCK_STREAM=1,ESP_OK=0;
 int socket(int domain,int type,int protocol){assert(domain==AF_INET6&&type==SOCK_STREAM&&protocol==0);calls.push_back("socket-create");return 71;}
@@ -107,6 +110,14 @@ struct Context {
   int client=-1,listener=-1;
   struct {uint8_t ll[16]{};} address;
   char interfaceName[8]{};
-  bool tlsInitialized=false,budgetBound=false,failed=false;
+  bool tlsInitialized=false,budgetBound=false,failed=false,fileCommitted=false,url=false;
+  struct Storage {
+    bool succeeds=true;uint32_t bytes=0;
+    bool finish(){return succeeds;}
+    uint32_t committedBytes()const{return bytes;}
+    const char* savedPath()const{return "/Inbox/empty (AirDrop test).bin";}
+    const char* error()const{return "injected failure";}
+    storage::State state()const{return succeeds?storage::State::PublishedVerified:storage::State::Failed;}
+  } storage;
 };
 bool nonblocking(int){calls.push_back("nonblocking");return true;}

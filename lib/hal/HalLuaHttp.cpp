@@ -151,7 +151,7 @@ bool spawn(void(*fn)(void*),void* arg) {
 }
 }
 
-// Link wrappers budget only the Lua worker; all existing firmware TLS callers retain their allocator.
+// Link wrappers budget the Lua and AirDrop workers; other TLS callers retain their allocator.
 extern "C" void* __real_esp_mbedtls_mem_calloc(size_t,size_t);
 extern "C" void __real_esp_mbedtls_mem_free(void*);
 extern "C" void* __wrap_esp_mbedtls_mem_calloc(size_t n,size_t size) {
@@ -159,9 +159,12 @@ extern "C" void* __wrap_esp_mbedtls_mem_calloc(size_t n,size_t size) {
   auto owner=budgetTask.load(std::memory_order_acquire);
   const bool limited=owner && owner==xTaskGetCurrentTaskHandle();
   const auto receiverOwner=receiverBudgetTask.load(std::memory_order_acquire);
-  auto* selected=limited?activeBudget:(receiverOwner&&receiverOwner==xTaskGetCurrentTaskHandle()?receiverBudget:nullptr);
+  const bool receiverLimited=receiverOwner&&receiverOwner==xTaskGetCurrentTaskHandle();
+  auto* selected=limited?activeBudget:(receiverLimited?receiverBudget:nullptr);
   if(selected && !selected->permits(n*size))return nullptr;
-  void* p=__real_esp_mbedtls_mem_calloc(n,size);
+  // Sticky-only AirDrop TLS owns these bounded, non-DMA buffers until mbedTLS
+  // frees them. Keep internal RAM available for the radio and task stacks.
+  void* p=receiverLimited?heap_caps_calloc(n,size,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT):__real_esp_mbedtls_mem_calloc(n,size);
   if(selected && p && !selected->add(p,heap_caps_get_allocated_size(p))) {
     __real_esp_mbedtls_mem_free(p);return nullptr;
   }

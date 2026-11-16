@@ -11,7 +11,7 @@ upstream autoaccepting/whole-archive TLS receiver are excluded. A separate
 link-only probe in the task evidence compiled the pinned original receiver;
 that probe does not execute or enable receiving.
 
-Core headers retain upstream bytes except the capability-gated truthful AirDrop
+Core headers retain upstream bytes except atomic acquire/release ring cursors, bounded IPv6 receive-length normalization and the capability-gated truthful AirDrop
 TXT flag advertisement in `awdl_frame.h`; non-Sticky golden frames are retained. The port and its public header are
 adapted for cooperative stop, checked partial acquisition, callback admission,
 and a persistent queued TCP/IP drain acknowledgment. `awdl_owned_gate.h` is

@@ -70,7 +70,6 @@ class StorageSink {
   const char* error_ = nullptr;
   bool stageOpen_ = false;
   bool publicationAttempted_ = false;
-  bool text_ = false;
   uint32_t expected_ = 0;
   uint32_t written_ = 0;
   char token_[33]{};
@@ -89,9 +88,7 @@ class StorageSink {
   bool record(uint8_t phase);
   bool loadRecord(uint8_t phase);
   void serialize(uint8_t phase);
-  bool verify(const char* path, bool validateContent);
-  bool readAt(uint32_t offset, uint8_t* bytes, size_t length);
-  bool validateEpub();
+  bool verify(const char* path);
   State inspectImpl(const char* token, bool verifyPayload);
 };
 

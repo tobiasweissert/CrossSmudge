@@ -98,15 +98,17 @@ static void basic() {
 }
 static void unsafeAndCancel() {
   { MemoryFiles files; files.stop = true; StorageSink sink(files); assert(!sink.begin("book.txt", 3, token)); assert(files.files.empty()); }
-  for (const char* name : {"../book.txt", "book.exe", "CON.txt", "bad .txt"}) {
+  for (const char* name : {"../book.txt", "CON.txt", "bad .txt"}) {
     MemoryFiles files; StorageSink sink(files); assert(!sink.begin(name, 3, token)); assert(files.files.empty());
   }
   MemoryFiles files; StorageSink sink(files); assert(sink.begin("book.txt", 3, token));
-  const uint8_t invalid[] = {0xc0, 0x80, 0}; assert(sink.append(invalid, 3)); assert(!sink.finish()); assert(files.renames == 0);
+  const uint8_t binary[] = {0xc0, 0x80, 0}; assert(sink.append(binary, 3));
+  files.files.at(files.stage)[0] ^= 1; // Readback must still reject changed opaque bytes.
+  assert(!sink.finish()); assert(files.renames == 0);
   MemoryFiles cancelled; StorageSink stopping(cancelled); assert(stopping.begin("book.txt", 3, token));
   assert(write(stopping, 2)); stopping.cancel(); assert(stopping.state() == State::Cancelled); assert(cancelled.renames == 0);
   StorageSink incomplete(cancelled); assert(incomplete.inspect("01020304050000000000000000000000") == State::RetainedPartial);
-  std::puts("PASS unsafe names, invalid UTF-8 and cancel never publish");
+  std::puts("PASS unsafe names, hash mismatch and cancel never publish");
 }
 static void uncertainty() {
   MemoryFiles files; StorageSink sink(files); assert(sink.begin("book.txt", 2049, token)); assert(write(sink, 2049));
@@ -267,21 +269,21 @@ static void contents() {
     MemoryFiles files; StorageSink sink(files); assert(storeBytes(files, sink, "book.epub", bytes));
     StorageSink fresh(files); assert(fresh.inspect("01020304050000000000000000000000") == State::PublishedVerified);
   }
-  for (unsigned mutation = 0; mutation < 4; ++mutation) {
-    auto bytes = epub();
-    if (mutation == 0) bytes[38] ^= 1; // Correct ZIP shape with wrong EPUB mimetype bytes.
-    if (mutation == 1) bytes.pop_back();
-    if (mutation == 2) bytes[6] = 1; // Encryption is unsupported.
-    if (mutation == 3) bytes = epub("../book.opf");
-    MemoryFiles files; StorageSink sink(files); assert(!storeBytes(files, sink, "book.epub", bytes)); assert(files.renames == 0);
+  const std::vector<uint8_t> binary = {0x00, 0xff, 0x80, 0x01, 0x50, 0x4b};
+  for (const char* name : {"report.pdf", "photo.jpg", "bundle.zip", "firmware.bin", "font.ttf", "README", "run.sh", "book.exe", "opaque.epub", "opaque.txt"}) {
+    MemoryFiles files; StorageSink sink(files);
+    assert(storeBytes(files, sink, name, binary));
+    assert(files.files.at(sink.savedPath()) == binary);
+    StorageSink fresh(files);
+    assert(fresh.inspect("01020304050000000000000000000000") == State::PublishedVerified);
   }
   std::vector<uint8_t> utf8; utf8.reserve(1027); utf8.insert(utf8.end(), 1023, 'a');
   for (const uint8_t c : {0xf0, 0x9f, 0x93, 0x96}) utf8.push_back(c);
   { MemoryFiles files; StorageSink sink(files); assert(storeBytes(files, sink, "book.txt", utf8)); }
   utf8.pop_back();
-  { MemoryFiles files; StorageSink sink(files); assert(!storeBytes(files, sink, "book.txt", utf8)); assert(files.renames == 0); }
+  { MemoryFiles files; StorageSink sink(files); assert(storeBytes(files, sink, "book.txt", utf8)); }
   { MemoryFiles files; StorageSink sink(files); assert(storeBytes(files, sink, "empty.txt", {})); }
-  std::puts("PASS bounded EPUB ZIP/OCF structure and streaming UTF-8 validation before publication");
+  std::puts("PASS opaque arbitrary files, extensionless names, binary bytes and journal recovery");
 }
 static void recoveryFaults() {
   MemoryFiles original; StorageSink success(original); assert(success.begin("book.txt", 3, token)); assert(write(success, 3)); assert(success.finish());

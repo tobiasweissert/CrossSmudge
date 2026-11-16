@@ -2,17 +2,16 @@
 
 `Decoder` accepts an already consented single-file `Manifest` and DVZip body
 bytes. It does not open SD files, acknowledge AirDrop, publish books, or drive
-Wi-Fi/UI. The caller must establish HTTP framing completion, authorization,
+Wi-Fi/UI. The caller must establish bounded HTTP framing, authorization,
 absolute transfer/stall deadlines, and safe publication before sender success.
 All errors expose a static reason through `error()`; the integration boundary
 must log that reason before reporting failure.
 
 The mandatory `archivePath` binds the member to exactly the consented basename
-or `./basename`; it never selects an SD destination. One regular `.epub` or
-`.txt` file, optional root `.` directory, and one matching `._basename`
+or `./basename`; it never selects an SD destination. One regular file of any type, optional root `.` directory, and one matching `._basename`
 AppleDouble sidecar are supported. Directory wrappers are rejected. The sidecar
 must use the same `./` prefix as the accepted path and is discarded, never
-extracted. Links, special files, executable permission bits, unexpected or
+extracted. Permission bits are not applied to saved files. Links, special files, unexpected or
 duplicate files, unsafe FAT basenames, invalid UTF-8 and bidi controls fail.
 Bytes remain opaque: this core does not establish EPUB validity or text encoding.
 
@@ -22,9 +21,11 @@ implementation via `MinizConfig.h`, without ROM symbol collision, a new miniz
 copy, the `InflateStream` framebuffer loan, or its hidden unused-input state.
 Zlib stream end, exact compressed-record consumption and Adler32 are checked.
 A CPIO trailer is mandatory; at most 511 zero padding bytes follow it. Explicit
-DVZip zero end records are supported; HTTP-complete record boundary is also
-accepted only after the full CPIO manifest/trailer validates. Silence never
-signals completion. Gzip, raw CPIO and newc are unsupported and have no fallback.
+DVZip zero end records are supported. A complete record boundary is accepted
+after the full CPIO manifest/trailer validates, even without HTTP's final zero
+chunk: native senders can wait for our response before sending it. The owner
+must then close the connection after publication rather than parse another
+request. Silence never signals completion. Gzip, raw CPIO and newc are unsupported and have no fallback.
 
 Bounds are decimal 30,000,000 payload bytes, 32,000,000 archive bytes,
 40,000,000 DVZip body bytes, 1,048,576 encoded/expanded bytes per record,

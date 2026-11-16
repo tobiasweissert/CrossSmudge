@@ -12,7 +12,10 @@ int main(int argc,char** argv){
   using namespace airdrop::discovery;
   assert(start()&&tap);std::ifstream cases(root+"/cases.tsv");assert(cases);std::string key;int expected;
   while(cases>>key>>expected){std::ifstream f(root+"/"+key+".ip6",std::ios::binary);assert(f);std::vector<uint8_t> packet{std::istreambuf_iterator<char>(f),{}};sends=0;allocations=0;
-    const uint8_t peer[6]={1,2,3,4,5,6};insideCallback=true;tap(nullptr,peer,packet.data(),packet.size());insideCallback=false;
+    const uint8_t peer[6]={1,2,3,4,5,6};insideCallback=true;
+    const size_t packetLength=awdl_ip6_packet_length(packet.data(),packet.size());
+    if(packetLength)tap(nullptr,peer,packet.data(),packetLength);
+    insideCallback=false;
     if(sends!=unsigned(expected)){std::fprintf(stderr,"FAIL %s expectedEmit=%d actual=%u\n",key.c_str(),expected,sends);++failures;}
     if(allocations){std::fprintf(stderr,"FAIL callback allocated %zu for %s\n",allocations,key.c_str());++failures;}
     if(key=="service-ptr"&&sends)save(root+"/response.bin",sent,sentLength);

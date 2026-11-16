@@ -146,6 +146,11 @@ void AirDropReceiveActivity::decide(const bool accept) {
     // validation and delivery; receiver snapshot already uses this lock order.
     if (!airdrop::Receiver::instance().decide(routedIdentity_, accept)) {
       LOG_ERR("AIRDROP", "Offer decision rejected or decision queue unavailable");
+      decisionSent_ = false;
+      paintedPending_ = true;
+    } else {
+      LOG_INF("AIRDROP", "Offer %llu decision queued: %s", static_cast<unsigned long long>(routedIdentity_.offer),
+              accept ? "accept" : "decline");
     }
   }
   requestUpdate();
@@ -253,7 +258,7 @@ void AirDropReceiveActivity::loop() {
     }
   }
   if (previousState != status_.state || identityChanged || previousOwnership != status_.ownershipUncertain ||
-      ((previousRevision != status_.revision || status_.state == airdrop::State::Pending) &&
+      ((previousRevision != status_.revision && status_.state != airdrop::State::Pending) &&
        status_.nowMs - lastPaintRequestMs_ >= PaintIntervalMs)) {
     lastPaintRequestMs_ = status_.nowMs;
     requestUpdate();
@@ -375,12 +380,14 @@ void AirDropReceiveActivity::buildScreen(UiApp::ScreenType& screen) {
     text(status_.state == airdrop::State::Publishing ? tr(STR_AIRDROP_VERIFYING) : tr(STR_AIRDROP_RECEIVING), 2, false, true);
     text(status_.offer.filename, 2, true);
     fui::ProgressBarProps progress;
-    progress.value = static_cast<int32_t>(std::min<uint64_t>(status_.committedBytes, airdrop::MaxFileBytes));
+    const uint32_t received = static_cast<uint32_t>(std::min<uint64_t>(status_.payloadBytes, status_.offer.fileSize));
+    progress.value = static_cast<int32_t>(received);
     progress.max = static_cast<int32_t>(std::max<uint32_t>(1, status_.offer.fileSize));
     fui::progressBar(screen.frame(), screen.takeTop(theme.spaceLg, theme.spaceMd), progress);
-    std::snprintf(textBuffer_, sizeof(textBuffer_), tr(STR_AIRDROP_PROGRESS), static_cast<unsigned long>(status_.wireBytes),
-                  static_cast<unsigned long>(status_.payloadBytes), static_cast<unsigned long>(status_.committedBytes));
-    text(textBuffer_, 3, true);
+    const unsigned percent = status_.offer.fileSize ? static_cast<unsigned>(uint64_t(received) * 100 / status_.offer.fileSize) : 100;
+    std::snprintf(textBuffer_, sizeof(textBuffer_), tr(STR_AIRDROP_PROGRESS), percent,
+                  static_cast<unsigned long>(received), static_cast<unsigned long>(status_.offer.fileSize));
+    text(textBuffer_, 2, true);
   } else if (status_.state == airdrop::State::Success) {
     text(tr(STR_AIRDROP_RECEIVED), 2, false, true); text(status_.savedPath, 3, true);
   } else if (status_.state == airdrop::State::UrlReady) {

@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <vector>
@@ -145,7 +147,6 @@ static bool hostile() {
   CHECK(rejected(record(archive("dir/book.txt"), true)));
   CHECK(rejected(record(archive("book.txt", "abc", 0120644), false)));
   CHECK(rejected(record(archive("book.txt", "abc", 0100644, 2), false)));
-  CHECK(rejected(record(archive("book.txt", "abc", 0100755), false)));
   CHECK(rejected(record(archive("book.txt", "abc", 0500644), false)));
   CHECK(rejected(record(archive("other.txt"), false)));
   auto bytes = archive();
@@ -173,7 +174,7 @@ static bool hostile() {
   CHECK(rejected({0x80, 0x10, 0, 1}));
   CHECK(rejected(record(archive(), false), manifest("book.txt", kMaxPayload + 1)));
   CHECK(rejected(record(header("book.txt", kMaxPayload + 1), false), manifest("book.txt", kMaxPayload)));
-  for (const auto name : {"foo .txt", "aux.txt", "COM1.txt", "book.txt.", "bad\\name.txt", "book.exe"}) {
+  for (const auto name : {"foo .txt", "aux.txt", "COM1.txt", "book.txt.", "bad\\name.txt"}) {
     CHECK(rejected(record(archive(name), false), manifest(name)));
   }
   auto decoder = std::make_unique<Decoder>();
@@ -189,6 +190,15 @@ static bool hostile() {
   CHECK(decoder->reset(manifest(), {&output, append, cancelled}));
   CHECK(!push(*decoder, bytes));
   CHECK(decoder->finish() == Status::Error);
+  for (const char* name : {"report.pdf", "photo.jpg", "bundle.zip", "firmware.bin", "font.ttf", "README", "run.sh", "book.exe"}) {
+    for (bool compressed : {false, true}) {
+      auto accepted = std::make_unique<Decoder>();
+      Output bytes{};
+      CHECK(accepted->reset(manifest(name), {&bytes, append, cancelled}));
+      CHECK(push(*accepted, record(archive(name, std::string("\0\xff\x80", 3), 0100755), compressed), 1));
+      CHECK(accepted->finish() == Status::Complete && bytes.bytes == 3);
+    }
+  }
   return true;
 }
 
@@ -241,12 +251,21 @@ static bool boundaries() {
   CHECK(decoder->finish() == Status::Complete);
   bytes.push_back(0);
   CHECK(rejected(record(bytes, false)));
+  for(const char* name : {"x\xe2\x80\x8e.txt", "x\xe2\x80\x8f.txt", "x\xe2\x80\xa8.txt", "x\xe2\x80\xa9.txt", "x\xef\xbb\xbf.txt"}) CHECK(!safeName(name,std::strlen(name)));
   CHECK(!safeName("bad\xE2\x80\xAE.txt", 10));
   CHECK(!safeName("bad\xC0\xAF.txt", 9));
   return true;
 }
 
 static bool wrappers() {
+  for (const uint32_t links : {0u,1u,2u,3u,17u,65535u}) for(bool compressed : {false,true}) {
+    auto bytes=header(".",0,0040755,links);add(bytes,archive("./book.txt"));
+    auto decoder=std::make_unique<Decoder>();Output output{};auto accepted=manifest();
+    std::strcpy(accepted.archivePath,"./book.txt");
+    CHECK(decoder->reset(accepted,{&output,append,cancelled}));
+    CHECK(push(*decoder,record(bytes,compressed),1));
+    CHECK(decoder->finish()==Status::Complete&&output.bytes==3);
+  }
   auto bytes = header(".", 0, 0040755, 2);
   add(bytes, header("./._book.txt", 4));
   bytes.insert(bytes.end(), 4, 0x42);
@@ -291,7 +310,21 @@ static bool large(bool compressed) {
   return true;
 }
 
-int main() {
+static bool nativeArchive(const char* path) {
+  std::ifstream file(path,std::ios::binary);CHECK(file);
+  const std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(file),{}};
+  for(bool compressed : {false,true}) {
+    auto decoder=std::make_unique<Decoder>();Output output{};auto accepted=manifest();
+    std::strcpy(accepted.archivePath,"./book.txt");
+    CHECK(decoder->reset(accepted,{&output,append,cancelled}));
+    CHECK(push(*decoder,record(bytes,compressed),1));
+    CHECK(decoder->finish()==Status::Complete&&output.bytes==3);
+  }
+  return true;
+}
+
+int main(int argc,char** argv) {
+  if(argc==2&&!nativeArchive(argv[1]))return 1;
   if (!small() || !hostile() || !boundaries() || !wrappers() || !large(false) || !large(true)) return 1;
   std::printf("stream tests passed; decoder fixed workspace=%zu bytes; exact payload=%u bytes stored/zlib\n",
               sizeof(Decoder), kMaxPayload);

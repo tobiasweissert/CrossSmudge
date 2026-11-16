@@ -1,0 +1,5 @@
+# Regenerate with:
+# python3 scripts/generate_icons.py --library crosssmudge \
+#   --manifest src/components/icons/airdropIcons.manifest \
+#   --sizes 32 --out src/components/icons/airdropIcons.h
+airdrop = airdrop

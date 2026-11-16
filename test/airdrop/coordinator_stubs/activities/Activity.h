@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #define LOG_ERR(...) ((void)0)
+#define LOG_INF(...) ((void)0)
 #define tr(...) ""
 #define STR_BACK 1
 #define STR_SELECT 2

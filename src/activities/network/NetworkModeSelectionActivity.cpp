@@ -9,6 +9,9 @@
 #include "components/UITheme.h"
 #include "components/UIThemeTokens.h"
 #include "components/icons/listIcons.h"
+#if CROSSINK_APP_CAP_AIRDROP
+#include "components/icons/airdropIcons.h"
+#endif
 #include "components/icons/readingStatsIcons.h"
 #include "fontIds.h"
 
@@ -211,6 +214,10 @@ void NetworkModeSelectionActivity::buildListScreen(UiApp::ScreenType& screen) {
       item.icon = fui::bitmapFromIcon(icon_chevrons_left_right_ellipsis_32);
     } else if (menuModes[i] == NetworkMode::NEARBY_STATS_SYNC) {
       item.icon = fui::bitmapFromIcon(icon_reading_stats_32);
+#if CROSSINK_APP_CAP_AIRDROP
+    } else if (menuModes[i] == NetworkMode::AIRDROP_RECEIVE) {
+      item.icon = fui::bitmapFromIcon(icon_airdrop_32);
+#endif
     } else {
       item.icon = listIconFor(menuIcons[i], 32);  // subtitle rows carry the larger icon
     }

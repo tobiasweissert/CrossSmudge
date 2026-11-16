@@ -824,7 +824,9 @@ EPUB layout cache versions and identities are unchanged by this catalog.
 Native AirDrop writes four exclusive immutable 512-byte publication records:
 Receiving, CompleteStaged, PublishAttempted and PublishedVerified. `payload.part`
 stays in this hidden session directory until one no-overwrite rename into Inbox.
-These records do not change any EPUB cache format.
+These records do not change any EPUB cache format. Any regular file type,
+including extensionless names, is stored as opaque bytes; size and SHA256
+readback checks apply without EPUB or text-content filtering.
 
 | Offset | Field |
 | --- | --- |

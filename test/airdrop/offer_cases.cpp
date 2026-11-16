@@ -14,10 +14,11 @@ int main(int argc, char** argv) {
   assert(argc == 2);
   assert(safeFilename("ordinary.epub") && safeFilename("book.txt"));
   assert(!safeFilename("book .txt") && !safeFilename("book..epub") && !safeFilename("CON.txt"));
+  for(const char* name : {"x\xe2\x80\x8e.txt", "x\xe2\x80\x8f.txt", "x\xe2\x80\xa8.txt", "x\xe2\x80\xa9.txt", "x\xef\xbb\xbf.txt"}) assert(!safeFilename(name));
   static OfferScratch scratch;
   static Offer offer;
-  const char* good[] = {"url", "url_noid", "url_utf16_sender", "file", "file_limit", "file_noid", "large_icon", "ask_limit"};
-  const char* bad[] = {"ask_over", "file_wrapper", "mixed", "batch", "empty", "http", "bare", "userinfo", "private_literal", "encoded_slash", "control_url", "long_url", "file_over", "traversal", "unsafe_fat", "device_name", "directory", "bad_size", "executable", "bad_utf16", "bad_offset", "cycle", "duplicate_key", "bad_ref", "bad_type", "bad_trailer", "huge_object_count", "too_deep", "bad_bom"};
+  const char* good[] = {"dynamic_type", "no_type", "pdf", "image", "archive", "binary", "font", "extensionless", "script", "url", "url_noid", "url_utf16_sender", "file", "file_limit", "file_noid", "large_icon", "ask_limit"};
+  const char* bad[] = {"ask_over", "file_wrapper", "mixed", "batch", "empty", "http", "bare", "userinfo", "private_literal", "encoded_slash", "control_url", "long_url", "file_over", "traversal", "unsafe_fat", "device_name", "directory", "bad_size", "bad_utf16", "bad_offset", "cycle", "duplicate_key", "bad_ref", "bad_type", "bad_trailer", "huge_object_count", "too_deep", "bad_bom"};
   auto check = [&](const char* name, bool expected) {
     std::ifstream f(std::string(argv[1]) + "/" + name, std::ios::binary);
     std::vector<uint8_t> b((std::istreambuf_iterator<char>(f)), {});

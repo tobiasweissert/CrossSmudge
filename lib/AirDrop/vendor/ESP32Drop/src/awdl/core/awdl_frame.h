@@ -43,6 +43,14 @@
 #include <stdbool.h>
 #include "awdl_window.h"
 
+/* Captures may include a Wi-Fi FCS or link padding after the IPv6 packet.
+ * Never expose those bytes to DNS/lwIP, or accept a truncated declared payload. */
+static inline size_t awdl_ip6_packet_length(const uint8_t *ip, size_t captured) {
+  if (!ip || captured < 40 || (ip[0] >> 4) != 6) return 0;
+  const size_t length = 40u + ((size_t)ip[4] << 8) + ip[5];
+  return length <= captured ? length : 0;
+}
+
 /* Buffer floor the caller must provide. The builder emits a variable-length frame and
  * does NOT bounds-check each of its ~180 writes -- that would be 180 branches guarding
  * against a caller who passed a buffer too small for a frame whose size is known in

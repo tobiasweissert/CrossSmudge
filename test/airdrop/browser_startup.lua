@@ -13,6 +13,8 @@ smudge.take_launch_url=function()
 end
 smudge.ack_launch_url=function(token)
  assert(test_idle(),'URL acked while startup work owned Browser')
+ local valid,accepted=pcall(ack,token+4294967296)
+ assert(not valid or not accepted,"wrapped token acknowledged current attempt")
  acks=acks+1;return ack(token)
 end
 local function drain()

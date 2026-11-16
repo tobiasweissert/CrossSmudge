@@ -8,6 +8,7 @@
 #include "network/AirDropReceiver.h"
 #include <browser/BrowserLaunch.h>
 #define LOG_ERR(...) ((void)0)
+#define LOG_INF(...) ((void)0)
 namespace CrossPointSettings {enum class SHORT_PWRBTN{SLEEP};}
 static int lockDepth=0,decisionCalls=0,stopCalls=0,navigations=0,resolveCalls=0,disconnectCalls=0,browserCalls=0,startCalls=0;
 static bool lastHome=false;

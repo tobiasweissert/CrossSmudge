@@ -19,6 +19,8 @@ struct Harness {
   std::vector<std::string> events;
   std::vector<uint8_t> output;
   std::string failure;
+  std::vector<std::string> failuresReported;
+  bool responseCloses=false;
   Offer offered{};OfferIdentity identity{},queued{};
   uint64_t clock=1000,sequence=0,requestOffset=0,deadline=0;
   size_t position=0,split=2048;
@@ -35,6 +37,7 @@ struct Harness {
   }
   static bool write(void* p,const uint8_t* data,size_t n,uint64_t deadline){auto& h=self(p);assert(h.clock<deadline);if(h.writeFail)return false;
     std::string value(reinterpret_cast<const char*>(data),n);
+    if(value.find("Connection: close\r\n")!=std::string::npos)h.responseCloses=true;
     if(value.rfind("HTTP/1.1 ",0)==0){int code=std::stoi(value.substr(9,3));h.codes.push_back(code);h.events.push_back("http:"+std::to_string(code));if(code==200&&h.slowAcceptedUrl)h.clock=h.deadline+1;}
     else h.events.push_back("response-body");
     return true; // A local write may succeed after peer FIN; alive() remains the explicit peer signal.
@@ -63,7 +66,7 @@ struct Harness {
   static void cancelFile(void* p){auto& h=self(p);++h.cancels;h.events.push_back("cancel-file");}
   static void progress(void*,uint64_t,uint64_t){}
   static void urlAccepted(void* p,const Offer& offer,const OfferIdentity& id){auto& h=self(p);++h.handovers;h.events.push_back("url-handoff");assert(offer.kind==OfferKind::Url&&equal(h.identity,id));}
-  static void failed(void* p,const char* reason){self(p).failure=reason;}
+  static void failed(void* p,const char* reason){self(p).failure=reason;self(p).failuresReported.emplace_back(reason);}
   void serve(uint64_t connection=1){
     Io io{this,read,write,alive,now,wait};Backend backend{this,cancelled,pending,decision,beginFile,append,finishFile,cancelFile,progress,urlAccepted,failed};
     OfferIdentity token{};token.generation=1;token.session=connection;token.connection=connection;token.interfaceIndex=3;token.peer[0]=0xfe;token.peer[1]=0x80;token.peer[15]=1;
@@ -86,6 +89,11 @@ int failures=0;
 }
 int main(int argc,char** argv){
   assert(argc==2);std::string root=argv[1];auto url=load(root,"url.plist"),file=load(root,"file.plist"),legacy=load(root,"file-noid.plist"),stored=load(root,"stored.dvzip"),compressed=load(root,"zlib.dvzip");
+  {Harness h;h.input=request("/Discover",{});h.serve();
+    CHECK("discovery closes promptly for separate Ask",h.responseCloses&&h.count(200)==1&&h.waits==0&&h.pendingCount==0);
+    h.reconnect(request("/Ask",file));add(h.input,request("/Upload",stored,uploadHeaders));h.serve(2);
+    CHECK("separate Ask after discovery",h.pendingCount==1&&h.count(200)==3&&h.finishes==1);
+  }
   for(size_t split:{size_t(1),size_t(2),size_t(7),size_t(17),size_t(2048)}){
     Harness h;h.input=request("/Ask",url);h.split=split;h.wouldBlockEvery=3;h.serve();
     CHECK("native URL",h.pendingCount==1&&h.count(200)==1&&h.handovers==1&&h.fileBegins==0&&h.output.empty());
@@ -104,6 +112,23 @@ int main(int argc,char** argv){
     CHECK("file pipeline",h.count(200)==2&&h.count(100)==1&&h.fileBegins==1&&h.finishes==1&&h.cancels==0&&std::string(h.output.begin(),h.output.end())=="abc");
     CHECK("publication before success",h.event("accept")<h.event("http:200")&&h.event("http:200")<h.event("begin-file")&&h.event("accept")<h.event("begin-file")&&h.event("begin-file")<h.event("http:100")&&h.event("finish-file")<h.events.size()&&h.events.back()=="http:200");
   }
+  for(const char* mime : {"application/x-cpio; charset=utf-8", "application/x-apple-cpio", "application/octet-stream", ""}) {
+    std::string headers="TransferID: A3F34E01-1234-5678-ABCD-EF0123456789\r\n";
+    if(*mime)headers+=std::string("Content-Type: ")+mime+"\r\n";
+    Harness h;h.input=request("/Ask",file);add(h.input,request("/Upload",stored,headers));h.serve();
+    CHECK("MIME metadata does not reject valid approved archive",h.count(200)==2&&h.finishes==1&&std::string(h.output.begin(),h.output.end())=="abc");
+    Harness invalid;invalid.input=request("/Ask",file);add(invalid.input,request("/Upload",{'b','a','d'},headers));invalid.serve();
+    CHECK("MIME metadata cannot bypass archive validation",invalid.finishes==0&&invalid.count(200)==1&&invalid.cancels==1);
+  }
+  for(bool zipped:{false,true})for(size_t split:{size_t(1),size_t(13),size_t(2048)}){
+    Harness h;h.input=request("/Ask",file);auto archive=zipped?compressed:stored;archive.resize(archive.size()-4);
+    auto upload=request("/Upload",archive,uploadHeaders,true);upload.resize(upload.size()-5); // no HTTP zero chunk
+    add(h.input,upload);h.split=split;h.serve();
+    CHECK("native archive completion without HTTP last chunk",h.finishes==1&&h.cancels==0&&h.count(200)==2&&h.responseCloses&&h.clock<16000&&std::string(h.output.begin(),h.output.end())=="abc");
+  }
+  {Harness h;h.input=request("/Ask",file);auto corrupt=compressed;corrupt[corrupt.size()-5]^=1;auto upload=request("/Upload",corrupt,uploadHeaders,true);upload.resize(upload.size()-5);add(h.input,upload);h.serve();
+    CHECK("archive completion cannot bypass zlib checksum",h.finishes==0&&h.cancels==1&&h.count(200)==1);
+  }
   {Harness h;h.input=request("/Upload",stored,uploadHeaders);h.serve();CHECK("unauthorized Upload",h.pendingCount==0&&h.count(100)==0&&h.count(200)==0&&h.fileBegins==0);}
   {Harness h;h.input=request("/Ask",file);std::string wrong=uploadHeaders;wrong.replace(wrong.find("A3F34E01"),8,"B3F34E01");add(h.input,request("/Upload",stored,wrong));h.serve();CHECK("wrong TransferID",h.count(200)==1&&h.count(100)==0&&h.fileBegins==0);}
   for(bool expired : {false,true}) {Harness h;h.input=request("/Ask",file);add(h.input,request("/Upload",stored,uploadHeaders));h.disconnectOnFinish=!expired;h.deadlineOnFinish=expired;h.serve();CHECK("no final ACK after publication loses live deadline/channel",h.count(200)==1&&h.finishes==1&&h.cancels==0);}
@@ -112,6 +137,10 @@ int main(int argc,char** argv){
   {Harness h;h.input=request("/Ask",file);add(h.input,request("/Upload",stored,uploadHeaders));h.serve();auto begins=h.fileBegins;h.reconnect(request("/Upload",stored,uploadHeaders));h.serve(2);CHECK("replayed Upload",h.count(200)==2&&h.count(100)==1&&h.fileBegins==begins&&h.finishes==1);}
   {Harness h;h.input=request("/Ask",file);add(h.input,request("/Upload",stored,uploadHeaders));h.serve();h.reconnect(request("/Ask",file));add(h.input,request("/Upload",stored,uploadHeaders));h.serve(2);CHECK("fresh approval every transfer",h.pendingCount==2&&h.count(200)==4&&h.count(100)==2&&h.fileBegins==2&&h.finishes==2&&h.sequence==2);}
   for(int fault=0;fault<4;++fault){Harness h;h.input=request("/Ask",file);auto archive=stored;if(fault==3)archive.resize(archive.size()-6);add(h.input,request("/Upload",archive,uploadHeaders));h.stageFail=fault==0;h.appendFail=fault==1;h.finishFail=fault==2;h.eofDisconnect=true;h.serve();CHECK("storage/archive error",h.count(200)==1&&h.handovers==0);if(fault)CHECK("partial cancelled",h.cancels==1);if(fault==1||fault==3)CHECK("no finish invalid bytes",h.finishes==0);}
+  {Harness h;h.input=request("/Ask",file);auto incomplete=request("/Upload",stored,uploadHeaders);incomplete.resize(incomplete.size()-1);add(h.input,incomplete);h.waitMs=1000;h.serve();
+    CHECK("stalled incomplete HTTP body cannot publish",h.finishes==0&&h.cancels==1&&h.count(200)==1);
+    CHECK("input stall identifies byte counts",std::any_of(h.failuresReported.begin(),h.failuresReported.end(),[](const auto& reason){return reason.find("15-second input stall; wire=")!=std::string::npos&&reason.find("file=3")!=std::string::npos;}));
+  }
   {Harness h;h.input=request("/Ask",url,"Content-Length: 1\r\n");h.serve();CHECK("duplicate framing",h.count(200)==0&&h.pendingCount==0&&h.fileBegins==0);}
   {Harness h;h.input=request("/Ask",url);h.writeFail=true;h.serve();CHECK("failed ack write",h.handovers==0&&h.fileBegins==0);}
   std::printf("production Session tests: failures=%d workspace=%zu; no device proof\n",failures,sizeof(Workspace));return failures?1:0;

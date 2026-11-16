@@ -3,6 +3,20 @@
 int main(int argc,char** argv){
   assert(argc==2);std::string mode=argv[1];
   using namespace airdrop;
+  if(mode=="empty-file"){
+    Context c;status.committedBytes=0;completeStatus(c);assert(status.state==State::Stopped);
+    assert(finishFile(&c)&&c.fileCommitted&&status.committedBytes==0);
+    completeStatus(c);assert(status.state==State::Success);
+    c.storage.succeeds=false;assert(!finishFile(&c));completeStatus(c);assert(status.state==State::Error);
+    std::puts("PASS zero-byte committed file remains successful through real cleanup selection");return 0;
+  }
+  if(mode=="request-failure"){
+    Context c;state(State::Pending);protocolFailure(&c,"invalid request");
+    assert(!c.failed&&status.state==State::Listening);
+    failure(c,"storage failure");protocolFailure(&c,"publication failed");
+    assert(c.failed&&status.state==State::Error);
+    std::puts("PASS failed request returns to listening without clearing storage failure");return 0;
+  }
   if(mode=="queue"){
     Offer offer;offer.kind=OfferKind::Url;OfferIdentity token{};token.generation=1;token.session=2;token.offer=3;token.connection=4;token.interfaceIndex=5;token.peer[15]=6;
     auto& receiver=Receiver::instance();pending(nullptr,offer,token,2000);
