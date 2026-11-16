@@ -35,6 +35,11 @@ class LuaRunner {
   void onButton(const char* buttonName, bool isPressed);
   void onTouch(int x, int y, const char* eventType);
   void onTap(int x, int y);
+  bool hasLongPressHandler();
+  void onLongPress(int x, int y);
+  bool hasTouchReleaseHandler();
+  bool hasActiveTouchHold() const { return touchHoldActive_; }
+  void onTouchRelease();
   void onSwipe(const char* dir);
   void onExit();
 
@@ -54,9 +59,8 @@ class LuaRunner {
   bool hasError() const { return hasError_; }
   const std::string& getErrorMessage() const { return errorMessage_; }
 
-  bool needsNetworkPermission() const { return http_.domains.count && !http_.allowed; }
+  bool networkEnabled() const { return http_.allowed; }
   const http::Domains& networkDomains() const { return http_.domains; }
-  bool allowNetwork();
 
   bool preventAutoSleep() const { return preventAutoSleep_.load(std::memory_order_relaxed); }
   void setPreventAutoSleep(bool prevent) { preventAutoSleep_.store(prevent, std::memory_order_relaxed); }
@@ -75,12 +79,15 @@ class LuaRunner {
   bool hasError_ = false;
   bool redrawRequested_ = false;
   bool fullRefreshRequested_ = false;
+  bool touchHoldActive_ = false;
+  int touchHoldX_ = 0, touchHoldY_ = 0;
   std::atomic<bool> preventAutoSleep_{false};
   std::string errorMessage_;
 
   // Memory sandbox tracking
   size_t currentAllocatedBytes_ = 0;
   size_t maxLuaHeapBytes_ = 0;
+  bool luaHeapUsesPsram_ = false;
 
   static void* customLuaAlloc(void* ud, void* ptr, size_t osize, size_t nsize);
 

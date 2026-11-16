@@ -136,6 +136,8 @@ class MappedInputManager {
   // (which wasScreenTapped never reports). InputSnapshot builders forward it
   // off-target so FreeInkUI routing clears its pressed-element state.
   bool wasScreenTouchReleased() const;
+  // Physical contact survives tap suppression after an opt-in Lua hold.
+  bool isScreenContactActive() const;
   bool wasTapInRect(int x, int y, int width, int height) const;
   bool wasListItemTapped(int& index, int itemCount, int selectedIndex, int listTop, int listHeight,
                          bool hasSubtitle) const;
@@ -198,6 +200,7 @@ class MappedInputManager {
   constexpr bool wasCoverTapped(int&) const { return false; }
   constexpr bool wasCoverTouchedDown(int&) const { return false; }
   constexpr bool wasScreenTouchReleased() const { return false; }
+  constexpr bool isScreenContactActive() const { return false; }
   constexpr bool wasTapInRect(int, int, int, int) const { return false; }
   constexpr bool wasListItemTapped(int&, int, int, int, int, bool) const { return false; }
   constexpr bool wasListItemTouchedDown(int&, int, int, int, int, bool) const { return false; }

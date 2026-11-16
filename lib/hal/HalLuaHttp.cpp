@@ -1,15 +1,15 @@
 #include "HalLuaHttp.h"
 #ifndef SIMULATOR
+#include <AppNetworkPolicy.h>
 #include <Arduino.h>
 #include <Logging.h>
-#include <Preferences.h>
+#include <HalClock.h>
 #include <WiFi.h>
 #include <esp_crt_bundle.h>
 #include <esp_heap_caps.h>
 #include <esp_timer.h>
 #include <esp_tls.h>
 #include <lwip/netdb.h>
-#include <mbedtls/sha256.h>
 #include <mbedtls/ssl.h>
 #include <mbedtls/x509_crt.h>
 #include <ctime>
@@ -21,22 +21,31 @@ std::atomic<TaskHandle_t> budgetTask{nullptr};
 ink::http::AllocationBudget* activeBudget=nullptr;
 portMUX_TYPE timeMux=portMUX_INITIALIZER_UNLOCKED;
 int64_t trustedEpoch=0, trustedMono=0;
-// Copy one synchronized anchor; SNTP cannot move the trusted clock after consent.
+// Pin one synchronized anchor; later wall-clock changes cannot move TLS time.
 int64_t trustedNow() {
   portENTER_CRITICAL(&timeMux);
   auto epoch=trustedEpoch;auto mono=trustedMono;
   portEXIT_CRITICAL(&timeMux);
   return epoch ? epoch+(esp_timer_get_time()-mono)/1000000 : 0;
 }
-void digest(const std::string& app, const ink::http::Domains& domains, unsigned char out[32]) {
-  mbedtls_sha256_context c;mbedtls_sha256_init(&c);mbedtls_sha256_starts(&c,0);
-  mbedtls_sha256_update(&c,reinterpret_cast<const unsigned char*>(app.c_str()),app.size()+1);
-  for(size_t i=0;i<domains.count;++i)mbedtls_sha256_update(&c,reinterpret_cast<const unsigned char*>(domains.names[i]),strlen(domains.names[i])+1);
-  mbedtls_sha256_finish(&c,out);mbedtls_sha256_free(&c);
+bool pinTime(HalLuaHttp::TimeProposal proposal) {
+  const auto elapsed=esp_timer_get_time()-proposal.monotonicUs;
+  if(proposal.epoch<1735689600 || proposal.epoch>4102444800LL || elapsed<0 || elapsed>300000000)return false;
+  portENTER_CRITICAL(&timeMux);
+  trustedMono=proposal.monotonicUs;trustedEpoch=proposal.epoch;
+  portEXIT_CRITICAL(&timeMux);
+  return true;
 }
-void keyFor(const std::string& app,char key[16]) {
-  unsigned char hash[32];ink::http::Domains empty;digest(app,empty,hash);
-  for(int i=0;i<7;++i)snprintf(key+i*2,3,"%02x",hash[i]);
+bool prepareTime(ink::http::Job& job) {
+  if(job.cancel.load()){job.result.error="cancelled";return false;}
+  if(trustedNow())return true;
+  // Runs in the existing HTTP worker, keeping the UI responsive during NTP.
+  if(!halClock.hasSynchronizedSystemTime() && !halClock.syncSystemTimeFromNTP()) {
+    job.result.error="time_sync_failed";return false;
+  }
+  if(job.cancel.load()){job.result.error="cancelled";return false;}
+  if(!pinTime(HalLuaHttp::proposeTime())){job.result.error="time_sync_failed";return false;}
+  return true;
 }
 int compare(const mbedtls_x509_time& a,const tm& b) {
   const int x[]={a.year,a.mon,a.day,a.hour,a.min,a.sec};
@@ -49,8 +58,11 @@ bool connect(void* p,const char* host,uint32_t timeout,const std::atomic<bool>& 
   auto& c=*static_cast<Connection*>(p);c.cancel=&cancel;c.start=millis();c.timeout=timeout;
   if(!trustedNow() || WiFi.status()!=WL_CONNECTED)return false;
   // TLS needs two 16 KiB records plus certificates, stack and WiFi. Fail before creating it on a crowded C3.
-  if(heap_caps_get_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT)<112*1024 ||
-     heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT)<40*1024) {
+  const auto internalFree=heap_caps_get_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT);
+  const auto internalBlock=heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT);
+  LOG_INF("LHTTP","TLS heap: free=%u largest=%u psram=%u",unsigned(internalFree),unsigned(internalBlock),
+          unsigned(heap_caps_get_free_size(MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)));
+  if(internalFree<112*1024 || internalBlock<40*1024) {
     LOG_ERR("LHTTP","Insufficient internal heap for TLS");return false;
   }
   addrinfo hints{};hints.ai_family=AF_INET;hints.ai_socktype=SOCK_STREAM;
@@ -105,7 +117,7 @@ int write(void* p,const char* data,size_t n){return transfer(*static_cast<Connec
 void close(void* p){auto& c=*static_cast<Connection*>(p);if(c.tls){esp_tls_conn_destroy(c.tls);c.tls=nullptr;}}
 uint32_t clockMs(void*){return millis();}
 void execute(void*,ink::http::Job& job) {
-  if(!trustedNow()){job.result.error="time_untrusted";return;}
+  if(!prepareTime(job))return;
   activeBudget=&job.tlsBudget;
   budgetTask.store(xTaskGetCurrentTaskHandle(),std::memory_order_release);
   Connection c;
@@ -113,6 +125,9 @@ void execute(void*,ink::http::Job& job) {
   ink::http::exchange(job.request,job.result,job.scratch,io,job.cancel);
   budgetTask.store(nullptr,std::memory_order_release);
   activeBudget=nullptr;
+  LOG_INF("LHTTP","Complete: status=%d bytes=%u free=%u largest=%u",job.result.status,unsigned(job.result.size),
+          unsigned(heap_caps_get_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT)),
+          unsigned(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT)));
   if(job.tlsBudget.used()) LOG_ERR("LHTTP","TLS allocations retained after close");
   if(job.result.error)LOG_ERR("LHTTP","Request failed: %s",job.result.error);
 }
@@ -149,29 +164,20 @@ extern "C" void __wrap_esp_mbedtls_mem_free(void* p) {
 }
 
 namespace HalLuaHttp {
-bool approved(const std::string& app,const ink::http::Domains& domains) {
-  if(!domains.count)return false;
-  Preferences prefs;if(!prefs.begin("lua_https",true))return false;
-  unsigned char expected[32],saved[32];char key[16]{};keyFor(app,key);digest(app,domains,expected);
-  bool yes=prefs.getBytesLength(key)==sizeof(saved) && prefs.getBytes(key,saved,sizeof(saved))==sizeof(saved) && !memcmp(expected,saved,32);
-  prefs.end();return yes;
+bool networkEnabled() {
+  bool readOk;
+  const bool enabled = ink::http::networkEnabled(readOk);
+  if (!readOk) LOG_ERR("LHTTP", "Cannot read app network setting; networking disabled");
+  return enabled;
 }
-bool approve(const std::string& app,const ink::http::Domains& domains) {
-  if(!domains.count)return false;
-  Preferences prefs;if(!prefs.begin("lua_https",false)){LOG_ERR("LHTTP","Cannot open grants");return false;}
-  unsigned char expected[32];char key[16]{};keyFor(app,key);digest(app,domains,expected);
-  bool ok=prefs.putBytes(key,expected,sizeof(expected))==sizeof(expected);prefs.end();
-  if(!ok)LOG_ERR("LHTTP","Cannot save grant");return ok;
+bool setNetworkEnabled(bool enabled) {
+  const bool ok = ink::http::setNetworkEnabled(enabled);
+  if (!ok) LOG_ERR("LHTTP", "Cannot save app network setting");
+  return ok;
 }
-bool revokeAll(){Preferences p;if(!p.begin("lua_https",false))return false;bool ok=p.clear();p.end();return ok;}
 TimeProposal proposeTime(){return {time(nullptr),esp_timer_get_time()};}
 bool trustTime(TimeProposal proposal){
-  auto elapsed=esp_timer_get_time()-proposal.monotonicUs;
-  if(proposal.epoch<1735689600 || proposal.epoch>4102444800LL || elapsed<0 || elapsed>300000000 || ink::http::Session::busy())return false;
-  portENTER_CRITICAL(&timeMux);
-  trustedMono=proposal.monotonicUs;trustedEpoch=proposal.epoch;
-  portEXIT_CRITICAL(&timeMux);
-  return true;
+  return !ink::http::Session::busy() && pinTime(proposal);
 }
 bool timeTrusted(){return trustedNow()!=0;}
 bool wifiConnected(){return WiFi.status()==WL_CONNECTED && WiFi.localIP()!=IPAddress(0,0,0,0);}

@@ -460,6 +460,15 @@ bool MappedInputManager::wasFrontButtonHintTouchedDown(const uint8_t buttonIndex
 
 bool MappedInputManager::wasScreenTouchReleased() const { return gpio.wasTouchReleased(); }
 
+bool MappedInputManager::isScreenContactActive() const {
+  if (!touchInputEnabled()) return false;
+#ifdef SIMULATOR
+  if (simulatorTouch.pressed) return true;
+#endif
+  if (!gpio.isTouchPressed()) return false;
+  return !gpio.supportsMultiTouch() || gpio.getTouchSnapshot().reportedCount == 1;
+}
+
 bool MappedInputManager::wasTapInRect(const int x, const int y, const int width, const int height) const {
   int tx = 0;
   int ty = 0;

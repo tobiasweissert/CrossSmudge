@@ -6,10 +6,6 @@
 
 #include "SmudgeSettings.h"
 #include <HalLuaHttp.h>
-#include <ctime>
-#include "Memory.h"
-#include "activities/util/ConfirmationActivity.h"
-#include "activities/apps/lua/LuaConsentActivity.h"
 #include "activities/Activity.h"
 #include "components/UITheme.h"
 
@@ -29,7 +25,7 @@ class AppSettingsActivity : public Activity {
 
   void loop() override {
     auto& settings = SmudgeSettings::getInstance();
-    constexpr int totalItems = 4;
+    constexpr int totalItems = 3;
 
     if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
       settings.save();
@@ -70,7 +66,7 @@ class AppSettingsActivity : public Activity {
     const int menuHeight = pageHeight - startY - metrics.buttonHintsHeight - metrics.verticalSpacing;
 
     auto& settings = SmudgeSettings::getInstance();
-    constexpr int totalItems = 4;
+    constexpr int totalItems = 3;
 
     // 1. Draw Header
     GUI.drawHeader(renderer, Rect{0, headerY, pageWidth, headerH}, "App Settings");
@@ -86,8 +82,7 @@ class AppSettingsActivity : public Activity {
             return (settings.sortMode == MenuSortMode::MostUsed) ? "Most Frequently Used  [Active]"
                                                                  : "Most Frequently Used";
           }
-          if (index == 2) return tr(STR_LUA_NETWORK_REVOKE);
-          if (index == 3) return tr(STR_LUA_TRUST_TIME);
+          if (index == 2) return HalLuaHttp::networkEnabled() ? tr(STR_LUA_NETWORK_DISABLE) : tr(STR_LUA_NETWORK_ENABLE);
           return "";
         },
         [](int index) { return (index == 0) ? UIIcon::Applications : UIIcon::Recent; });
@@ -112,23 +107,12 @@ class AppSettingsActivity : public Activity {
     } else if (cursorIndex == 1) {
       settings.sortMode = MenuSortMode::MostUsed;
     } else {
-      const bool revoke = cursorIndex == 2;
-      const auto proposal=HalLuaHttp::proposeTime();
-      char date[40]{}; time_t now=proposal.epoch; tm utc{};
-      if (gmtime_r(&now,&utc)) strftime(date,sizeof(date),"%Y-%m-%d %H:%M:%S UTC",&utc);
-      std::unique_ptr<Activity> prompt;
-      if (revoke) prompt=makeUniqueNoThrow<ConfirmationActivity>(renderer,mappedInput,tr(STR_LUA_NETWORK_REVOKE),"",true);
-      else prompt=makeUniqueNoThrow<LuaConsentActivity>(renderer,mappedInput,date,tr(STR_LUA_TRUST_TIME),tr(STR_CONFIRM));
-      if (!prompt) { LOG_ERR("LHTTP", "Dialog allocation failed"); return; }
-      startActivityForResult(std::move(prompt), [this,revoke,proposal](const ActivityResult& result) {
-        if (!result.isCancelled) {
-          bool ok=revoke ? HalLuaHttp::revokeAll() : HalLuaHttp::trustTime(proposal);
-          if (!ok) LOG_ERR("LHTTP", "Permission/time operation failed");
-          operationResult_ = ok ? 1 : -1;
-        }
+      if (cursorIndex == 2) {
+        operationResult_ = HalLuaHttp::setNetworkEnabled(!HalLuaHttp::networkEnabled()) ? 1 : -1;
         requestUpdate();
-      });
-      return;
+        return;
+      }
+
     }
     settings.save();
     requestUpdate();

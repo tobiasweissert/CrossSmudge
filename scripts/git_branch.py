@@ -12,6 +12,7 @@ Simulator environments set CROSSSMUDGE_VERSION / CROSSINK_VERSION directly in pl
 """
 
 import configparser
+import hashlib
 import os
 import re
 import subprocess
@@ -153,9 +154,29 @@ def get_production_version(project_dir):
     return get_crosssmudge_version(project_dir)
 
 
+def owner_source_fingerprint(project_dir):
+    """Hash source bytes, including unstaged/new files, independently of Git metadata."""
+    paths = subprocess.check_output(
+        ['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd=project_dir
+    ).split(b'\0')
+    digest = hashlib.sha256()
+    for raw in sorted(set(paths)):
+        if not raw:
+            continue
+        path = os.path.join(project_dir, os.fsdecode(raw))
+        if os.path.isfile(path):
+            digest.update(raw + b'\0')
+            with open(path, 'rb') as source:
+                digest.update(hashlib.sha256(source.read()).digest())
+    return digest.hexdigest()
+
+
 def get_hardware_version(project_dir, pioenv):
     if os.environ.get('CROSSSMUDGE_RC_HASH') or os.environ.get('CROSSINK_RC_HASH'):
         return get_release_candidate_version(project_dir)
+
+    if pioenv == 'sticky-owner-test':
+        return f'{get_crosssmudge_version(project_dir)}-test.{get_git_short_hash(project_dir, 7)}.{owner_source_fingerprint(project_dir)[:8]}'
 
     if pioenv == 'default':
         if os.environ.get('CROSSSMUDGE_RELEASE_VERSION') or os.environ.get('CROSSINK_RELEASE_VERSION'):
@@ -184,7 +205,7 @@ def inject_version(env):
         ('CROSSINK_GIT_DIRTY', f'\\"{get_git_dirty(project_dir)}\\"'),
     ])
 
-    if pioenv in {'default', 'sticky', 'x4-pro', 'x4-classic'}:
+    if pioenv in {'default', 'sticky', 'sticky-owner-test', 'x4-pro', 'x4-classic'}:
         version_string = get_hardware_version(project_dir, pioenv)
         if os.environ.get('CROSSSMUDGE_RC_HASH') or os.environ.get('CROSSINK_RC_HASH'):
             print(f'CrossSmudge RC build version: {version_string}')

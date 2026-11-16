@@ -1,0 +1,13 @@
+# CrossPlay parity and limits
+
+Ported source byte card encoding, deterministic xorshift/Fisher-Yates shuffle and deal, legal descending alternating-color runs, freely assigned foundations, foundation-to-tableau moves, draw one/three, recycle order, revealed-card flipping, 96-step reversible moves, win checks and source autoPlay. UI permits automatic finish only under source canAutoFinish (empty stock, all tableau cards face up); explicit single-card foundation taps remain available.
+
+The responsive seven-column board retains original CrossSmudge suit art, packed into immutable strings. One shared geometry drives draw/hit-testing in portrait and landscape. Card taps select the source then a destination; a second tap on the selected pile deselects. Physical-button single-card foundation convenience remains available. Stock taps use the shipped (x,y,event) signature; only on_touch is registered to avoid double execution through the host's tap dispatch. Undo records are packed integers, avoiding 96 Lua hash tables. Source native font/card artwork and aggregate victory statistics are not migrated. New-deal confirmation, live moves, full card rules and saves work; this is not the previous engine with a version bump.
+
+The Sticky replacement is additionally stress-tested at 75 KiB as well as its 2 MiB runtime budget; this does not select it on non-Sticky devices. Adapter SVG evidence is not an on-device screenshot. Hardware refresh speed and minimum visible spacing at extreme tableau lengths remain device checks.
+
+Tests use the committed Lua source with signed int32/float32 settings and only shipped host APIs. They are native adapters, not a firmware build. Read the independent test directory for exact source oracles, failure injection and measured memory. No firmware/SDK download, flash, commit, push or PR creation was performed.
+
+CrossPlay gameplay is selected only when `smudge.get_device()` returns `"sticky"`. Every other device (including X3, X4, X4 Pro and simulator), and firmware without that API, runs the byte-identical original game from base `2c82f306`. Original modules, assets, callbacks and save APIs are preserved; the replacement core/journal is never loaded on that path.
+
+All CrossPlay feature descriptions and limitations above apply to Sticky only. Legacy behavior (including pre-existing limitations) is intentionally unchanged elsewhere. Native adapters use the stock int32/float32 Lua configuration but host pointers and instrumentation differ from hardware. Full legacy trace comparisons use a 2 MiB host cap; separate 75 KiB observations compare the unchanged baseline and dispatcher candidate and do not claim hardware memory parity.
