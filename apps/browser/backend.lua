@@ -2,9 +2,9 @@
 local P=dofile('protocol.lua');local J=P.json
 local B={protocol=P,json=J}
 function B.available()
- return (smudge.api_version or 0)>=7 and smudge.has_feature('browser_backend_v1')and type(smudge.browser_backend_request)=='function'and type(smudge.browser_backend_configured)=='function'
+ return (smudge.api_version or 0)>=7 and smudge.has_feature('browser_backend_public_v1')and type(smudge.browser_backend_request)=='function'and type(smudge.browser_request_id)=='function'
 end
-function B.configured()return B.available()and smudge.browser_backend_configured()end
+function B.configured()return B.available()end
 function B.request(job)
  return smudge.browser_backend_request{path='/v1/'..job.endpoint,body=J.encode(job.payload),timeout_ms=job.endpoint=='open'and 2000 or job.endpoint=='image'and 15000 or 5000}
 end
