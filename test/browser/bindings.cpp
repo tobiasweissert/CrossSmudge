@@ -20,7 +20,7 @@ int main(){
  assert(!readNetworkDeclaration(manifest.as<JsonVariantConst>(),domains));domains.publicHttps=true;
  std::string directory;assert(resolveAppDirectory("/saves/browser","/apps/browser","/saves/browser",directory));assert(!resolveAppDirectory("/saves/other","/apps/browser","/saves/browser",directory));
  Heap h;lua_State* L=lua_newstate(Heap::alloc,&h);assert(L);assert(ink::runtime::openEssential(L)==LUA_OK);assert(ink::runtime::openNetwork(L,true)==LUA_OK);
- Session s({nullptr,run,spawn});s.allowed=true;s.domains=domains;std::filesystem::create_directories(".pio/browser-binding-data");strcpy(s.resourceRoot,".pio/browser-binding-data");lua_newtable(L);registerApi(L,s);lua_setglobal(L,"smudge");restrictStandardLibraries(L);
+ Session s({nullptr,run,spawn});s.allowed=true;s.domains=domains;char bindingDirectory[256];snprintf(bindingDirectory,sizeof(bindingDirectory),"%s/browser-binding-XXXXXX",getenv("TMPDIR")?getenv("TMPDIR"):"/tmp");assert(mkdtemp(bindingDirectory));strcpy(s.resourceRoot,bindingDirectory);lua_newtable(L);registerApi(L,s);lua_setglobal(L,"smudge");restrictStandardLibraries(L);
  script(L,"old={text='Previous useful page'}; function on_http(e) event=e end; assert(smudge.http_request{url='https://example.org/one'})");assert(dispatch(L,s)==LUA_OK);
  script(L,"assert(event.handle and not event.body and #smudge.http_read(event.handle,0,8192)==8192 and #smudge.http_read(event.handle,8192,8192)==3808);assert(not smudge.http_read(event.handle,0,8193));assert(smudge.http_release(event.handle));local id,e=smudge.http_request{url='https://example.org/',method='POST'};assert(not id and e=='invalid_method')");
  response=BrowserBody;script(L,"function on_http(e) if e.handle then smudge.http_read(e.handle,0,8192) end; event=e end;event=nil;collectgarbage('collect');assert(smudge.http_request{url='https://another.example.org/'})");
@@ -31,10 +31,10 @@ int main(){
  response=128;script(L,"events={};function on_http(e) events[#events+1]=e end");
  for(int i=0;i<5;++i){script(L,"assert(smudge.http_request{url='https://example.org/held'})");assert(dispatch(L,s)==LUA_OK);}
  script(L,"assert(#events==5 and events[5].error=='resource_limit');assert(not smudge.http_store(events[1].handle,'../escape'));assert(smudge.http_store(events[1].handle,'copy-object'));assert(not smudge.http_store(events[1].handle,'copy-object'));for i=1,4 do assert(smudge.http_release(events[i].handle))end");
- assert(std::filesystem::file_size(".pio/browser-binding-data/copy-object")==128);std::filesystem::remove(".pio/browser-binding-data/copy-object");
+ assert(std::filesystem::file_size(std::string(bindingDirectory)+"/copy-object")==128);std::filesystem::remove(std::string(bindingDirectory)+"/copy-object");
  Session draining({nullptr,run,defer});draining.allowed=true;draining.domains=domains;strcpy(draining.resourceRoot,s.resourceRoot);
  lua_newtable(L);registerApi(L,draining);lua_setglobal(L,"draining");script(L,"assert(draining.http_request{url='https://example.org/cancel'})");
  assert(Session::busy());draining.close();assert(Session::busy());later(laterArgument);assert(!Session::busy());
  s.allowed=false;script(L,"local id,e=smudge.http_request{url='https://example.org/'};assert(not id and e=='permission_denied')");
- s.close();lua_close(L);assert(h.used==0);assert(!Session::busy());puts("PASS production API5 bindings/manifest/root listing/OOM recovery/opt-out; int32 float32");
+ s.close();std::filesystem::remove_all(bindingDirectory);lua_close(L);assert(h.used==0);assert(!Session::busy());puts("PASS production API5 bindings/manifest/root listing/OOM recovery/opt-out; int32 float32");
 }

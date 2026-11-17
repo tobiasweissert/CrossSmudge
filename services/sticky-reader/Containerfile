@@ -1,0 +1,10 @@
+# Build outside the runtime node with scripts/test.sh; package_oci.py is the daemonless route.
+FROM scratch
+COPY --chown=65532:65532 sticky-reader-arm64 /usr/local/bin/sticky-reader
+COPY --chown=65532:65532 ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+USER 65532:65532
+WORKDIR /cache
+ENV GOMAXPROCS=1 GOMEMLIMIT=48MiB SRP_LISTEN=:8080 SRP_CACHE=/cache/session SRP_VERIFIERS=/run/auth/verifiers.json SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+VOLUME ["/cache", "/tmp"]
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/sticky-reader"]

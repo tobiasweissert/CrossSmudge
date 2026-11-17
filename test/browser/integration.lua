@@ -1,7 +1,7 @@
 local host=dofile;local modules={}
 function dofile(n)local value=host('apps/browser/'..n);modules[n]=value;return value end
 local resources={};local files={};local text='';local bodyText='';local request;local id=0;local fail=false;local w,h=480,800
-smudge={api_version=5,has_feature=function()return true end,request_update=function()end,
+smudge={api_version=test_api_version or 5,has_feature=function()return true end,request_update=function()end,
  browser_path=function(n)return 'saved/'..n end,
  get_bounds=function()return w,h end,get_metrics=function()return{top_padding=10,header_height=40,button_hints_height=36,content_side_padding=16}end,
  text_width=function(s,font,style)return (utf8.len(s)or #s)*(font=='small'and 7 or font=='lexend16'and 13 or font=='lexend14'and 11 or 9)+(style=='bold'and 1 or 0)end,

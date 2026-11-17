@@ -18,10 +18,14 @@ constexpr size_t MaxUpload = 2048;
 constexpr size_t MaxDomains = 4;
 struct Url { char host[128]{}; char path[385]{}; };
 struct Header { char name[33]{}; char value[129]{}; };
+inline constexpr char BackendHost[] = "sticky-browser.tobiasweissert.ch";
+inline constexpr char BackendOrigin[] = "https://sticky-browser.tobiasweissert.ch";
 struct Request {
   Url url;
   size_t limit = BrowserBody;
   bool browser = false;
+  bool backend = false;
+  char authorization[72]{}; // Native-only, never exposed in a Lua event.
   bool post = false;
   uint32_t timeoutMs = 15000;
   size_t bodySize = 0;
@@ -29,6 +33,9 @@ struct Request {
   Header headers[4];
   size_t headerCount = 0;
 };
+bool backendPath(std::string_view path);
+bool backendToken(std::string_view token);
+bool prepareBackend(Request&, std::string_view path, std::string_view body, std::string_view token);
 struct Result {
   uint32_t checksum=1;
   int status = 0;

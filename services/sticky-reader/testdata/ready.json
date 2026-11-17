@@ -1,0 +1,192 @@
+{
+  "v": 1,
+  "state": "ready",
+  "doc": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "url": "https://example.org/story",
+  "title": "Original SRP1 fixture",
+  "lang": "en",
+  "dir": "ltr",
+  "mode": "simplified",
+  "chunks": 1,
+  "chunk": 0,
+  "truncated": false,
+  "blocks": [
+    {
+      "id": 1,
+      "kind": "h1",
+      "runs": [
+        {
+          "text": "Original SRP1 fixture",
+          "size": 2,
+          "bold": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "kind": "p",
+      "runs": [
+        {
+          "text": "Beginning café text with "
+        },
+        {
+          "text": "bold words",
+          "bold": true
+        },
+        {
+          "text": " and an "
+        },
+        {
+          "text": "original link",
+          "href": "https://example.org/next#details"
+        },
+        {
+          "text": "."
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "kind": "h2",
+      "runs": [
+        {
+          "text": "Middle",
+          "size": 1,
+          "bold": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "kind": "p",
+      "runs": [
+        {
+          "text": "Original paragraph preserved for a small Lua-friendly transport chunk."
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "kind": "quote",
+      "runs": [
+        {
+          "text": "An original quotation."
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "kind": "pre",
+      "runs": [
+        {
+          "text": "Original code\n  preserves spacing.",
+          "pre": true
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "kind": "li",
+      "runs": [
+        {
+          "text": "Original list item."
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "kind": "image",
+      "image": {
+        "asset": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "alt": "Original synthetic gradient",
+        "width": 160,
+        "height": 80
+      }
+    },
+    {
+      "id": 9,
+      "kind": "caption",
+      "runs": [
+        {
+          "text": "Original caption."
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "kind": "form",
+      "form": {
+        "action": "https://example.org/search",
+        "fields": [
+          {
+            "name": "q",
+            "value": "",
+            "type": "search"
+          },
+          {
+            "name": "scope",
+            "value": "all",
+            "type": "hidden"
+          }
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "kind": "p",
+      "runs": [
+        {
+          "text": "FINAL_ORIGINAL_TAIL."
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "kind": "p",
+      "runs": [
+        {
+          "text": "Original index",
+          "href": "https://example.org/index"
+        }
+      ]
+    }
+  ],
+  "anchors": [
+    {
+      "id": "top",
+      "block": 1,
+      "run": 1,
+      "byte": 1
+    },
+    {
+      "id": "intro",
+      "block": 2,
+      "run": 1,
+      "byte": 1
+    },
+    {
+      "id": "middle",
+      "block": 3,
+      "run": 1,
+      "byte": 1
+    },
+    {
+      "id": "picture",
+      "block": 8,
+      "run": 1,
+      "byte": 1
+    },
+    {
+      "id": "search",
+      "block": 10,
+      "run": 1,
+      "byte": 1
+    },
+    {
+      "id": "end",
+      "block": 11,
+      "run": 1,
+      "byte": 1
+    }
+  ]
+}

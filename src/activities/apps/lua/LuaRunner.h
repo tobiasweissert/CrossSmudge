@@ -22,7 +22,7 @@ namespace ink {
 
 class LuaRunner {
  public:
-  static constexpr int LUA_API_VERSION = 6;
+  static constexpr int LUA_API_VERSION = 7;
 
   LuaRunner(GfxRenderer& renderer, MappedInputManager& input, const std::string& appDir, const std::string& appId);
   ~LuaRunner();

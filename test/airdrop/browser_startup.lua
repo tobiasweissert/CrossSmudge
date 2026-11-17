@@ -25,7 +25,7 @@ local target='https://example.com/a#fragment'
 test_prepare_launch(target)
 dofile('main.lua');assert(test_supports_launch(),'stale Browser lacks launch API')
 on_init();assert(takes==0 and acks==0 and #requested==0 and test_launch_state()==2)
-drain();assert(takes==1 and acks==1 and test_launch_state()==3)
+drain();on_draw();assert(takes==1 and acks==1 and test_launch_state()==3,test_text())
 -- ACK is after enqueue, before outgoing HTTPS completes. Fragment stays off wire.
 on_update();assert(#requested==1 and requested[1].url=='https://example.com/a')
 for _=1,30 do on_update()end

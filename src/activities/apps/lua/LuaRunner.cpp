@@ -4,6 +4,7 @@
 #include <HalClock.h>
 #include <HalStorage.h>
 #include <HalLuaHttp.h>
+#include <HalBrowserBackend.h>
 #include <HttpManifest.h>
 #include <BrowserImage.h>
 #include <BrowserMemory.h>
@@ -521,6 +522,8 @@ void LuaRunner::onExit() {
 
 void LuaRunner::registerSmudgeApi() {
   lua_newtable(L);  // table 'smudge' (and 'ink')
+  http_.backendEnabled=browser_;
+  http_.backendAccess=HalBrowserBackend::access();
   http::registerApi(L, http_);
   if(browser_){
    browser::registerWork(L);
@@ -2250,6 +2253,7 @@ int LuaRunner::l_getApiVersion(lua_State* L) {
 int LuaRunner::l_hasFeature(lua_State* L) {
   const char* feat = luaL_checkstring(L, 1);
   bool supported = false;
+  if(strcmp(feat,"browser_backend_v1")==0){supported=s_activeRunner && s_activeRunner->browser_ && s_activeRunner->http_.backendAccess.read;}
   if(strcmp(feat,"browser_v6")==0){supported=s_activeRunner && s_activeRunner->browser_;}
   if(strcmp(feat,"browser_v5")==0){supported=s_activeRunner && s_activeRunner->browser_;}
   else if (strcmp(feat, "https_async") == 0) {

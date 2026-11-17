@@ -2,6 +2,7 @@
 #include "HttpCore.h"
 #include "AllocationBudget.h"
 #include "HttpResource.h"
+#include "BackendConfig.h"
 #include <mutex>
 struct lua_State;
 namespace ink::http {
@@ -32,6 +33,8 @@ class Session {
   Domains domains;
   bool allowed=false;
   bool cooperative=false;
+  bool backendEnabled=false;
+  BackendAccess backendAccess;
   char resourceRoot[256]{};
   bool retain();
   Resource* resource(int id);

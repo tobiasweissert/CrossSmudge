@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <HttpResource.h>
 #include <cassert>
 #include <cstdio>
@@ -7,7 +8,7 @@
 #include <unistd.h>
 using ink::http::Resource;
 int main(){
- char directory[]="/tmp/browser-cursor-XXXXXX";assert(mkdtemp(directory));
+ char directory[256];snprintf(directory,sizeof(directory),"%s/browser-cursor-XXXXXX",getenv("TMPDIR")?getenv("TMPDIR"):"/tmp");assert(mkdtemp(directory));
  Resource source;assert(source.begin(directory,1));char bytes[256];memset(bytes,'x',sizeof(bytes));
  for(int i=0;i<1024;++i)assert(source.append(bytes,sizeof(bytes)));assert(source.finish());
  auto buffer=std::make_unique<char[]>(8192);

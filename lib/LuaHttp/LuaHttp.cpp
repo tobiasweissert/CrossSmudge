@@ -112,6 +112,43 @@ int request(lua_State* L) {
   if(status!=LUA_OK){s.discard();return lua_error(L);}
   return 2;
 }
+int backendRequestInner(lua_State* L) {
+ auto& s=session(L);
+ if(!s.allowed || !s.backendEnabled || !s.domains.publicHttps)return error(L,"permission_denied");
+ if(!lua_istable(L,1))return error(L,"invalid_options");
+ lua_pushnil(L);while(lua_next(L,1)){auto k=string(L,-2);bool valid=k=="path"||k=="body"||k=="timeout_ms";lua_pop(L,1);if(!valid){lua_pop(L,1);return error(L,"invalid_options");}}
+ rawField(L,1,"path");auto path=string(L,-1);
+ rawField(L,1,"body");auto body=string(L,-1);
+ rawField(L,1,"timeout_ms");uint32_t timeout=15000;
+ if(!lua_isnil(L,-1)){if(!lua_isinteger(L,-1)||lua_tointeger(L,-1)<1000||lua_tointeger(L,-1)>30000)return error(L,"invalid_timeout");timeout=lua_tointeger(L,-1);}
+ // All Lua reads precede credential access, avoiding Lua longjmp over secrets.
+ char token[65]{};
+ if(!s.backendAccess.read || !s.backendAccess.read(s.backendAccess.context,token)){eraseBackendSecret(token,sizeof(token));return error(L,"not_configured");}
+ Job* j=s.reserve();
+ if(!j){eraseBackendSecret(token,sizeof(token));return error(L,Session::busy()?"busy":"out_of_memory");}
+ bool valid=prepareBackend(j->request,path,body,token);eraseBackendSecret(token,sizeof(token));
+ if(!valid){s.discard();return error(L,"invalid_options");}
+ j->request.timeoutMs=timeout;j->result.capacity=j->request.limit;
+ int id=j->id;
+ if(!j->resource.begin(s.resourceRoot,id)){s.discard();return error(L,"storage_open");}
+ j->result.sinkContext=&j->resource;j->result.sink=[](void* p,const char* b,size_t n){return static_cast<Resource*>(p)->append(b,n);};
+ if(!s.start()){s.discard();return error(L,"worker_failed");}
+ lua_pushinteger(L,id);return 1;
+}
+int backendRequest(lua_State* L){
+ auto& s=session(L);if(s.job())return error(L,"busy");
+ lua_pushlightuserdata(L,&s);lua_pushcclosure(L,backendRequestInner,1);lua_pushvalue(L,1);
+ if(lua_pcall(L,1,2,0)!=LUA_OK){s.discard();return lua_error(L);}return 2;
+}
+int configured(lua_State* L){auto& s=session(L);char token[65]{};bool ok=s.backendEnabled && s.backendAccess.read && s.backendAccess.read(s.backendAccess.context,token);eraseBackendSecret(token,sizeof(token));lua_pushboolean(L,ok);return 1;}
+int configure(lua_State* L){auto& s=session(L);const char* e="unavailable";
+ if(s.backendEnabled && s.backendAccess.import)e=Session::busy()?"busy":s.backendAccess.import(s.backendAccess.context);
+ lua_pushboolean(L,!e);if(e){lua_pushstring(L,e);return 2;}return 1;
+}
+int requestId(lua_State* L){auto& s=session(L);unsigned char bytes[16];char hex[33];
+ if(!s.backendEnabled || !s.backendAccess.random || !s.backendAccess.random(s.backendAccess.context,bytes,sizeof(bytes)))return error(L,"entropy_unavailable");
+ constexpr char digits[]="0123456789abcdef";for(size_t i=0;i<16;++i){hex[2*i]=digits[bytes[i]>>4];hex[2*i+1]=digits[bytes[i]&15];}hex[32]=0;lua_pushlstring(L,hex,32);return 1;
+}
 int cancel(lua_State* L) {
   auto& s=session(L);auto* j=s.job();
   bool found=j && lua_isinteger(L,1) && lua_tointeger(L,1)==j->id;
@@ -148,7 +185,7 @@ int deliver(lua_State* L) {
   lua_call(L,1,0);return 0;
 }
 }
-void Job::release(){if(references.fetch_sub(1,std::memory_order_acq_rel)==1){free(result.extended);delete this;occupied.store(false);}}
+void Job::release(){if(references.fetch_sub(1,std::memory_order_acq_rel)==1){eraseBackendSecret(request.authorization,sizeof(request.authorization));free(result.extended);delete this;occupied.store(false);}}
 bool Session::busy(){return occupied.load();}
 Job* Session::reserve(){
   if(job_ || occupied.exchange(true))return nullptr;
@@ -228,6 +265,12 @@ void restrictStandardLibraries(lua_State* L) {
   lua_getglobal(L, "load"); lua_pushcclosure(L, textOnlyLoad, 1); lua_setglobal(L, "load");
 }
 void registerApi(lua_State* L,Session& s){
+  if(s.backendEnabled){
+   lua_pushlightuserdata(L,&s);lua_pushcclosure(L,backendRequest,1);lua_setfield(L,-2,"browser_backend_request");
+   lua_pushlightuserdata(L,&s);lua_pushcclosure(L,configured,1);lua_setfield(L,-2,"browser_backend_configured");
+   lua_pushlightuserdata(L,&s);lua_pushcclosure(L,configure,1);lua_setfield(L,-2,"browser_backend_configure");
+   lua_pushlightuserdata(L,&s);lua_pushcclosure(L,requestId,1);lua_setfield(L,-2,"browser_request_id");
+  }
   lua_pushcfunction(L,[](lua_State* state){lua_pushboolean(state,Session::busy());return 1;});lua_setfield(L,-2,"http_busy");
   lua_pushlightuserdata(L,&s);lua_pushcclosure(L,resourceRead,1);lua_setfield(L,-2,"http_read");
   lua_pushlightuserdata(L,&s);lua_pushcclosure(L,resourceRelease,1);lua_setfield(L,-2,"http_release");

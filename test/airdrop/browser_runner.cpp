@@ -28,7 +28,7 @@ int main(int argc,char** argv){
   lua_register(state,"test_supports_launch",(+[](lua_State* L){lua_pushboolean(L,supportsLaunchApi(L));return 1;}));
   lua_register(state,"test_read",(+[](lua_State* L){
     const char* path=luaL_checkstring(L,1);int offset=luaL_checkinteger(L,2),count=luaL_checkinteger(L,3);
-    if(offset<0||count<0||count>24657)return luaL_error(L,"test read bound");
+    if(offset<0||count<0||count>65537)return luaL_error(L,"test read bound");
     FILE* file=fopen(path,"rb");if(!file){lua_pushnil(L);return 1;}
     luaL_Buffer buffer;char* bytes=luaL_buffinitsize(L,&buffer,count);size_t n=0;
     if(!fseek(file,offset,SEEK_SET))n=fread(bytes,1,count,file);fclose(file);luaL_pushresultsize(&buffer,n);return 1;

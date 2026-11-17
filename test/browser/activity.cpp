@@ -47,7 +47,7 @@ class HostRunner {
   lua_pushstring(vm,root.c_str());lua_setglobal(vm,"test_root");
   lua_register(vm,"test_fs_list",(+[](lua_State* L){lua_newtable(L);int i=1;for(const auto& entry:std::filesystem::directory_iterator(root)){auto name=entry.path().filename().string();lua_pushlstring(L,name.data(),name.size());lua_rawseti(L,-2,i++);}return 1;}));
   lua_register(vm,"test_fs_remove",(+[](lua_State* L){std::error_code error;bool removed=std::filesystem::remove(luaL_checkstring(L,1),error);lua_pushboolean(L,removed&&!error);return 1;}));
-  lua_register(vm,"test_read",(+[](lua_State* L){auto* path=luaL_checkstring(L,1);auto o=luaL_checkinteger(L,2),n=luaL_checkinteger(L,3);assert(o>=0 && n>=0 && n<=24657);std::ifstream f(path,std::ios::binary);if(!f){lua_pushnil(L);return 1;}std::string s(n,'\0');f.seekg(o);f.read(s.data(),n);lua_pushlstring(L,s.data(),f.gcount());return 1;}));return true;
+  lua_register(vm,"test_read",(+[](lua_State* L){auto* path=luaL_checkstring(L,1);auto o=luaL_checkinteger(L,2),n=luaL_checkinteger(L,3);assert(o>=0 && n>=0 && n<=65537);std::ifstream f(path,std::ios::binary);if(!f){lua_pushnil(L);return 1;}std::string s(n,'\0');f.seekg(o);f.read(s.data(),n);lua_pushlstring(L,s.data(),f.gcount());return 1;}));return true;
  }
  bool loadScript(const std::string&){assert(luaL_dofile(vm,"test/browser/activity.lua")==LUA_OK);lua_getglobal(vm,"dofile");lua_pushliteral(vm,"main.lua");check(lua_pcall(vm,1,0,0));return true;}
  void check(int result){if(result!=LUA_OK){fprintf(stderr,"VM: %s\n",lua_tostring(vm,-1));abort();}}
@@ -77,7 +77,7 @@ static void tick(Adapter& activity,MappedInputManager& input){auto start=std::ch
 static void ticks(Adapter& activity,MappedInputManager& input,int n=50){for(int i=0;i<n;++i)tick(activity,input);}
 static void navigate(Adapter& activity,MappedInputManager& input){auto& runner=*HostRunner::live;runner.call("test_address");ticks(activity,input,5);runner.textCall("test_edit","https://example.org/candidate");ticks(activity,input,5);assert(producer);}
 int main(){
- char temp[]="/tmp/browser-activity-XXXXXX";assert(mkdtemp(temp));root=temp;
+ char temp[256];snprintf(temp,sizeof(temp),"%s/browser-activity-XXXXXX",getenv("TMPDIR")?getenv("TMPDIR"):"/tmp");assert(mkdtemp(temp));root=temp;
  GfxRenderer renderer;MappedInputManager input;Adapter activity(renderer,input,"apps/browser","Browser");activity.onEnter();ticks(activity,input);
  navigate(activity,input);complete("<article><h1>OLD READABLE PAGE</h1><p>Retained contents</p></article>");ticks(activity,input,100);
  auto& runner=*HostRunner::live;assert(runner.stringCall("test_text").find("OLD READABLE PAGE")!=std::string::npos);auto oldIndex=runner.stringCall("test_index");

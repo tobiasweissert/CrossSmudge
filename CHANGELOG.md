@@ -2,6 +2,10 @@
 
 ### Fixed
 
+- Assisted Browser rejects forbidden response fields and oversized JSON, validates exact protocol values, and finds saved phrases across styled text with accurate Find-next positions.
+
+- Assisted Browser accepts the service’s UTF-8 JSON responses and fragment targets on image and GET form blocks while rejecting invalid offsets.
+
 - AirDrop rejects truncated HTTP uploads and invalid data inside the declared body, while preserving native senders that omit the final HTTP chunk at a validated archive boundary.
 
 - Sticky Battleship and Hex keep landscape instructions readable; Hearts and Jaipur require a painted discard confirmation, and Wavelength prevents queued phase skips and labels scored Teams calls truthfully.
@@ -48,6 +52,8 @@
 - Fixed Solitaire v1.0.1 touch input on reTerminal Sticky: tapping cards now deals, selects, and moves cards; reset confirmation buttons match their drawn bounds, and taps in tableau gaps or below cards are ignored. Other devices retain their existing input behavior and saved games remain compatible.
 
 ### Added
+
+- Browser 0.3.0 adds an owner-configured Assisted reader with chunk navigation and checked offline saves; Direct and existing saved pages remain available on API6. Assisted requests use a dedicated API7 authenticated fixed-origin lane.
 
 - Sudoku Hint on Sticky highlights an empty target first; a second explicit Hint reveals it. Editing or changing the board clears the pending hint.
 

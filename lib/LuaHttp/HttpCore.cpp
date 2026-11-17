@@ -132,6 +132,38 @@ bool safeHeader(std::string_view n,std::string_view v) {
   for(unsigned char c:v) if(c<32 || c>126) return false;
   return true;
 }
+bool backendPath(std::string_view path) {
+  for (auto allowed : {"/v1/open", "/v1/poll", "/v1/chunk", "/v1/locate", "/v1/find", "/v1/image", "/v1/cancel"})
+    if (path == allowed) return true;
+  return false;
+}
+bool backendToken(std::string_view token) {
+  if (token.size()!=64) return false;
+  for (char c:token) if (!((c>='0' && c<='9') || (c>='a' && c<='f'))) return false;
+  return true;
+}
+static bool utf8Body(std::string_view s) {
+ for(size_t i=0;i<s.size();){
+  unsigned char c=s[i++];if(c<128)continue;
+  unsigned count=0;uint32_t cp=0,min=0;
+  if(c>=0xc2 && c<=0xdf){count=1;cp=c&31;min=0x80;}
+  else if(c>=0xe0 && c<=0xef){count=2;cp=c&15;min=0x800;}
+  else if(c>=0xf0 && c<=0xf4){count=3;cp=c&7;min=0x10000;}else return false;
+  if(count>s.size()-i)return false;
+  while(count--){unsigned char b=s[i++];if((b&0xc0)!=0x80)return false;cp=(cp<<6)|(b&63);}
+  if(cp<min || cp>0x10ffff || (cp>=0xd800 && cp<=0xdfff))return false;
+ }
+ return true;
+}
+bool prepareBackend(Request& q, std::string_view path, std::string_view body, std::string_view token) {
+  if (!backendPath(path) || body.empty() || body.size()>MaxUpload || body.find('\0')!=body.npos || !backendToken(token) || !utf8Body(body)) return false;
+  q.backend=true;q.browser=true;q.post=true;q.headerCount=0;
+  strcpy(q.url.host,BackendHost);memcpy(q.url.path,path.data(),path.size());q.url.path[path.size()]=0;
+  memcpy(q.body,body.data(),body.size());q.bodySize=body.size();
+  memcpy(q.authorization,"Bearer ",7);memcpy(q.authorization+7,token.data(),64);q.authorization[71]=0;
+  q.limit=path=="/v1/image"?65536:49152;
+  return true;
+}
 bool safeRelativePath(std::string_view s) {
   if(s.empty() || s.size()>240) return false;
   size_t start=0;
@@ -177,6 +209,7 @@ static void exchangeOne(const Request& q,Result& r,Scratch& scratch,Io& io,const
     return true;
   };
   auto fail=[&](const char* e) {if(!r.error) r.error=e;};
+  if(q.backend && (strcmp(url.host,BackendHost) || !backendPath(url.path) || !q.post || q.headerCount || strncmp(q.authorization,"Bearer ",7) || !backendToken(q.authorization+7))){fail("backend_invalid");return;}
   if(!ok()) return;
   if(!io.connect(io.context,url.host,timeout,cancel)) {fail("tls_or_network");io.close(io.context);return;}
   struct Close {Io& io; ~Close(){io.close(io.context);}} close{io};
@@ -191,6 +224,11 @@ static void exchangeOne(const Request& q,Result& r,Scratch& scratch,Io& io,const
   if(!send(scratch.line,n))return;
   const char* connection=q.browser?"Connection: close\r\nAccept-Encoding: gzip, identity\r\n":"Connection: close\r\nAccept-Encoding: identity\r\n";
   if(!send(connection,strlen(connection)))return;
+  if(q.backend){
+    const char* accept=!strcmp(q.url.path,"/v1/image")?"Accept: image/png\r\n":"Accept: application/json\r\n";
+    if(!send(accept,strlen(accept)))return;
+    if(!send("Content-Type: application/json\r\nAuthorization: ",strlen("Content-Type: application/json\r\nAuthorization: ")) || !send(q.authorization,71) || !send("\r\n",2))return;
+  }
   for(size_t i=0;i<q.headerCount;++i) {
     n=snprintf(scratch.line,sizeof(scratch.line),"%s: %s\r\n",q.headers[i].name,q.headers[i].value);
     if(!send(scratch.line,n)) return;
@@ -219,13 +257,17 @@ static void exchangeOne(const Request& q,Result& r,Scratch& scratch,Io& io,const
      !digit(status[9]) || !digit(status[10]) || !digit(status[11]) || (status.size()>12 && status[12]!=' ')) {fail("protocol");return;}
   r.status=(status[9]-'0')*100+(status[10]-'0')*10+status[11]-'0';
   if(r.status<200 || r.status>599) {fail("protocol");return;}
-  size_t length=0;bool hasLength=false,chunked=false,compressed=false,encodingSeen=false;
+  size_t length=0;bool hasLength=false,chunked=false,compressed=false,encodingSeen=false,contentTypeSeen=false;
   while(line()) {
     std::string_view s(scratch.line); if(s.empty()) break;
     auto colon=s.find(':'); if(colon==s.npos || colon==0 || s[0]==' ' || s[0]=='\t') {fail("protocol");return;}
     auto name=s.substr(0,colon),value=s.substr(colon+1);
     while(!value.empty() && (value.front()==' ' || value.front()=='\t'))value.remove_prefix(1);
     while(!value.empty() && (value.back()==' ' || value.back()=='\t'))value.remove_suffix(1);
+    if(q.backend && (equalFold(name,"location") || equalFold(name,"set-cookie") || equalFold(name,"cookie"))){
+      fail(r.status>=300 && r.status<=399?"redirect_denied":"backend_headers");return;
+    }
+    if(q.backend && (name.back()==' ' || name.back()=='\t')){fail("protocol");return;}
     if(equalFold(name,"content-length")) {
       if(hasLength || !decimal(value,length)){fail("protocol");return;} hasLength=true;
       if(length>(q.browser?q.limit:r.capacity)){fail("body_limit");return;}
@@ -235,6 +277,7 @@ static void exchangeOne(const Request& q,Result& r,Scratch& scratch,Io& io,const
       if(r.location[0] || value.size()>=sizeof(r.location)){fail("redirect_invalid");return;}
       memcpy(r.location,value.data(),value.size());r.location[value.size()]=0;
     } else if(q.browser && equalFold(name,"content-type")) {
+      if(q.backend && contentTypeSeen){fail("protocol");return;}contentTypeSeen=true;
       if(value.size()>=sizeof(r.contentType)){fail("header_limit");return;}
       memcpy(r.contentType,value.data(),value.size());r.contentType[value.size()]=0;
     } else if(equalFold(name,"content-encoding")) {
@@ -247,7 +290,18 @@ static void exchangeOne(const Request& q,Result& r,Scratch& scratch,Io& io,const
   }
   if(r.error) return;
   if(chunked && hasLength){fail("protocol");return;}
-  if(r.status>=300 && r.status<=399) {if(!q.browser)fail("redirect_denied");return;}
+  if(r.status>=300 && r.status<=399) {if(!q.browser || q.backend)fail("redirect_denied");return;}
+  if(q.backend){
+    const bool image=!strcmp(q.url.path,"/v1/image") && r.status==200;
+    const size_t cap=r.status>=400?2048:image?65536:49152;
+    r.capacity=cap;
+    if(hasLength && !compressed && length>cap){fail("body_limit");return;}
+    // The service explicitly labels its JSON as UTF-8. Keep other parameters closed.
+    const bool validType=image?!strcmp(r.contentType,"image/png"):
+      equalFold(r.contentType,"application/json") || equalFold(r.contentType,"application/json; charset=utf-8");
+    if(!validType){fail("content_type");return;}
+    if(image && (compressed || !hasLength || chunked)){fail("protocol");return;}
+  }
   if(r.status==204 || r.status==304) return;
   if(q.browser){
     if(!hasLength && !chunked){fail("protocol");return;}
@@ -264,7 +318,11 @@ static void exchangeOne(const Request& q,Result& r,Scratch& scratch,Io& io,const
         if(remaining>q.limit-wire){fail("body_limit");return -1;}
         if(!remaining){
           scratch.headerBytes=0;
-          while(line() && scratch.line[0])if(!strchr(scratch.line,':')){fail("protocol");return -1;}
+          while(line() && scratch.line[0]){
+            // Backend responses have a closed trailer policy, including empty fields.
+            if(q.backend){fail("backend_headers");return -1;}
+            if(!strchr(scratch.line,':')){fail("protocol");return -1;}
+          }
           done=true;return r.error?-1:0;
         }
         crlf=true;
