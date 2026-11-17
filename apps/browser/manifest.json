@@ -1,9 +1,9 @@
 {
   "id": "browser",
   "name": "Browser",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "author": "CrossSmudge",
-  "description": "Direct HTTPS reader with live RSS/Atom feeds, links, search forms and checked offline pages. No scripts or logins.",
+  "description": "Assisted reader with explicit Direct/Offline modes, checked chunk saves, links and search forms. Assisted requires API7 and owner configuration.",
   "entry": "main.lua",
   "min_api": 6,
   "network": {
