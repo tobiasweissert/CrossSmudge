@@ -53,7 +53,7 @@
 
 ### Added
 
-- Browser 0.3.0 adds an owner-configured Assisted reader with chunk navigation and checked offline saves; Direct and existing saved pages remain available on API6. Assisted requests use a dedicated API7 authenticated fixed-origin lane.
+- Browser 0.3.1 makes Assisted public and keyless at sticky.tobiasweissert.ch, removes private configuration import, and requires the explicit public-mode firmware flag. Shared quotas and opaque IDs are not private storage. Direct/Offline and existing saves remain available on API6.
 
 - Sudoku Hint on Sticky highlights an empty target first; a second explicit Hint reveals it. Editing or changing the board clears the pending hint.
 

@@ -70,10 +70,7 @@
                   {
                     "name": "SRP_CACHE",
                     "value": "/cache/session"
-                  },
-                  {
-                    "name": "SRP_VERIFIERS",
-                    "value": "/run/auth/verifiers.json"
+
                   }
                 ],
                 "securityContext": {
@@ -120,11 +117,7 @@
                   {
                     "name": "tmp",
                     "mountPath": "/tmp"
-                  },
-                  {
-                    "name": "auth",
-                    "mountPath": "/run/auth",
-                    "readOnly": true
+
                   }
                 ]
               }
@@ -141,13 +134,7 @@
                 "emptyDir": {
                   "sizeLimit": "32Mi"
                 }
-              },
-              {
-                "name": "auth",
-                "secret": {
-                  "secretName": "sticky-browser-device-auth",
-                  "defaultMode": 288
-                }
+
               }
             ]
           }
@@ -191,12 +178,32 @@
         "tls": [
           {
             "hosts": [
+              "sticky.tobiasweissert.ch",
               "sticky-browser.tobiasweissert.ch"
             ],
             "secretName": "sticky-browser-backend-tls"
           }
         ],
         "rules": [
+          {
+            "host": "sticky.tobiasweissert.ch",
+            "http": {
+              "paths": [
+                {
+                  "path": "/",
+                  "pathType": "Prefix",
+                  "backend": {
+                    "service": {
+                      "name": "sticky-browser-backend",
+                      "port": {
+                        "number": 80
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
           {
             "host": "sticky-browser.tobiasweissert.ch",
             "http": {

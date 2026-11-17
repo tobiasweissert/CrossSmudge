@@ -18,7 +18,7 @@ int main(int argc,char** argv){
   else p.response+="Content-Length: "+std::to_string(wire.size())+"\r\n\r\n"+wire;
   Io io{&p,RepairPeer::connect,Peer::read,Peer::write,Peer::close,Peer::millis};exchange(q,r,s,io,cancel);assert(p.connections==1);
  };
- assert(prepareBackend(q,"/v1/open","{}",std::string(64,'a')));
+ assert(prepareBackend(q,"/v1/open","{}"));
  if(headers){
   for(bool gzip:{false,true}){
    for(const auto& field:{"Location: \r\n","LoCaTiOn: \r\n","Location:\t\r\n","Location: https://example.org/\r\n","Set-Cookie: \r\n","Cookie:\t\r\n","sEt-CoOkIe: x=y\r\n","cOoKiE: x=y\r\n"}){
@@ -39,7 +39,7 @@ int main(int argc,char** argv){
  }else{
   auto json=[](size_t n){return "{\"x\":\""+std::string(n-8,'x')+"\"}";};
   for(auto path:{"/v1/image","/v1/open"}){
-   assert(prepareBackend(q,path,"{}",std::string(64,'a')));
+   assert(prepareBackend(q,path,"{}"));
    for(int status:{200,201,202,206,400,429,500}){
     if(std::string(path)=="/v1/image"&&status==200)continue;
     size_t cap=status>=400?2048:49152;
@@ -49,7 +49,7 @@ int main(int argc,char** argv){
     }
    }
   }
-  assert(prepareBackend(q,"/v1/image","{}",std::string(64,'a')));
+  assert(prepareBackend(q,"/v1/image","{}"));
   run(200,std::string(65536,'x'),false,false,"","",true);assert(!r.error&&output.size()==65536);
   run(200,std::string(65537,'x'),false,false,"","",true);assert(r.error);
  }

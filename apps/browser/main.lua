@@ -153,7 +153,7 @@ open=function(target,mode,index)
   S.status='Offline • address not saved';redraw();return false
  end
  if S.transport=='Assisted'then
-  if not B.configured()then S.status='Assisted unavailable • import server configuration';return false end
+  if not B.configured()then S.status='Assisted unavailable • update firmware for public mode';return false end
   local rid=smudge.browser_request_id();if not rid then S.status='Request ID unavailable';return false end
   cancel();backendRid=rid
   local nav={url=URL.wire(target),target=target,mode=mode or 'push',index=index,font=S.font,reader=S.reader,start=clock(),generation=S.generation}
@@ -339,7 +339,7 @@ end
 function on_init()
  startupComplete=false;launchChecked=false
  closed=false;active=nil;pending=nil;staged=nil;screen=nil;zoom=nil;menuPage=1
- S={transport=B.configured()and 'Assisted'or 'Direct',status='Direct HTTPS • no scripts/logins/paywall bypass',page=1,anchors={{b=1,s=1,p=1}},reader=true,font=0,history={},cursor=0,generation=0}
+ S={transport=B.configured()and 'Assisted'or 'Direct',status=B.available()and 'Public Assisted • shared capacity; not private storage'or 'Direct HTTPS • Assisted needs firmware update',page=1,anchors={{b=1,s=1,p=1}},reader=true,font=0,history={},cursor=0,generation=0}
  if not smudge.has_feature('browser_v6')then S.status='Please update firmware: Browser needs API 6 + PSRAM';closed=true;if smudge.fail_launch_url then smudge.fail_launch_url()end;redraw();return end
  queue(function()
  awaitDrain();b7=B7.open(W);b7:objects();cache=C.open(W,hasResources);W.stage('Reading cache');cache:cleanup();cache:clearImages();if #cache.sources==0 then cache.sources=defaults end
@@ -584,8 +584,8 @@ local function listActions()
   for _,f in ipairs(form.fields)do if not f.hidden then local field=f;rows[#rows+1]={f.name..': '..f.value,function()U.edit(field.name,field.value,256,function(s)field.value=s end)end}end end
   rows[#rows+1]={'Submit GET search',function()local url;if S.doc and S.doc.srp then url=B.protocol.formURL(form)else url=M.formURL(form)end;if url then open(url)else S.status='Search URL exceeds limits'end end};return rows
  end
- local modes={{'Mode: '..(S.transport or 'Direct'),function()screen='modes';menuPage=1 end},{'Import server configuration',function()cancel();awaitDrain();local ok,err;if B.available()then ok,err=smudge.browser_backend_configure()end;if ok then S.transport='Assisted';S.status='Assisted configured • enter an address'else S.status='Configuration import failed: '..tostring(err or 'API7 unavailable')end;screen=nil end},{'Retry last navigation',function()if lastRetry then open(lastRetry.target,lastRetry.mode,lastRetry.index)elseif S.url then open(S.url)end end},{'Save offline (all chunks)',function()if S.doc and S.doc.srp then cancel();saveAll={doc=S.doc.srp.doc,next=0};saveNext7()else S.status='Direct pages are saved after loading'end;screen=nil end}}
- if screen=='modes'then return {{'Assisted'..(B.configured()and ''or ' • unavailable'),function()if B.configured()then cancel();S.transport='Assisted';S.status='Assisted • operator can see addresses/content';screen=nil else S.status='API7 + imported configuration required'end end},{'Direct',function()cancel();S.transport='Direct';cancelRid=nil;S.status='Direct HTTPS';screen=nil end},{'Offline',function()cancel();S.transport='Offline';cancelRid=nil;S.status='Offline • saved coverage only';screen=nil end}}end
+ local modes={{'Mode: '..(S.transport or 'Direct'),function()screen='modes';menuPage=1 end},{'Retry last navigation',function()if lastRetry then open(lastRetry.target,lastRetry.mode,lastRetry.index)elseif S.url then open(S.url)end end},{'Save offline (all chunks)',function()if S.doc and S.doc.srp then cancel();saveAll={doc=S.doc.srp.doc,next=0};saveNext7()else S.status='Direct pages are saved after loading'end;screen=nil end}}
+ if screen=='modes'then return {{'Assisted'..(B.configured()and ''or ' • unavailable'),function()if B.configured()then cancel();S.transport='Assisted';S.status='Public Assisted • shared capacity; not private storage';screen=nil else S.status='Update firmware for public Assisted mode'end end},{'Direct',function()cancel();S.transport='Direct';cancelRid=nil;S.status='Direct HTTPS';screen=nil end},{'Offline',function()cancel();S.transport='Offline';cancelRid=nil;S.status='Offline • saved coverage only';screen=nil end}}end
  local rows={{'Document details',function()screen='details';menuPage=1 end},{'Address / search',address},{'Back website',function()history(-1)end},{'Forward website',function()history(1)end},
  {'Live news feeds',function()screen='news';menuPage=1 end},{'Bookmarks',function()screen='bookmarks';menuPage=1 end},
  {'Bookmark this page',saveBookmark},{'Offline pages',function()screen='offline';menuPage=1 end},{'History',function()screen='history';menuPage=1 end},
@@ -671,7 +671,7 @@ function on_draw()
    end
   end
  else
-  U.wrap(S.transport=='Assisted'and 'Assisted reader. The owner backend and hosting operator can see requested addresses and content. Import configuration explicitly; no scripts, logins or paywall bypass.'or S.transport=='Offline'and 'Offline reader. Choose saved pages; missing chunks and images need an explicit switch to Assisted.'or 'Direct public HTTPS browser. Reader mode, RSS/Atom news, bookmarks and checked offline pages. JavaScript, logins, paywalls and bot challenges are unsupported.',p,y,w-2*p,6)
+  U.wrap(S.transport=='Assisted'and 'Public Assisted reader. Shared capacity and short-lived extraction cache, not private storage. The backend and hosting operator see addresses/content; opaque handles are not login protection. No scripts, logins or paywall bypass.'or S.transport=='Offline'and 'Offline reader. Choose saved pages; missing chunks and images need an explicit switch to Assisted.'or 'Direct public HTTPS browser. Reader mode, RSS/Atom news, bookmarks and checked offline pages. JavaScript, logins, paywalls and bot challenges are unsupported.',p,y,w-2*p,6)
   U.button('Live news feeds',p,bottom-100,w-2*p,44,function()screen='news';menuPage=1 end)
   U.button('Offline pages',p,bottom-50,w-2*p,44,function()screen='offline';menuPage=1 end)
  end

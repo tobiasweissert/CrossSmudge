@@ -1,43 +1,39 @@
-# Browser 0.3.0 assisted reader
+# Browser 0.3.1 public keyless assisted reader
 
 Browser keeps its API6 Direct and Offline paths. Assisted requires API7,
-PSRAM, the `browser_backend_v1` capability and explicitly imported native
-configuration. The firmware owns the fixed HTTPS origin
-`https://sticky-browser.tobiasweissert.ch`; Lua cannot supply an origin,
+PSRAM and the explicit `browser_backend_public_v1` capability. API7 alone or the
+older `browser_backend_v1` flag is insufficient: old keyed firmware shows an
+update-needed state, while Direct/Offline remain available with manifest min_api=6.
+The firmware owns the fixed HTTPS origin
+`https://sticky.tobiasweissert.ch`; Lua cannot supply an origin,
 Authorization header or credential. Ordinary Browser HTTP remains GET-only.
 All backend redirects are rejected, including redirects to that same origin.
 Existing TLS hostname, certificate, date and public-DNS pinning checks remain.
 
 Connect Wi-Fi through the existing firmware flow before Assisted navigation.
 The request-ID helper requires connected Wi-Fi so the ESP hardware RNG has
-fresh radio entropy. Importing configuration does not enable networking or
-change the global network opt-out. A configured installation may start in
-Assisted, but restoring an offline page never submits its address to the server.
+fresh radio entropy. Public mode does not change the global network opt-out.
+A capable installation defaults to Assisted without any token or private file,
+but restoring an offline page never submits its address to the server.
 Errors preserve the readable view and offer an explicit Retry or mode choice.
 There is no automatic Direct or extraction-mode fallback.
 
-Use Browser's menu to select Assisted, Direct or Offline. Import server
-configuration is a separate explicit action. The native importer reads only
-`/.crosssmudge/private/browser-backend.json`, at most 512 bytes, with exactly:
+Use Browser's menu to select Assisted, Direct or Offline. There is no import or
+configuration action. Native requests emit no Authorization; no SD private file
+or NVS credential is read, imported or deleted. Legacy API7 configured/configure
+bindings are credential-free capability/no-op shims for Browser0.3.0, never
+provisioning. Ordinary HTTP Authorization and Browser POST remain forbidden.
 
-```json
-{"v":1,"origin":"https://sticky-browser.tobiasweissert.ch","token":"<64 lowercase hexadecimal characters>"}
-```
-
-The parent/operator provisions the real device credential privately and puts
-only its verifier in the backend's app Secret. Retrieve the configuration
-through the owner's private SSH/SFTP channel, not chat, a public download URL
-or Git. The importer checks the exact origin and token format, stages a dedicated
-NVS blob, verifies it, then verifies the active-slot selector. Failed imports
-retain the prior active credential; configuration changes are refused while
-the HTTP worker still owns any request. The SD file is not automatically deleted.
-Lua receives only a boolean and stable error code, never the credential.
-
-SD configuration and normal Preferences/NVS storage have physical extraction
-risk. This implementation makes no encryption claim. Cached pages and images
-also remain plaintext on SD. The backend operator and hosting provider can see
-requested addresses/content; publishers see the backend's address. HTTPS
-protects transport, not compromised storage or server administration.
+The public service uses one bounded anonymous principal and shared capacity.
+Legacy Authorization and invented device/proxy headers do not create identities
+or extra budgets, and are never forwarded to publishers. Opaque random request,
+job, document and asset IDs remain required, but are not account isolation:
+someone holding an ID can access/cancel its public extraction. This is not
+private storage. Cache lifetime is bounded; anyone can exhaust the shared quota.
+The backend and hosting operator see addresses/content, publishers see the
+backend IP, and SD caches remain plaintext. HTTPS protects transport only.
+The old sticky-browser.tobiasweissert.ch route remains explicitly configured
+temporarily for installed firmware; new firmware never selects it or redirects.
 
 SRP1 transports semantic chunks, not screen pages. The footer reports `P<local
 page> C<chunk>/<chunks>`. Layout, font changes, rotation, fragment resolution
@@ -85,13 +81,13 @@ of a server cancel, so backend deadlines remain necessary. No hard real-time
 cancellation or physical-device speed claim is made.
 
 For hardware verification, use a Sticky with the parent's integrated API7
-firmware: Apps → Browser → Import server configuration, then select Assisted and
+public-mode firmware: Apps → Browser (Assisted defaults), then
 open an original synthetic article. Check title/byline/tail, chunk crossing and
 Back/Forward, Find/fragment jumps, GET forms, image load, font changes and both
 orientations. Save all chunks, disconnect networking, reopen Offline and verify
 coverage plus previously loaded images. Interrupt a save/request/image, navigate
-again after drain, and verify late responses never replace the view. Retry a bad
-configuration while keeping the old working credential. Exercise AirDrop URL
+again after drain, and verify late responses never replace the view. Verify
+fresh setup with no private file/NVS credential. Exercise AirDrop URL
 handoff during asynchronous startup: ACK follows admitted ordinary navigation,
 not fetch success; failed ACK/startup/exit retains Retry/Cancel. On API6, confirm
 Assisted is unavailable while Direct and existing B5/B1 saves still work. On C3,
@@ -101,5 +97,5 @@ these checks.
 
 The source ZIP is a parent integration artifact. It does not update the App Store
 catalog or deploy a server/firmware. Full firmware linking, actual backend E2E,
-trusted deployed TLS, real credential provisioning, independent review and
+trusted deployed TLS, independent review and
 physical Sticky checks remain parent gates.

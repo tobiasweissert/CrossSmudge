@@ -90,7 +90,7 @@ local function cancelServer()
  draw();if request and request.q.path=='/v1/cancel'then deliver7({v=1,state='cancelled'})end
 end
 
-dofile('main.lua');on_init();draw();menu('Import server configuration')
+dofile('main.lua');on_init();draw();assert(imports==0)
 click('Address');edit('https://example.org/one');on_update();endpoint('open')
 local t=ready(0);t.chunks=1;t.blocks=J.array{{id=1,kind='p',runs=J.array{{text='hello, '},{text='world',bold=true}}}};t.anchors=J.array()
 deliver7(t);menu('Mode:');click('Offline')

@@ -9,6 +9,7 @@ go test -mod=readonly -race -p=1 -count=1 ./...
 go vet -mod=readonly -p=1 ./...
 python3 scripts/test_oci.py
 python3 scripts/test_deploy.py
+python3 scripts/test_live_flow.py
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=readonly -p=1 -trimpath -o "$SRP_SCRATCH/artifacts/sticky-reader-amd64" ./cmd/sticky-reader
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=readonly -p=1 -trimpath -o "$SRP_SCRATCH/artifacts/qualify-amd64" ./cmd/qualify
 CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -mod=readonly -p=1 -trimpath -o "$SRP_SCRATCH/artifacts/sticky-reader-arm64" ./cmd/sticky-reader

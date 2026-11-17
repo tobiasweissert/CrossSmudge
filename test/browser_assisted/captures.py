@@ -6,9 +6,9 @@ O=pathlib.Path(os.environ['ASSISTED_TEST_OUT']);capture=O/'captures';capture.mkd
 source=(R/'test/browser_assisted/client.lua').read_text()
 changes=[("deliver7({v=1,error='too_large',retryable=false},413);","deliver7({v=1,error='too_large',retryable=false},413);capture('image-error-portrait');"),("menu('Mode:');click('Offline')","menu('Mode:');capture('modes-portrait');click('Offline');capture('offline-portrait')"),("click('GET search form');click('q:')","click('GET search form');capture('form-portrait');click('q:')"),("click('Image');on_update();assert(endpoint('image')","capture('image-placeholder-portrait');click('Image');on_update();assert(endpoint('image')"),("w,h=800,480;draw();capture('assisted-opening-landscape');w,h=480,800;draw()","w,h=800,480;draw();capture('assisted-opening-landscape');menu('Mode:');capture('modes-landscape');on_button('back',true);draw();w,h=480,800;draw()")]
 for old,new in changes:assert old in source;source=source.replace(old,new,1)
-# Capture the menu containing the mode/configuration actions before selecting it.
+# Capture the mode menu, with no retired configuration-import action.
 needle="if b[6]:sub(1,#label)==label then on_tap"
-assert needle in source;source=source.replace(needle,"if b[6]:sub(1,#label)==label then if label=='Mode:'or label=='Import server configuration'then capture((label=='Mode:'and 'mode-menu-'or 'configuration-import-')..(w==480 and 'portrait'or 'landscape'))end;on_tap",1)
+assert needle in source;source=source.replace(needle,"if b[6]:sub(1,#label)==label then if label=='Mode:'then capture('mode-menu-'..(w==480 and 'portrait'or 'landscape'))end;on_tap",1)
 driver=O/'capture-extra.lua';driver.write_text(source)
 env=dict(os.environ,BROWSER_CAPTURE=str(capture),ASSISTED_PNG_FIXTURE=str(O/'palette.png'),ASAN_OPTIONS='detect_leaks=0',UBSAN_OPTIONS='halt_on_error=1')
 subprocess.run([str(O/'font-lua'),str(driver)],env=env,check=True)

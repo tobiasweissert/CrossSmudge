@@ -155,12 +155,12 @@ static bool utf8Body(std::string_view s) {
  }
  return true;
 }
-bool prepareBackend(Request& q, std::string_view path, std::string_view body, std::string_view token) {
-  if (!backendPath(path) || body.empty() || body.size()>MaxUpload || body.find('\0')!=body.npos || !backendToken(token) || !utf8Body(body)) return false;
+bool prepareBackend(Request& q, std::string_view path, std::string_view body) {
+  if (!backendPath(path) || body.empty() || body.size()>MaxUpload || body.find('\0')!=body.npos || !utf8Body(body)) return false;
   q.backend=true;q.browser=true;q.post=true;q.headerCount=0;
   strcpy(q.url.host,BackendHost);memcpy(q.url.path,path.data(),path.size());q.url.path[path.size()]=0;
   memcpy(q.body,body.data(),body.size());q.bodySize=body.size();
-  memcpy(q.authorization,"Bearer ",7);memcpy(q.authorization+7,token.data(),64);q.authorization[71]=0;
+  q.authorization[0]=0;
   q.limit=path=="/v1/image"?65536:49152;
   return true;
 }
@@ -209,7 +209,7 @@ static void exchangeOne(const Request& q,Result& r,Scratch& scratch,Io& io,const
     return true;
   };
   auto fail=[&](const char* e) {if(!r.error) r.error=e;};
-  if(q.backend && (strcmp(url.host,BackendHost) || !backendPath(url.path) || !q.post || q.headerCount || strncmp(q.authorization,"Bearer ",7) || !backendToken(q.authorization+7))){fail("backend_invalid");return;}
+  if(q.backend && (strcmp(url.host,BackendHost) || !backendPath(url.path) || !q.post || q.headerCount || q.authorization[0])){fail("backend_invalid");return;}
   if(!ok()) return;
   if(!io.connect(io.context,url.host,timeout,cancel)) {fail("tls_or_network");io.close(io.context);return;}
   struct Close {Io& io; ~Close(){io.close(io.context);}} close{io};
@@ -227,7 +227,7 @@ static void exchangeOne(const Request& q,Result& r,Scratch& scratch,Io& io,const
   if(q.backend){
     const char* accept=!strcmp(q.url.path,"/v1/image")?"Accept: image/png\r\n":"Accept: application/json\r\n";
     if(!send(accept,strlen(accept)))return;
-    if(!send("Content-Type: application/json\r\nAuthorization: ",strlen("Content-Type: application/json\r\nAuthorization: ")) || !send(q.authorization,71) || !send("\r\n",2))return;
+    if(!send("Content-Type: application/json\r\n",strlen("Content-Type: application/json\r\n")))return;
   }
   for(size_t i=0;i<q.headerCount;++i) {
     n=snprintf(scratch.line,sizeof(scratch.line),"%s: %s\r\n",q.headers[i].name,q.headers[i].value);

@@ -85,7 +85,7 @@ type Server struct {
 }
 
 func New(c Config) (*Server, error) {
-	if len(c.Verifiers) == 0 || len(c.Verifiers) > 16 {
+	if c.Verifiers != nil && (len(c.Verifiers) == 0 || len(c.Verifiers) > 16) {
 		return nil, fail("unauthorized")
 	}
 	if c.Now == nil {
@@ -106,6 +106,9 @@ func New(c Config) (*Server, error) {
 	}
 	for p := range c.Verifiers {
 		s.rates[p] = &rate{}
+	}
+	if c.Verifiers == nil {
+		s.rates["anonymous"] = &rate{}
 	}
 	s.wg.Add(1)
 	go s.loop()
@@ -148,6 +151,11 @@ func (s *Server) loop() {
 	}
 }
 func (s *Server) auth(r *http.Request) string {
+	// Public mode has one bounded shared budget. No header, including legacy
+	// Authorization or proxy identity, may allocate another principal.
+	if s.cfg.Verifiers == nil {
+		return "anonymous"
+	}
 	a := r.Header.Values("Authorization")
 	if len(a) != 1 || !strings.HasPrefix(a[0], "Bearer ") {
 		return ""

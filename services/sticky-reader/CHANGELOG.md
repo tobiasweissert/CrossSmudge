@@ -1,11 +1,12 @@
 # Changelog
 
-## Unreleased — 2026-11-16
+## Unreleased
 
 ### Added
 
-- Private SRP1 conversion service with authenticated public-DNS-pinned fetching, semantic reader
-  chunks, fragments/search, safe GET forms, on-demand monochrome PNGs and bounded private cache.
+- Public keyless SRP1 conversion service at sticky.tobiasweissert.ch with public-DNS-pinned fetching,
+  semantic reader chunks, fragments/search, safe GET forms, on-demand monochrome PNGs and bounded
+  shared cache/quotas. Legacy Authorization cannot mint identities or budgets. No verifier setup.
 - Owned child cancellation, serial admission, app-scoped deployment templates and validated
   daemonless ARM64 OCI packaging with synthetic protocol and native qualification fixtures.
 

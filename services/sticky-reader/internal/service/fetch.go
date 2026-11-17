@@ -47,7 +47,7 @@ func safeURL(s string) (*url.URL, error) {
 			return nil, fail("address_denied")
 		}
 	}
-	for _, suffix := range []string{"localhost", "local", "internal", "test", "invalid", "home", "lan", "nytimes.com", "nyt.com", "nyt.net", "nytimg.com", "nyti.ms", "sticky-browser.tobiasweissert.ch"} {
+	for _, suffix := range []string{"localhost", "local", "internal", "test", "invalid", "home", "lan", "nytimes.com", "nyt.com", "nyt.net", "nytimg.com", "nyti.ms", "sticky.tobiasweissert.ch", "sticky-browser.tobiasweissert.ch"} {
 		if host == suffix || strings.HasSuffix(host, "."+suffix) {
 			return nil, fail("address_denied")
 		}

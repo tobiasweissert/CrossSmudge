@@ -31,8 +31,8 @@ GET forms, loaded/saved partial coverage, sequential save, Find, dense-chunk
 positions beyond 512 screens, history/rotation, stale handles, cancelled ownership,
 layout-before-publication, failed writes/readback, uncertain-root GC, image
 references and preserved B5/B1 namespaces. Native tests cover the registered API,
-fixed-origin POST/Bearer, ordinary POST/Authorization negatives, every 3xx,
-content/framing/gzip/decoded caps, NVS/config faults, entropy eligibility and
+fixed-origin public POST with no Authorization, ordinary POST/Authorization negatives, every 3xx,
+content/framing/gzip/decoded caps, no SD/NVS access, entropy eligibility and
 worker drain. The true palette PNG fixture is original generated test data.
 The codec test verifies PNG → async production decoder → 2-bit PXC → blit with
 exactly half of 128×64 pixels black and all file handles closed.
@@ -51,12 +51,11 @@ ASSISTED_TEST_OUT=/path/to/scratch/normal python3 test/browser_assisted/replay.p
 The first command replays synthetic HTTP bytes through production HttpCore,
 resources, dispatch and real Browser Lua callbacks. The second uses a numeric
 loopback socket fixture. The third relays to the parent's actual local backend
-using only the explicitly synthetic `a` repeated 64 times test key; use a test
-backend verifier, never production credentials. `--response-http PATH` accepts
+without Authorization or private configuration. `--response-http PATH` accepts
 a frozen actual HTTP response for byte replay. Receipts distinguish these modes.
-The client's normal runtime origin and TLS path never change. In this sandbox,
-AF_INET socket creation is denied with EPERM: loopback/live relay therefore
-requires a parent run outside the sandbox. An in-process fixture is not live E2E
+The client's fixed canonical origin is https://sticky.tobiasweissert.ch; its
+production TLS/DNS checks remain. Some environments reject AF_INET with EPERM: retain the actual failed attempt
+and rerun on a normal parent host if that occurs. An in-process fixture is not live E2E
 or production TLS proof.
 
 `target_headers.py` is an optional owner-specific syntax diagnostic against the
@@ -73,14 +72,14 @@ actual LuaRunner feature/version function bodies and API constant with minimal
 host runner fields; the receipt names this scope rather than claiming full
 firmware linkage. `recheck_lua.py` can rerun the actual Lua suites without a heavy
 rebuild only when the prior qualification's native source hashes still match.
-`captures.py` records original synthetic input identities, extra mode/import/form/
+`captures.py` records original synthetic input identities, extra mode/form/
 image-error frames, and lossless PNG conversions of production-font host captures.
 Both helpers require `ASSISTED_TEST_OUT` naming an already qualified output.
 
 Combined qualification uses `combined.py` (after `run.py`, with an owned copy of
 Go module dependencies under `COMBINED_SCRATCH/go-mod-cache`). It overlays only
-an integration test into the service package; the 42 approved service files are
-never edited. Native POST bytes reach the real Go HTTP parser/server, maintained
+an integration test into the service package without changing service source.
+Keyless native POST bytes reach the real public Go HTTP parser/server, maintained
 extractor and owned worker. Actual response bytes return to production HttpCore,
 resources, Lua callbacks and the app. The image adapter runs the pinned PNGdec,
 production asynchronous PXC conversion and blit, checking 4096 black pixels.

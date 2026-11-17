@@ -64,8 +64,8 @@ local J=dofile('json.lua')
 smudge.api_version=7
 local configured=false
 local imports=0
-smudge.browser_backend_configured=function()return configured end
-smudge.browser_backend_configure=function()imports=imports+1;configured=true;return true end
+smudge.browser_backend_configured=function()error('app must not inspect credentials')end
+smudge.browser_backend_configure=function()error('app must not import private file')end
 smudge.browser_request_id=function()return string.rep('c',32)end
 local now=0;smudge.millis=function()return now end
 smudge.browser_backend_request=function(q)id=id+1;request={id=id,q=q};return id end
@@ -89,7 +89,7 @@ local function endpoint(n)assert(request and request.q.path=='/v1/'..n,text..' e
 local function cancelServer()
  draw();if request and request.q.path=='/v1/cancel'then deliver7({v=1,state='cancelled'})end
 end
-dofile('main.lua');on_init();draw();assert(not modules['model.lua'],'Direct parser must be lazy');assert(imports==0 and not request,'startup imported or forwarded configuration');menu('Import server configuration');assert(imports==1 and not request,'explicit import must not forward a saved address')
+dofile('main.lua');on_init();draw();assert(not modules['model.lua'],'Direct parser must be lazy');assert(imports==0 and not request,'startup imported or forwarded configuration');assert(not text:find('Direct HTTPS',1,true),'public default must not advertise Direct transport');assert(not text:find('Import server configuration',1,true),'retired setup UI')
 click('Address');edit('https://example.org/one');on_update();assert(endpoint('open').rid==string.rep('c',32))
 deliver7({v=1,state='pending',job=string.rep('b',32),retry_ms=500},202);assert(not request)
 now=499;on_update();assert(not request);now=500;on_update();endpoint('poll');deliver7(ready(0));assert(text:find('Original opening',1,true),text);assert(text:find('Chunk 1/2',1,true),text);capture('assisted-opening-portrait')
@@ -158,4 +158,15 @@ menu('Refresh page');on_update();endpoint('open');failRoot=true;deliver7(t);fail
 -- Existing B5/B1 namespaces and approved icon are untouched.
 files['saved/page1.cache']='B1:legacy';on_exit();assert(files['saved/page1.cache']=='B1:legacy')
 for _ in pairs(resources)do error('resource leaked')end
+-- Old API7 keyed firmware is not public-capable, despite its old feature flag.
+on_exit();smudge.has_feature=function(name)return name~='browser_backend_public_v1'end
+dofile('main.lua');on_init();draw();assert(not modules['backend.lua'].available())
+click('...')
+for n=1,10 do
+ local found=false;for _,b in ipairs(modules['ui.lua'].buttons)do assert(not b[6]:find('Import server',1,true));if b[6]:sub(1,5)=='Mode:'then found=true end end
+ if found then break end;click('More')
+end
+click('Mode:');click('Assisted');on_button('back',true);draw()
+assert(text:find('Update firmware',1,true),text);assert(not request)
+on_exit()
 print('PASS assisted input/navigation/poll/chunks/find/stale/cancel/SD/offline/reentry/font geometry; synthetic fixture')

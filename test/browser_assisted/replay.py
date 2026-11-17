@@ -24,10 +24,10 @@ receipts=[]
 class Handler(http.server.BaseHTTPRequestHandler):
  def log_message(self,*a):pass
  def do_POST(self):
-  assert self.headers['Authorization']=='Bearer '+'a'*64
+  assert self.headers.get('Authorization') is None
   body=self.rfile.read(int(self.headers['Content-Length']));assert len(body)<=2048
   if args.endpoint:
-   req=urllib.request.Request(args.endpoint.rstrip('/')+self.path,data=body,headers={'Authorization':'Bearer '+'a'*64,'Content-Type':'application/json'},method='POST')
+   req=urllib.request.Request(args.endpoint.rstrip('/')+self.path,data=body,headers={'Content-Type':'application/json'},method='POST')
    try:res=urllib.request.urlopen(req,timeout=20)
    except urllib.error.HTTPError as e:res=e
    with res:status=res.status;raw=res.read(65537);kind=res.headers.get('Content-Type','')

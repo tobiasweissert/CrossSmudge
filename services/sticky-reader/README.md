@@ -1,6 +1,6 @@
 # Sticky Reader SRP1 service
 
-Private, pure-Go conversion service for the fixed origin `https://sticky-browser.tobiasweissert.ch`.
+Public keyless pure-Go conversion service for the fixed origin `https://sticky.tobiasweissert.ch`.
 It implements all seven POST endpoints in the parent-frozen SRP1 contract. The application owns
 HTTPS fetching; a single owned subprocess performs inert Readeck v2 extraction or image decoding.
 Cancellation kills and **waits for** the child before the serial queue advances. Successful 202
@@ -21,15 +21,25 @@ cluster or credential mutation is performed. Check the parent build-owner comple
 starting resource-intensive commands when integrating into the shared workspace.
 
 ```sh
-SRP_VERIFIERS=/private/verifiers.json SRP_CACHE=/private/empty-cache \
+SRP_CACHE=/private/empty-cache \
   /root/.hermes/cache/scratch/sticky-reader-service/artifacts/sticky-reader-amd64
 ```
 
-Verifier schema: `{"v":1,"devices":[{"id":"device-id","sha256":"<64 lowercase hex>"}]}`.
-The hash is SHA256 of the **ASCII 64 lowercase hexadecimal characters** of the bearer token.
-No verifier means startup fails. At most sixteen unique IDs and hashes are accepted. The parent
-alone generates real credentials and provisions the private native API7 configuration. No token
-is returned in content or forwarded upstream. Test tokens in the source are deliberately synthetic.
+Production never loads verifiers, secrets or auth files; SRP_VERIFIERS is ignored.
+All valid /v1 requests work without Authorization. Legacy Authorization and invented
+device/proxy headers are ignored as identity and never forwarded upstream. Public
+mode (Config.Verifiers=nil) preallocates exactly one anonymous principal/rate state.
+Explicit verifier maps remain a library-only private-mode regression option; neither
+the production command nor deployment exposes that option.
+
+Everyone shares the existing principal quotas: 60 operations/minute, 120 polls/minute,
+ten new opens/minute, 64 MiB fetched/day, sixteen cached docs and one distinct active
+open. Global serial worker/queue/cache/cgroup limits are unchanged. Header invention
+cannot multiply budgets. Anyone can exhaust this small public service's capacity.
+Random opaque 128-bit IDs are still validated, but are bearer handles, not accounts:
+anyone holding an ID can retrieve/cancel its extraction. Public extraction output
+is not private storage. URLs/content are visible to the operator/hosting provider;
+publishers see the backend IP. TLS protects transport, not administration or cache.
 The cache path must be dedicated to this service. On process startup, only recognized cache files
 are purged; unknown files, symlinks and excessive entries cause startup refusal.
 
@@ -42,9 +52,10 @@ Errors use the contract's closed codes. No HTML or origin image URLs are deliver
 Normal `go test ./...` includes real HTTP/TLS bytes over controlled streams, real extraction/codecs,
 strict malformed protocol tests, principal ownership, quota/queue/cache limits, cancellation,
 child crash and forced kill/reap. Only DNS and numeric-to-fixture dialing are fake boundaries.
-Set `SRP_TCP_FIXTURES=1` to run the same HTTP tests over actual loopback TCP. This sandbox rejects
-both TCP and Unix listeners with EPERM; the default fixture stream mode does not claim to test
-kernel TCP or actual public DNS. Never disable production address or authentication checks to test.
+Set `SRP_TCP_FIXTURES=1` to run the same HTTP tests and production-command startup over
+actual loopback TCP. Some sandbox environments reject listeners with EPERM; retain that
+raw failure if encountered. The default fixture stream mode does not claim to test
+kernel TCP or actual public DNS. Never disable production address or bounds checks to test.
 
 `testdata/original.html` and `ready.json` are original synthetic canonical conversion fixtures;
 `requests.json` and `responses.json` cover endpoint shapes. `TestCanonicalWireGolden` qualifies
@@ -75,8 +86,8 @@ hard cgroup limit or emulate 500m CPU, ARM64 hardware, device SD, Lua or e-ink l
 
 ## Security and limits
 
-- Sixteen accepted connections and eight concurrent handlers bound pre-auth/header and body state.
-  Auth and bounded rates precede body reads, cache or work: 60 operations/minute, separate
+- Sixteen accepted connections and eight concurrent handlers bound header and body state.
+  Fixed-principal bounded rates precede body reads, cache or work: 60 operations/minute, separate
   120 polls/minute, ten new opens/minute with burst two and six-second spacing thereafter;
   64 MiB fetched bytes/day/principal, including failed fetches. One active network/conversion task,
   four queued tasks; at most one active distinct open per principal. Identical opens share work
@@ -84,7 +95,7 @@ hard cgroup limit or emulate 500m CPU, ARM64 hardware, device SD, Lua or e-ink l
 - Every redirect/image/CSS hop validates HTTPS hostname-only URLs, all DNS answers, public address
   ranges, IDNA, numeric peer pin, original TLS name, system roots and dates. IPv4 is deliberately
   selected; mapped, private and mixed results fail. No environment proxy, credentials or cookies.
-  NYT hosts and the backend origin are denied. No JS/headless/login/paywall/bot bypass or feed adapter.
+  NYT hosts and both canonical/legacy backend origins are denied. No JS/headless/login/paywall/bot bypass or feed adapter.
 - Shared deadlines and wire/decoded budgets include redirects and failures. Gzip validates CRC,
   length, one-member framing and expansion ratio. HTML is UTF-8 only, max 1 MiB wire/4 MiB decoded;
   token/node/depth budgets precede inert DOM/Readability. External static visibility supports two
@@ -129,10 +140,13 @@ Traefik v3.6 documents `traefik.ingress.kubernetes.io/router.observability.acces
 sets it false and disables route tracing. Documentation verified 2026-11-16:
 https://doc.traefik.io/traefik/v3.6/reference/routing-configuration/kubernetes/ingress/
 This is configuration intent; live router logs/headers, certificate issuance, NetworkPolicy behavior,
-containerd import, pinned imageID and credentials remain parent deployment qualification tasks.
+containerd import and pinned imageID remain parent deployment qualification tasks.
+The template retains explicit TLS SANs and routes for sticky.tobiasweissert.ch and
+sticky-browser.tobiasweissert.ch; the latter is temporary installed-firmware
+compatibility, not a native fallback. Neither route redirects or trusts proxy identity.
 
-On a real reTerminal Sticky with the companion API7 lane installed, explicitly import the private
-configuration, choose Assisted, open a permitted public page, navigate a later chunk/fragment, Find,
+On a real reTerminal Sticky with the public-mode API7 lane installed, no setup key or
+private file is needed. Open Browser (Assisted defaults), navigate a later chunk/fragment, Find,
 load an image, cancel during fetch/conversion, then check cross-document Back/offline behavior.
 Expect explicit errors/Partial when limits apply, retained old view after cancellation, no direct
 fallback, and no media origin/token in Lua callbacks. No firmware EPUB cache reset is needed;
@@ -145,10 +159,10 @@ module metadata absent from this sandbox's cache (including x/net v0.33.0); sock
 so that broader audit needs the parent's network-enabled environment. This is not a missing runtime
 package or a reason to replace/disable dependencies. Exact failed commands remain in the handoff.
 
-For parent-only live HTTPS qualification, use `python3 scripts/live_flow.py --device-config
-/private/device-config.json --url https://example.org/`. It reads an existing private configuration,
+For parent-only live HTTPS qualification, use `python3 scripts/live_flow.py
+--url https://example.org/`. It reads no private configuration and sends no Authorization,
 refuses redirects, exercises model/chunk/locate/find/image/cancel and prints only sizes/statuses.
-It never prints the bearer, URLs, titles, or private body text. The parent must also run the companion
+It never prints URLs, titles, or body text. The parent must also run the companion
 native/Lua tests and physical Sticky flow; this operator script is not device integration proof.
 
 ### Repair round 1 qualification

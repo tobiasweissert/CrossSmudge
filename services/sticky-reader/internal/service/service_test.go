@@ -26,7 +26,7 @@ func TestStrictJSON(t *testing.T) {
 	}
 }
 func TestURLPolicy(t *testing.T) {
-	for _, s := range []string{"http://example.org/", "https://127.0.0.1/", "https://2130706433/", "https://0x7f000001/", "https://example.org:443/", "https://example.org./", "https://u:p@example.org/", "https://nytimes.com/", "https://x.nytimg.com/", "https://sticky-browser.tobiasweissert.ch/", "https://localhost/", "https://example.org/%00"} {
+	for _, s := range []string{"http://example.org/", "https://127.0.0.1/", "https://2130706433/", "https://0x7f000001/", "https://example.org:443/", "https://example.org./", "https://u:p@example.org/", "https://nytimes.com/", "https://x.nytimg.com/", "https://sticky.tobiasweissert.ch/", "https://localhost/", "https://example.org/%00"} {
 		if _, e := safeURL(s); e == nil {
 			t.Errorf("accepted %s", s)
 		}

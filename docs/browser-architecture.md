@@ -1,4 +1,11 @@
-# Sticky Browser 0.2.1 architecture and API 6 contract
+# Sticky Browser 0.3.1 architecture
+
+Public Assisted mode is specified in [browser-assisted.md](browser-assisted.md).
+It requires API7 plus `browser_backend_public_v1`, uses fixed verified HTTPS
+`https://sticky.tobiasweissert.ch`, and reads no credentials or private file.
+The server shares one bounded anonymous principal; opaque IDs are not private
+storage or user isolation. The existing API6 contract below describes Direct
+and Offline; ordinary API3/API6 header/method/TLS policy is unchanged.
 
 The product remains a Lua app. Native code provides HTTPS, PSRAM allocation,
 font advances and existing streamed JPEG/PNG decoders. It does not execute web

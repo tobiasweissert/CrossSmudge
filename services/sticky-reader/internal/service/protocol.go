@@ -12,7 +12,7 @@ import (
 	"unicode/utf8"
 )
 
-const Origin = "https://sticky-browser.tobiasweissert.ch"
+const Origin = "https://sticky.tobiasweissert.ch"
 
 var idPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
 var tokenPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)

@@ -49,7 +49,11 @@ func TestCombinedNativeLua(t *testing.T) {
 		w.Header().Set("Content-Type", "text/html")
 		io.WriteString(w, `<html lang="en"><title>Combined original</title><article><h1 id="top">Combined original</h1><p id="intro">Beginning café hello, <b>world</b>. </p><p>`+strings.Repeat("Original continued café passage. ", 700)+`</p><p id="end">FINAL_COMBINED_TAIL hello, <b>world</b>.</p><img id="picture" src="/photo.png" width="128" height="64" alt="Original checkerboard"><form id="search" action="/search"><input name="q" type="search"><input name="scope" type="hidden" value="all"></form></article></html>`)
 	}))
-	s := newTestServer(t, f)
+	s, e := New(Config{CacheDir: t.TempDir(), Fetcher: f, WorkerArgs: []string{"-test.run=^TestWorkerProcess$"}, WorkerEnv: []string{"SRP_TEST_WORKER=1"}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
 	api := fixtureServer(t, s, false)
 	defer api.Close()
 	// Native client sees complete actual HTTP bytes, through a framed pipe only at
@@ -98,13 +102,13 @@ func TestCombinedNativeLua(t *testing.T) {
 				done <- e
 				return
 			}
-			if !bytes.Contains(raw, []byte("Authorization: Bearer "+strings.Repeat("a", 64))) {
-				done <- fmt.Errorf("missing native bearer")
+			if bytes.Contains(bytes.ToLower(raw), []byte("authorization:")) {
+				done <- fmt.Errorf("public native request emitted authorization")
 				return
 			}
 			first, _, _ := bytes.Cut(raw, []byte("\r\n"))
 			_, body, _ := bytes.Cut(raw, []byte("\r\n\r\n"))
-			trace, _ := json.Marshal(map[string]any{"request_line": string(first), "body": string(body), "synthetic_credential_only": true})
+			trace, _ := json.Marshal(map[string]any{"request_line": string(first), "body": string(body), "public_no_auth": true})
 			if e = os.WriteFile(filepath.Join(out, fmt.Sprintf("request-%03d.json", n)), trace, 0600); e != nil {
 				done <- e
 				return

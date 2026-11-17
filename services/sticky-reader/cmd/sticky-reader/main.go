@@ -27,18 +27,16 @@ func main() {
 func run() error {
 	runtime.GOMAXPROCS(1)
 	debug.SetMemoryLimit(48 << 20)
-	verifiers, e := service.LoadVerifiers(os.Getenv("SRP_VERIFIERS"))
-	if e != nil {
-		return e
-	}
+
 	dir := os.Getenv("SRP_CACHE")
 	if dir == "" {
 		dir = "/cache/session"
 	}
-	if e = service.ResetCache(dir); e != nil {
+	if e := service.ResetCache(dir); e != nil {
 		return e
 	}
-	s, e := service.New(service.Config{CacheDir: dir, Verifiers: verifiers})
+	// Production is always public: legacy verifier environment is ignored.
+	s, e := service.New(service.Config{CacheDir: dir})
 	if e != nil {
 		return e
 	}

@@ -121,12 +121,9 @@ int backendRequestInner(lua_State* L) {
  rawField(L,1,"body");auto body=string(L,-1);
  rawField(L,1,"timeout_ms");uint32_t timeout=15000;
  if(!lua_isnil(L,-1)){if(!lua_isinteger(L,-1)||lua_tointeger(L,-1)<1000||lua_tointeger(L,-1)>30000)return error(L,"invalid_timeout");timeout=lua_tointeger(L,-1);}
- // All Lua reads precede credential access, avoiding Lua longjmp over secrets.
- char token[65]{};
- if(!s.backendAccess.read || !s.backendAccess.read(s.backendAccess.context,token)){eraseBackendSecret(token,sizeof(token));return error(L,"not_configured");}
  Job* j=s.reserve();
- if(!j){eraseBackendSecret(token,sizeof(token));return error(L,Session::busy()?"busy":"out_of_memory");}
- bool valid=prepareBackend(j->request,path,body,token);eraseBackendSecret(token,sizeof(token));
+ if(!j)return error(L,Session::busy()?"busy":"out_of_memory");
+ bool valid=prepareBackend(j->request,path,body);
  if(!valid){s.discard();return error(L,"invalid_options");}
  j->request.timeoutMs=timeout;j->result.capacity=j->request.limit;
  int id=j->id;
@@ -140,9 +137,10 @@ int backendRequest(lua_State* L){
  lua_pushlightuserdata(L,&s);lua_pushcclosure(L,backendRequestInner,1);lua_pushvalue(L,1);
  if(lua_pcall(L,1,2,0)!=LUA_OK){s.discard();return lua_error(L);}return 2;
 }
-int configured(lua_State* L){auto& s=session(L);char token[65]{};bool ok=s.backendEnabled && s.backendAccess.read && s.backendAccess.read(s.backendAccess.context,token);eraseBackendSecret(token,sizeof(token));lua_pushboolean(L,ok);return 1;}
+// API7 compatibility shims for Browser0.3.0: capability, never credentials.
+int configured(lua_State* L){auto& s=session(L);lua_pushboolean(L,s.backendEnabled);return 1;}
 int configure(lua_State* L){auto& s=session(L);const char* e="unavailable";
- if(s.backendEnabled && s.backendAccess.import)e=Session::busy()?"busy":s.backendAccess.import(s.backendAccess.context);
+ if(s.backendEnabled)e=Session::busy()?"busy":nullptr;
  lua_pushboolean(L,!e);if(e){lua_pushstring(L,e);return 2;}return 1;
 }
 int requestId(lua_State* L){auto& s=session(L);unsigned char bytes[16];char hex[33];

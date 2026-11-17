@@ -53,6 +53,7 @@ if os.environ.get('BROWSER_CODEC_ROOT'):
 
 env['ASSISTED_TEST_OUT']=str(O)
 run([sys.executable,'test/browser_assisted/feature.py'])
+run([sys.executable,'test/browser_assisted/public_metadata.py'])
 source_after=inputs();assert source_before==source_after,'Production sources changed during qualification'
 (O/'source-inputs.json').write_text(json.dumps(source_after,indent=2)+'\n')
 print('PASS source-stable isolated qualification:',O)

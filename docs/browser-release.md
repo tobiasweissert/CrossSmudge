@@ -1,4 +1,13 @@
-# Browser 0.2.1 owner-test release handoff
+# Browser 0.3.1 public Assisted release handoff
+
+Current release: Browser0.3.1 requires public-mode API7 firmware for Assisted
+(`browser_backend_public_v1`), with canonical HTTPS sticky.tobiasweissert.ch.
+No key, NVS token or SD private configuration is needed. min_api remains 6 for
+Direct/Offline. Preserve old origin routing for installed firmware and all saves.
+Public output uses shared quotas/cache and is not private storage. See
+[browser-assisted.md](browser-assisted.md) and services/sticky-reader/README.md.
+Parent alone owns target build, deployment, Git/publication and readiness notice;
+the historical Direct-mode checks below remain applicable where labelled.
 
 This is an integrated local preview for the owner's store. The parent performs
 frozen review, commit/publication and raw URL/hash verification. This worker must

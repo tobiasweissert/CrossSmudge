@@ -34,14 +34,14 @@ static void execute(void*,ink::http::Job& j){
  if(port==0){
   std::ifstream in(getenv("REPLAY_HTTP_RESPONSE"),std::ios::binary);assert(in);struct Fixture{std::string body,sent;size_t at=0;} f{std::string((std::istreambuf_iterator<char>(in)),{})};assert(f.body.size()<=65536);
   ink::http::Io io{&f,[](void*,const char* host,uint32_t,const std::atomic<bool>&){return !strcmp(host,ink::http::BackendHost);},[](void* p,char* b,size_t n){auto& f=*(Fixture*)p;n=std::min(n,f.body.size()-f.at);memcpy(b,f.body.data()+f.at,n);f.at+=n;return int(n);},[](void* p,const char* b,size_t n){((Fixture*)p)->sent.append(b,n);return int(n);},[](void*){},milliseconds};
-  ink::http::exchange(j.request,j.result,j.scratch,io,j.cancel);assert(f.sent.find("Authorization: Bearer "+std::string(64,'a'))!=f.sent.npos);return;
+  ink::http::exchange(j.request,j.result,j.scratch,io,j.cancel);assert(f.sent.find("Authorization:")==f.sent.npos);return;
  }
  Socket socket;
  ink::http::Io io{&socket,[](void* p,const char* host,uint32_t,const std::atomic<bool>&){assert(!strcmp(host,ink::http::BackendHost));auto& s=*(Socket*)p;s.fd=::socket(AF_INET,SOCK_STREAM,0);if(s.fd<0)return false;timeval tv{5,0};setsockopt(s.fd,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(tv));sockaddr_in a{};a.sin_family=AF_INET;a.sin_port=htons(port);a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);return ::connect(s.fd,(sockaddr*)&a,sizeof(a))==0;},[](void* p,char* b,size_t n){return int(::recv(((Socket*)p)->fd,b,n,0));},[](void* p,const char* b,size_t n){return int(::send(((Socket*)p)->fd,b,n,MSG_NOSIGNAL));},[](void* p){auto& s=*(Socket*)p;if(s.fd>=0)::close(s.fd);s.fd=-1;},milliseconds};
  ink::http::exchange(j.request,j.result,j.scratch,io,j.cancel);
 }
 static bool start(void(*fn)(void*),void* a){fn(a);return true;}
-static bool token(void*,char (&out)[65]){memset(out,'a',64);out[64]=0;return true;}
+static bool token(void*,char (&out)[65]){assert(false && "public replay read credentials");return false;}
 static bool entropy(void*,unsigned char* p,size_t n){static unsigned counter=0;++counter;for(size_t i=0;i<n;++i)p[i]=(counter>>(i%4*8))^i;return true;}
 int main(int argc,char** argv){assert(argc==4);port=atoi(argv[2]);assert(port>=0&&port<65536);Heap heap;lua_State* L=lua_newstate(Heap::alloc,&heap);assert(ink::runtime::openEssential(L)==LUA_OK);assert(ink::runtime::openNetwork(L,true)==LUA_OK);assert(ink::browser::openBrowserWork(L)==LUA_OK);
 #ifdef BROWSER_FONT_HOST
