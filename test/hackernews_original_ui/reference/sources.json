@@ -60,7 +60,12 @@
     "cache.lua": "b0c042e109ea39fc21b3d6ac64ac1dd33d3c44b0f56d68bceae8ed78ebd108ca",
     "json.lua": "7c6f00b1072a721e8ac5a90cad4d079a3e5374c6fca60db5440f4d1c4c6707cc",
     "design.lua": "9d098da0954dac941e819c0b31f5fcf35a64a3d879d01f5ce54e7f5df21d4786",
-    "manifest.json": "ba71f8f84b5c4563fcda90d73bd47ed339049d7e2e9bc31b78ebc72413d9091e"
+    "manifest.json": "b3a020ebeb0fc597b804f7714d6c9d7155b8959155da1182db6415ed54ab329b"
+  },
+  "preservation_manifest_baseline": {
+    "commit": "2a477dea03a6db5ed4b5ccd33772c04cf19f8767",
+    "historical_sha256": "ba71f8f84b5c4563fcda90d73bd47ed339049d7e2e9bc31b78ebc72413d9091e",
+    "reason": "Selected current-main manifest already differs from the earlier visual-port freeze; app source and versions are unchanged by Crosscub. All renderer/reference pixel and runtime module pins remain intact."
   },
   "legacy_presentation_sha256": "67f54cd2823847198b23c3944ed71ea63e899c53f6495e641ba5cb292db6de8c",
   "licenses": "CrossPlay MIT in app/LICENSE; OFL-Jersey25.txt/OFL-NotoSerif.txt for source fonts"

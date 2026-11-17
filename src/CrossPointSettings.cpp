@@ -43,7 +43,7 @@ constexpr char LANG_FILE_BIN[] = "/.crosspoint/language.bin";
 constexpr char LANG_FILE_BAK[] = "/.crosspoint/language.bin.bak";
 constexpr uint8_t INVALID_READER_FONT_SIZE = 0xFF;
 constexpr uint8_t TILT_DIRECTION_SCHEMA_CURRENT = 2;
-// X3 hardware predates this migration by less than a year. Reject the RTC's
+// Reject the RTC's
 // factory/default year while preserving dates written by released firmware.
 constexpr uint16_t MIN_TRUSTED_MIGRATED_RTC_YEAR = 2025;
 constexpr uint8_t SLEEP_SCREEN_STORAGE_ORDER[] = {
@@ -243,14 +243,7 @@ uint8_t migrateTiltDirectionValue(const uint8_t direction) {
 }  // namespace
 
 const char* CrossPointSettings::getDefaultDeviceName() {
-#if (defined(FREEINK_DEVICE_X4CLASSIC) && FREEINK_DEVICE_X4CLASSIC) || defined(SIMULATOR_DEVICE_X4_CLASSIC)
-  return "X4 Classic";
-#endif
-  if (BoardConfig::isSticky()) return "Sticky";
-  if (BoardConfig::isX4Pro()) return "CrossSmudge X4 Pro";
-  if (gpio.deviceIsX3()) return "CrossSmudge X3";
-  if (gpio.deviceIsX4()) return "CrossSmudge X4";
-  return "CrossSmudge";
+  return "Crosscub Sticky";
 }
 
 const char* CrossPointSettings::getEffectiveDeviceName() const {

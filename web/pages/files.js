@@ -3,7 +3,7 @@ const currentPath = decodeURIComponent(new URLSearchParams(window.location.searc
 
 if (currentPath !== "/") {
   const leaf = currentPath.split("/").filter(Boolean).pop();
-  if (leaf) document.title = leaf + " - Files - CrossSmudge Reader";
+  if (leaf) document.title = leaf + " - Files - Crosscub Reader";
 }
 
 // Network status monitoring
@@ -91,7 +91,7 @@ function formatFileSize(bytes) {
 }
 
 async function hydrate() {
-  // Fetch CrossSmudge version
+  // Fetch Crosscub version
   fetchVersion();
 
   // Close modals when clicking overlay - call proper cleanup functions
@@ -1426,12 +1426,11 @@ const WS_CHUNK_SIZE = 4096; // 4KB chunks - smaller for ESP32 stability
 
 // Device profiles (short edge × long edge in portrait orientation)
 const DEVICE_PROFILES = {
-  X4: { width: 480, height: 800, label: "X4" },
-  X3: { width: 528, height: 792, label: "X3" },
+  Sticky: { width: 480, height: 800, label: "Sticky" },
 };
 
 // Default conversion settings
-const DEFAULT_DEVICE = "X4";
+const DEFAULT_DEVICE = "Sticky";
 const DEFAULT_MAX_WIDTH = DEVICE_PROFILES[DEFAULT_DEVICE].width;
 const DEFAULT_MAX_HEIGHT = DEVICE_PROFILES[DEFAULT_DEVICE].height;
 const DEFAULT_JPEG_QUALITY = 85;
@@ -1442,7 +1441,7 @@ const X_DEFAULT_REFERENCE_CHARACTERS_PER_PAGE = 1500;
 // Note: Overlap is now always centered distribution (min 5%)
 
 // Dynamic conversion settings (updated by UI)
-let DEVICE_TARGET = "auto"; // 'auto' | 'X4' | 'X3'
+let DEVICE_TARGET = "auto"; // 'auto' | 'Sticky'
 let DETECTED_DEVICE = null; // populated from /api/status
 let ACTIVE_DEVICE = DEFAULT_DEVICE;
 let MAX_WIDTH = DEFAULT_MAX_WIDTH;
@@ -1499,7 +1498,7 @@ function applyUploadSettings(settings = {}) {
     );
 
     setQualityPreset(Math.max(1, Math.min(95, parseInt(merged.quality, 10) || DEFAULT_JPEG_QUALITY)));
-    setDeviceTarget(["auto", "X3", "X4"].includes(merged.deviceTarget) ? merged.deviceTarget : "auto");
+    setDeviceTarget(["auto", "Sticky"].includes(merged.deviceTarget) ? merged.deviceTarget : "auto");
     setHandedness(merged.handedness === "left" ? "left" : "right");
     setOverlap([5, 10, 15].includes(Number(merged.overlap)) ? Number(merged.overlap) : 5);
     toggleConvertOptions();
@@ -1559,7 +1558,7 @@ const logSection = document.getElementById("log-section");
 const logContainer = document.getElementById("log-container");
 const exportLogCheckbox = document.getElementById("export-log-checkbox");
 
-// CrossSmudge version (fetched from API)
+// Crosscub version (fetched from API)
 let crosspointVersion = "Unknown";
 
 // Fetch version from API
@@ -1569,7 +1568,7 @@ async function fetchVersion() {
     if (response.ok) {
       const data = await response.json();
       crosspointVersion = data.version || "Unknown";
-      if (data.device === "X3" || data.device === "X4") {
+      if (data.device === "Sticky") {
         DETECTED_DEVICE = data.device;
         applyDeviceTarget();
       }
@@ -1579,7 +1578,7 @@ async function fetchVersion() {
   }
 }
 
-// Resolve DEVICE_TARGET ('auto' | 'X4' | 'X3') to a concrete profile and update UI.
+// Resolve DEVICE_TARGET ('auto' | 'Sticky') to a concrete profile and update UI.
 function applyDeviceTarget() {
   const resolved = DEVICE_TARGET === "auto" ? DETECTED_DEVICE || DEFAULT_DEVICE : DEVICE_TARGET;
   const profile = DEVICE_PROFILES[resolved] || DEVICE_PROFILES[DEFAULT_DEVICE];
@@ -1966,7 +1965,7 @@ function exportLogToFile(filename = null, isBatch = false) {
   }
   // Extract text from log entries
   const entries = logContainer.querySelectorAll(".log-entry");
-  let logText = `CrossSmudge Reader ${crosspointVersion} - EPUB Conversion Log\n`;
+  let logText = `Crosscub Reader ${crosspointVersion} - EPUB Conversion Log\n`;
   logText += `Generated: ${new Date().toLocaleString()}\n`;
   logText += `${"=".repeat(60)}\n\n`;
 
@@ -4563,7 +4562,7 @@ async function convertEpubFile(file, progressCallback) {
         let modified = false;
 
         // Remove width/height attributes from ALL img tags (dimensions may have changed)
-        // This prevents CrossSmudge and other readers from using wrong dimensions
+        // This prevents Crosscub and other readers from using wrong dimensions
         const allImgElements = doc.querySelectorAll("img");
         for (const img of allImgElements) {
           if (img.hasAttribute("width")) {

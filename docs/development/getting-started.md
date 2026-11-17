@@ -6,7 +6,7 @@ nav_order: 1
 
 # Getting Started
 
-This guide helps you build and run CrossSmudge locally.
+This guide helps you build and run Crosscub locally.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ This guide helps you build and run CrossSmudge locally.
 - Python 3.8+
 - `clang-format` 21+ in your `PATH` (CI uses clang-format 21)
 - USB-C cable
-- Xteink X4 or X3 device for hardware testing
+- reTerminal Sticky device for hardware testing
 
 If `./bin/clang-format-fix` fails with either of these errors, install clang-format 21:
 
@@ -50,7 +50,7 @@ The reported major version must be 21 or newer.
 
 ```sh
 git clone --recursive https://github.com/uxjulia/CrossSmudge
-cd CrossSmudge
+cd Crosscub
 ```
 
 If you already cloned without submodules:
@@ -66,7 +66,7 @@ pio run -e simulator
 pio run -e default
 ```
 
-`pio run` without an environment builds the X3/X4 and Sticky firmware targets listed in `platformio.ini`.
+`pio run` without an environment builds only the Sticky firmware target listed in `platformio.ini`.
 
 ## Flash
 

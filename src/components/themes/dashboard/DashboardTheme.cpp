@@ -39,7 +39,6 @@ constexpr int kCoverCornerRadius = 8;
 constexpr int kStatsColumnWidth = 105;
 constexpr int kStatsColumnWidthWide = 120;
 constexpr int kCoverStatsGap = 15;
-constexpr int kPairInwardShiftX3 = 15;
 constexpr int kTitleTopGap = 28;
 constexpr int kTitleChapterGap = 8;
 constexpr int kBookTitleMaxLines = 2;
@@ -61,7 +60,7 @@ Rect coverRectForScreen(const GfxRenderer& renderer, const Rect& rect) {
   const int maxCoverW = renderer.getScreenWidth() - inset * 2 - statsW - kCoverStatsGap;
   const int coverW = std::min(DashboardMetrics::homeCoverImageWidth, maxCoverW);
   const int coverH = std::min(DashboardMetrics::homeCoverImageHeight, (coverW * 3) / 2);
-  return Rect{inset + (gpio.deviceIsX3() ? kPairInwardShiftX3 : 0), rect.y + kTopInset, coverW, coverH};
+  return Rect{inset + 0, rect.y + kTopInset, coverW, coverH};
 }
 
 Rect fittedBitmapRect(const Bitmap& bitmap, const Rect& target) {
@@ -248,7 +247,7 @@ void drawStatsRow(const GfxRenderer& renderer, const int rightX, const int y, co
 
 void drawDashboardStats(const GfxRenderer& renderer, const Rect& coverRect, const BookReadingStats* stats,
                         const float progressPercent, const bool black = true) {
-  const int rightX = renderer.getScreenWidth() - contentInset(renderer) - (gpio.deviceIsX3() ? kPairInwardShiftX3 : 0);
+  const int rightX = renderer.getScreenWidth() - contentInset(renderer) - 0;
   const int blockH = statsBlockHeight(renderer);
   const bool showRtcStats = halClock.isAvailable();
   const int rowCount = showRtcStats ? kStatsRowCount : kStatsRowCountX4;
@@ -507,7 +506,7 @@ void drawFooterStats(const GfxRenderer& renderer, const Rect& coverRect, const G
   drawIconLabel(renderer, StreakIcon, coverRect.x, centerY, streakBuf, leftTextW, inverted);
 
   const char* readerLabel = readerTypeLabel(globalStats);
-  const int rightX = renderer.getScreenWidth() - inset - (gpio.deviceIsX3() ? kPairInwardShiftX3 : 0);
+  const int rightX = renderer.getScreenWidth() - inset - 0;
   const int maxReaderTextW = std::max(1, renderer.getScreenWidth() / 2 - inset - kFooterIconSize - kFooterIconTextGap);
   drawRightAlignedIconLabel(renderer, readerTypeIcon(globalStats), rightX, centerY, readerLabel, maxReaderTextW,
                             inverted);

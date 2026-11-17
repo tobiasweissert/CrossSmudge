@@ -5,7 +5,7 @@ nav_order: 8
 
 # Nearby Position Sync
 
-CrossSmudge can share the current EPUB reading position between two nearby X3/X4 readers running CrossSmudge. The sync is direct reader-to-reader over ESP-NOW; it does not use WiFi, a server, an account, or KOReader's online sync service.
+Crosscub can share the current EPUB reading position between two nearby Sticky readers running Crosscub. The sync is direct reader-to-reader over ESP-NOW; it does not use WiFi, a server, an account, or KOReader's online sync service.
 
 Nearby Position Sync is separate from [Reading Stats Sync](./reading-stats-sync.md). Stats Sync shares all-time reading totals. Nearby Position Sync shares one in-book location for the currently open EPUB.
 
@@ -25,7 +25,7 @@ The receiving reader only applies the position after you confirm it.
 
 ## Requirements
 
-- Both readers must be running CrossSmudge.
+- Both readers must be running Crosscub.
 - Both readers must have the same EPUB open.
 - Both readers must be near each other.
 - Nearby Position Sync must be run on real hardware; it is not available in the simulator.
@@ -45,11 +45,11 @@ Only one reader needs to press **Share**. The other reader should stay on the Ne
 
 ## What Happens On The Device
 
-Before starting the sync, CrossSmudge saves the current reader progress. The sender then broadcasts the current EPUB position over ESP-NOW. The receiver checks that the incoming packet is from a compatible CrossSmudge nearby-position protocol and that the book identity matches the EPUB currently open on the receiver.
+Before starting the sync, Crosscub saves the current reader progress. The sender then broadcasts the current EPUB position over ESP-NOW. The receiver checks that the incoming packet is from a compatible Crosscub nearby-position protocol and that the book identity matches the EPUB currently open on the receiver.
 
-If the book matches, the receiver maps the shared KOReader-compatible position back to CrossSmudge's local section and page model. When paragraph, list-item, or anchor details are available, CrossSmudge uses them to refine the target page.
+If the book matches, the receiver maps the shared KOReader-compatible position back to Crosscub's local section and page model. When paragraph, list-item, or anchor details are available, Crosscub uses them to refine the target page.
 
-After you press **Select**, CrossSmudge writes the received position to the normal EPUB progress file and returns to the reader at that position.
+After you press **Select**, Crosscub writes the received position to the normal EPUB progress file and returns to the reader at that position.
 
 ## Common Messages
 
@@ -59,7 +59,7 @@ The two readers are not opened to the same EPUB according to the current documen
 
 **Version mismatch. Position not synced**
 
-The other reader is using an incompatible nearby-position sync protocol. Update both readers to compatible CrossSmudge builds.
+The other reader is using an incompatible nearby-position sync protocol. Update both readers to compatible Crosscub builds.
 
 **No nearby reader found** or **Position sync timed out**
 
@@ -67,4 +67,4 @@ The readers did not find each other within the sync window. Keep both readers cl
 
 **Nearby position sync is not available in simulator**
 
-This feature depends on ESP-NOW hardware support, so it only works on a real X3/X4 reader.
+This feature depends on ESP-NOW hardware support, so it only works on a real Sticky reader.

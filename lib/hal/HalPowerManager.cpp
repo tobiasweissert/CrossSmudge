@@ -129,7 +129,7 @@ void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
   // Cut the gated peripheral rails (touch/SD/EPD on boards like the Sticky) and
   // hold the enables off through deep sleep — otherwise the GT911 and SD card
   // stay powered all through "off" and drain the battery. No-op on boards with
-  // no switched rails (X4/X3). Trade-off: no touch-to-wake; wake is the power
+  // no switched rails. Trade-off: no touch-to-wake; wake is the power
   // button. Must run after display.deepSleep() so the panel controller gets its
   // deep-sleep command while its rail is still up (enterDeepSleep() in main.cpp
   // guarantees that ordering).
@@ -175,7 +175,7 @@ uint16_t HalPowerManager::getBatteryPercentage() const {
 #if CROSSINK_BATTERY_DIAG_LOG
 bool HalPowerManager::getBatteryDiagnostics(BatteryDiagnostics& out) const {
   // Function-local like getBatteryPercentage()'s: BoardConfig::ACTIVE is only
-  // resolved once HalGPIO::begin() has run the X3/X4 probe, so a file-scope
+  // resolved once HalGPIO::begin() has initialized the board, so a file-scope
   // instance could be constructed against an unresolved profile.
   static const BatteryMonitor battery;
   const BatteryMonitor::Status status = battery.readStatus();

@@ -282,7 +282,7 @@ bool NearbyStatsSyncActivity::beginEspNow() {
   WiFi.mode(WIFI_STA);
   // A saved station can begin reconnecting as soon as STA mode starts. ESP-IDF
   // cannot change channels while it is associating, which is especially easy
-  // to hit on the X4 Pro's faster S3 radio.
+  // to hit on a fast S3 radio.
   if (!WiFi.disconnect(false, false, 1000)) {
     LOG_DBG(LOG_TAG, "Disconnect before ESP-NOW setup timed out");
   }

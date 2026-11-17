@@ -202,7 +202,7 @@ bool Bitmap::setDitheredOutputSize(const int targetWidth, const int targetHeight
   }
 
   // The error buffers must use final-screen coordinates. Recreating this tiny
-  // helper costs about 3 KiB for an X3-wide custom sleep image, not a full BMP.
+  // helper costs only a few KiB for a custom sleep image, not a full BMP.
   auto* resizedDitherer = new (std::nothrow) AtkinsonDitherer(targetWidth, imageLevels);
   if (!resizedDitherer || !resizedDitherer->isValid()) {
     delete resizedDitherer;
@@ -222,7 +222,7 @@ BmpReaderError Bitmap::readNextRow(uint8_t* data, uint8_t* rowBuffer) const {
   if (outputRowsRead >= outputHeight) return BmpReaderError::ShortReadRow;
 
   // Select source rows before dithering. For example, a 480x800 custom
-  // wallpaper fitted to an X3 becomes 475x792 here, so error diffusion never
+  // wallpaper fitted to the panel has a bounded width, so error diffusion never
   // has to survive the renderer's later non-integer scale.
   const int sourceY = std::min(height - 1, (outputRowsRead * height + height / 2) / outputHeight);
   while (sourceRowsRead <= sourceY) {

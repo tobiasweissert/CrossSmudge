@@ -147,7 +147,7 @@ std::string formatCompactDuration(const uint32_t seconds) {
 
 void drawSystemVersionFooter(const GfxRenderer& renderer, const int pageWidth, const int pageHeight,
                              const ThemeMetrics& metrics) {
-  const std::string label = "CrossSmudge " CROSSSMUDGE_VERSION;
+  const std::string label = "Crosscub " CROSSSMUDGE_VERSION;
   const int maxWidth = pageWidth - systemVersionFooterSideMargin * 2;
   const int bottomLineY =
       pageHeight - metrics.buttonHintsHeight - metrics.verticalSpacing - systemVersionFooterBottomInset;
@@ -303,14 +303,6 @@ void SettingsActivity::rebuildSettingsLists() {
   dictionaryRegistry.refreshIfDirty();
   const auto allSettings = getSettingsList(needsFonts ? &sdFontSystem.registry() : nullptr, &dictionaryRegistry);
   displaySettings = buildGroupedDisplaySettingsList(allSettings);
-#ifndef SIMULATOR
-  if (BoardConfig::isX4Pro() || CROSSINK_APP_DEVICE_X4CLASSIC) {
-    displaySettings.erase(
-        std::remove_if(displaySettings.begin(), displaySettings.end(),
-                       [](const SettingInfo& setting) { return setting.valuePtr == &CrossPointSettings::fadingFix; }),
-        displaySettings.end());
-  }
-#endif
   displaySleepSettings = buildDisplaySleepSettingsList(allSettings);
   displayFrontlightSettings = buildDisplayFrontlightSettingsList(allSettings);
   readerSettings = buildReaderSettingsParentList(allSettings);
@@ -1504,7 +1496,7 @@ void SettingsActivity::render(RenderLock&&) {
   app.render();
   uiReady = true;
 
-  // Draw CrossSmudge version label at the bottom of the System tab
+  // Draw Crosscub version label at the bottom of the System tab
   if (!isFileBrowserView() && selectedCategoryIndex == 3) {
     drawSystemVersionFooter(renderer, pageWidth, renderer.getScreenHeight(), metrics);
   }

@@ -2,6 +2,9 @@
 local app=dofile('main.lua')
 assert(type(app)=='table' and app.state, 'production identity selected legacy Solitaire')
 on_init();on_draw()
+-- The full-memory graphical app starts on its existing home menu; use the
+-- normal Confirm action before inspecting the playing board's stock target.
+if app.layout().menu then on_button('confirm',true);on_draw() end
 local g=app.state();local l=app.layout()
 local stock,waste,moves=#g.piles[0],#g.piles[1],g.moves
 assert(stock>0)

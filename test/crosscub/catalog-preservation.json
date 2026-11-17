@@ -1,0 +1,196 @@
+{
+  "baseline_catalog_sha256": "6218e06b6f4cabc2afee701a39fea88fa1e81c8b7cd9146ff4d1bd7b5f05c327",
+  "catalog_count": 37,
+  "apps": {
+    "dice": {
+      "version": "1.0.0",
+      "record_sha256": "e035e021df2e37a592d5a127b2b663952d5661f3cec4b6a703bf464ed70ee5f4",
+      "manifest_sha256": "193ff0e4ebf94dc6cc4edab82c00a69ef7b07af13818cf6eb365f7a040bf61bf"
+    },
+    "lifecounter": {
+      "version": "1.0.0",
+      "record_sha256": "921260d50af655daa2e0531f8fa622481d4cbfcf65f32fd9a7753dafc6756cc9",
+      "manifest_sha256": "2a3c441a2b8bb18b019a8eeae264ec3de03a6ac446d4a41e67207030e817b6ba"
+    },
+    "rosary": {
+      "version": "1.0.0",
+      "record_sha256": "d64d56bf827229364028451b3769c2b6c53cbd4288039df797f9783bf35bfab4",
+      "manifest_sha256": "1144b467378e208bbea00065a912eed3b8e5d8d4bc05fc375284939995c0d200"
+    },
+    "dailyoffice": {
+      "version": "1.0.0",
+      "record_sha256": "3794b19498c0345d351227fd5a9e35ab8d27908d339a3d3be71d6b839859b3b0",
+      "manifest_sha256": "6fa5a979f4d29f9b3838a05abae37f8e736f61359e525278d7860427ee99d6c6"
+    },
+    "wordle": {
+      "version": "1.2.1",
+      "record_sha256": "4cb073cd11fc318f8e3b3dbb186a1d6a51444c1d64db1995fbd27719da70ba14",
+      "manifest_sha256": "49c1687ff1b44e52b3aa82f802f25807bfbcbf0e7abdfbc51af564099fad1a38"
+    },
+    "2048": {
+      "version": "1.1.0",
+      "record_sha256": "bce659b85165e5c0355a8b26ac145722637446006835589ad3c393bd0a655d53",
+      "manifest_sha256": "078085c5ba2e6d476fd1596fba2105e9c0e8d09a61a514bb96de776afb7c2625"
+    },
+    "sudoku": {
+      "version": "1.1.1",
+      "record_sha256": "c2ecfaca4a642da1fef474727af1daa8c37d25ad0bebce3e173d693eab245444",
+      "manifest_sha256": "fac6dd20b134353aeada68a1c688f026066c55c257cf9593d0c9fad5c5e66d77"
+    },
+    "blackjack": {
+      "version": "1.0.0",
+      "record_sha256": "8e6c050ba4d648059b49e9ace6c688c1b61e6568fbf681271c4433adb9213e35",
+      "manifest_sha256": "c59c8f29c8af5f41de308bfc494618c8f147a37e271b1f6a01802a348c975423"
+    },
+    "blockdrop": {
+      "version": "1.0.1",
+      "record_sha256": "161ea16498412bde1be12e2379077a8712cd6a8a80d2230a3f9cd40cd72d70ef",
+      "manifest_sha256": "ba93ad4b5f804b2842f15bb06bc0f00dce2c1285c511cf80c6046d911d41b1b5"
+    },
+    "codex": {
+      "version": "1.0.0",
+      "record_sha256": "239e3ebe0794b5070150b57561607e52edfd53f7957aa97922d93c010bd9c2ab",
+      "manifest_sha256": "4d95c009d443d7db02216951cf6718e8e058976d97b9a9952e142fbdcfe7757d"
+    },
+    "watertracker": {
+      "version": "1.0.1",
+      "record_sha256": "77d0a79d5e2cb676312daa7c4128911e63570ae7b36ea5c58daf7a2412db0fe7",
+      "manifest_sha256": "241001a774b9ec2d7c13ca66f40a470a0257f6d41c5d727793957c089e1ca30f"
+    },
+    "stopwatch": {
+      "version": "1.0.0",
+      "record_sha256": "ae394e8ecb69040cc1fc92738387b0e7190b72a99908fa060261f2a9f83e4994",
+      "manifest_sha256": "0f08d119c308cdd12df04f08e449167a6f78ee616d762b50b404efe312c45a43"
+    },
+    "dashboard": {
+      "version": "1.0.3",
+      "record_sha256": "c16bee2a05ea6f3c613a22fe991f0cf41dca366091fce79e276db524c0ce34d3",
+      "manifest_sha256": "03ea517179ea8ad1541ed81b968d9e827b54edf996920906e0f9f3498cf5537a"
+    },
+    "hourglass": {
+      "version": "1.0.1",
+      "record_sha256": "e8a53ea3885dcefaeedb45d50cec662d9e65ad532a9851c7e25854c4f841b30a",
+      "manifest_sha256": "ee778b621bf1969d3d38caf2e8151074159a0a8dfd02735dbed93b2963771f7a"
+    },
+    "solitaire": {
+      "version": "1.1.1",
+      "record_sha256": "d2ec7d01426f7713ca439c7da8348b7c5eb74cecdc2ea0a8194eb34dea41c17a",
+      "manifest_sha256": "84136e84971e7e9e0755f7d40d926cfef933b15eac736551efc97cd572401895"
+    },
+    "chess": {
+      "version": "1.1.1",
+      "record_sha256": "67ba78191cee85ab74eafdaa65bb0921a9e27b7c3cf87c4ca73b9a0594351705",
+      "manifest_sha256": "b68d9314c12e9b6691bca6f6964ee8b9332a68bb3c82317ac56a1b7124bc3aa3"
+    },
+    "cp-battleship": {
+      "version": "0.1.4",
+      "record_sha256": "00972420452f3a639deb15660075a97552f6548d6f22d072d3cdb9ed3d110a43",
+      "manifest_sha256": "25a8559d7fe3b8e9ba24cc8883b53d638b9f764e6bccb086d208e424f9420d64"
+    },
+    "cp-calculator": {
+      "version": "0.1.4",
+      "record_sha256": "1c7fabc92f307c05dbf944f3ef652f40306914fe604dd95d6171c38d28938286",
+      "manifest_sha256": "6f1871fb9f377e8e09fa1a7924ffbe9e2f7298d664635d34a28a85935066f702"
+    },
+    "cp-checkers": {
+      "version": "0.1.4",
+      "record_sha256": "1501eddb860a6dc87fe3cc54cbd25b193b7fd2f1d622bb62fc565f7a2a30c8fe",
+      "manifest_sha256": "2b9538cb79096d4efebff6e6167d67911fa19b75a7b703d646fba2dd56d6c79b"
+    },
+    "cp-connectfour": {
+      "version": "0.1.4",
+      "record_sha256": "71a0744323043063ee0b3929b83b7eec0631c2ffcd6064b0191df709e01f9911",
+      "manifest_sha256": "5f1712c76d273c11a566f4b67982384239bbebaaf46c82c6fd90a7032ac2df4d"
+    },
+    "cp-forehead": {
+      "version": "0.1.4",
+      "record_sha256": "9bdbb1a8a1201b22e9d36de6b018a63d4f474ddbaa24457adfb7d8af8f841a62",
+      "manifest_sha256": "edbe1f77a9fa6e18a972ea4994212af55452ee250c70b74fcc7401b332f891c0"
+    },
+    "cp-hearts": {
+      "version": "0.1.4",
+      "record_sha256": "6dfcab5bfa128d55f317dcf85c02377d4fa41caccb8156f74197bbadddf7c2b9",
+      "manifest_sha256": "edc5be4ff7c2e3cabb628ed2640576f35d636c31c06cbacf11e5f7a7f14ca038"
+    },
+    "cp-hex": {
+      "version": "0.1.4",
+      "record_sha256": "635c4081358d8d536e8526f8aa9f977ecf6ad551fb0bb12f4777cc22f51d9266",
+      "manifest_sha256": "91f7188b37173ff3d0484c48c5b766ed5afe85c0bb83ec74852c0eecd37b1965"
+    },
+    "cp-insider": {
+      "version": "0.1.4",
+      "record_sha256": "f6991410bad1f990d6fc6991812f72deb837a248722a31b5ceafaca106212f28",
+      "manifest_sha256": "55f40e085f918b73607fdece77cafc89efb878fcba9b1113d07878204cdf3883"
+    },
+    "cp-knucklebones": {
+      "version": "0.1.4",
+      "record_sha256": "dc894b8ca9437dbc169cf4e976553b36c59658e3cc8b9f8a2fdbaafc6439d7fc",
+      "manifest_sha256": "e7a26108b970954acd467b0ea2d00fd9ec482b0275de9b8e6f64dac0d850403b"
+    },
+    "cp-minesweeper": {
+      "version": "0.1.5",
+      "record_sha256": "6bd33b027749a967abc066d3acdae3c971a8a2aa13a9af021267bcb82a3f4fa6",
+      "manifest_sha256": "30a0042d2079f8f2449de0f9332dc283c9637a7a2bd36447a812090c3c835e5b"
+    },
+    "cp-notes": {
+      "version": "0.1.4",
+      "record_sha256": "37ad47d1f6321d58a4fa63bd9e80b9048121f7b1aa70acbb748628cbf22d4f1c",
+      "manifest_sha256": "f42819569db5247c91958f1e13e1793e147935bc18ce0e6d0865b4773c6f1386"
+    },
+    "cp-wavelength": {
+      "version": "0.1.4",
+      "record_sha256": "6e99b6894b43b8cda06718e7340177c67ff44fb00c6ff188ef532d1cab5a0700",
+      "manifest_sha256": "7ed6a525e75a821a8c98e2208fc5217cfc897e747c931f5d7c566ff90a099ef8"
+    },
+    "cp-yahtzee": {
+      "version": "0.1.4",
+      "record_sha256": "cbc589b4b539bfdece481f2d540ce6da16f57327210e5e40167f3eb0e0ef465a",
+      "manifest_sha256": "a5a2ffae2cbd87793c21439136b62766dbc2a9c2cbdbd7490eb901b90bfd16d7"
+    },
+    "cp-jaipur": {
+      "version": "0.1.4",
+      "record_sha256": "c42b7d4eef13431be389fb7b07e1c14913731a333d87ea01db8bce81e0433bf8",
+      "manifest_sha256": "bf8e89a0e7cb3a71c230fa173654603d9627fbdac8316e0103b4f8070d96d09b"
+    },
+    "cp-seasalt": {
+      "version": "0.1.4",
+      "record_sha256": "314afbf485b78403a1f8cc753c20c4f9c6c663d35cbd17af50556094b3fb274f",
+      "manifest_sha256": "5370a617a27532639164823374517f51bbb960fbe24e11e210c449851e3e0f63"
+    },
+    "cp-toybattle": {
+      "version": "0.1.4",
+      "record_sha256": "c222b2d874d143342aa0cf60c9595da18b2fee13a871f5ff1c847c07e4f2380c",
+      "manifest_sha256": "2140b4ee3bf959d51cb2463340037d7b4932db03ff03a8ab16c46cb16967427e"
+    },
+    "cp-murdle": {
+      "version": "0.1.4",
+      "record_sha256": "72abc4e000be63c160fd5a0ad025137c8e83db1dfc9112958aa9c1f8b6a3561e",
+      "manifest_sha256": "3c573f0556574ec81ae95269eceee3ac221e36f0e63b49020e7dcf730fd97166"
+    },
+    "cp-go": {
+      "version": "0.1.4",
+      "record_sha256": "3834cdc102c3c171de40935a88fbab68fb1652c56405f0c79c9666dc4788da24",
+      "manifest_sha256": "cf487ea79c82d8780ace9c80b4c2c9c309e154c0861b8e50ac1fec0b85c25d1c"
+    },
+    "cp-hackernews": {
+      "version": "0.1.3",
+      "record_sha256": "01c6b83c9355f062a7fd8d59578e68ff591071a73c545853325dbd5854db221e",
+      "manifest_sha256": "b3a020ebeb0fc597b804f7714d6c9d7155b8959155da1182db6415ed54ab329b"
+    },
+    "cp-trivia": {
+      "version": "0.1.3",
+      "record_sha256": "c0bf96863759e7d921037bb6051073c24440ee9a6b8d3ba28b8289141baf2fdd",
+      "manifest_sha256": "0b02b7b09ed6969f33b9f257e4a5763933384e4471af761fcf183fece3452ebb"
+    },
+    "browser": {
+      "version": "0.3.1",
+      "record_sha256": "6cb1b537421110efa1f28e9bbd856ae69a01c2f6b655934c0c3e91ef55a8cb9a",
+      "manifest_sha256": "bb7594fe3cf2ae1d81168a2c77ec9634a294f9bde06aa79632bd12a0297ddf65"
+    }
+  },
+  "allowed_delta": {
+    "branch": "feat/crosscub-sticky-only",
+    "dailyoffice_add_file": "lessons/2026-09-30.txt",
+    "stopwatch_version": "1.0.1"
+  }
+}

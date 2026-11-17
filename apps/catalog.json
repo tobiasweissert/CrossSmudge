@@ -1,6 +1,6 @@
 {
   "repo": "tobiasweissert/CrossSmudge",
-  "branch": "integration/sticky-test-all",
+  "branch": "feat/crosscub-sticky-only",
   "apps": [
     {
       "id": "dice",
@@ -62,7 +62,8 @@
         "hours/none.txt",
         "hours/prime.txt",
         "hours/sext.txt",
-        "hours/terce.txt"
+        "hours/terce.txt",
+        "lessons/2026-09-30.txt"
       ]
     },
     {
@@ -273,7 +274,7 @@
     {
       "id": "stopwatch",
       "name": "Stopwatch",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": "Mumfee",
       "description": "Pixel cartoon stopwatch with digital display and lap split recording",
       "files": [

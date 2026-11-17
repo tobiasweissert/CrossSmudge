@@ -178,19 +178,14 @@ def get_hardware_version(project_dir, pioenv):
     if pioenv == 'sticky-owner-test':
         return f'{get_crosssmudge_version(project_dir)}-test.{get_git_short_hash(project_dir, 7)}.{owner_source_fingerprint(project_dir)[:8]}'
 
-    if pioenv == 'default':
-        if os.environ.get('CROSSSMUDGE_RELEASE_VERSION') or os.environ.get('CROSSINK_RELEASE_VERSION'):
-            return get_production_version(project_dir)
-        base_version = get_crosssmudge_version(project_dir)
-        branch = get_git_branch(project_dir)
-        return f'{base_version}-dev+{branch}'
-
     base_version = (
         get_production_version(project_dir)
         if (os.environ.get('CROSSSMUDGE_RELEASE_VERSION') or os.environ.get('CROSSINK_RELEASE_VERSION'))
         else get_crosssmudge_version(project_dir)
     )
-    device_suffix = {'sticky': '-sticky', 'x4-pro': '-x4-pro', 'x4-classic': '-x4-classic'}[pioenv]
+    if pioenv not in {'sticky', 'default'}:
+        raise ValueError('Crosscub hardware version requires Sticky')
+    device_suffix = '-sticky'
     return f'{base_version}{device_suffix}'
 
 
@@ -205,14 +200,14 @@ def inject_version(env):
         ('CROSSINK_GIT_DIRTY', f'\\"{get_git_dirty(project_dir)}\\"'),
     ])
 
-    if pioenv in {'default', 'sticky', 'sticky-owner-test', 'x4-pro', 'x4-classic'}:
+    if pioenv in {'default', 'sticky', 'sticky-owner-test'}:
         version_string = get_hardware_version(project_dir, pioenv)
         if os.environ.get('CROSSSMUDGE_RC_HASH') or os.environ.get('CROSSINK_RC_HASH'):
-            print(f'CrossSmudge RC build version: {version_string}')
+            print(f'Crosscub RC build version: {version_string}')
         elif os.environ.get('CROSSSMUDGE_RELEASE_VERSION') or os.environ.get('CROSSINK_RELEASE_VERSION'):
-            print(f'CrossSmudge production build version: {version_string}')
+            print(f'Crosscub production build version: {version_string}')
         else:
-            print(f'CrossSmudge build version: {version_string}')
+            print(f'Crosscub build version: {version_string}')
         env.Append(CPPDEFINES=[
             ('CROSSSMUDGE_VERSION', f'\\"{version_string}\\"'),
             ('CROSSINK_VERSION', f'\\"{version_string}\\"'),
@@ -231,7 +226,7 @@ def inject_version(env):
             'CROSSSMUDGE_SHOW_SLEEP_BUILD_INFO',
             'CROSSINK_SHOW_SLEEP_BUILD_INFO',
         ])
-        print(f'CrossSmudge test build version: {ci_version}{suffix}')
+        print(f'Crosscub test build version: {ci_version}{suffix}')
 
     elif pioenv == 'sticky-debug':
         branch = get_git_branch(project_dir)
@@ -246,22 +241,7 @@ def inject_version(env):
             'CROSSSMUDGE_SHOW_SLEEP_BUILD_INFO',
             'CROSSINK_SHOW_SLEEP_BUILD_INFO',
         ])
-        print(f'CrossSmudge test build version: {ci_version}{suffix}')
-
-    elif pioenv in {'x4-pro-debug', 'x4-classic-debug'}:
-        branch = get_git_branch(project_dir)
-        short_hash = get_git_short_hash(project_dir)
-        ci_version = get_crosssmudge_version(project_dir)
-        suffix = f'-{branch}+{short_hash}'
-        env.Append(CPPDEFINES=[
-            ('CROSSSMUDGE_VERSION', f'\\"{ci_version}{suffix}\\"'),
-            ('CROSSINK_VERSION', f'\\"{ci_version}{suffix}\\"'),
-            ('CROSSSMUDGE_BUILD_ENV', '\\"debug\\"'),
-            ('CROSSINK_BUILD_ENV', '\\"debug\\"'),
-            'CROSSSMUDGE_SHOW_SLEEP_BUILD_INFO',
-            'CROSSINK_SHOW_SLEEP_BUILD_INFO',
-        ])
-        print(f'CrossSmudge test build version: {ci_version}{suffix}')
+        print(f'Crosscub test build version: {ci_version}{suffix}')
 
     elif pioenv == 'test':
         branch = get_git_branch(project_dir)
@@ -272,7 +252,7 @@ def inject_version(env):
             ('CROSSSMUDGE_VERSION', f'\\"{ci_version}{suffix}\\"'),
             ('CROSSINK_VERSION', f'\\"{ci_version}{suffix}\\"'),
         ])
-        print(f'CrossSmudge test build version: {ci_version}{suffix}')
+        print(f'Crosscub test build version: {ci_version}{suffix}')
 
     elif pioenv == 'gh_release_rc':
         # CI passes CROSSSMUDGE_RC_HASH as an env var; locally we derive it from git.
@@ -281,7 +261,7 @@ def inject_version(env):
             ('CROSSSMUDGE_VERSION', f'\\"{version_string}\\"'),
             ('CROSSINK_VERSION', f'\\"{version_string}\\"'),
         ])
-        print(f'CrossSmudge RC build version: {version_string}')
+        print(f'Crosscub RC build version: {version_string}')
 
 
 # PlatformIO/SCons entry point — Import and env are SCons builtins injected at runtime.

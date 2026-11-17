@@ -195,7 +195,7 @@ inline bool isTouchMenuGesture(const MappedInputManager& input) {
          (SETTINGS.touchReaderControls && input.hasTouch() && input.wasReaderMenuGesture());
 }
 
-// X4 Pro opens the reader menu with an upward swipe. Its top-edge downward
+// Legacy Home-key profiles open the reader menu with an upward swipe. The top-edge downward
 // swipe is the opposite gesture and dismisses the menu instead of opening the
 // frontlight panel. Other touch boards retain their existing menu behavior.
 inline bool isTouchMenuDismissGesture(const MappedInputManager& input) {
@@ -234,8 +234,8 @@ inline PageTurnResult detectPageTurn(const MappedInputManager& input) {
 // before the next page turn (the tiled grayscale cleanup does).
 inline void displayWithRefreshCycle(const GfxRenderer& renderer, int& pagesUntilFullRefresh, bool async = false) {
   // A negative countdown is reserved for the explicit Refresh Screen shortcut.
-  // Regular cadence cleanup remains a HALF refresh at 1. The X4 retains its
-  // prior clean HALF waveform; other panels use their full waveform.
+  // Regular cadence cleanup remains a HALF refresh at 1; the explicit
+  // manual refresh uses the full waveform.
   const auto mode = pagesUntilFullRefresh < 0    ? manualScreenRefreshMode()
                     : pagesUntilFullRefresh <= 1 ? HalDisplay::HALF_REFRESH
                                                  : HalDisplay::FAST_REFRESH;

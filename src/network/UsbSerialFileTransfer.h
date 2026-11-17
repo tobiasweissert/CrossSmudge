@@ -9,7 +9,7 @@ enum class ProcessResult {
 
 ProcessResult process(bool fileTransferAllowed);
 
-// Register the native USB CDC overflow callback when the X4 Pro transport
+// Register the native USB CDC overflow callback when the selected transport
 // supports it. Other transports intentionally do nothing.
 void registerUsbCdcOverflowHandler();
 

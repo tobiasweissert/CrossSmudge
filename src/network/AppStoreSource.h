@@ -3,11 +3,10 @@
 namespace AppStoreSource {
 // One root controls catalog, icons and every package dependency. Catalog metadata
 // never redirects downloads to a different host or branch.
-#if defined(CROSSSMUDGE_OWNER_TEST)
+// Repository name is retained for source compatibility; this is Crosscub's
+// live owner-controlled 41-app catalog, not this branch's 37-source inventory.
+// Never replace the live catalog with the smaller source-baseline catalog.
 #define CROSSSMUDGE_STORE_ROOT "https://raw.githubusercontent.com/tobiasweissert/CrossSmudge/integration/sticky-test-all/apps/"
-#else
-#define CROSSSMUDGE_STORE_ROOT "https://raw.githubusercontent.com/Mumfee/CrossSmudge/main/apps/"
-#endif
 static constexpr const char* baseUrl = CROSSSMUDGE_STORE_ROOT;
 static constexpr const char* catalogUrl = CROSSSMUDGE_STORE_ROOT "catalog.json";
 #undef CROSSSMUDGE_STORE_ROOT

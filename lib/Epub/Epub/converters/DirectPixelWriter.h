@@ -15,7 +15,7 @@
 struct DirectPixelWriter {
   uint8_t* fb;
   GfxRenderer::RenderMode mode;
-  uint16_t displayWidthBytes;  // Runtime framebuffer stride (X4: 100, X3: 99)
+  uint16_t displayWidthBytes;  // Runtime framebuffer stride in bytes
   // Active write target: for tiled grayscale, fb is the band scratch, originY is
   // the band's top physical row, and clipRows is the band height. Off-band
   // pixels are dropped. With no strip active these collapse to the full frame

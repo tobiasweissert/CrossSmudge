@@ -7,15 +7,8 @@
 #include "CrossPointSettings.h"
 #include "util/QuickLockTrigger.h"
 
-// X4's vendor FULL waveform visibly inverts the whole panel several times.
-// Keep its manual shortcut on the clean HALF waveform used before the manual
-// refresh change; X3 and every other device retain the explicit full refresh.
+// Explicit manual refresh retains the full waveform on Sticky.
 inline HalDisplay::RefreshMode manualScreenRefreshMode() {
-#if FREEINK_DEVICE_X4
-  if (gpio.deviceIsX4()) {
-    return HalDisplay::HALF_REFRESH;
-  }
-#endif
   return HalDisplay::FULL_REFRESH;
 }
 

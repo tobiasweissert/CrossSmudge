@@ -1,28 +1,24 @@
-# CrossSmudge ✒️
+# Crosscub ✒️
 
-**CrossSmudge** is an open-source, extensible e-reader and micro-application firmware for ESP32 e-paper devices. 
+**Crosscub** is an open-source, extensible e-reader and micro-application firmware for the Seeed reTerminal Sticky (ESP32-S3R8, 16 MiB flash, 8 MiB PSRAM).
 
-Built upon the typography and reading enhancements of **[CrossInk](https://github.com/uxjulia/crossink)** and the rock-solid foundations of **[CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader)**, **CrossSmudge** introduces a lightweight **standalone Lua 5.4 application engine**, an **on-device App Store** for wireless app installations, a **browser-based web app manager**, and an expanding suite of games and utilities—all engineered to run within the strict hardware and memory limits of low-power e-ink hardware.
+Built upon the typography and reading enhancements of **[CrossSmudge](https://github.com/Mumfee/CrossSmudge)** and **[CrossInk](https://github.com/uxjulia/crossink)** and the rock-solid foundations of **[CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader)**, **Crosscub** preserves the inherited lightweight **standalone Lua 5.4 application engine**, an **on-device App Store** for wireless app installations, a **browser-based web app manager**, and an expanding suite of games and utilities—all engineered to run within the strict hardware and memory limits of low-power e-ink hardware.
 
 ---
 
 ### Supported Devices
 
-- **Xteink X3** (ESP32-C3, physical buttons, 800×480 monochrome e-ink)
-- **Xteink X4** (ESP32-C3, physical buttons, 800×480 monochrome e-ink)
-- **Xteink X4 Pro** (ESP32-S3, touch + SDMMC, PSRAM)
-- **Xteink X4 Classic** (ESP32-S3, touch + physical buttons)
 - **Seeed Studio reTerminal Sticky** (ESP32-S3, touch, PSRAM)
 
 ---
 
-## What's New in CrossSmudge 🎮✨
+## What's New in Crosscub 🎮✨
 
 ### 🚀 Standalone Lua 5.4 Application Engine
 Develop, share, and run custom applications directly from your SD card—**no firmware compilation or flashing required!**
 * **Dynamic Discovery:** Drop an application folder into `/.crosssmudge/applications/` on your SD card, and it instantly appears in the on-device **Applications** launcher.
 * **Full E-Paper Graphics API:** Complete `smudge.*` standard library providing high-contrast vector drawing, text wrapping, bitmap sprite rendering, modal dialogues, font selection, and hardware button/touch event handlers.
-* **Hardware-Enforced Memory Safety:** Sandboxed Lua runtime calibrated for constrained ESP32-C3 microcontrollers (75 KB DRAM limit).
+* **Hardware-Enforced Memory Safety:** Sandboxed Lua runtime with the existing per-app heap budgets and PSRAM policies preserved.
 
 ### 🛒 On-Device App Store (Over Wi-Fi)
 Discover and install community-created applications directly on your device:
@@ -37,7 +33,7 @@ Manage your device's apps from any desktop or mobile browser:
 * **Storage Manager:** View installed apps, versions, author information, storage footprint, and delete apps with one click.
 
 ### 🃏 Built-In & Community Applications
-CrossSmudge includes a collection of e-paper applications and games:
+Crosscub includes a collection of e-paper applications and games:
 
 | Application | Description |
 | :--- | :--- |
@@ -59,7 +55,7 @@ CrossSmudge includes a collection of e-paper applications and games:
 
 ### ⚙️ System & Firmware Enhancements
 * **Front Button Navigation:** Unified physical button navigation across the App Store, Applications menu, and games (physical Up/Down/Select/Back controls).
-* **Dedicated Over-The-Air (OTA) Updates:** Pointed directly to [CrossSmudge GitHub Releases](https://github.com/Mumfee/CrossSmudge/releases) for seamless one-tap firmware upgrades.
+* **Dedicated Over-The-Air (OTA) Updates:** Owner-controlled Crosscub-only release validation; no Crosscub update is published yet. Upstream product images are never selected by OTA. Manual SD recovery remains available.
 * **Low-Latency E-Paper Engine:** Custom partial refresh scheduling and waveform management to minimize ghosting during interactive gameplay.
 
 ---
@@ -153,7 +149,7 @@ CrossSmudge includes a collection of e-paper applications and games:
 
 ## Developer Guide: Building Your Own Apps 🛠️
 
-CrossSmudge makes creating e-paper applications accessible to everyone. You do not need an ESP-IDF toolchain or C++ knowledge; any text editor is all you need to build standalone applications in **Lua 5.4**.
+Crosscub makes creating e-paper applications accessible to everyone. You do not need an ESP-IDF toolchain or C++ knowledge; any text editor is all you need to build standalone applications in **Lua 5.4**.
 
 ### 1. Application Anatomy
 Every application is a folder placed inside `apps/<app_id>/` (or on your device in `/.crosssmudge/applications/<app_id>/`):
@@ -172,7 +168,7 @@ my_app/
   "name": "My Application",
   "version": "1.0.0",
   "author": "YourGitHubUsername",
-  "description": "A clean, functional e-paper utility for CrossSmudge.",
+  "description": "A clean, functional e-paper utility for Crosscub.",
   "entry": "main.lua"
 }
 ```
@@ -232,25 +228,28 @@ The sandboxed runtime provides a focused set of graphics, layout, input, and per
 
 👉 **[Read the Full Application Developer Guide (500+ lines of documentation & API specifications)](./apps/README.md)**
 
-### 4. Mandatory Hardware Constraint Testing
-Because physical ESP32-C3 devices have approximately 380 KB of total RAM with **75 KB of DRAM allocated for the Lua heap**, you must test your app under exact hardware limits before deployment:
+### 4. Sticky Production Budgets and Regression Testing
+Sticky's PSRAM-backed Lua runtime uses a **2 MB per-app Lua heap** by default. The explicitly declared Browser capability uses a **4 MB Lua heap**, subject to the production allocator's PSRAM reserve/admission checks (`LuaRunner.cpp` and `lib/LuaBrowser/BrowserMemory.h`). These are per-app limits, not a promise that every allocation succeeds. Do not change runtime budgets to satisfy a fixture.
+
+Run the current dependency-free product contracts and the relevant preservation group:
 
 ```bash
-# Build the native simulator
-pio run -e simulator
-
-# Launch the simulator with enforced 75 KB hardware DRAM ceiling
-SMUDGE_X3_CONSTRAINTS=1 .pio/build/simulator/program
+python3 test/crosscub/test_product.py
+python3 test/crosscub/run_preservation.py --group apps --output /path/to/new-evidence/apps
+# Full host routine: set existing read-only ARDUINOJSON_INCLUDE_DIR,
+# CP_FIXTURES and ESP_IDF_SOURCE_ROOT first; use a Python with Pillow:
+python3 test/crosscub/run_all.py --output /path/to/new-evidence/full
 ```
-If your application leaks memory or exceeds 75 KB, the simulator will immediately catch it.
+
+`SMUDGE_X3_CONSTRAINTS=1` remains an **optional stress** compatibility alias for a 75 KB simulator Lua heap. It is not Sticky's production acceptance ceiling. Host fixtures do not replace target compilation or physical touch/e-ink, radio, SD and sleep/wake qualification.
 
 ---
 
 ## How to Submit Your App to the Official App Store 🌐
 
-Want to share your creation with all CrossSmudge users worldwide?
+Want to share your creation with all Crosscub users worldwide?
 
-1. **Verify Your App:** Ensure your app lives in `apps/<your_app_id>/` and runs cleanly with `SMUDGE_X3_CONSTRAINTS=1`.
+1. **Verify Your App:** Ensure your app lives in `apps/<your_app_id>/`, passes the relevant Sticky production-budget and preservation tests above, and retains existing IDs and saves.
 2. **Add to `apps/catalog.json`:** Add an entry for your application to [`apps/catalog.json`](./apps/catalog.json):
    ```json
    {
@@ -266,14 +265,14 @@ Want to share your creation with all CrossSmudge users worldwide?
      ]
    }
    ```
-3. **Submit a Pull Request:** Open a PR against the `main` branch of [https://github.com/Mumfee/CrossSmudge](https://github.com/Mumfee/CrossSmudge).
-4. **Instant Distribution:** As soon as your PR is merged, your app appears immediately in the on-device **App Store** on every Wi-Fi connected CrossSmudge device worldwide!
+3. **Prepare a Pull Request:** Open a PR against `feat/crosscub-sticky-only` in [tobiasweissert/CrossSmudge](https://github.com/tobiasweissert/CrossSmudge) for source review. Merging this feature branch does not publish an app.
+4. **Separate Live Publication:** Only an explicitly authorized per-app composition/publication into `integration/sticky-test-all` updates the configured live App Store. Preserve the live catalog's 41 entries and unrelated metadata; never replace it with this branch's 37-source-app catalog. Firmware store routing remains unchanged.
 
 ---
 
 ## Core Reading Features & Typography (CrossInk Heritage) 📖
 
-CrossSmudge preserves the reader improvements and typography enhancements originally created in **[CrossInk](https://github.com/uxjulia/crossink)**:
+Crosscub preserves the reader improvements and typography enhancements originally created in **[CrossSmudge](https://github.com/Mumfee/CrossSmudge)** and **[CrossInk](https://github.com/uxjulia/crossink)**:
 
 <table>
   <tr>
@@ -300,44 +299,24 @@ CrossSmudge preserves the reader improvements and typography enhancements origin
 
 ---
 
-## Installation & Flashing ⚡
+## Installation & Updating
 
-### Method 1: In-Browser Web Flasher (Recommended)
-You can flash CrossSmudge directly from any Chromium browser (Google Chrome, Microsoft Edge, Opera, or Brave) using WebSerial — no command-line tools or drivers needed!
+Crosscub targets **reTerminal Sticky only**. No Crosscub firmware release has
+been published yet. Source is on `feat/crosscub-sticky-only` in
+[tobiasweissert/CrossSmudge](https://github.com/tobiasweissert/CrossSmudge).
+The repository name is retained; it is not the active product name.
 
-1. Download the latest `firmware-*.bin` for your device model from the **[CrossSmudge Releases](https://github.com/Mumfee/CrossSmudge/releases/latest)**:
-   - **Xteink X3 / X4**: `firmware-x3-x4-v1.6.5.3.bin`
-   - **Xteink X4 Pro**: `firmware-x4-pro-v1.6.5.3.bin`
-   - **Xteink X4 Classic**: `firmware-x4-classic-v1.6.5.3.bin`
-   - **Seeed Studio Sticky**: `firmware-sticky-v1.6.5.3.bin`
-2. Connect your device to your computer using a USB-C data cable and ensure the device is powered on.
-3. Open the **CrossPoint Web Flasher**:
-   👉 **[https://crosspointreader.com/#flash-tools](https://crosspointreader.com/#flash-tools)**
-4. Select your device model from the list (e.g. *XTEINK X4/X3*, *XTEINK X4Pro*, or *reTerminal Sticky*).
-5. Under the firmware selection, click **"Custom .bin"** (*Upload file*).
-6. Select your downloaded `firmware-*.bin` file and click **Flash**!
+For a verified application image, keep an SD backup and use **Settings → System
+→ SD Card Firmware Update**, select the `.bin`, and confirm. This is an
+application update, not a factory image. Do not format SD/NVS: existing
+`.crosspoint`, `.crosssmudge` and `.smudge` settings, reading progress, apps and
+saves stay in place. Custom boot/sleep images and preferences remain supported.
 
-*(You can also use the official [Espressif Web Flasher](https://espressif.github.io/esptool-js/) with flash address `0x10000`).*
-
-### Method 2: On-Device SD Card Firmware Update (Zero PC Tools)
-If you already have CrossPoint, CrossInk, or CrossSmudge installed:
-1. Download the `firmware-*.bin` file for your device from the **[CrossSmudge Releases](https://github.com/Mumfee/CrossSmudge/releases/latest)**.
-2. Copy the `.bin` file onto your SD card (it can be placed in root or any folder).
-3. On your device, open **Settings → System → SD Card Firmware Update**.
-4. Select the `.bin` file to install and restart.
-
-### Method 3: Over-The-Air (OTA) Updates
-If your device is already running CrossSmudge and connected to Wi-Fi, open **Settings → Firmware Update** to check for and install the latest release wirelessly.
-
-### Method 4: Command Line (`esptool.py`)
-For terminal users on macOS or Linux:
-```bash
-# For ESP32-C3 (Xteink X3 / X4):
-esptool.py --chip esp32c3 write_flash 0x10000 firmware-x3-x4-v1.6.5.3.bin
-
-# For ESP32-S3 (X4 Pro / Sticky / X4 Classic):
-esptool.py --chip esp32s3 write_flash 0x10000 firmware-x4-pro-v1.6.5.3.bin
-```
+OTA remains available in Settings. It accepts only the owner's `crosscub-v…`
+release tags, `crosscub-sticky-v….bin` assets, pinned SHA-256 and Crosscub
+application identity. It never selects upstream product firmware. Until an
+owner release exists, the update screen reports no Crosscub update published.
+See [installation](docs/installation.md) before changing firmware.
 
 ---
 
@@ -349,7 +328,7 @@ esptool.py --chip esp32s3 write_flash 0x10000 firmware-x4-pro-v1.6.5.3.bin
 
 ### Clone and Initialize
 ```bash
-git clone https://github.com/Mumfee/CrossSmudge.git
+git clone --branch feat/crosscub-sticky-only https://github.com/tobiasweissert/CrossSmudge.git
 cd crosssmudge
 git submodule update --init --recursive
 ```
@@ -358,14 +337,12 @@ git submodule update --init --recursive
 
 | Command | Target Device / Platform |
 | :--- | :--- |
-| `pio run -e default` | Xteink X3 / X4 (ESP32-C3, physical buttons) |
 | `pio run -e sticky` | Seeed Studio reTerminal Sticky (ESP32-S3, touch, PSRAM) |
-| `pio run -e x4-pro` | Xteink X4 Pro (ESP32-S3, touch + SDMMC, PSRAM) |
 | `pio run -e simulator` | Native desktop simulator (SDL2) |
 
 ### Flash via USB
 ```bash
-pio run -e default --target upload
+pio run -e sticky --target upload
 ```
 
 ### Nix / NixOS
@@ -393,8 +370,8 @@ nix-shell nix
 
 ## Acknowledgments & Upstream Credits 🤝
 
-CrossSmudge stands on the shoulders of giants:
-- **[CrossInk](https://github.com/uxjulia/crossink)** by **Julia (@uxjulia)** — For the reader typography, reading statistics, focus reading modes, and design sensibilities that form the core reading experience.
+Crosscub stands on the shoulders of giants:
+- **[CrossSmudge](https://github.com/Mumfee/CrossSmudge)** and **[CrossInk](https://github.com/uxjulia/crossink)** by **Julia (@uxjulia)** — For the reader typography, reading statistics, focus reading modes, and design sensibilities that form the core reading experience.
 - **[CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader)** — For the original open-source ESP32 e-reader architecture and EPUB engine.
 - **[FreeInk SDK](https://freeink.org/)** — For the underlying hardware drivers and e-paper display abstractions.
 
@@ -402,4 +379,4 @@ CrossSmudge stands on the shoulders of giants:
 
 ## License
 
-CrossSmudge is open-source software licensed under the **GNU General Public License v3.0 (GPL-3.0)**. See [`LICENSE`](./LICENSE) for full details.
+Crosscub's root [`LICENSE`](./LICENSE) is **MIT**. Component-specific licenses, notices and attribution obligations remain in force for inherited and bundled components; consult their license files as well. This description does not relicense any component.

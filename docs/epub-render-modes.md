@@ -5,10 +5,10 @@ nav_order: 9
 
 # EPUB Render Modes
 
-CrossSmudge normally tries to render EPUBs with the full CrossSmudge renderer. Some
+Crosscub normally tries to render EPUBs with the full Crosscub renderer. Some
 EPUBs contain complex publisher styling, tables, or image rules that can use too
 much memory for the reader. Render modes let you keep reading those books by
-asking CrossSmudge to simplify the layout work for that book.
+asking Crosscub to simplify the layout work for that book.
 
 Render mode is saved per book. Changing it for one EPUB does not change the
 default behavior for your other books.
@@ -17,23 +17,23 @@ default behavior for your other books.
 
 | Mode             | Best for                                                                                         | What it keeps                                                                                                  | What it simplifies                                                                            |
 | ---------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| CrossSmudge Default | Most books                                                                                       | Full CrossSmudge styling, detailed CSS, table layout, image sizing, publisher spacing, Focus Reading, Guide Dots | Nothing by default                                                                            |
-| Balanced         | Books where CrossSmudge has fallen back automatically, or books you want to start in a lighter mode | Publisher spacing, image sizing, decorations, Focus Reading, Guide Dots                                       | Complex CSS lookups and table layout                                                          |
+| Crosscub Default | Most books                                                                                       | Full Crosscub styling, detailed CSS, table layout, image sizing, publisher spacing, Focus Reading, Guide Dots | Nothing by default                                                                            |
+| Balanced         | Books where Crosscub has fallen back automatically, or books you want to start in a lighter mode | Publisher spacing, image sizing, decorations, Focus Reading, Guide Dots                                       | Complex CSS lookups and table layout                                                          |
 | Light            | Books where Balanced is still too heavy, or books you want to start in the safest mode           | Text content, hidden-content rules, basic formatting, Focus Reading, Guide Dots                               | Complex CSS lookups, table layout, publisher spacing, image sizing, and decorative separators |
 | Safe Mode        | Final automatic fallback for books that still run out of memory in Light                         | Text content, hidden-content rules, basic formatting                                                           | Light-mode simplifications plus embedded styles, Focus Reading, and Guide Dots               |
 
-Most users can leave books on **CrossSmudge Default**. If a book runs out of memory
-while building a section, CrossSmudge will automatically try **Balanced** and then
+Most users can leave books on **Crosscub Default**. If a book runs out of memory
+while building a section, Crosscub will automatically try **Balanced** and then
 **Light**. Manual mode changes are mainly for choosing a lighter mode before
-opening a known-problem book, or for changing the saved mode after CrossSmudge has
+opening a known-problem book, or for changing the saved mode after Crosscub has
 already fallen back.
 
-## CrossSmudge Default
+## Crosscub Default
 
-CrossSmudge Default is the normal renderer.
+Crosscub Default is the normal renderer.
 
 It tries to preserve the book's layout and publisher styling as much as
-CrossSmudge supports, including:
+Crosscub supports, including:
 
 - CSS rules that depend on surrounding elements
 - Tables rendered as tables when possible
@@ -65,7 +65,7 @@ It simplifies:
 - Complex CSS rules that depend on surrounding elements
 - Tables, which are flattened into readable text blocks
 
-Use Balanced when CrossSmudge has already fallen back to it, or when you want a
+Use Balanced when Crosscub has already fallen back to it, or when you want a
 known-problem book to start with lighter rendering immediately. The page may not
 match the publisher layout exactly, but it should still keep more of the book's
 visual styling than Light.
@@ -90,40 +90,40 @@ It simplifies or removes:
 - Horizontal rules and decorative separators
 - Publisher page number markers
 
-Use Light when CrossSmudge has already fallen back to it, or when you want a
+Use Light when Crosscub has already fallen back to it, or when you want a
 known-problem book to start in the safest mode immediately. Light may look less
-like the publisher's original layout, but it gives CrossSmudge the best chance of
+like the publisher's original layout, but it gives Crosscub the best chance of
 rendering the book on limited memory.
 
 ## Safe Mode
 
 Safe Mode is an automatic final fallback, not a selectable render mode.
 
-If CrossSmudge cannot build a section in Light because memory is still too tight,
+If Crosscub cannot build a section in Light because memory is still too tight,
 it tries Safe Mode once. Safe Mode uses Light rendering and also turns off:
 
 - Embedded styles
 - Focus Reading
 - Guide Dots
 
-When Safe Mode succeeds, CrossSmudge saves those settings for that book. The reader
+When Safe Mode succeeds, Crosscub saves those settings for that book. The reader
 briefly shows **Safe Mode** over the current page. Your other books keep their
 own reader settings.
 
 ## Automatic Fallback
 
-If a book starts in CrossSmudge Default and a section runs out of memory while
-building, CrossSmudge automatically retries in this order:
+If a book starts in Crosscub Default and a section runs out of memory while
+building, Crosscub automatically retries in this order:
 
-1. CrossSmudge Default
+1. Crosscub Default
 2. Balanced
 3. Light
 4. Safe Mode
 
-If the book starts in Balanced, CrossSmudge can fall back to Light and then Safe
-Mode. If the book starts in Light, CrossSmudge can still try Safe Mode.
+If the book starts in Balanced, Crosscub can fall back to Light and then Safe
+Mode. If the book starts in Light, Crosscub can still try Safe Mode.
 
-When a fallback succeeds, CrossSmudge saves that successful mode for the book. The
+When a fallback succeeds, Crosscub saves that successful mode for the book. The
 next time you open the same book, it starts in the saved mode.
 
 When a book opens in Balanced or Light, the reader briefly shows **Balanced
@@ -139,7 +139,7 @@ stats.
 ## Changing A Book's Render Mode
 
 You can change a book's render mode before opening it. This is optional because
-CrossSmudge already falls back automatically, but it is useful when you know a book
+Crosscub already falls back automatically, but it is useful when you know a book
 is difficult and want it to start in a specific mode:
 
 - Long-press an EPUB in **File Browser**

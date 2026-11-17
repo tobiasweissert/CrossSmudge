@@ -2,7 +2,7 @@
 from pathlib import Path
 import subprocess,sys,os
 root=Path.cwd(); out=Path(sys.argv[1]);out.mkdir(parents=True,exist_ok=True)
-binary=Path('/root/.hermes/cache/scratch/2048/runner')
+binary=out/'runner'
 binary.parent.mkdir(parents=True,exist_ok=True)
 sources=[str(p) for p in Path('lib/Lua/src').glob('*.c') if p.name not in ('lua.c','luac.c')]
 cmd=['cc','-O2','-Ilib/Lua/src','test/2048_design/runner.c',*sources,'-lm','-o',str(binary)]

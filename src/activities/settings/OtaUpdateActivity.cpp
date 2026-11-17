@@ -58,7 +58,7 @@ void OtaUpdateActivity::onWifiSelectionComplete(const bool success) {
   }
 
   const auto res = updater.checkForUpdate();
-  if (res != OtaUpdater::OK) {
+  if (res != OtaUpdater::OK && res != OtaUpdater::NO_UPDATE) {
     LOG_DBG("OTA", "Update check failed: %d", res);
     {
       RenderLock lock(*this);

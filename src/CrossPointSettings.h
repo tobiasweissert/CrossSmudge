@@ -601,10 +601,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // adjacent so old settings files simply retain their default-initialized tail.
   uint8_t quickActionSlots[5] = {IGNORE, IGNORE, IGNORE, IGNORE, IGNORE};
   uint8_t quickActionsTrigger = 0;
-  // Tilt-based page turning on devices with a supported IMU (X3 and Sticky).
+  // Tilt-based page turning with the Sticky IMU.
   uint8_t tiltPageTurn = TILT_OFF;
   uint8_t tiltPageTurnDirection = TILT_LEFT_RIGHT;
-  // Frontlight quick-panel state (boards with FREEINK_CAP_FRONTLIGHT, e.g. X4
+  // Frontlight quick-panel state (boards with FREEINK_CAP_FRONTLIGHT, legacy
   // Pro). Applied at boot, edited only from the frontlight panel; persisted as
   // category-less entries so they stay out of the Settings screen. Writes are
   // debounced by the panel (saved once on exit), not per slider tick.

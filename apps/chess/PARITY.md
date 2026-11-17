@@ -10,7 +10,7 @@ The move sheet reconstructs original-style SAN from the saved contiguous legal F
 
 Tests use the committed Lua source with signed int32/float32 settings and only shipped host APIs. They are native adapters, not a firmware build. Read the independent test directory for exact source oracles, failure injection and measured memory. No firmware/SDK download, flash, commit, push or PR creation was performed.
 
-CrossPlay gameplay is selected only when `smudge.get_device()` returns `"sticky"`. Every other device (including X3, X4, X4 Pro and simulator), and firmware without that API, runs the byte-identical original game from base `2c82f306`. Original modules, assets, callbacks and save APIs are preserved; the replacement core/journal is never loaded on that path.
+CrossPlay gameplay is selected only when `smudge.get_device()` returns `"sticky"`. The simulator compatibility path and firmware without that API run the byte-identical original game from base `2c82f306`. Original modules, assets, callbacks and save APIs are preserved; the replacement core/journal is never loaded on that path.
 
 All CrossPlay feature descriptions and limitations above apply to Sticky only. Legacy behavior (including pre-existing limitations) is intentionally unchanged elsewhere. Native adapters use the stock int32/float32 Lua configuration but host pointers and instrumentation differ from hardware. Full legacy trace comparisons use a 2 MiB host cap; separate 75 KiB observations compare the unchanged baseline and dispatcher candidate and do not claim hardware memory parity.
 

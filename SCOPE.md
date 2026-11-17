@@ -1,55 +1,49 @@
-# Project Vision & Scope: CrossSmudge
+# Project Vision & Scope: Crosscub
 
-The goal of this CrossPoint fork is to provide useful enhancements while still adhering to the core principles of Crosspoint. If you have a major feature request, it should first be directed at the main project since this is a downstream project that consumes their updates.
+Crosscub is a Sticky-only continuation of the selected currentmain CrossSmudge
+firmware, descended from CrossInk, CrossPoint Reader and FreeInk SDK. Those
+projects retain their authorship and license credits. This is not a fresh
+upstream reset and does not claim original authorship of inherited code.
 
-The content below is taken directly from Crosspoint and aligns with CrossSmudge's vision as well.
+## Core mission
 
-## 1. Core Mission
+Provide a stable reading-first firmware for the **Seeed reTerminal Sticky**,
+keeping the current design and navigation while fitting its 480×800 portrait
+and 800×480 landscape viewports. Preserve working features before optional
+redesigns. Shared SDK hardware catalogues are dependency internals, not
+Crosscub product targets.
 
-To provide a lightweight, high-performance firmware that maximizes the potential of the X4, prioritizing legibility and usability over "swiss-army-knife" functionality.
+## Existing features remain in scope
 
-## 2. Scope
+- EPUB, TXT, XTC and current document/font/dictionary/rendering features;
+  bookmarks, clippings, reading progress, statistics, sleep and power behavior.
+- Existing OPDS, Calibre, Wi-Fi, web file manager/WebDAV, local transfers,
+  native AirDrop and the public API7 Browser backend; API3/API6 compatibility.
+- The full current Lua catalog, loader, application sandbox, installed packages,
+  games/utilities and their existing save/history/journal paths.
+- Sticky touch, gesture, button, clock and sensor behavior already present in
+  currentmain. The existing RTC/time-trust and network admission policies stay
+  intact; this migration does not grant a new transport or memory budget.
 
-### In-Scope
+## Product and data boundaries
 
-*These are features that directly improve the primary purpose of the device.*
+- Crosscub is the active product identity. The repository URL and serialized
+  `.crosspoint`, `.crosssmudge` and `.smudge` names remain where compatibility
+  requires them. Rebranding must not reset SD/NVS or strand installed apps.
+- The owner-controlled App Store is the normal default. OTA must validate a
+  Crosscub release and application identity, never silently select a different
+  upstream product. Manual SD application update/recovery remains usable.
+- Keep mandatory copyrights, third-party SDK/vendor files, font/asset licenses
+  and historical provenance honest. Do not mutate dependency board profiles to
+  make a text search empty.
+- Target compilation, host callback/render fixtures and physical e-ink/radio
+  acceptance are different gates. A successful host capture is not a flash or
+  a claim of physical installation.
 
-* **User Experience:** E.g. User-friendly interfaces, and interactions, both inside the reader and navigating the
-  firmware. This includes things like button mapping, book loading, and book navigation like bookmarks.
-* **Document Rendering:** E.g. Support for rendering documents (primarily EPUB) and improvements to the rendering
-  engine.
-* **Format Optimization:** E.g. Efficiently parsing EPUB (CSS/Images) and other documents within the device's
-  capabilities.
-* **Typography & Legibility:** E.g. Custom font support, hyphenation engines, and adjustable line spacing.
-* **E-Ink Driver Refinement:** E.g. Reducing full-screen flashes (ghosting management) and improving general rendering.
-* **Library Management:** E.g. Simple, intuitive ways to organize and navigate a collection of books.
-* **Local Transfer:** E.g. Simple, "pull" based book loading via a basic web-server or public and widely-used standards.
-* **Language Support:** E.g. Support for multiple languages both in the reader and in the interfaces.
-* **Reference Tools:** E.g. Local dictionary lookup. Providing quick, offline definitions to enhance comprehension
-  without breaking focus.
-* **Clock Display (device dependent):**
+## Change discipline
 
-| Device | Scope |
-| -- | -- |
-| X3 | The X3 uses a dedicated DS3231 RTC, which maintains accurate time across sleep cycles and can be treated as a reliable wall clock. |
-| X4 | The X4 relies on the ESP32-C3's internal RTC, which drifts significantly during deep sleep. NTP sync could correct this, with an appropriate user experience around connecting to the internet on wake or on demand. This causes some tension with the **Active Connectivity** section below, so please open a discussion about this UX if it's a feature you would find useful. |
-
-### Out-of-Scope
-
-*These items are rejected because they compromise the device's stability or mission.*
-
-* **Interactive Apps:** No Notepads, Calculators, or Games. This is a reader, not a PDA.
-* **Active Connectivity:** No RSS readers, News aggregators, or Web browsers. Background Wi-Fi tasks drain the battery and complicate the single-core CPU's execution.
-* **Media Playback:** No Audio players or Audiobooks.
-* **Complex Annotation:** No typed out notes. These features are better suited for devices with better input capabilities and more powerful chips.
-
-### In-scope — Technically Unsupported
-
-*These features align with Crosspoint's goals but are impractical on the current hardware or produce poor UX.*
-
-* **PDF Rendering:** PDFs are fixed-layout documents, so rendering them requires displaying pages as images rather than reflowable text — resulting in constant panning and zooming that makes for a poor reading experience on e-ink.
-
-## 3. Idea Evaluation
-
-While I appreciate the desire to add new and exciting features to Crosspoint Reader, Crosspoint Reader is designed to be a lightweight, reliable, and performant e-reader. Things which distract or compromise the device's core mission will not be accepted. As a guiding question, consider if your idea improve the "core reading experience" for the average user,
-and, critically, not distract from that reading experience.
+Use behavioral RED/GREEN tests for changed behavior. Keep the current graphical
+style, fonts and navigation; repair reproduced clipping or inaccessible touch
+controls with shared draw/hit geometry. Do not use this migration for unrelated
+backend deployment, budget changes, broad refactors or a UI redesign. Optional
+future work requires its own scope and acceptance criteria.

@@ -1141,7 +1141,7 @@ bool HomeActivity::allocateCarouselFrameSlots(int targetFrameCount) {
     bool allocFailed = false;
     for (int i = 0; i < attemptFrameCount; ++i) {
       // This is a full framebuffer-sized cache, too large for stack/static
-      // storage. PSRAM keeps the X4 Pro reader-exit path from fragmenting its
+      // storage. PSRAM keeps the reader-exit path from fragmenting its
       // internal heap; C3 continues to use the guarded default heap path.
       auto frame = usePsram ? makePsramByteBufferNoThrow(bufferSize) : makeHeapByteBufferNoThrow(bufferSize);
       if (!frame) {

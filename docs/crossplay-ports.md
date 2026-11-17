@@ -1,3 +1,5 @@
+> Historical provenance/checkpoint record, not Crosscub build or installation guidance. See [Crosscub](../README.md).
+
 # CrossPlay Lua ports — review scope
 
 **Incomplete collection: 18 local adaptations, 4 unchanged existing equivalents, 11 titles without a package (33 total).** No claim of complete original feature/UI/engine parity. No live publication has occurred.

@@ -1,0 +1,925 @@
+{
+  "baseline": "2a477dea03a6db5ed4b5ccd33772c04cf19f8767",
+  "scanner": "scripts/audit_crosscub.py; UTF-8 text, excludes generated ledgers and binary/font/art payloads",
+  "owned_counts": {
+    "inherited historical provenance; not current hardware guidance": 40,
+    "legacy low-memory stress environment alias; production budgets unchanged": 7,
+    "coordinate/algebra identifier; not hardware": 2,
+    "negative compile-time rejection of retired hardware": 4,
+    "inherited grayscale calibration provenance; not a product target": 3,
+    "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board": 18,
+    "inherited XTC file-format provenance/resolution; not a current hardware target": 3,
+    "legacy serialized Home-key actions; retain enum values and fields": 3,
+    "historical source-oracle/legacy-data or negative-admission fixture (not a build target)": 70
+  },
+  "owned": [
+    {
+      "path": "CHANGELOG.md",
+      "line": 52,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Corrected Lua device identification so Sticky apps select their touch controls; X4 Pro and X3 also report their proper identities."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 156,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "  - Optimized memory footprint to strictly stay under the 76,800-byte ESP32-C3 hardware DRAM limit (`SMUDGE_X3_CONSTRAINTS=1`): modular chunk loading order, elimination of string churn, and zero-allocation move generation during search."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 169,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Removed the quote card section and unneeded nested tables in Desk Stand, compressing digit segments into bitmask arrays to cut Lua compilation heap usage from ~70 KB down to ~25 KB and strictly adhere to ESP32-C3's 75 KB DRAM ceiling (`SMUDGE_X3_CONSTRAINTS=1`)."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 213,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "  - Triangle drawing primitive `smudge.triangle(x1, y1, x2, y2, x3, y3, [filled], [thickness], [color])` with outline stroke and scanline fill rasterization."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 233,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Four-tab grimoire system in *Codex: Ink & Iron* (`[Deck]`, `[Discard]`, `[Relics]`, `[Menu]`) accessible via Xteink X3 top buttons (`BTN_UP`/`BTN_DOWN`) or header touch, featuring dedicated views for collected relics and an in-game delve menu with options to Resume, Save & Exit to Title, Save & Exit to Applications, or Abandon Delve."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 236,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Deck and Discard pile viewers in *Codex: Ink & Iron* mapped to Xteink X3 top-left (`BTN_UP`) and top-right (`BTN_DOWN`) buttons with floor/grimoire/discard counts in the combat header."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 290,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "  - Setting environment variable `SMUDGE_X3_CONSTRAINTS=1` (or building with `-DSIMULATOR_DEVICE_X3`) enforces the strict 75 KB hardware DRAM ceiling on host simulator runs, enabling deterministic testing and profiling of embedded memory constraints without hardware guesswork."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 312,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "  - Verified across multiple simulator scenarios under the exact 75 KB ESP32-C3 hardware DRAM limit (`SMUDGE_X3_CONSTRAINTS=1`)."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 343,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Resolved Out of Memory (`[Application Error not enough memory]`) failure when launching *Codex: Ink & Iron* on memory-constrained ESP32-C3 devices (Xteink X3/X4):"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 393,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- X4 Classic's left/right tilt direction labels now match the physical page-turn direction."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 399,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- EPUB chapter layout releases rebuildable font caches first, reducing low-memory failures on X3/X4."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 420,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Exiting Calibre Wireless on X4 now returns Home with one clean screen refresh instead of repeated blank flashes."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 425,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Quick Actions assignments stay visible in button-combo settings, and X4 Classic can use the Up + Down shortcut."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 436,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Xteink X4 Pro and X4 Classic support, including device-specific firmware and USB Drive access; X4 Pro also supports direct USB file transfers."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 439,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Quick Lock, assignable button combinations, and shortcuts for Previous Page and Nearby Position Sync. Quick Actions can also be assigned to Power + Up and X4 Pro Home-button gestures."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 446,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Touch EPUB readers use a half-height, five-tab menu. Sticky opens the menu with a swipe up and book details with a swipe down; X4 Pro frontlight controls include reading stats and reader shortcuts."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 456,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- The undocumented X4 Pro power-button double-click frontlight toggle."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 467,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Quick Resume, custom sleep images, transparent overlays, and X3/X4 wake refreshes avoid blank screens, grid artifacts, and lingering images."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 479,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- X4 Pro readers can lock the Home button while reading, with a Power-button shortcut to toggle it."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 499,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- EPUB inline-image pages on X3 now use the grayscale-aware display base before the image grayscale overlay, reducing the moment where images appear too dark before settling."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 516,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Firmware releases now identify the supported device type: X3/X4 or Seeed Sticky."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 534,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Sleep screens now honor the current orientation, avoid X4 transition flashes, fall back to a valid wallpaper when needed, and handle low-memory image decoding without rebooting."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 537,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Manage Fonts now opens and scans large catalogs more safely on X3/X4, reports low-memory failures instead of restarting, and returns to Font Options when cancelled."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 538,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Network screens refresh cleanly on X4; long errors wrap correctly; saved Wi-Fi networks and KOReader connections recover more reliably after restart or a missing address."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 539,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Translated Wi-Fi and clock labels no longer truncate text or time values, and clock sync no longer risks a reboot while saving settings on memory-constrained X3/X4 devices."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 545,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- SD-card font and clipping work now release temporary data at the right time, preserving memory for reflow, dictionary use, covers, and thumbnails on X3/X4."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 614,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- EPUB grayscale page turns on X3 now use the grayscale-aware display base, reducing the moment where new text appears too dark before the anti-aliased overlay finishes."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 636,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- X3 SD-card writes now use the RTC for file timestamps when the clock is available."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 647,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- X3 Tilt Direction now labels left/right choices as `Left-Right` and `Right-Left`, with existing left/right preferences migrated to keep the same physical tilt behavior."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 682,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- The X3 clock visibility setting is now phrased as `Hide Clock`, with existing `Show Clock` preferences migrated to the matching hide behavior."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 686,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- RoundedRaff's date shown in settings now sits lower on X3 devices instead of overlapping the battery."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 706,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Current date in the top-right Settings header on X3 devices."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 709,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Expanded X3 Reading Stats, including streaks, time charts, editable dates, all-time backups, reset controls, an idle-time threshold, and the `Minimal Stats` sleep screen."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 715,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- The X3 clock visibility setting is now phrased as `Hide Clock`, with existing `Show Clock` preferences migrated to the matching hide behavior."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 726,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- X3 clock settings now have clearer UTC offset editing, and `Sync Date/Time` can use saved WiFi networks automatically."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 745,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Moved the X3 reader clock into a new top-centered status bar and moved clock settings to Settings > System > Device."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 777,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Sleep-entry, network, and SD-card font download reliability improvements: cached sleep-screen assets are reused, OPDS pages idle normally after load, the X3 tilt sensor sleeps outside the reader, WiFi power saving is disabled during transfers, WebDAV stack usage is lower, longer stalls are tolerated, interrupted font files are retried, and active reader fonts are freed when needed."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 840,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Reduced Controls settings section spacing so the grouped controls fit better on X3 screens."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "line": 847,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- Reader button and shortcut behavior, including X3 power-button wake filtering, folder delete long-press timing, and WiFi scan/connect screens that could not be exited while work was in progress."
+    },
+    {
+      "path": "README.md",
+      "line": 244,
+      "category": "legacy low-memory stress environment alias; production budgets unchanged",
+      "text": "`SMUDGE_X3_CONSTRAINTS=1` remains an **optional stress** compatibility alias for a 75 KB simulator Lua heap. It is not Sticky's production acceptance ceiling. Host fixtures do not replace target compilation or physical touch/e-ink, radio, SD and sleep/wake qualification."
+    },
+    {
+      "path": "apps/README.md",
+      "line": 323,
+      "category": "coordinate/algebra identifier; not hardware",
+      "text": "- **`smudge.triangle(x1, y1, x2, y2, x3, y3, [filled], [thickness], [color])`**  "
+    },
+    {
+      "path": "apps/README.md",
+      "line": 324,
+      "category": "coordinate/algebra identifier; not hardware",
+      "text": "  Draws an outline or filled triangle between three vertices `(x1, y1)`, `(x2, y2)`, and `(x3, y3)`."
+    },
+    {
+      "path": "apps/README.md",
+      "line": 586,
+      "category": "legacy low-memory stress environment alias; production budgets unchanged",
+      "text": "   The retained `SMUDGE_X3_CONSTRAINTS=1` environment name is a **legacy stress"
+    },
+    {
+      "path": "apps/README.md",
+      "line": 609,
+      "category": "legacy low-memory stress environment alias; production budgets unchanged",
+      "text": "SMUDGE_X3_CONSTRAINTS=1 .pio/build/simulator/program"
+    },
+    {
+      "path": "docs/MAC-HANDOFF.md",
+      "line": 20,
+      "category": "inherited historical provenance; not current hardware guidance",
+      "text": "- The real board-identity repair: use value-checked `FREEINK_DEVICE_*` flags. `defined(CROSSINK_APP_DEVICE_X4CLASSIC)` was true even when its value was zero, making Sticky report `x4` and load legacy games."
+    },
+    {
+      "path": "include/AppCapabilities.h",
+      "line": 6,
+      "category": "negative compile-time rejection of retired hardware",
+      "text": "    (!defined(FREEINK_DEVICE_STICKY) || !FREEINK_DEVICE_STICKY || FREEINK_DEVICE_X3 || FREEINK_DEVICE_X4 || \\"
+    },
+    {
+      "path": "include/AppCapabilities.h",
+      "line": 7,
+      "category": "negative compile-time rejection of retired hardware",
+      "text": "     FREEINK_DEVICE_X4PRO || FREEINK_DEVICE_X4CLASSIC || FREEINK_DEVICE_WS397 || FREEINK_DEVICE_ONEPAGE || \\"
+    },
+    {
+      "path": "lib/GfxRenderer/BitmapHelpers.cpp",
+      "line": 56,
+      "category": "inherited grayscale calibration provenance; not a product target",
+      "text": "// The thresholds are fine-tuned to the X4 display"
+    },
+    {
+      "path": "lib/GfxRenderer/BitmapHelpers.h",
+      "line": 171,
+      "category": "inherited grayscale calibration provenance; not a product target",
+      "text": "    } else {  // fine-tuned to X4 eink display"
+    },
+    {
+      "path": "lib/GfxRenderer/BitmapHelpers.h",
+      "line": 284,
+      "category": "inherited grayscale calibration provenance; not a product target",
+      "text": "    } else {  // fine-tuned to X4 eink display"
+    },
+    {
+      "path": "lib/GfxRenderer/GfxRenderer.cpp",
+      "line": 883,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "            // Dedicated X3 gray LUTs now provide proper 4-level gray on both devices"
+    },
+    {
+      "path": "lib/GfxRenderer/GfxRenderer.h",
+      "line": 332,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "  // Grayscale preconditioning settle pass (no-op on X4). The rect overload"
+    },
+    {
+      "path": "lib/GfxRenderer/GfxRenderer.h",
+      "line": 339,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "  // follows (X3: OEM differential base waveform; others: plain display with"
+    },
+    {
+      "path": "lib/Xtc/README",
+      "line": 14,
+      "category": "inherited XTC file-format provenance/resolution; not a current hardware target",
+      "text": "XTC/XTCH are container formats designed for ESP32 e-paper displays. They store pre-rendered bitmap pages optimized for the XTeink X4 e-reader (480x800 resolution)."
+    },
+    {
+      "path": "lib/Xtc/Xtc/XtcTypes.h",
+      "line": 7,
+      "category": "inherited XTC file-format provenance/resolution; not a current hardware target",
+      "text": " * XTC is the native binary ebook format for XTeink X4 e-reader."
+    },
+    {
+      "path": "lib/Xtc/Xtc/XtcTypes.h",
+      "line": 30,
+      "category": "inherited XTC file-format provenance/resolution; not a current hardware target",
+      "text": "// XTeink X4 display resolution"
+    },
+    {
+      "path": "lib/hal/HalDisplay.h",
+      "line": 28,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "  // requestResync() and defuses the SDK's X3 _x3InitialFullSyncsRemaining"
+    },
+    {
+      "path": "lib/hal/HalDisplay.h",
+      "line": 30,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "  // (~770ms each on X3)."
+    },
+    {
+      "path": "lib/hal/HalDisplay.h",
+      "line": 62,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "  // base pass. X3 has a dedicated grayscale waveform and must stay blocking."
+    },
+    {
+      "path": "lib/hal/HalDisplay.h",
+      "line": 81,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "  // X3 grayscale preconditioning (OEM \"AA-pre-BW(mid)\" settle pass), windowed"
+    },
+    {
+      "path": "lib/hal/HalDisplay.h",
+      "line": 84,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "  // are written; no-op on X4. See EInkDisplay::preconditionGrayscale."
+    },
+    {
+      "path": "lib/hal/HalDisplay.h",
+      "line": 89,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "  // follows. X3 uses the OEM differential base waveform (\"AA-pre-BW(mid)\");"
+    },
+    {
+      "path": "lib/hal/HalDisplay.h",
+      "line": 91,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "  // Forces the same X3 resync that displayBuffer(HALF)/displayBuffer(FULL) do"
+    },
+    {
+      "path": "lib/hal/HalTiltSensor.cpp",
+      "line": 113,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "  // On the X3 PCB: X axis = left/right in portrait, Y axis = left/right in landscape."
+    },
+    {
+      "path": "scripts/audit_crosscub.py",
+      "line": 13,
+      "category": "legacy low-memory stress environment alias; production budgets unchanged",
+      "text": "TOKEN=re.compile(r'\\bx[34](?:[- _]?(?:pro|classic))?\\b|(?:FREEINK|SIMULATOR)_DEVICE_X[34]\\w*|deviceIsX[34]|XteinkX[34]\\w*|CROSSINK_APP_DEVICE_X4CLASSIC|SMUDGE_X3_CONSTRAINTS|X4PRO_\\w*',re.I)"
+    },
+    {
+      "path": "scripts/audit_crosscub.py",
+      "line": 35,
+      "category": "legacy low-memory stress environment alias; production budgets unchanged",
+      "text": "  elif 'SMUDGE_X3_CONSTRAINTS'in line:category='legacy low-memory stress environment alias; production budgets unchanged'"
+    },
+    {
+      "path": "src/CrossPointSettings.h",
+      "line": 254,
+      "category": "legacy serialized Home-key actions; retain enum values and fields",
+      "text": "    // Values 23-26 are already persisted by the X4 Pro Home-key feature."
+    },
+    {
+      "path": "src/CrossPointSettings.h",
+      "line": 260,
+      "category": "legacy serialized Home-key actions; retain enum values and fields",
+      "text": "    // Appended after the X4 Pro and Quick Actions values so existing settings"
+    },
+    {
+      "path": "src/CrossPointSettings.h",
+      "line": 486,
+      "category": "legacy serialized Home-key actions; retain enum values and fields",
+      "text": "  // X4 Pro capacitive Home-key actions. Values below SHORT_PWRBTN_COUNT map"
+    },
+    {
+      "path": "src/activities/apps/lua/LuaRunner.cpp",
+      "line": 136,
+      "category": "legacy low-memory stress environment alias; production budgets unchanged",
+      "text": "  const char* lowMemoryStressEnv = getenv(\"SMUDGE_X3_CONSTRAINTS\");"
+    },
+    {
+      "path": "src/activities/apps/lua/LuaRunner.cpp",
+      "line": 174,
+      "category": "legacy low-memory stress environment alias; production budgets unchanged",
+      "text": "        const char* constrained=getenv(\"SMUDGE_X3_CONSTRAINTS\");"
+    },
+    {
+      "path": "src/network/FirmwareBoardTag.cpp",
+      "line": 8,
+      "category": "negative compile-time rejection of retired hardware",
+      "text": "#if !FREEINK_DEVICE_STICKY || FREEINK_DEVICE_X3 || FREEINK_DEVICE_X4 || FREEINK_DEVICE_X4PRO || \\"
+    },
+    {
+      "path": "src/network/FirmwareBoardTag.cpp",
+      "line": 9,
+      "category": "negative compile-time rejection of retired hardware",
+      "text": "    FREEINK_DEVICE_X4CLASSIC || FREEINK_DEVICE_WS397 || FREEINK_DEVICE_ONEPAGE || FREEINK_DEVICE_PAPERMONO || \\"
+    },
+    {
+      "path": "src/network/FirmwareBoardTag.h",
+      "line": 9,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "// and X4 Pro both use ESP32-S3, so the ESP image chip ID cannot distinguish"
+    },
+    {
+      "path": "src/network/OtaBootSwitch.h",
+      "line": 8,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "// X4 (and X3) factory bootloaders accept our patch_firmware_image.py-patched"
+    },
+    {
+      "path": "src/platform/skip_efuse_blk_check.c",
+      "line": 2,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "// The X3's validation code misreads the new image's esp_app_desc_t through a"
+    },
+    {
+      "path": "src/util/BatteryDiagnosticLog.h",
+      "line": 15,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "// charge. The X3's BQ27220 is read raw - no calibration, no cross-check - so a"
+    },
+    {
+      "path": "src/util/BatteryDiagnosticLog.h",
+      "line": 19,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "// on the X3 (which has no charger IC) it also flips the sign of the gauge's"
+    },
+    {
+      "path": "src/util/BatteryDiagnosticLog.h",
+      "line": 37,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "// The device sleeps through most of a discharge, and the X3 cuts the SD rail"
+    },
+    {
+      "path": "src/util/SleepWakePolicy.h",
+      "line": 19,
+      "category": "SDK/bootloader/diagnostic legacy behavior provenance; no selectable board",
+      "text": "// A UC8279 X3 can skip its initial resync only after a saved Quick Resume frame"
+    },
+    {
+      "path": "test/2048_design/run.py",
+      "line": 17,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": " for device in ['missing','x3','x4','x4pro','x4-pro','simulator']:"
+    },
+    {
+      "path": "test/airdrop/browser_run.py",
+      "line": 25,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "env=dict(os.environ,SMUDGE_X3_CONSTRAINTS='1',ASAN_OPTIONS='detect_leaks=0',UBSAN_OPTIONS='halt_on_error=1')"
+    },
+    {
+      "path": "test/airdrop/browser_run.py",
+      "line": 36,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "        (OUT/'results.json').write_text(json.dumps({'mode':mode,'environment':{k:env[k]for k in ['SMUDGE_X3_CONSTRAINTS','ASAN_OPTIONS','UBSAN_OPTIONS']},'commands':receipts},indent=2)+'\\n')"
+    },
+    {
+      "path": "test/airdrop/session_run.py",
+      "line": 49,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "env=dict(os.environ,ASAN_OPTIONS='detect_leaks=0',UBSAN_OPTIONS='halt_on_error=1',SMUDGE_X3_CONSTRAINTS='1')"
+    },
+    {
+      "path": "test/browser/run.py",
+      "line": 12,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "env=dict(os.environ,ASAN_OPTIONS='detect_leaks=0',UBSAN_OPTIONS='halt_on_error=1',SMUDGE_X3_CONSTRAINTS='1')"
+    },
+    {
+      "path": "test/browser_assisted/README.md",
+      "line": 21,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "with int32/float32 values and a 4 MiB heap. The X3 constraint environment is set;"
+    },
+    {
+      "path": "test/browser_assisted/combined.py",
+      "line": 29,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "env=dict(os.environ,COMBINED_ROOT=str(R),COMBINED_NATIVE=str(O/'native'),COMBINED_DRIVER=str(O/'driver.lua'),COMBINED_OUT=str(O),COMBINED_RESOURCES=str(resources),GOMAXPROCS='1',GOPROXY='off',GOMODCACHE=str(S/'go-mod-cache'),GOCACHE=str(S/'go-cache'),GOTMPDIR=str(S),TMPDIR=str(S),ASAN_OPTIONS='detect_leaks=0',UBSAN_OPTIONS='halt_on_error=1',SMUDGE_X3_CONSTRAINTS='1')"
+    },
+    {
+      "path": "test/browser_assisted/recheck_lua.py",
+      "line": 13,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "env=dict(os.environ,ASAN_OPTIONS='detect_leaks=0',UBSAN_OPTIONS='halt_on_error=1',ASSISTED_PNG_FIXTURE=str(O/'palette.png'),SMUDGE_X3_CONSTRAINTS='1',TMPDIR=str(O/'tmp'))"
+    },
+    {
+      "path": "test/browser_assisted/run.py",
+      "line": 14,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "env=dict(os.environ,ASAN_OPTIONS='detect_leaks=0',UBSAN_OPTIONS='halt_on_error=1',SMUDGE_X3_CONSTRAINTS='1',TMPDIR=str(O/'tmp'))"
+    },
+    {
+      "path": "test/crosscub/round1_regressions.py",
+      "line": 137,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "        # SDK's actual selection block, including precedence and X3/X4 fallback."
+    },
+    {
+      "path": "test/crosscub/test_product.py",
+      "line": 67,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "            cpp.write_text('#include <cstring>\\n#include <cassert>\\nstruct BoardConfig{static bool isSticky(){return true;}static bool isX4Pro(){return false;}};struct GPIO{bool deviceIsX3(){return false;}bool deviceIsX4(){return false;}}gpio;struct CrossPointSettings{static const char* getDefaultDeviceName();};\\n' + body + '\\nint main(){assert(!strcmp(CrossPointSettings::getDefaultDeviceName(),\"Crosscub Sticky\"));}')"
+    },
+    {
+      "path": "test/crosscub/test_product.py",
+      "line": 89,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "            for flags in [['-DFREEINK_DEVICE_STICKY=0'], ['-DFREEINK_DEVICE_X4PRO=1'],"
+    },
+    {
+      "path": "test/crosscub/test_product.py",
+      "line": 90,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "                          ['-DFREEINK_DEVICE_STICKY=1', '-DFREEINK_DEVICE_X4PRO=1']]:"
+    },
+    {
+      "path": "test/crossplay_ui_parity/battleship_nonsticky.lua",
+      "line": 1,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "-- UI changes belong to Sticky. Preserve existing larger-heap X4 Pro layout."
+    },
+    {
+      "path": "test/crossplay_ui_parity/battleship_nonsticky.lua",
+      "line": 2,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "smudge.get_device=function()return 'x4pro'end"
+    },
+    {
+      "path": "test/epubs-src/test_reader_rendering_matrix/OEBPS/chapter1.xhtml",
+      "line": 14,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "  <p>This paragraph is intentionally long enough to cover several lines on the X4 display. It gives the firmware a simple first-page sample with plain words, commas, periods, and enough natural wrap points to reveal obvious spacing or cache regressions before moving into more targeted cases.</p>"
+    },
+    {
+      "path": "test/firmware_board_tag/FirmwareBoardTagTest.cpp",
+      "line": 22,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "  constexpr char image[] = \"payloadCROSSPOINT-BOARD-V1:x4pro;\";"
+    },
+    {
+      "path": "test/firmware_board_tag/FirmwareBoardTagTest.cpp",
+      "line": 29,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "  EXPECT_STREQ(scanner.foundName(), \"x4pro\");"
+    },
+    {
+      "path": "test/four_original_boards/nonsticky.py",
+      "line": 29,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "    for device in ('x4-pro','x4','simulator','older-host-error'):"
+    },
+    {
+      "path": "test/hackernews_original_ui/README.md",
+      "line": 11,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "The entrypoint also compares full legacy startup/error pixels for X3, X4, X4 Pro, simulator, unknown and missing identity fixtures in both orientations (12 before/after pairs). These are identity fixtures and do not claim physical memory acceptance."
+    },
+    {
+      "path": "test/hackernews_original_ui/preservation.py",
+      "line": 29,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "for device in ['x3','x4','x4pro','simulator','unknown','missing']:"
+    },
+    {
+      "path": "test/hearts_jaipur_original_ui/README.md",
+      "line": 30,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "primitive traces and save bytes for high-heap x4-pro and 75 KiB x3, both entry"
+    },
+    {
+      "path": "test/hearts_jaipur_original_ui/README.md",
+      "line": 52,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "check held last board -> SEE SCORES -> NEXT ROUND, then exit/reopen. x3/x4 and"
+    },
+    {
+      "path": "test/hearts_jaipur_original_ui/README.md",
+      "line": 53,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "x4-pro retain the baseline UI; no save/cache reset is required."
+    },
+    {
+      "path": "test/hearts_jaipur_original_ui/preservation.py",
+      "line": 17,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "  for device,limit in [('x4-pro',2097152),('x3',76800)]:"
+    },
+    {
+      "path": "test/integration_owner/README.md",
+      "line": 6,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "SMUDGE_X3_CONSTRAINTS=1 python3 test/integration_owner/run.py --output /tmp/owner-integration"
+    },
+    {
+      "path": "test/lua_http/CMakeLists.txt",
+      "line": 22,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "set_tests_properties(LuaHttp_async PROPERTIES ENVIRONMENT \"SMUDGE_X3_CONSTRAINTS=1\")"
+    },
+    {
+      "path": "test/lua_http/run.sh",
+      "line": 22,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "SMUDGE_X3_CONSTRAINTS=1 \"$TEST_OUT/async\""
+    },
+    {
+      "path": "test/lua_startup/run.py",
+      "line": 28,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": " env=dict(os.environ,SMUDGE_X3_CONSTRAINTS='1',LUA_APP_LIMIT='2097152');env.update(extra)"
+    },
+    {
+      "path": "test/murdle_original_ui/preservation.py",
+      "line": 17,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "  for device in ['x4pro','unknown','missing']:"
+    },
+    {
+      "path": "test/release_json_parser/ReleaseJsonParserTest.cpp",
+      "line": 162,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "static bool isX3X4FirmwareAsset(const char* assetName) { return strcmp(assetName, \"firmware-x3-x4-v2.4.1.bin\") == 0; }"
+    },
+    {
+      "path": "test/release_json_parser/ReleaseJsonParserTest.cpp",
+      "line": 398,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "        {\"name\": \"firmware-x3-x4-v2.4.1.bin\", \"browser_download_url\": \"https://example.com/x3-x4.bin\", \"size\": 4321}"
+    },
+    {
+      "path": "test/release_json_parser/ReleaseJsonParserTest.cpp",
+      "line": 408,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "  ASSERT_STREQ(p.getFirmwareUrl(), \"https://example.com/x3-x4.bin\");"
+    },
+    {
+      "path": "test/replacement_chess/README.md",
+      "line": 11,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "The native drawing adapter validates coordinates and API coverage; it is not the physical display, SD filesystem, or a device performance measurement. Hardware checks remain necessary: on Sticky open Chess, play/undo, change AI mode, promote, sleep/resume and relaunch. On X3/X4 verify original gameplay and save resume. Do not clear old saves to test migration."
+    },
+    {
+      "path": "test/replacement_chess/README.md",
+      "line": 29,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "`package.py --test` also runs `preservation.py` against extracted ZIP bytes. It checks every original module/asset against pinned git base 2c82f306, compares actual callbacks/render calls/save values and reload behavior for x3/x4/x4pro/simulator/unknown/missing API in both orientations, and forbids cp modules on those paths. Legacy trace comparison uses 2 MiB on the host; separate 75 KiB baseline/candidate observations record instrumentation/host-pointer limits honestly. Existing replacement entry tests explicitly select Sticky; all source-oracle assertions remain intact. Earlier replacement-only C3 stress tests are not the device dispatcher behavior."
+    },
+    {
+      "path": "test/replacement_chess/preservation.py",
+      "line": 22,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "        for device in ['x3','x4','x4pro','simulator','unknown','missing']:"
+    },
+    {
+      "path": "test/replacement_chess/preservation.py",
+      "line": 36,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "        for device in ['x3','x4','x4pro','simulator','unknown','missing']:"
+    },
+    {
+      "path": "test/replacement_solitaire/README.md",
+      "line": 38,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "`package.py --test` also runs `preservation.py` against extracted ZIP bytes. It checks every original module/asset against pinned git base 2c82f306, compares actual callbacks/render calls/save values and reload behavior for x3/x4/x4pro/simulator/unknown/missing API in both orientations, and forbids cp modules on those paths. Legacy trace comparison uses 2 MiB on the host; separate 75 KiB baseline/candidate observations record instrumentation/host-pointer limits honestly. Existing replacement entry tests explicitly select Sticky; all source-oracle assertions remain intact. Earlier replacement-only C3 stress tests are not the device dispatcher behavior."
+    },
+    {
+      "path": "test/replacement_solitaire/preservation.py",
+      "line": 22,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "        for device in ['x3','x4','x4pro','simulator','unknown','missing']:"
+    },
+    {
+      "path": "test/replacement_solitaire/preservation.py",
+      "line": 36,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "        for device in ['x3','x4','x4pro','simulator','unknown','missing']:"
+    },
+    {
+      "path": "test/replacement_sudoku/README.md",
+      "line": 27,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "`package.py --test` also runs `preservation.py` against extracted ZIP bytes. It checks every original module/asset against pinned git base 2c82f306, compares actual callbacks/render calls/save values and reload behavior for x3/x4/x4pro/simulator/unknown/missing API in both orientations, and forbids cp modules on those paths. Legacy trace comparison uses 2 MiB on the host; separate 75 KiB baseline/candidate observations record instrumentation/host-pointer limits honestly. Existing replacement entry tests explicitly select Sticky; all source-oracle assertions remain intact. Earlier replacement-only C3 stress tests are not the device dispatcher behavior."
+    },
+    {
+      "path": "test/replacement_sudoku/REVIEW.md",
+      "line": 17,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "On a Sticky or X4 Pro, install the candidate under the existing `sudoku` ID with an old save present. Confirm the backup/new-game notice, generate each difficulty, cancel an Expert generation, enter pencil marks, request a hint with a wrong entry present, undo, and resume after exiting. Check dense pencil marks in both orientations and inspect elapsed time after pausing. No EPUB cache reset is relevant. On X3/X4, verify the unsupported-device screen exits cleanly and leaves the old save untouched."
+    },
+    {
+      "path": "test/replacement_sudoku/preservation.py",
+      "line": 22,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "        for device in ['x3','x4','x4pro','simulator','unknown','missing']:"
+    },
+    {
+      "path": "test/replacement_sudoku/preservation.py",
+      "line": 36,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "        for device in ['x3','x4','x4pro','simulator','unknown','missing']:"
+    },
+    {
+      "path": "test/replacement_wordle/README.md",
+      "line": 34,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "`package.py --test` also runs `preservation.py` against extracted ZIP bytes. It checks every original module/asset against pinned git base 2c82f306, compares actual callbacks/render calls/save values and reload behavior for x3/x4/x4pro/simulator/unknown/missing API in both orientations, and forbids cp modules on those paths. Legacy trace comparison uses 2 MiB on the host; separate 75 KiB baseline/candidate observations record instrumentation/host-pointer limits honestly. Existing replacement entry tests explicitly select Sticky; all source-oracle assertions remain intact. Earlier replacement-only C3 stress tests are not the device dispatcher behavior."
+    },
+    {
+      "path": "test/replacement_wordle/preservation.py",
+      "line": 22,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "        for device in ['x3','x4','x4pro','simulator','unknown','missing']:"
+    },
+    {
+      "path": "test/replacement_wordle/preservation.py",
+      "line": 36,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "        for device in ['x3','x4','x4pro','simulator','unknown','missing']:"
+    },
+    {
+      "path": "test/seasalt_toybattle_original_ui/README.md",
+      "line": 42,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "`preservation.py` checks immutable 621719e4 against current high-heap x4-pro and"
+    },
+    {
+      "path": "test/seasalt_toybattle_original_ui/README.md",
+      "line": 43,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "75 KiB x3 callbacks, both entry orientations: eight equal successful pairs,"
+    },
+    {
+      "path": "test/seasalt_toybattle_original_ui/README.md",
+      "line": 63,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "On x3/x4/x4-pro check unchanged legacy presentation and saves. No save/cache reset"
+    },
+    {
+      "path": "test/seasalt_toybattle_original_ui/preservation.py",
+      "line": 14,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "  for device,limit in [('x4-pro',2097152),('x3',76800)]:"
+    },
+    {
+      "path": "test/social_original_ui/preservation.py",
+      "line": 17,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "  for device in ['x4pro','unknown','missing']:"
+    },
+    {
+      "path": "test/solitaire_touch/README.md",
+      "line": 11,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "Sticky receives `(x, y, event)`. x4pro/x4/x3/simulator and missing get_device"
+    },
+    {
+      "path": "test/solitaire_touch/run.py",
+      "line": 25,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "    parser.add_argument('--devices', nargs='+', default=['sticky', 'x4pro', 'x4', 'x3', 'simulator', 'missing'])"
+    },
+    {
+      "path": "test/sticky_app_touch/dashboard/README.md",
+      "line": 14,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "non-tap events, button controls, saves/reload, and app-specific targets. On x4pro,"
+    },
+    {
+      "path": "test/sticky_app_touch/dashboard/README.md",
+      "line": 15,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "x4, x3, simulator, and missing get_device, legacy calls still work and stock-order"
+    },
+    {
+      "path": "test/sticky_app_touch/dashboard/run.py",
+      "line": 22,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "    for device in ['sticky','x4pro','x4','x3','simulator','missing']:"
+    },
+    {
+      "path": "test/sticky_app_touch/hourglass/README.md",
+      "line": 14,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "non-tap events, button controls, saves/reload, and app-specific targets. On x4pro,"
+    },
+    {
+      "path": "test/sticky_app_touch/hourglass/README.md",
+      "line": 15,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "x4, x3, simulator, and missing get_device, legacy calls still work and stock-order"
+    },
+    {
+      "path": "test/sticky_app_touch/hourglass/run.py",
+      "line": 22,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "    for device in ['sticky','x4pro','x4','x3','simulator','missing']:"
+    },
+    {
+      "path": "test/sticky_app_touch/watertracker/README.md",
+      "line": 14,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "non-tap events, button controls, saves/reload, and app-specific targets. On x4pro,"
+    },
+    {
+      "path": "test/sticky_app_touch/watertracker/README.md",
+      "line": 15,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "x4, x3, simulator, and missing get_device, legacy calls still work and stock-order"
+    },
+    {
+      "path": "test/sticky_app_touch/watertracker/run.py",
+      "line": 22,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "    for device in ['sticky','x4pro','x4','x3','simulator','missing']:"
+    },
+    {
+      "path": "test/three_original_boards/README.md",
+      "line": 49,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "X3/X4 and X4 Pro as a separate hardware check. No cache reset or save deletion"
+    },
+    {
+      "path": "test/three_original_boards/nonsticky.py",
+      "line": 28,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "    for device in ('x4-pro','x4','simulator','older-host-error'):"
+    },
+    {
+      "path": "test/utility_sudoku_original_ui/preservation.py",
+      "line": 16,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": " for device in ['x3','x4','x4pro','simulator','unknown','missing']:"
+    },
+    {
+      "path": "test/wavelength_original_ui/README.md",
+      "line": 50,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "and exact journal bytes for highheap x4-pro,75KiB x3, unknown/missing get_device,"
+    },
+    {
+      "path": "test/wavelength_original_ui/README.md",
+      "line": 72,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "abandon, summary, new session and reopen preserve scores. Check legacy on x3/x4"
+    },
+    {
+      "path": "test/wavelength_original_ui/README.md",
+      "line": 73,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "and x4-pro. Keep existing state-a/b.dat; no cache reset required. UI observations"
+    },
+    {
+      "path": "test/wavelength_original_ui/preservation.py",
+      "line": 15,
+      "category": "historical source-oracle/legacy-data or negative-admission fixture (not a build target)",
+      "text": "  for device,limit in [('x4-pro',2097152),('x3',76800),('unknown',2097152),('missing',2097152),('no-release',2097152)]:"
+    }
+  ],
+  "third_party_reference_lines": 808,
+  "full_third_party_evidence": {
+    "path": "repair-round1/audit/remaining-references.json",
+    "sha256": "ea4a3192d0a4074e603d32bc726d6d90d794a5d885a9bfd35b4da9cf7eabd97b"
+  },
+  "binary_path_exceptions": [],
+  "policy": "Retain SDK/vendor/legal/format/serialized/negative-guard/algebra exceptions; no other-board firmware profile is selectable.",
+  "round1_adjudication": "Two FirmwareBoardTag guard lines are explicit negative compile-time admission, not selectable hardware; scanner source unchanged."
+}

@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+### Crosscub
+
+- Crosscub is now a reTerminal Sticky-only continuation of currentmain. The default build, native simulator, CI and release targets no longer select other hardware.
+- Boot, default sleep, device identity, settings and web/documentation branding use Crosscub and the owner-selected Welcome bear. Custom pictures and existing SD/NVS paths remain supported.
+- The owner's App Store is the standard default. OTA retains updating but accepts only pinned owner-controlled Crosscub Sticky releases and Crosscub application identity; no own-product release is published yet. Manual SD update/recovery remains available.
+- Stopwatch keeps its portrait artwork/card layout and fits the same artwork beside the splits card in landscape. Draw/hit geometry and visible 60px touch controls now agree; saved elapsed time and laps keep their existing format.
+- All current catalog IDs, versions, application assets, reading data, API3/API6/API7 Browser and native AirDrop behavior remain carried forward. The supplied baseline contains 37 catalog apps; no catalog app is removed.
+
 ### Fixed
 
 - Assisted Browser rejects forbidden response fields and oversized JSON, validates exact protocol values, and finds saved phrases across styled text with accurate Find-next positions.

@@ -12,7 +12,7 @@ Refer to https://freeink.org/llms.txt for guidance.
 - The valid local simulator env in this repo is `simulator`, and `pio run -e simulator` currently builds cleanly.
 - The simulator `PNGdec` stub in `crossink-simulator/src/PNGdec.h` needs to mirror the real API shape used by app code, including `hasAlpha()` and `getTransparentColor()`, even though decode still fails intentionally.
 - Known simulator limits:
-  - `SMUDGE_X3_CONSTRAINTS=1 .pio/build/simulator/program` forces the strict 75 KB ESP32-C3 hardware DRAM ceiling in the simulator. Always use this when testing apps and Lua changes.
+  - Crosscub is Sticky-only. Existing low-budget Lua runs are stress/legacy-data compatibility checks, not the Sticky production heap policy. Use the current Crosscub preservation and production-raster fixtures.
   - No image rendering: `platformio.ini` ignores `hal`, `PNGdec`, and `JPEGDEC`, so image decoders are intentionally absent.
   - JPEGDEC stub always fails; `JPEGDEC fallback: open failed (err=-1)` is expected in simulator.
   - `esp_deep_sleep_start()` is a no-op in simulator.
@@ -35,7 +35,7 @@ Refer to https://freeink.org/llms.txt for guidance.
 - Use FreeInkUI SDK components and input routing for list-style screens where possible. Row rendering, touch targets,
   hit testing, and pagination should share the same FreeInkUI list configuration instead of custom touch scaling.
 
-## Heap Baselines (X4 hardware, SD card font)
+## Historical inherited heap observations (not Sticky qualification)
 
 - A normal resume-into-partial reading session runs at ~85-90KB free / ~49KB maxAlloc by
   the first watermark crossing (Epub metadata + x-locations + resident glyph caches).

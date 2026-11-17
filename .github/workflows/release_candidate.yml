@@ -14,14 +14,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - environment: default
-            firmware: firmware-x3-x4
           - environment: sticky
-            firmware: firmware-sticky
-          - environment: x4-pro
-            firmware: firmware-x4-pro
-          - environment: x4-classic
-            firmware: firmware-x4-classic
+            firmware: crosscub-sticky
     env:
       RC_BRANCH: ${{ github.ref_name }}
       RC_HASH: ${{ github.sha }}
@@ -59,7 +53,7 @@ jobs:
           branch_without_prefix="${RC_BRANCH#release/}"
           branch_safe=$(printf '%s\n' "$branch_without_prefix" | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/^-+//; s/-+$//')
           hash_short="${RC_HASH::7}"
-          rc_tag="rc-${branch_safe}-${hash_short}"
+          rc_tag="crosscub-rc-${branch_safe}-${hash_short}"
           echo "RC_BRANCH_RAW=$branch_without_prefix" >> "$GITHUB_ENV"
           echo "RC_BRANCH_SAFE=$branch_safe" >> "$GITHUB_ENV"
           echo "RC_HASH_SHORT=$hash_short" >> "$GITHUB_ENV"
@@ -74,7 +68,7 @@ jobs:
           sed -i "/^\[crosssmudge\]$/,/^\[/s|^version = .*|version = ${escaped_version}|" platformio.ini
           sed -i "/^\[crossink\]$/,/^\[/s|^version = .*|version = ${escaped_version}|" platformio.ini
 
-      - name: Build CrossSmudge
+      - name: Build Crosscub
         shell: bash
         env:
           CROSSSMUDGE_RELEASE_VERSION: "1"
@@ -106,7 +100,7 @@ jobs:
           branch_without_prefix="${RC_BRANCH#release/}"
           branch_safe=$(printf '%s\n' "$branch_without_prefix" | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/^-+//; s/-+$//')
           hash_short="${RC_HASH::7}"
-          rc_tag="rc-${branch_safe}-${hash_short}"
+          rc_tag="crosscub-rc-${branch_safe}-${hash_short}"
           echo "RC_BRANCH_RAW=$branch_without_prefix" >> "$GITHUB_ENV"
           echo "RC_BRANCH_SAFE=$branch_safe" >> "$GITHUB_ENV"
           echo "RC_HASH_SHORT=$hash_short" >> "$GITHUB_ENV"
@@ -125,13 +119,10 @@ jobs:
           token: ${{ secrets.RELEASE_PAT }}
           tag_name: ${{ env.RC_TAG }}
           target_commitish: ${{ github.sha }}
-          name: RC ${{ env.RC_BRANCH_SAFE }} ${{ env.RC_HASH_SHORT }}
+          name: Crosscub RC ${{ env.RC_BRANCH_SAFE }} ${{ env.RC_HASH_SHORT }}
           body: |
             Draft release candidate build from `release/${{ env.RC_BRANCH_RAW }}` at `${{ env.RC_HASH_SHORT }}`.
           draft: true
           prerelease: true
           files: |
-            release-candidate-firmware/firmware-x3-x4-${{ env.RC_BRANCH_SAFE }}-${{ env.RC_HASH_SHORT }}-RC.bin
-            release-candidate-firmware/firmware-sticky-${{ env.RC_BRANCH_SAFE }}-${{ env.RC_HASH_SHORT }}-RC.bin
-            release-candidate-firmware/firmware-x4-pro-${{ env.RC_BRANCH_SAFE }}-${{ env.RC_HASH_SHORT }}-RC.bin
-            release-candidate-firmware/firmware-x4-classic-${{ env.RC_BRANCH_SAFE }}-${{ env.RC_HASH_SHORT }}-RC.bin
+            release-candidate-firmware/crosscub-sticky-${{ env.RC_BRANCH_SAFE }}-${{ env.RC_HASH_SHORT }}-RC.bin

@@ -31,7 +31,7 @@ static bool isImagePreviewFile(const std::string& path) {
 bool ReaderActivity::shouldShowLoadingPopup(const std::string& path) {
   // Only first-open EPUBs are slow enough to need the popup (they build the
   // spine/TOC cache). A cached EPUB opens in ~ms, so showing the popup would
-  // just add an extra full e-ink refresh (~3s on X3) before the reader paints
+  // just add an extra full e-ink refresh before the reader paints
   // its first page; that page's own refresh is the visible "working" feedback.
   // Other formats, and EPUBs without a metadata cache yet, keep the popup.
   if (isXtcFile(path) || isTxtFile(path) || isImagePreviewFile(path)) {

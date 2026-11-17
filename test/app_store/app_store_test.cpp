@@ -458,7 +458,7 @@ void sourceRouting() {
 #if defined(CROSSSMUDGE_OWNER_TEST)
   const std::string root = "https://raw.githubusercontent.com/tobiasweissert/CrossSmudge/integration/sticky-test-all/apps/";
 #else
-  const std::string root = "https://raw.githubusercontent.com/Mumfee/CrossSmudge/main/apps/";
+  const std::string root = "https://raw.githubusercontent.com/tobiasweissert/CrossSmudge/integration/sticky-test-all/apps/";
 #endif
   CHECK(f.app.baseUrl_ == root);
   CHECK(f.app.catalogUrl_ == root + "catalog.json");

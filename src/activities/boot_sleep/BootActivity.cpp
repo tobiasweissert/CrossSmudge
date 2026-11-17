@@ -16,7 +16,7 @@
 #include "CrossPointState.h"
 #include "ImageFolderIndex.h"
 #include "fontIds.h"
-#include "images/Logo120.h"
+#include "images/CrosscubLogo.h"
 
 namespace {
 
@@ -119,7 +119,7 @@ void drawDefaultBootLogo(const GfxRenderer& renderer) {
   const auto pageHeight = renderer.getScreenHeight();
 
   renderer.clearScreen();
-  renderer.drawImage(Logo120, (pageWidth - 120) / 2, (pageHeight - 120) / 2, 120, 120);
+  drawCrosscubLogo(renderer, (pageWidth - 120) / 2, (pageHeight - 120) / 2);
   renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 70, tr(STR_CROSSSMUDGE), true, EpdFontFamily::BOLD);
   renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 95, tr(STR_BOOTING));
   renderer.drawCenteredText(SMALL_FONT_ID, pageHeight - 30, CROSSSMUDGE_VERSION);

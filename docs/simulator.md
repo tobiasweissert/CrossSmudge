@@ -5,7 +5,7 @@ nav_order: 15
 
 # Development Device Simulator
 
-CrossSmudge can run in the [CrossPoint simulator](https://github.com/uxjulia/crosspoint-simulator), which renders the e-ink display in an SDL2 window. Use it for quick sanity checks without flashing firmware every time.
+Crosscub can run in the [CrossPoint simulator](https://github.com/uxjulia/crosspoint-simulator), which renders the e-ink display in an SDL2 window. Use it for quick sanity checks without flashing firmware every time.
 
 ## Platform Support
 
@@ -34,14 +34,8 @@ Place EPUB books in `./fs_/books/` relative to the project root. That maps to th
 ## Build And Run
 
 ```sh
-pio run -e simulator
+pio run -e sticky-simulator
 .pio/build/simulator/program
-```
-
-Use the X4 Pro environment to enable its touch, frontlight, and Home-key behavior:
-
-```sh
-pio run -e x4-pro-simulator -t run_simulator
 ```
 
 ## Keyboard Controls
@@ -53,9 +47,7 @@ pio run -e x4-pro-simulator -t run_simulator
 | Return | Confirm / Select |
 | Escape | Back |
 | P | Power |
-| H | X4 Pro Home key (tap to go Home; hold for 700 ms to toggle the reader menu) |
 
-The `H` mapping is active only in `x4-pro-simulator`.
 
 ## Cache Note
 

@@ -3,14 +3,14 @@ title: User Guide
 nav_order: 1.5
 ---
 
-# CrossSmudge User Guide
+# Crosscub User Guide
 
-Welcome to the **CrossSmudge** firmware. This guide covers day-to-day device use.
+Welcome to the **Crosscub** firmware. This guide covers day-to-day device use.
 For focused reference material, see [Reader Features](./reader-features.md),
 [Controls](./controls.md), [SD Card Fonts](./sd-card-fonts.md),
 [File Transfer](./webserver.md), and [Troubleshooting](./troubleshooting.md). For Dashboard and Minimal Home-screen gestures, see [Touch Navigation](./touch-navigation.md).
 
-- [CrossSmudge User Guide](#crosssmudge-user-guide)
+- [Crosscub User Guide](#crosssmudge-user-guide)
   - [1. Hardware Overview](#1-hardware-overview)
     - [Button Layout](#button-layout)
     - [Taking a Screenshot](#taking-a-screenshot)
@@ -44,7 +44,7 @@ For focused reference material, see [Reader Features](./reader-features.md),
     - [Page Turning](#page-turning)
     - [Chapter Navigation](#chapter-navigation)
     - [Auto Page Turn](#auto-page-turn)
-    - [Tilt Page Turn (X3 and Sticky)](#tilt-page-turn-x3-and-sticky)
+    - [Tilt Page Turn (Sticky)](#tilt-page-turn-sticky)
     - [Touch Reader Controls](#touch-reader-controls)
     - [Footnote Navigation](#footnote-navigation)
     - [System Navigation](#system-navigation)
@@ -57,32 +57,10 @@ For focused reference material, see [Reader Features](./reader-features.md),
 
 ## 1. Hardware Overview
 
-CrossInk supports many devices with various button layouts. For the X3/X4 devices with front buttons, by default they will use the following layout from left to right, and this guide will refer to them by those names.
-
-<table>
-  <thead>
-    <tr>
-      <th colspan="4"><center>Default Front Button Mapping</center></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Back</td>
-      <td>Confirm</td>
-      <td>Left</td>
-      <td>Right</td>
-    </tr>
-  </tbody>
-</table>
-
-For devices with buttons on either side of the device, this guide may refer to the buttons as follows:
-
-| Location       | Button Mapping     |
-| -------------- | ------------------ |
-| **Left Side**  | **Left**/**Up**    |
-| **Right Side** | **Right**/**Down** |
-
-Button layout can be customized in **Settings > Controls**.
+Crosscub supports the reTerminal Sticky. Use the touchscreen rows, Back header,
+Home gestures and reader controls described below. The physical Power button
+and the existing logical button mappings remain available; no front-button
+cluster or capacitive Home key is required.
 
 ### Taking a Screenshot
 
@@ -150,14 +128,10 @@ Download links for files already on the device are available in the web interfac
 A **Wi-Fi signal strength indicator** (dBm) is displayed on-screen during joined-network web server sessions.
 
 The same screen also has **Receive File**, which receives a supported
-book or image directly from another nearby CrossSmudge reader without joining a
+book or image directly from another nearby Crosscub reader without joining a
 Wi-Fi network. See [Nearby File Transfer](./nearby-file-transfer.md) for the
 complete sender and receiver workflow.
 
-On X4 Pro, the screen also includes **USB Drive**. This exposes the reader's SD
-card to a computer over USB for direct file management. See the
-[USB Drive instructions](./installation.md#usb-drive) for the safe-eject and
-disconnect behavior.
 
 > [!TIP]
 > Advanced users can manage files programmatically with the same HTTP endpoints
@@ -166,7 +140,7 @@ disconnect behavior.
 
 ### 3.5.1 Calibre Wireless Transfers
 
-CrossSmudge supports sending books from Calibre using the CrossPoint Reader device plugin.
+Crosscub supports sending books from Calibre using the CrossPoint Reader device plugin.
 
 1. Download the current `crosspoint_reader` plugin ZIP from the
    [CrossPoint Reader plugin releases](https://github.com/crosspoint-reader/calibre-plugins/releases).
@@ -185,7 +159,7 @@ device model and build.
 #### 3.6.1 Display
 
 - **Sleep Screen**: Which sleep screen to display when the device sleeps:
-  - "Dark" (default) - The default dark CrossSmudge logo sleep screen
+  - "Dark" (default) - The default dark Crosscub logo sleep screen
   - "Light" - The same default sleep screen, on a white background
   - "Custom" - Custom images from the SD card; see [Sleep Screen](#37-sleep-screen) below for more information
   - "Cover" - The book cover image (Note: this is experimental and may not work as expected)
@@ -220,7 +194,7 @@ device model and build.
 - **Refresh Frequency**: Set how often the screen does a full refresh while reading to reduce ghosting; options are every 1, 5, 10, 15, or 30 pages.
 
 - **UI Theme**: Set which UI theme to use:
-  - "Classic" - The original CrossSmudge theme
+  - "Classic" - The original Crosscub theme
   - "Minimal" - A minimal theme with a large book cover
   - "Dashboard" - A dashboard-style home layout
   - "Lyra" - A theme with simple icons featuring your current book
@@ -229,10 +203,6 @@ device model and build.
   - "RoundedRaff" - A rounded theme with additional visual styling
 
 - **Recent Books View**: Choose whether the Recent Books screen uses a list or grid layout.
-
-- **Sunlight Fading Fix**: Configure whether to enable a software-fix for the issue where white X4 models may fade when used in direct sunlight:
-  - "OFF" (default) - Disable the fix
-  - "ON" - Enable the fix
 
 - **Frontlight and wake schedule** (on supported devices with a frontlight and
   real-time clock): Open **Settings > Display > Frontlight**.
@@ -370,7 +340,7 @@ which status-bar items are shown.
 - **Time to Sleep**: Set the duration of inactivity before the device automatically goes to sleep. Values are in minutes, with a "Never" option at the end of the range.
 
 - **Custom Boot Screen**: Enable or disable custom boot screens (enabled by
-  default). When disabled, CrossInk uses the standard logo on cold boot and keeps the current sleep
+  default). When disabled, Crosscub uses the standard logo on cold boot and keeps the current sleep
   screen visible on power-button wake, even if a custom image or boot-screen
   folder is configured. Disabling this does not remove the selected image or
   the folders; turn it back on to use them again.
@@ -393,7 +363,7 @@ which status-bar items are shown.
 - **Check for Updates** and **SD Firmware Update**: Check for firmware updates
   over Wi-Fi or install a `firmware.bin` placed on the SD card.
 
-- **Language**: Set the UI language. CrossSmudge supports 28 languages: English,
+- **Language**: Set the UI language. Crosscub supports 28 languages: English,
   Spanish, French, German, Czech, Brazilian Portuguese, Russian, Swedish,
   Romanian, Catalan, Ukrainian, Belarusian, Italian, Polish, Finnish, Danish,
   Dutch, Turkish, Kazakh, Hungarian, Lithuanian, Slovenian, Valencian, Hebrew,
@@ -401,7 +371,7 @@ which status-bar items are shown.
 
 #### 3.6.5 OPDS Servers (Multiple Libraries)
 
-CrossSmudge supports saving multiple OPDS servers and switching between them when browsing catalogs.
+Crosscub supports saving multiple OPDS servers and switching between them when browsing catalogs.
 
 1. Open **Settings -> System -> OPDS Servers**.
 
@@ -446,17 +416,17 @@ Behavior notes:
 
 #### 3.6.7 KOReader Sync Quick Setup
 
-CrossSmudge can sync reading progress with KOReader-compatible sync servers.
+Crosscub can sync reading progress with KOReader-compatible sync servers.
 It also interoperates with KOReader apps/devices when they use the same server and credentials.
 
 ##### Option A: CrossPoint Sync Server (`sync.crosspointreader.com`, default)
 
-When **Sync Server URL** is left empty, CrossSmudge uses the free CrossPoint sync server at `https://sync.crosspointreader.com`. It speaks the standard KOReader sync protocol (so KOReader apps can use it too) and additionally stores an exact spine/page position for lossless CrossSmudge-to-CrossSmudge sync.
+When **Sync Server URL** is left empty, Crosscub uses the free CrossPoint sync server at `https://sync.crosspointreader.com`. It speaks the standard KOReader sync protocol (so KOReader apps can use it too) and additionally stores an exact spine/page position for lossless Crosscub-to-Crosscub sync.
 
-1. On each CrossSmudge device:
+1. On each Crosscub device:
    - Go to **Settings -> System -> KOReader Sync**.
 
-   - Set **Username** and **Password** (enter the plain password; CrossSmudge computes MD5 internally, and use the same values on all devices).
+   - Set **Username** and **Password** (enter the plain password; Crosscub computes MD5 internally, and use the same values on all devices).
 
    - Leave **Sync Server URL** empty (or set it to `https://sync.crosspointreader.com`).
 
@@ -468,7 +438,7 @@ Accounts are per server. Existing `sync.koreader.rocks` credentials do not exist
 
 Use this if you already sync KOReader devices against the official public server.
 
-1. On each CrossSmudge device:
+1. On each Crosscub device:
    - Go to **Settings -> System -> KOReader Sync**.
 
    - Set **Sync Server URL** to `https://sync.koreader.rocks` (required; an empty URL now points at the CrossPoint server instead).
@@ -532,7 +502,7 @@ curl -H "Accept: application/vnd.koreader.v1+json" "http://<server-ip>:17200/hea
 ```
 
 3. Register a user once.
-   CrossSmudge authenticates against KOReader Sync (`koreader/kosync`) using an MD5 key, so register using the MD5 of your password:
+   Crosscub authenticates against KOReader Sync (`koreader/kosync`) using an MD5 key, so register using the MD5 of your password:
 
 > [!WARNING]
 > Sending a reusable MD5-derived password over plain HTTP is insecure.
@@ -556,7 +526,7 @@ If this returns `HTTP 402` with `{"code":2002,"message":"Username is already reg
 4. On each device:
    - Go to **Settings -> System -> KOReader Sync**.
 
-   - Set **Username** and **Password** (enter the plain password; CrossSmudge computes MD5 internally, and use the same values on all devices).
+   - Set **Username** and **Password** (enter the plain password; Crosscub computes MD5 internally, and use the same values on all devices).
 
    - Set **Sync Server URL** to `http://<server-ip>:17200`.
 
@@ -569,7 +539,7 @@ If you use the HTTPS listener, use `https://<server-ip>:7200` (`curl -k` only fo
 Once any of the options above is set up, press **Confirm** while reading to open the reader menu, then select **Sync Progress**. Alternatively, set **Settings -> Controls -> Long-press Menu** to **KOSync** and hold Confirm to launch sync directly.
 
 - With **Sync Behavior** set to **Ask every time**, choose **Apply Remote** to jump to remote progress or **Upload Local** to push current progress.
-- With **Sync Behavior** set to **Smart sync**, CrossSmudge auto-resolves simple cases: upload when no remote progress exists, confirm and leave both unchanged when local and remote progress are already synchronized, upload when local progress is further ahead, or apply remote when remote progress is further ahead.
+- With **Sync Behavior** set to **Smart sync**, Crosscub auto-resolves simple cases: upload when no remote progress exists, confirm and leave both unchanged when local and remote progress are already synchronized, upload when local progress is further ahead, or apply remote when remote progress is further ahead.
 
 ### 3.7 Sleep Screen
 
@@ -577,8 +547,8 @@ The **Sleep Screen** setting controls what is displayed when the device goes to 
 
 | Mode               | Behavior                                                                                                                                         |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Dark** (default) | The CrossSmudge logo on a dark background.                                                                                                          |
-| **Light**          | The CrossSmudge logo on a white background.                                                                                                         |
+| **Dark** (default) | The Crosscub logo on a dark background.                                                                                                          |
+| **Light**          | The Crosscub logo on a white background.                                                                                                         |
 | **Custom**         | A custom image from the SD card (see below). Falls back to **Dark** if no custom image is found.                                                 |
 | **Cover**          | The cover of the currently open book. Falls back to **Dark** if no book is open.                                                                 |
 | **Cover + Custom** | The cover of the currently open book, shown only while actively reading. Falls back to **Custom** behavior when not reading.                     |
@@ -607,8 +577,7 @@ In **Page Overlay** mode, white BMP pixels and transparent PNG pixels let the cu
 > For best results:
 >
 > - Use uncompressed BMP files with 24-bit color depth
-> - X4: Use a resolution of 480x800 pixels to match the device's screen resolution.
-> - X3: Use a resolution of 528x792 pixels to match the device's screen resolution.
+> - Sticky: use 480x800 portrait or 800x480 landscape.
 
 > [!TIP]
 > You can set an image as the sleep screen cover directly from the BMP image viewer in the **[Browse Files](#33-browse-files-screen)** screen.
@@ -618,12 +587,12 @@ In **Page Overlay** mode, white BMP pixels and transparent PNG pixels let the cu
 ### 3.8 Boot Screen
 
 The **Custom Boot Screen** toggle is in **Settings -> System** and is enabled by
-default. When it is on, you can replace the default CrossInk logo shown during
+default. When it is on, you can replace the default Crosscub logo shown during
 a cold boot with BMP images stored on the SD card. A configured custom boot
 screen is also shown after a power-button wake. This is separate from the
 sleep screen.
 
-CrossInk supports two ways to choose a custom boot screen:
+Crosscub supports two ways to choose a custom boot screen:
 
 - **One fixed image:** In **[Browse Files](#33-browse-files-screen)**, open a
   BMP image from any folder, open its context menu, and choose **Set Boot
@@ -631,12 +600,12 @@ CrossInk supports two ways to choose a custom boot screen:
   folder. To stop using it, open the same image and choose **Clear Boot Screen**.
 
 - **Rotating images:** Create a `/.bootscreen` folder in the root of the SD card
-  and place BMP files directly inside it. CrossInk randomly selects an image
+  and place BMP files directly inside it. Crosscub randomly selects an image
   each time it starts and avoids recently used images where possible. A
   `/bootscreen` folder is also supported. Folder names are case-insensitive; if
   both folders exist, `/.bootscreen` takes priority.
 
-CrossInk caches folder contents for faster startup. If you add BMP files
+Crosscub caches folder contents for faster startup. If you add BMP files
 directly to an already-used folder while the device is off, the new files may
 not be selected until the index is rebuilt. Upload them through the **File
 Transfer** web file manager or **Nearby File Transfer** to invalidate the
@@ -646,10 +615,10 @@ The selection and fallback order is:
 
 1. A selected BMP set with **Set Boot Screen**.
 2. A usable BMP selected from the active root-level boot-screen folder.
-3. The standard CrossInk logo.
+3. The standard Crosscub logo.
 
 On a cold boot, if a selected image or the active folder is missing, unreadable,
-empty, or contains no usable BMP, CrossInk falls back to the next option in the
+empty, or contains no usable BMP, Crosscub falls back to the next option in the
 order above. If both folder names exist, `/.bootscreen` masks `/bootscreen`
 even when the hidden folder is empty or unusable; remove or rename it to use
 `/bootscreen` instead.
@@ -662,19 +631,19 @@ sleep screen visible. With no selected image or boot-screen folder, a
 power-button wake is also splashless.
 
 > [!TIP]
-> Use an uncompressed BMP at your device's screen resolution for the best result: 480x800 pixels on X4 or 528x792 pixels on X3. Images with other dimensions are centered and scaled down as needed.
+> Use an uncompressed BMP at your device's screen resolution for the best result: 480x800 pixels in Sticky portrait or 800x480 in landscape. Images with other dimensions are centered and scaled down as needed.
 
 ---
 
 ### 3.9 Custom Fonts (SD Card)
 
-CrossSmudge supports loading additional fonts from the SD card, extending beyond the built-in Lexend Deca and Bitter families. Custom fonts can include extended Unicode coverage, enabling CJK (Chinese, Japanese, Korean) and other scripts.
+Crosscub supports loading additional fonts from the SD card, extending beyond the built-in Lexend Deca and Bitter families. Custom fonts can include extended Unicode coverage, enabling CJK (Chinese, Japanese, Korean) and other scripts.
 
 There are three ways to install fonts:
 
 1. **Download from device (recommended):** Go to **Settings -> Reader -> Font Options -> Manage Fonts**, browse the available font families, and select one to download over Wi-Fi.
 2. **Upload via web interface:** While in **File Transfer** mode, open the web UI in a browser and navigate to the **Fonts** tab to upload `.cpfont` files.
-3. **Manual SD card copy:** Download font files from the [CrossSmudge-fonts repository](https://github.com/uxjulia/crosssmudge-fonts/releases) and copy them to `/.fonts/` (preferred) or `/fonts/` on your SD card.
+3. **Manual SD card copy:** Download font files from the [Crosscub-fonts repository](https://github.com/uxjulia/crosssmudge-fonts/releases) and copy them to `/.fonts/` (preferred) or `/fonts/` on your SD card.
 
 Once installed, custom fonts appear in **Settings -> Reader -> Font Options -> Font Family** alongside the built-in fonts.
 
@@ -708,9 +677,9 @@ This feature can be disabled in **Settings > Controls > Front Buttons** to help 
 
 Auto Page Turn automatically advances pages at a set interval, useful for hands-free reading. This feature can be enabled and configured from the **[Reader Menu](#5-reader-menu)** while reading an EPUB.
 
-### Tilt Page Turn (X3 and Sticky)
+### Tilt Page Turn (Sticky)
 
-On the **Xteink X3** and **Sticky**, the gyroscope can be used to turn pages by tilting the device. This feature and its left-right or forward-back direction are available in **Settings -> Controls**.
+On **Sticky**, the gyroscope can be used to turn pages by tilting the device. This feature and its left-right or forward-back direction are available in **Settings -> Controls**.
 
 ### Touch Reader Controls
 
@@ -735,23 +704,11 @@ right third for the previous page. If only one direction allows taps, taps
 across the page turn in that direction. The top and bottom gesture bands are
 reserved for vertical gestures, so taps in those bands do not turn pages.
 
-For **EPUB readers**, vertical gestures depend on the device:
-
-- On **Sticky**, swipe up to open the reader menu. Swipe down to open the
-  reader-details/frontlight panel; use that panel's header to return Home.
-- On **X4 Pro**, swipe up to open the reader menu and swipe down to open the
-  frontlight panel. The capacitive Home key returns Home on a short press and
-  opens the reader menu on a long press by default. Configure these actions, or
-  disable the key while reading, in **Settings > Controls > Home Button**.
-- On other touchscreen devices, swipe down to open the reader menu and swipe up
-  to return Home.
-
-**XTC** and **TXT** readers use narrower, format-specific vertical routing. For
-example, Sticky TXT has the down-swipe reader-details/frontlight panel but no
-swipe-to-menu or swipe-to-Home action; on X4 Pro, XTC keeps the swipe-up reader
-menu while its down-swipe frontlight panel is top-edge only, and TXT has no
-swipe-to-menu action. These vertical gestures are separate from the page-turn
-settings above.
+For **EPUB readers** on Sticky, swipe up to open the reader menu. Swipe down
+to open the reader-details panel; use that panel's header to return Home.
+**XTC** and **TXT** retain format-specific routing. Sticky TXT has the down-swipe
+reader-details panel but no swipe-to-menu or swipe-to-Home action. These
+vertical gestures are separate from page-turn settings above.
 
 Choose **Disabled** in **Next Page** or **Previous Page** to stop touch page
 turns in that direction without disabling the touchscreen's vertical reader-menu
@@ -802,7 +759,7 @@ If the device goes to sleep or you close the book while viewing a footnote, the 
 
 ### Supported Languages
 
-CrossSmudge renders text using the following Unicode character blocks, enabling support for a wide range of languages:
+Crosscub renders text using the following Unicode character blocks, enabling support for a wide range of languages:
 
 - **Latin Script (Basic, Supplement, Extended-A/B):** Covers English, German, French, Spanish, Portuguese, Italian, Dutch, Swedish, Norwegian, Danish, Finnish, Polish, Czech, Hungarian, Romanian, Slovak, Slovenian, Turkish, Catalan, and others.
 - **Cyrillic Script (Standard and Extended):** Covers Russian, Ukrainian, Belarusian, Bulgarian, Serbian, Macedonian, Kazakh, Kyrgyz, Mongolian, and others.
@@ -876,9 +833,9 @@ Please note that this firmware is currently in active development. The following
 
 ## 7. Troubleshooting Issues & Escaping Bootloop
 
-If an issue or crash is encountered while using CrossSmudge, feel free to raise an issue ticket and attach the logs.
+If an issue or crash is encountered while using Crosscub, feel free to raise an issue ticket and attach the logs.
 
-**Crash reports on SD card:** After a crash, CrossSmudge automatically saves a crash report to the SD card (no USB connection needed). Check the root of the SD card for a crash log file and include it with any bug report.
+**Crash reports on SD card:** After a crash, Crosscub automatically saves a crash report to the SD card (no USB connection needed). Check the root of the SD card for a crash log file and include it with any bug report.
 
 **Serial monitor logs:** For more detailed debugging, connect the device to a computer and run the custom debugging monitor script (requires Python 3 with `pyserial`, `colorama`, and `matplotlib`; install via `pip3 install pyserial colorama matplotlib`):
 

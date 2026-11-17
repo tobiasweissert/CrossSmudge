@@ -10,8 +10,8 @@ def option(section,key):
  return re.sub(r'\$\{([^}.]+)\.([^}]+)\}',lambda m:option(m[1],m[2]),value)
 s=(R/'src/activities/apps/lua/LuaRunner.cpp').read_text();match=re.search(r'int LuaRunner::l_getDevice\(lua_State\* L\) \{.*?\n\}',s,re.S);assert match;body=match.group()
 # Preserve the actual compatibility header's defined-but-zero identity macros.
-cap=(R/'include/AppCapabilities.h').read_text();mapping=re.search(r'#if defined\(FREEINK_DEVICE_X4CLASSIC\).*?#endif',cap,re.S);assert mapping
-prefix=mapping.group()+'\n#include <cstring>\n#include <cstdio>\nstruct lua_State {}; static const char* result; void lua_pushstring(lua_State*,const char* s){result=s;} class LuaRunner {public:static int l_getDevice(lua_State*);};\n'
+cap=(R/'include/AppCapabilities.h').read_text();mapping=''
+prefix=mapping+'\n#include <cstring>\n#include <cstdio>\nstruct lua_State {}; static const char* result; void lua_pushstring(lua_State*,const char* s){result=s;} class LuaRunner {public:static int l_getDevice(lua_State*);};\n'
 failed=[]
 import argparse, shutil
 parser = argparse.ArgumentParser()
@@ -23,7 +23,7 @@ if a.baseline:
 
 with tempfile.TemporaryDirectory(prefix='sticky-device-') as tmp:
  p=pathlib.Path(tmp);src=p/'device.cpp';src.write_text(prefix+body+'\nint main(){lua_State L;LuaRunner::l_getDevice(&L);puts(result);}\n')
- for env,expected in [('sticky','sticky'),('sticky-debug','sticky'),('sticky-owner-test','sticky'),('x4-pro','x4pro'),('x4-classic','x4'),('default','x3')]:
+ for env,expected in [('sticky','sticky'),('sticky-debug','sticky'),('sticky-owner-test','sticky'),('default','sticky'),('debug','sticky')]:
   flags=option('env:'+env,'build_flags');defines=re.findall(r'-D((?:FREEINK_DEVICE_|CROSSINK_APP_DEVICE_)[A-Z0-9_]+)(?:=([^\s]+))?',flags);args=['-D'+name+'='+ (value or '1') for name,value in defines]
   subprocess.run(['g++',*args,str(src),'-o',str(p/'device')],check=True);actual=subprocess.check_output([str(p/'device')],text=True).strip();print(env,dict(defines),'expected',expected,'actual',actual)
   if actual!=expected:failed.append(env)
@@ -33,7 +33,7 @@ with tempfile.TemporaryDirectory(prefix='sticky-device-') as tmp:
  # The app dispatcher and touch callback run unchanged; no Lua identity override.
  touch = re.search(r'void LuaRunner::onTouch\(int x, int y, const char\* eventType\) \{.*?\n\}', s, re.S).group()
  linked = p/'linked.cpp'
- linked.write_text(mapping.group() + '\nextern "C" {\n#include "lua.h"\n}\n'
+ linked.write_text(mapping + '\nextern "C" {\n#include "lua.h"\n}\n'
                    + '#include <cstdio>\nclass LuaRunner {public:lua_State* L;bool hasError_=false;static LuaRunner* s_activeRunner;static int l_getDevice(lua_State*);void onTouch(int,int,const char*);void setError(const char* e){hasError_=true;fprintf(stderr,"%s\\n",e);}};\nLuaRunner* LuaRunner::s_activeRunner=nullptr;\n'
                    + touch + '\nextern "C" int production_touch(lua_State* L) {LuaRunner runner;runner.L=L;runner.onTouch(lua_tointeger(L,1),lua_tointeger(L,2),lua_tostring(L,3));lua_pushboolean(L,!runner.hasError_);return 1;}\n'
                    + body + '\nextern "C" int production_get_device(lua_State* L) {return LuaRunner::l_getDevice(L); }\n')

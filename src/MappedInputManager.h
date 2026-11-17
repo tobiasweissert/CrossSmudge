@@ -100,7 +100,7 @@ class MappedInputManager {
   bool getTwoFingerTouch(int& x1, int& y1, int& x2, int& y2) const;
   bool wasCompletedMultiTouchSwipe(CompletedSwipe& swipe) const;
   bool wasCompletedMultiTouchRotation(CompletedRotation& rotation) const;
-  // True on boards with a capacitive home key (X4 Pro), where the bottom-edge
+  // True on profiles with a capacitive home key, where the bottom-edge
   // up-swipe is the reader-menu gesture rather than the exit-to-home gesture.
   // The Home key has its own reader lock setting, so it remains available when
   // "Disable Touchscreen" turns off only screen touch input.
@@ -152,10 +152,10 @@ class MappedInputManager {
   SwipeDir wasSwipe() const;
   bool wasSwipeWithPoints(SwipeDir& direction, int& startX, int& startY, int& endX, int& endY) const;
   bool wasLeftEdgeGesture() const;
-  // An upward swipe that starts in the lower edge band. X4 Pro uses this for
+  // An upward swipe that starts in the lower edge band. Home-key profiles use this for
   // its reader menu because its capacitive key handles Home.
   bool wasBottomEdgeUpSwipe() const;
-  // Exit-to-home intent. Boards with a capacitive home key (X4 Pro) use the
+  // Exit-to-home intent. Profiles with a capacitive home key use the
   // key's press edge; everywhere else it's the bottom-edge up-swipe.
   bool wasHomeGesture() const;
   // Deliver a delayed capacitive Home-key tap through the usual activity route.

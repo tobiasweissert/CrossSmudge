@@ -43,7 +43,7 @@ struct RiscvPanicRegisters {
 RTC_NOINIT_ATTR RiscvPanicRegisters panicRiscvRegisters;
 #endif
 #if CONFIG_IDF_TARGET_ARCH_XTENSA
-// Preserve the X4 Pro/Sticky exception details alongside their existing
+// Preserve the Sticky exception details alongside their existing
 // symbolizable backtrace. EXCVADDR identifies the bad address for memory
 // access faults, which the backtrace alone cannot show.
 struct XtensaPanicRegisters {
@@ -246,7 +246,7 @@ std::string getPanicInfo(bool full) {
   } else {
     std::string info;
 
-    info += "CrossSmudge version: " CROSSSMUDGE_VERSION;
+    info += "Crosscub version: " CROSSSMUDGE_VERSION;
     info += "\nCrossSmudge device type: " CROSSSMUDGE_FIRMWARE_DEVICE_TYPE;
     info += "\n\nPanic reason: " + std::string(panicMessage);
     info += "\n\nLast logs:\n" + getLastLogs();

@@ -50,7 +50,10 @@ for ref in sorted((D/'reference').glob('*.png')):
    count+=1;diff+=expected[y*w+x]!=actual[y*w+x]
  comparisons.append(dict(state=state,w=w,h=h,full_different_pixels=full,scoped_different_pixels=diff,compared_pixels=count,excluded_rectangles=masks,exact_required=required,reason=reason))
 if not a.test and not a.red:
- for name,digest in meta['preserved_sha256'].items():assert hashlib.sha256((a.app_root/Path(name).relative_to('apps')).read_bytes()).hexdigest()==digest,name
+ for name,digest in meta['preserved_sha256'].items():
+  if Path(name).name=='manifest.json':
+   carry=json.loads((R/'test/crosscub/catalog-preservation.json').read_text());digest=carry['apps'][Path(name).parent.name]['manifest_sha256']
+  assert hashlib.sha256((a.app_root/Path(name).relative_to('apps')).read_bytes()).hexdigest()==digest,name
  assert hashlib.sha256((a.app_root/'sudoku/app.lua').read_bytes()).hexdigest()==meta['sudoku_reviewed_app_sha256']
  for app,test in [('calculator','calculator.lua'),('notes','notes.lua'),('notes','notes_capacity.lua'),('calculator','calculator_integration.lua'),('notes','notes_integration.lua')]:
   for w,h in[(480,800),(800,480)]:

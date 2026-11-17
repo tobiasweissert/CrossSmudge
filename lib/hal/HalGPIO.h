@@ -5,20 +5,6 @@
 
 #include "AppCapabilities.h"
 
-// Display SPI pins (custom pins for XteinkX4, not hardware SPI defaults)
-#define EPD_SCLK 8   // SPI Clock
-#define EPD_MOSI 10  // SPI MOSI (Master Out Slave In)
-#define EPD_CS 21    // Chip Select
-#define EPD_DC 4     // Data/Command
-#define EPD_RST 5    // Reset
-#define EPD_BUSY 6   // Busy
-
-#define SPI_MISO 7  // SPI MISO, shared between SD card and display (Master In Slave Out)
-
-#define BAT_GPIO0 0  // Battery voltage
-
-#define UART0_RXD 20  // Used for USB connection detection
-
 class HalGPIO {
 #if CROSSPOINT_EMULATED == 0
   InputManager inputMgr;
@@ -65,24 +51,14 @@ class HalGPIO {
     unsigned long durationMs = 0;
   };
 
-  enum class DeviceType : uint8_t { X4, X3 };
-
- private:
-  DeviceType _deviceType = DeviceType::X4;
-
- public:
   HalGPIO() = default;
 
-  // Inline device type helpers for cleaner downstream checks
-  inline bool deviceIsX3() const { return _deviceType == DeviceType::X3; }
-  inline bool deviceIsX4() const { return _deviceType == DeviceType::X4; }
-  bool isXteinkDevice() const;
 
   // True when the board's page buttons sit on the left/right screen edges
-  // (X3, X4 Pro) rather than an off-screen vertical rocker. Drives side-hint
+  // rather than an off-screen vertical rocker. Drives side-hint
   // placement, the flipped large-step direction in selection activities, and
   // the keyboard's side-gutter reserve. Keyed off the active BoardConfig
-  // profile, not the X3/X4 runtime detection.
+  // profile, not runtime board detection.
   bool hasEdgeSideButtons() const;
 
   // Start button GPIO and setup SPI for screen and SD card
@@ -105,7 +81,7 @@ class HalGPIO {
   bool wasCompletedMultiTouchSwipe(CompletedMultiTouchSwipe& swipe) const;
   bool wasCompletedMultiTouchRotation(CompletedMultiTouchRotation& rotation) const;
   // Capacitive home key under the bezel, reported by the touch controller
-  // (e.g. X4 Pro's GT911 key). Tap = short press (fires on release, the primary
+  // when supported by the SDK. Tap = short press (fires on release, the primary
   // "home" action); LongPress = held ~700ms (a hold shortcut, e.g. reader menu).
   bool hasHomeKey() const;
   bool wasHomeKeyPressed() const;

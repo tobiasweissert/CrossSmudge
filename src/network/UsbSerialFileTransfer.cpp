@@ -17,10 +17,6 @@
 #include "activities/boot_sleep/ImageFolderIndex.h"
 #include "util/BookCacheUtils.h"
 
-#if defined(FREEINK_DEVICE_X4PRO) && FREEINK_DEVICE_X4PRO && !ARDUINO_USB_MODE && !defined(SIMULATOR)
-#define CROSSINK_USB_RX_OVERFLOW_ENABLED
-#include <USBCDC.h>
-#endif
 
 namespace UsbSerialFileTransfer {
 namespace {

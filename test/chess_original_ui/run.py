@@ -35,7 +35,10 @@ for ref in sorted((D/'reference').glob('*.png')):
    if any(x0<=x<x1 and y0<=y<y1 for x0,y0,x1,y1 in masks):continue
    total+=1;diff+=expected[y*w+x]!=actual[y*w+x]
  comparisons.append(dict(state=state,w=w,h=h,full_different_pixels=sum(x!=y for x,y in zip(expected,actual)),scoped_different_pixels=diff,compared_pixels=total,excluded_rectangles=masks,excluded_extra_settings_rows=excluded_rows,exact_required=required,reason=reason))
-for name in meta['immutable_files']:assert hashlib.sha256((a.app_dir/name).read_bytes()).hexdigest()==meta['baseline_sha256'][name],name
+for name in meta['immutable_files']:
+ expected=meta['baseline_sha256'][name]
+ if name=='manifest.json':expected=json.loads((R/'test/crosscub/catalog-preservation.json').read_text())['apps']['chess']['manifest_sha256']
+ assert hashlib.sha256((a.app_dir/name).read_bytes()).hexdigest()==expected,name
 payload=dict(tests=rows,pixels=comparisons,deviations=meta['deviations'],renderer='Actual production raster/extractor and exact int32float32 VM/essentiallibraries/Stickyidentity; deterministic declared file/time fixtures, no host fonts or drawing mocks; host qualification only')
 (a.work_dir/'results.json').write_text(json.dumps(payload,indent=2)+'\n');assert all(t['returncode']==0 and json.loads(t['stdout'].strip().splitlines()[-1])['after_close']==0 for t in rows)
 if not a.red:assert all(t['scoped_different_pixels']==0 for t in comparisons if t['exact_required']),[t for t in comparisons if t['exact_required']and t['scoped_different_pixels']]

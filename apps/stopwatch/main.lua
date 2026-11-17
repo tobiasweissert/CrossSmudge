@@ -18,6 +18,32 @@ local plunger_down = false
 local plunger_timer = 0
 local split_flash_timer = 0
 
+-- Shared draw/hit geometry: portrait keeps the original watch/card positions.
+-- Landscape fits the same artwork beside the split card instead of clipping
+-- its fixed portrait bottom below the Sticky screen.
+local function screen_layout()
+    local landscape = w > h
+    local card_x = landscape and (math.floor(w * 0.4) + 24) or 24
+    local sy = landscape and 92 or 352
+    local card_h = landscape and (h - 68 - sy) or 380
+    return {
+        cx = landscape and math.floor(w * 0.2) or math.floor(w / 2), cy = 230,
+        card_x = card_x, sy = sy, card_w = w - 24 - card_x,
+        card_h = card_h, footer_y = h - 60,
+        visible_rows = math.max(1, math.min(6, math.floor((card_h - 96) / 44)))
+    }
+end
+
+local function draw_touch_footer(running)
+    if not (smudge.has_touch and smudge.has_touch()) then return end
+    local y = screen_layout().footer_y
+    smudge.line(12, y, w - 12, y, true)
+    local labels = { "Exit", running and "Stop" or "Start", "Split", "Reset" }
+    for i, label in ipairs(labels) do
+        smudge.text(math.floor((i - 0.5) * w / 4), y + 20, label, 10, false, "center", true)
+    end
+end
+
 local function get_now_ms()
     if smudge and smudge.millis then
         return smudge.millis()
@@ -329,7 +355,8 @@ local function draw_splits_card(card_x, sy, card_w, card_h)
         smudge.text(card_x + math.floor(card_w / 2), empty_cy + 10, "No Splits Recorded", 12, true, "center", true)
         smudge.text(card_x + math.floor(card_w / 2), empty_cy + 38, "Press [Start] then [Split] to record laps", 9, false, "center", true)
     else
-        local max_visible = 6
+        local max_visible = screen_layout().visible_rows
+        scroll_offset = math.min(scroll_offset, math.max(0, num_splits - max_visible))
         local start_idx = math.max(1, num_splits - scroll_offset - max_visible + 1)
         local end_idx = math.max(1, num_splits - scroll_offset)
 
@@ -389,22 +416,19 @@ function on_draw()
     local status_sub = is_running and "Running" or (elapsed_ms > 0 and "Paused" or "Ready")
     smudge.header("Stopwatch", status_sub)
 
-    local cx = math.floor(w / 2)
-    local cy = 230
+    local layout = screen_layout()
+    local cx, cy = layout.cx, layout.cy
 
     -- Draw Cartoon Stopwatch
     draw_stopwatch_art(cx, cy, elapsed_ms)
 
     -- Draw Splits Card under the stopwatch
-    local card_x = 24
-    local card_w = w - 48
-    local sy = 352
-    local card_h = 380
-    draw_splits_card(card_x, sy, card_w, card_h)
+    draw_splits_card(layout.card_x, layout.sy, layout.card_w, layout.card_h)
 
     -- Bottom button hints
     local b2_label = is_running and "Stop" or "Start"
     smudge.button_hints("Exit", b2_label, "Split", "Reset")
+    draw_touch_footer(is_running)
 end
 
 function on_button(btn, pressed)
@@ -420,8 +444,9 @@ function on_button(btn, pressed)
     elseif btn == "btn4" or btn == "right" or btn == "page_forward" or btn == "down" then
         trigger_reset()
     elseif btn == "up" then
-        if #splits > 6 then
-            scroll_offset = math.min(#splits - 6, scroll_offset + 1)
+        local visible = screen_layout().visible_rows
+        if #splits > visible then
+            scroll_offset = math.min(#splits - visible, scroll_offset + 1)
             if smudge and smudge.request_update then smudge.request_update() end
         end
     end
@@ -429,8 +454,8 @@ end
 
 function on_tap(x, y)
     -- Tap cartoon stopwatch to toggle Start / Stop
-    local cx = math.floor(w / 2)
-    local cy = 230
+    local layout = screen_layout()
+    local cx, cy = layout.cx, layout.cy
     local dx = x - cx
     local dy = y - cy
     if (dx * dx + dy * dy) <= (106 * 106) then
@@ -439,7 +464,7 @@ function on_tap(x, y)
     end
 
     -- Tap bottom button regions
-    if y >= 740 then
+    if x >= 0 and x < w and y >= layout.footer_y and y < h then
         local btn_w = math.floor(w / 4)
         if x < btn_w then
             save_data()
@@ -455,11 +480,13 @@ function on_tap(x, y)
     end
 
     -- Tap splits card to scroll
-    if y >= 352 and y <= 732 then
-        if y < 540 and #splits > 6 then
-            scroll_offset = math.min(#splits - 6, scroll_offset + 1)
+    if x >= layout.card_x and x < layout.card_x + layout.card_w and
+       y >= layout.sy and y <= layout.sy + layout.card_h then
+        local middle = layout.sy + math.floor(layout.card_h / 2)
+        if y < middle and #splits > layout.visible_rows then
+            scroll_offset = math.min(#splits - layout.visible_rows, scroll_offset + 1)
             if smudge and smudge.request_update then smudge.request_update() end
-        elseif y >= 540 and scroll_offset > 0 then
+        elseif y >= middle and scroll_offset > 0 then
             scroll_offset = math.max(0, scroll_offset - 1)
             if smudge and smudge.request_update then smudge.request_update() end
         end

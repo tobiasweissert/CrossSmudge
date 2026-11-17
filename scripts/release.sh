@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Usage: ./scripts/release.sh 1.2.7
-# Bumps [crosssmudge] version in platformio.ini, commits, and creates the git tag.
+# Bumps [crosssmudge] version in platformio.ini, commits, and creates a Crosscub product tag.
 set -euo pipefail
 
 VERSION="${1:-}"
@@ -11,6 +11,6 @@ fi
 
 sed -i '' "/^\\[crosssmudge\\]/,/^\\[/ s/^version = .*/version = $VERSION/" platformio.ini
 git add platformio.ini
-git commit -m "Update crosssmudge version to $VERSION"
-git tag "v$VERSION"
-echo "Tagged v$VERSION — push with: git push && git push origin v$VERSION"
+git commit -m "Update Crosscub version to $VERSION"
+git tag "crosscub-v$VERSION"
+echo "Tagged crosscub-v$VERSION — push with: git push && git push origin crosscub-v$VERSION"

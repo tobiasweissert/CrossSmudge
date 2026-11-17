@@ -456,7 +456,7 @@ def get_auto_detected_port() -> list[str]:
             if any(pat in port.description for pat in pattern_list)
             or port.hwid.startswith(
                 "USB VID:PID=303A:1001"
-            )  # Add specific VID:PID for XTEINK X4
+            )
         ]
 
     return port_list

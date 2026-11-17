@@ -13,7 +13,7 @@ This is an integrated local preview for the owner's store. The parent performs
 frozen review, commit/publication and raw URL/hash verification. This worker must
 not push, publish, flash hardware, deploy a backend or send email.
 
-Requires Sticky/X4 Pro PSRAM firmware providing API6. Install the matching
+Requires Sticky PSRAM firmware providing API6. Install the matching
 `sticky-owner-test` firmware via Settings -> SD Card Firmware Update, then update Browser through the owner's
 App Store. An app update does not update firmware. Keep the old BIN/ELF and SD
 backup available. Do not erase applications or saved data. Browser ID and icon

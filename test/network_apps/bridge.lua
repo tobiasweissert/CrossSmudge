@@ -3,7 +3,7 @@ local host=dofile
 local readAsset=TEST_READ_ASSET or function(p,n)
   local f=assert(io.open('apps/'..APP..'/'..p,'rb'));local data=f:read(n);f:close();return data
 end
-dofile=function(p) assert(p:match('^[a-z]+%.lua$')); return host('apps/'..APP..'/'..p) end
+dofile=function(p) assert(p:match('^[a-z_]+%.lua$')); return host('apps/'..APP..'/'..p) end
 local files={}
 rendered=''
 smudge={

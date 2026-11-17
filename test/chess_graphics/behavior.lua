@@ -1,5 +1,5 @@
 smudge.get_device=function()return'sticky'end
-local app=dofile('main.lua');on_init();local C,G=app.core,app.state();local N=dofile('notation.lua');on_draw();local l=app.layout()
+local app=dofile('main.lua');on_init();local C,G=app.core,app.state();local N=dofile('notation.lua');on_draw();if app.layout().start then local b=app.layout().start[1];on_touch(b.x+b.w//2,b.y+b.h//2,'tap');on_draw()end;local l=app.layout()
 local w,h=smudge.get_bounds();assert(l.y==140 and l.size==math.max(8,math.min(w-50,h-251)//8));assert(l.x==(w-l.size*8)//2)
 local function san(fen,from,to,prom,expected)
  local p=assert(C.parseFen(fen));local before=C.fen(p);local found

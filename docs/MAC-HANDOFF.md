@@ -1,3 +1,5 @@
+> Historical provenance/checkpoint record, not Crosscub build or installation guidance. See [Crosscub](../README.md).
+
 # Continue Sticky development on the Mac
 
 ## Start here

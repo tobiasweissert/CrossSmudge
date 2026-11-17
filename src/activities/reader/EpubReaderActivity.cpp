@@ -125,12 +125,6 @@ constexpr int PUBLISHER_PAGE_NUMBER_X = 5;
 constexpr uint16_t CLIP_ADVANCE_CODEPOINT_CAPACITY = 256;
 
 int publisherPageNumberX(const GfxRenderer& renderer) {
-#if (defined(FREEINK_DEVICE_X4PRO) && FREEINK_DEVICE_X4PRO) || \
-    (defined(FREEINK_DEVICE_X4CLASSIC) && FREEINK_DEVICE_X4CLASSIC)
-  if (renderer.getOrientation() == GfxRenderer::Orientation::LandscapeCounterClockwise) {
-    return PUBLISHER_PAGE_NUMBER_X + 5;
-  }
-#endif
 
   return PUBLISHER_PAGE_NUMBER_X;
 }
@@ -6654,7 +6648,7 @@ bool EpubReaderActivity::saveProgress(int spineIndex, int currentPage, int pageC
     visibleTextOffset = section->getVisibleTextOffsetForPage(static_cast<uint16_t>(currentPage));
   }
   if (section && section->isBuilding() && spineIndex == currentSpineIndex) {
-    // Free lazy-build cache files before opening progress.bin; X4/SdFat can reject
+    // Free lazy-build cache files before opening progress.bin; SdFat can reject
     // another file open while a still-building EPUB section keeps files open.
     section->releaseBuildFile();
   }
@@ -7002,8 +6996,8 @@ bool EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int fo
         composePageBuffer();
       }
       // The restored image frame becomes the base for the grayscale image
-      // planes below. On X3, use the same grayscale-aware base waveform as
-      // text-only grayscale turns; other panels keep the FAST fallback behavior.
+      // planes below. The SDK selects the grayscale-aware base waveform;
+      // Sticky keeps the FAST fallback behavior.
       renderer.displayGrayscaleBase(HalDisplay::FAST_REFRESH);
     } else {
       renderer.displayBuffer(pagesUntilFullRefresh < 0 ? manualScreenRefreshMode() : HalDisplay::HALF_REFRESH);
@@ -7017,7 +7011,7 @@ bool EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int fo
     pagesUntilFullRefresh = 1;
   } else if (needsAnyGrayscale) {
     if (pagesUntilFullRefresh <= 1) {
-      // Cleanup turns still need the stronger HALF pass, but X3 grayscale
+      // Cleanup turns still need the stronger HALF pass; SDK grayscale
       // overlays settle better if the OEM precondition step runs before the
       // gray planes are written.
       renderer.displayBuffer(pagesUntilFullRefresh < 0 ? manualScreenRefreshMode() : HalDisplay::HALF_REFRESH);
