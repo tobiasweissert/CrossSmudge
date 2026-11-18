@@ -506,8 +506,8 @@ OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback onProgres
 
   uint8_t descriptor[112];
   if (!stagedFile.seek(0) || stagedFile.read(descriptor, sizeof(descriptor)) != sizeof(descriptor) ||
-      !crosscub_ota::acceptsImageVersion(descriptor, sizeof(descriptor), latestVersion.c_str(),
-                                         CROSSSMUDGE_VERSION, compareVersions)) {
+      !crosscub_ota::acceptsImageVersion(descriptor, sizeof(descriptor), latestVersion.c_str(), CROSSSMUDGE_VERSION,
+                                         compareVersions)) {
     LOG_ERR("OTA", "Refusing an unbound, malformed or non-newer Crosscub application descriptor");
     stagedFile.close();
     Storage.remove(OTA_STAGE_PATH);

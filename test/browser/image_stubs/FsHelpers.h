@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
 namespace FsHelpers {
-inline bool hasJpgExtension(const std::string& s){return s.ends_with(".jpg")||s.ends_with(".jpeg");}
-inline bool hasPngExtension(const std::string& s){return s.ends_with(".png");}
-}
+inline bool hasJpgExtension(const std::string& s) { return s.ends_with(".jpg") || s.ends_with(".jpeg"); }
+inline bool hasPngExtension(const std::string& s) { return s.ends_with(".png"); }
+}  // namespace FsHelpers

@@ -15,7 +15,6 @@ HalDisplay::~HalDisplay() {}
 void HalDisplay::begin(bool seamless) {
   HalSpiBus::Lock spiLock;
 
-
   einkDisplay.begin();
 
   if (seamless) {
@@ -58,7 +57,6 @@ EInkDisplay::RefreshMode convertRefreshMode(HalDisplay::RefreshMode mode) {
 void HalDisplay::displayBuffer(HalDisplay::RefreshMode mode, bool turnOffScreen) {
   HalSpiBus::Lock spiLock;
 
-
   einkDisplay.displayBuffer(convertRefreshMode(mode), turnOffScreen);
 }
 
@@ -68,7 +66,6 @@ void HalDisplay::setInverted(bool inverted) {
 }
 
 void HalDisplay::displayBufferAsync(HalDisplay::RefreshMode mode) {
-
   einkDisplay.displayBufferAsyncNoShadow(convertRefreshMode(mode));
 }
 
@@ -89,7 +86,6 @@ bool HalDisplay::displayGrayscaleBase(GrayscaleMode mode, RefreshMode fallback, 
 
 void HalDisplay::refreshDisplay(HalDisplay::RefreshMode mode, bool turnOffScreen) {
   HalSpiBus::Lock spiLock;
-
 
   einkDisplay.refreshDisplay(convertRefreshMode(mode), turnOffScreen);
 }

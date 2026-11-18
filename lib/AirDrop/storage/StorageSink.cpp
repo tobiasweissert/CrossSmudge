@@ -21,7 +21,8 @@ void put32(uint8_t* p, uint32_t value) {
 }
 bool tokenValid(const char* token) {
   if (!token || strnlen(token, 33) != 32) return false;
-  for (unsigned i = 0; i < 32; ++i) if (!((token[i] >= '0' && token[i] <= '9') || (token[i] >= 'a' && token[i] <= 'f'))) return false;
+  for (unsigned i = 0; i < 32; ++i)
+    if (!((token[i] >= '0' && token[i] <= '9') || (token[i] >= 'a' && token[i] <= 'f'))) return false;
   return true;
 }
 }  // namespace
@@ -75,19 +76,24 @@ bool StorageSink::begin(const char* name, uint32_t size, const uint8_t nonce[16]
   finalPath_[0] = sessionPath_[0] = 0;
   std::memset(digest_, 0, sizeof digest_);
   const size_t length = name ? strnlen(name, sizeof name_) : 0;
-  if (!nonce || !stream::safeName(name, length) || size > MaxPayloadBytes) return fail("unsupported filename or file size");
+  if (!nonce || !stream::safeName(name, length) || size > MaxPayloadBytes)
+    return fail("unsupported filename or file size");
   std::memset(name_, 0, sizeof name_);
   std::memset(finalPath_, 0, sizeof finalPath_);
   std::memcpy(name_, name, length + 1);
   char token[33];
   static constexpr char Hex[] = "0123456789abcdef";
-  for (unsigned i = 0; i < 16; ++i) { token[2 * i] = Hex[nonce[i] >> 4]; token[2 * i + 1] = Hex[nonce[i] & 15]; }
+  for (unsigned i = 0; i < 16; ++i) {
+    token[2 * i] = Hex[nonce[i] >> 4];
+    token[2 * i + 1] = Hex[nonce[i] & 15];
+  }
   token[32] = 0;
   if (!paths(token)) return false;
   const int count = std::snprintf(finalPath_, sizeof finalPath_, "/Inbox/%s", name_);
   if (count < 0 || size_t(count) >= sizeof finalPath_) return fail("destination name exceeds storage bound");
   uint64_t available = 0;
-  if (!files_.ready(available) || available < uint64_t(size) + ReserveBytes) return fail("SD unavailable or insufficient reserved free space");
+  if (!files_.ready(available) || available < uint64_t(size) + ReserveBytes)
+    return fail("SD unavailable or insufficient reserved free space");
   if (!ensureDirectory("/Inbox")) return fail("SD Inbox is unreadable or cannot be created");
   uint32_t ignored = 0;
   if (files_.stat(finalPath_, ignored) != PathState::Missing)
@@ -105,8 +111,12 @@ bool StorageSink::begin(const char* name, uint32_t size, const uint8_t nonce[16]
 
 bool StorageSink::append(const uint8_t* bytes, size_t length) {
   if (state_ != State::Receiving || !stageOpen_) return fail("no writable accepted receive session");
-  if (files_.cancelled()) { cancel(); return false; }
-  if ((!bytes && length) || length > ChunkBytes || length > expected_ - written_) return fail("payload exceeds accepted size or chunk bound");
+  if (files_.cancelled()) {
+    cancel();
+    return false;
+  }
+  if ((!bytes && length) || length > ChunkBytes || length > expected_ - written_)
+    return fail("payload exceeds accepted size or chunk bound");
   if (!length) return true;
   const size_t written = files_.writeStage(bytes, length);
   if (written != length) {
@@ -149,7 +159,10 @@ bool StorageSink::verify(const char* path) {
   bool valid = size == expected_ && files_.hashStart();
   uint32_t position = 0;
   while (valid && position < size) {
-    if (files_.cancelled()) { valid = false; break; }
+    if (files_.cancelled()) {
+      valid = false;
+      break;
+    }
     const size_t length = std::min<size_t>(size - position, sizeof buffer_);
     valid = files_.read(buffer_, length) == int(length) && files_.hashUpdate(buffer_, length);
     position += length;
@@ -162,7 +175,10 @@ bool StorageSink::verify(const char* path) {
 
 bool StorageSink::finish() {
   if (state_ != State::Receiving || !stageOpen_) return fail("no active complete receive stage");
-  if (files_.cancelled()) { cancel(); return false; }
+  if (files_.cancelled()) {
+    cancel();
+    return false;
+  }
   if (written_ != expected_) return fail("received payload length differs from consent");
   if (!files_.hashFinish(digest_)) return fail("receive SHA256 finalization failed");
   if (!files_.syncStage()) return fail("SD stage sync failed");
@@ -172,14 +188,16 @@ bool StorageSink::finish() {
   if (!record(2)) return fail("complete-stage journal was not durably verified");
   state_ = State::CompleteStaged;
   uint32_t ignored = 0;
-  if (files_.stat(finalPath_, ignored) != PathState::Missing) return fail("destination collision or unreadable Inbox; stage retained");
+  if (files_.stat(finalPath_, ignored) != PathState::Missing)
+    return fail("destination collision or unreadable Inbox; stage retained");
   publicationAttempted_ = true;
   state_ = State::PublishAttempted;
   if (!record(3)) return fail("publication intent could not be durably verified", true);
   if (files_.cancelled()) return fail("cancelled after publication intent; stage retained", true);
   // No write/remove/retry follows a failed rename. False may already alias the
   // old and new cluster chain; the intent record is the durable uncertain state.
-  if (!files_.renameExclusive(stagePath_, finalPath_)) return fail("SD publication uncertain; retain both paths for repair", true);
+  if (!files_.renameExclusive(stagePath_, finalPath_))
+    return fail("SD publication uncertain; retain both paths for repair", true);
   if (!verify(finalPath_) || files_.stat(stagePath_, ignored) != PathState::Missing)
     return fail("SD publication readback uncertain; retain recovery identity", true);
   if (!record(4)) return fail("SD publication confirmation uncertain", true);
@@ -195,7 +213,10 @@ void StorageSink::cancel() {
   if (publicationAttempted_ || state_ == State::Uncertain || state_ == State::PublishedVerified) return;
   if (stageOpen_) {
     stageOpen_ = false;
-    if (!files_.closeStage()) { fail("cancelled stage close uncertain"); return; }
+    if (!files_.closeStage()) {
+      fail("cancelled stage close uncertain");
+      return;
+    }
   }
   state_ = State::Cancelled;
   error_ = "receive cancelled; incomplete stage retained";
@@ -207,11 +228,12 @@ bool StorageSink::loadRecord(uint8_t phase) {
   if (!files_.openRead(recordPath_, size)) return false;
   const bool read = size == RecordBytes && files_.read(journal_, RecordBytes) == int(RecordBytes);
   const bool closed = files_.closeRead();
-  if (!read || !closed || std::memcmp(journal_, Magic, sizeof Magic) ||
-      (journal_[8] != 1 && journal_[8] != 2) || (phase > 1 && journal_[8] != journalVersion_) || journal_[9] != phase ||
+  if (!read || !closed || std::memcmp(journal_, Magic, sizeof Magic) || (journal_[8] != 1 && journal_[8] != 2) ||
+      (phase > 1 && journal_[8] != journalVersion_) || journal_[9] != phase ||
       le32(journal_ + RecordCrcOffset) != journalCrc32(journal_, RecordCrcOffset) ||
       std::memcmp(journal_ + 400, token_, 32) || !std::memchr(journal_ + NameOffset, 0, sizeof name_) ||
-      !std::memchr(journal_ + FinalOffset, 0, sizeof finalPath_)) return false;
+      !std::memchr(journal_ + FinalOffset, 0, sizeof finalPath_))
+    return false;
   if (phase == 1) {
     journalVersion_ = journal_[8];
     expected_ = le32(journal_ + 12);
@@ -224,16 +246,20 @@ bool StorageSink::loadRecord(uint8_t phase) {
     if (!dot) dot = name_ + std::strlen(name_);
     // Version 1 receipts retain their original postfix identity, read-only.
     // Version 2 binds publication to the exact consented basename.
-    const int n = journalVersion_ == 1 ?
-        std::snprintf(reinterpret_cast<char*>(buffer_), sizeof buffer_, "/Inbox/%.*s (AirDrop %s)%s",
-                      int(dot - name_), name_, token_, dot) :
-        std::snprintf(reinterpret_cast<char*>(buffer_), sizeof buffer_, "/Inbox/%s", name_);
-    if (n < 0 || size_t(n) >= sizeof finalPath_ || std::strcmp(finalPath_, reinterpret_cast<char*>(buffer_))) return false;
+    const int n = journalVersion_ == 1
+                      ? std::snprintf(reinterpret_cast<char*>(buffer_), sizeof buffer_, "/Inbox/%.*s (AirDrop %s)%s",
+                                      int(dot - name_), name_, token_, dot)
+                      : std::snprintf(reinterpret_cast<char*>(buffer_), sizeof buffer_, "/Inbox/%s", name_);
+    if (n < 0 || size_t(n) >= sizeof finalPath_ || std::strcmp(finalPath_, reinterpret_cast<char*>(buffer_)))
+      return false;
   } else {
     if (le32(journal_ + 12) != expected_ || std::memcmp(journal_ + NameOffset, name_, sizeof name_) ||
-        std::memcmp(journal_ + FinalOffset, finalPath_, sizeof finalPath_)) return false;
-    if (phase == 2) std::memcpy(digest_, journal_ + 16, sizeof digest_);
-    else if (std::memcmp(digest_, journal_ + 16, sizeof digest_)) return false;
+        std::memcmp(journal_ + FinalOffset, finalPath_, sizeof finalPath_))
+      return false;
+    if (phase == 2)
+      std::memcpy(digest_, journal_ + 16, sizeof digest_);
+    else if (std::memcmp(digest_, journal_ + 16, sizeof digest_))
+      return false;
   }
   return true;
 }
@@ -242,7 +268,10 @@ State StorageSink::inspect(const char* token) { return inspectImpl(token, true);
 State StorageSink::inspectJournal(const char* token) { return inspectImpl(token, false); }
 
 State StorageSink::inspectImpl(const char* token, const bool verifyPayload) {
-  if (stageOpen_) { fail("cannot inspect recovery with an active stage", true); return state_; }
+  if (stageOpen_) {
+    fail("cannot inspect recovery with an active stage", true);
+    return state_;
+  }
   // A read-only inventory must never clear a real uncertainty latch.
   if (state_ == State::Uncertain || state_ == State::PublishAttempted) return state_;
   publicationAttempted_ = false;
@@ -251,16 +280,23 @@ State StorageSink::inspectImpl(const char* token, const bool verifyPayload) {
   written_ = expected_ = 0;
   if (!paths(token)) return state_;
   uint64_t free = 0;
-  if (!files_.ready(free) || !loadRecord(1)) { fail("recovery record unreadable or corrupt", true); return state_; }
+  if (!files_.ready(free) || !loadRecord(1)) {
+    fail("recovery record unreadable or corrupt", true);
+    return state_;
+  }
   uint8_t last = 1;
   bool missing = false;
   for (uint8_t phase = 2; phase <= 4; ++phase) {
     std::snprintf(recordPath_, sizeof recordPath_, "%s/phase.%u", sessionPath_, phase);
     uint32_t size = 0;
     const auto status = files_.stat(recordPath_, size);
-    if (status == PathState::Missing) { missing = true; continue; }
+    if (status == PathState::Missing) {
+      missing = true;
+      continue;
+    }
     if (missing || status != PathState::File || size != RecordBytes || !loadRecord(phase)) {
-      fail("recovery phase is unreadable, incomplete or out of order", true); return state_;
+      fail("recovery phase is unreadable, incomplete or out of order", true);
+      return state_;
     }
     last = phase;
   }
@@ -268,7 +304,8 @@ State StorageSink::inspectImpl(const char* token, const bool verifyPayload) {
   if (last == 4) {
     uint32_t size = 0;
     if (verifyPayload && (!verify(finalPath_) || files_.stat(stagePath_, size) != PathState::Missing)) {
-      fail("published candidate cannot be safely verified", true); return state_;
+      fail("published candidate cannot be safely verified", true);
+      return state_;
     }
     written_ = expected_;
     state_ = State::PublishedVerified;

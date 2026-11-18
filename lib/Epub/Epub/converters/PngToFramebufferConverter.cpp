@@ -44,7 +44,7 @@ struct PngContext {
 // File I/O callbacks use pFile->fHandle to access the FsFile*,
 // avoiding the need for global file state.
 void* pngOpenWithHandle(const char* filename, int32_t* size) {
-  if(ImageToFramebufferDecoder::cancelled())return nullptr;
+  if (ImageToFramebufferDecoder::cancelled()) return nullptr;
   auto f = makeUniqueNoThrow<FsFile>();
   if (!f) {
     LOG_ERR("PNG", "OOM: PNG file handle (%u free, %u max alloc)", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
@@ -208,7 +208,9 @@ void convertLineToGray(const uint8_t* pPixels, uint8_t* grayLine, int width, int
 
 int pngDrawCallback(PNGDRAW* pDraw) {
   PngContext* ctx = reinterpret_cast<PngContext*>(pDraw->pUser);
-  if (ImageToFramebufferDecoder::cancelled() || !ctx || !ctx->config || (!ctx->renderer && !ctx->config->cacheOnly) || !ctx->grayLineBuffer) return 0;
+  if (ImageToFramebufferDecoder::cancelled() || !ctx || !ctx->config || (!ctx->renderer && !ctx->config->cacheOnly) ||
+      !ctx->grayLineBuffer)
+    return 0;
 
   ImageToFramebufferDecoder::yieldDuringDecode(ctx->lastYieldMs);
 
@@ -242,7 +244,7 @@ int pngDrawCallback(PNGDRAW* pDraw) {
 
   // Pre-compute orientation and render-mode state once per callback.
   DirectPixelWriter pw{};
-  if(ctx->renderer)pw.init(*ctx->renderer);
+  if (ctx->renderer) pw.init(*ctx->renderer);
 
   for (int dstY = firstDstY; dstY < endDstY; dstY++) {
     ctx->lastDstY = dstY;
@@ -332,8 +334,9 @@ bool PngToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath
                                                     const RenderConfig& config) {
   return decode(imagePath, &renderer, config);
 }
-bool PngToFramebufferConverter::decode(const std::string& imagePath, GfxRenderer* renderer, const RenderConfig& config) {
-  if(ImageToFramebufferDecoder::cancelled() || (!renderer && !config.cacheOnly))return false;
+bool PngToFramebufferConverter::decode(const std::string& imagePath, GfxRenderer* renderer,
+                                       const RenderConfig& config) {
+  if (ImageToFramebufferDecoder::cancelled() || (!renderer && !config.cacheOnly)) return false;
   if (!MemoryBudget::hasHeapForImageDecoder("PNG", "PNG", PNG_DECODER_APPROX_SIZE)) {
     return false;
   }
@@ -440,7 +443,7 @@ bool PngToFramebufferConverter::decode(const std::string& imagePath, GfxRenderer
   ctx.caching = !config.cachePath.empty();
   if (ctx.caching) {
     if (!ctx.cache.begin(config.cachePath, ctx.dstWidth, ctx.dstHeight, config.x, config.y, 1,
-                         config.cacheOnly?ImageToFramebufferDecoder::cancelled:nullptr)) {
+                         config.cacheOnly ? ImageToFramebufferDecoder::cancelled : nullptr)) {
       LOG_ERR("PNG", "Failed to start cache stream, continuing without caching");
       ctx.caching = false;
     }
@@ -464,8 +467,8 @@ bool PngToFramebufferConverter::decode(const std::string& imagePath, GfxRenderer
 
   // Finalize the streamed cache (caching may have been cleared on a flush error).
   if (ctx.caching) {
-    bool saved=ctx.cache.finalize();
-    if(config.cacheOnly && !saved)return false;
+    bool saved = ctx.cache.finalize();
+    if (config.cacheOnly && !saved) return false;
   }
 
   return !config.cacheOnly || ctx.caching;

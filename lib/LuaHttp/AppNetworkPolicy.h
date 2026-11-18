@@ -22,4 +22,4 @@ inline bool setNetworkEnabled(bool enabled) {
   nvs_close(handle);
   return result == ESP_OK;
 }
-}
+}  // namespace ink::http

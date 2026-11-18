@@ -1,7 +1,7 @@
 #pragma once
 
-#include "activities/util/ConfirmationActivity.h"
 #include "FileMutationInputGate.h"
+#include "activities/util/ConfirmationActivity.h"
 
 // Only Files mutations opt in. Other confirmations retain their existing input
 // behavior; the ordinary popup still paints Cancel as the initial selection.
@@ -17,6 +17,7 @@ class FileMutationConfirmationActivity final : public ConfirmationActivity {
     if (!inputGate.allowInput(mappedInput)) return;
     ConfirmationActivity::loop();
   }
+
  private:
   FileMutationInputGate inputGate;
 };

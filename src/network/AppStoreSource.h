@@ -6,7 +6,8 @@ namespace AppStoreSource {
 // This is the renamed Crosscub repository's
 // live owner-controlled 41-app catalog, not this branch's 37-source inventory.
 // Never replace the live catalog with the smaller source-baseline catalog.
-#define CROSSSMUDGE_STORE_ROOT "https://raw.githubusercontent.com/tobiasweissert/Crosscub/integration/sticky-test-all/apps/"
+#define CROSSSMUDGE_STORE_ROOT \
+  "https://raw.githubusercontent.com/tobiasweissert/Crosscub/integration/sticky-test-all/apps/"
 static constexpr const char* baseUrl = CROSSSMUDGE_STORE_ROOT;
 static constexpr const char* catalogUrl = CROSSSMUDGE_STORE_ROOT "catalog.json";
 #undef CROSSSMUDGE_STORE_ROOT

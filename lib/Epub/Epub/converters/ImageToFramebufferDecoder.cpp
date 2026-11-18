@@ -3,13 +3,17 @@
 #include <Arduino.h>
 #include <Logging.h>
 
-namespace { thread_local const ImageDecodeControl* decodeControl=nullptr; }
-bool ImageDecodeControl::stopped()const {
- return (cancel && cancel->load(std::memory_order_relaxed)) || uint32_t(millis()-start)>=timeout;
+namespace {
+thread_local const ImageDecodeControl* decodeControl = nullptr;
 }
-ImageDecodeScope::ImageDecodeScope(const ImageDecodeControl* control):previous(decodeControl){decodeControl=control;}
-ImageDecodeScope::~ImageDecodeScope(){decodeControl=previous;}
-bool ImageToFramebufferDecoder::cancelled(){return decodeControl && decodeControl->stopped();}
+bool ImageDecodeControl::stopped() const {
+  return (cancel && cancel->load(std::memory_order_relaxed)) || uint32_t(millis() - start) >= timeout;
+}
+ImageDecodeScope::ImageDecodeScope(const ImageDecodeControl* control) : previous(decodeControl) {
+  decodeControl = control;
+}
+ImageDecodeScope::~ImageDecodeScope() { decodeControl = previous; }
+bool ImageToFramebufferDecoder::cancelled() { return decodeControl && decodeControl->stopped(); }
 
 void ImageToFramebufferDecoder::yieldDuringDecode(uint32_t& lastYieldMs) {
   const uint32_t now = millis();

@@ -1,6 +1,8 @@
 #pragma once
 #include <ArduinoJson.h>
+
 #include <cstring>
+
 #include "HttpCore.h"
 namespace ink::http {
 inline bool readNetworkDeclaration(JsonVariantConst network, Domains& domains) {
@@ -8,9 +10,15 @@ inline bool readNetworkDeclaration(JsonVariantConst network, Domains& domains) {
   if (network.isNull()) return true;
   if (!network.is<JsonObjectConst>() || network.size() != 1 || !network["domains"].is<JsonArrayConst>()) return false;
   for (JsonVariantConst domain : network["domains"].as<JsonArrayConst>()) {
-    if (!domain.is<const char*>()) { domains = {}; return false; }
+    if (!domain.is<const char*>()) {
+      domains = {};
+      return false;
+    }
     JsonString text = domain.as<JsonString>();
-    if (!domains.add(std::string_view(text.c_str(), text.size()))) { domains = {}; return false; }
+    if (!domains.add(std::string_view(text.c_str(), text.size()))) {
+      domains = {};
+      return false;
+    }
   }
   // Normalize declaration order before comparing a persisted grant.
   for (size_t i = 0; i < domains.count; ++i) {
@@ -25,4 +33,4 @@ inline bool readNetworkDeclaration(JsonVariantConst network, Domains& domains) {
   }
   return true;
 }
-}
+}  // namespace ink::http

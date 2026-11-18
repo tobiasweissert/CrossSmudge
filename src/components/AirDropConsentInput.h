@@ -9,7 +9,9 @@ namespace airdrop::input {
 // spanning either boundary cannot acquire the new view's identity at routing.
 class Capture {
  public:
-  struct Frame { uint32_t epoch = 0, serial = 0; };
+  struct Frame {
+    uint32_t epoch = 0, serial = 0;
+  };
   uint32_t begin() const { return epoch_.load(std::memory_order_acquire); }
   void end(uint32_t started) {
     frame_.epoch = started && !(started & 1) && started == begin() ? started : 0;
@@ -27,6 +29,7 @@ class Capture {
     epoch_.store(completed, std::memory_order_release);
     return completed & 1 ? 0 : completed;
   }
+
  private:
   std::atomic<uint32_t> epoch_{0};
   Frame frame_{};
@@ -42,8 +45,8 @@ class ConsentGate {
     touchReady_ = confirmReady_ = touchStarted_ = false;
   }
   uint32_t epoch() const { return epoch_; }
-  bool consume(Capture::Frame frame, bool contact, bool down, bool released,
-               bool confirmHeld, bool confirmPressed, bool& touch, bool& confirm) {
+  bool consume(Capture::Frame frame, bool contact, bool down, bool released, bool confirmHeld, bool confirmPressed,
+               bool& touch, bool& confirm) {
     touch = confirm = false;
     if (!epoch_ || frame.epoch != epoch_ || frame.serial == lastSerial_) return false;
     lastSerial_ = frame.serial;
@@ -64,6 +67,7 @@ class ConsentGate {
     }
     return true;
   }
+
  private:
   uint32_t epoch_ = 0, lastSerial_ = 0;
   bool touchReady_ = false, confirmReady_ = false, touchStarted_ = false;

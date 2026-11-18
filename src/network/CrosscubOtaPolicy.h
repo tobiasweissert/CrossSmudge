@@ -27,8 +27,8 @@ inline const char* version(const char* tag) {
     } else {
       digits = 0;
     }
-    if (!((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'z') ||
-          (*p >= 'A' && *p <= 'Z') || *p == '.' || *p == '-')) return nullptr;
+    if (!((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || *p == '.' || *p == '-'))
+      return nullptr;
   }
   return value;
 }
@@ -61,8 +61,9 @@ inline bool acceptsImageDescriptor(const uint8_t* bytes, size_t size) {
   constexpr size_t descriptor = 32;
   constexpr size_t project = descriptor + 48;
   if (!bytes || size < project + 32) return false;
-  if (bytes[0] != 0xe9 || bytes[descriptor] != 0x32 || bytes[descriptor + 1] != 0x54 ||
-      bytes[descriptor + 2] != 0xcd || bytes[descriptor + 3] != 0xab) return false;
+  if (bytes[0] != 0xe9 || bytes[descriptor] != 0x32 || bytes[descriptor + 1] != 0x54 || bytes[descriptor + 2] != 0xcd ||
+      bytes[descriptor + 3] != 0xab)
+    return false;
   constexpr char name[] = "Crosscub";
   return std::memcmp(bytes + project, name, sizeof(name)) == 0;
 }
@@ -71,8 +72,8 @@ inline bool acceptsImageDescriptor(const uint8_t* bytes, size_t size) {
 // the runtime display suffix "-sticky". Build provenance/display labels are
 // separate from this stable release identity; the descriptor producer writes
 // CROSSCUB_APP_VERSION rather than the display version.
-inline bool acceptsImageVersion(const uint8_t* bytes, size_t size, const char* tag,
-                                const char* current, int (*compare)(const char*, const char*)) {
+inline bool acceptsImageVersion(const uint8_t* bytes, size_t size, const char* tag, const char* current,
+                                int (*compare)(const char*, const char*)) {
   constexpr size_t offset = 32 + 16;  // esp_app_desc_t.version[32]
   constexpr size_t capacity = 32;
   if (!acceptsImageDescriptor(bytes, size) || size < offset + capacity || !compare) return false;

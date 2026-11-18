@@ -11,7 +11,6 @@
 #include <soc/usb_serial_jtag_reg.h>
 #endif
 
-
 // Global HalGPIO instance
 HalGPIO gpio;
 
@@ -20,9 +19,7 @@ constexpr unsigned long BUTTON_DEBOUNCE_REPOLL_MS = 6;
 
 }  // namespace
 
-void HalGPIO::begin() {
-  inputMgr.begin();
-}
+void HalGPIO::begin() { inputMgr.begin(); }
 
 void HalGPIO::update() {
   inputMgr.update();

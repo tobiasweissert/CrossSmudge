@@ -1,32 +1,33 @@
 #pragma once
 
-#include "LuaTouchDispatch.h"
-#include "../../../../lib/AirDrop/browser/BrowserLaunch.h"
+#include <HalLuaHttp.h>
 
 #include <memory>
 #include <mutex>
 #include <string>
 
+#include "../../../../lib/AirDrop/browser/BrowserLaunch.h"
 #include "GfxRenderer.h"
+#include "LuaTouchDispatch.h"
 #include "MappedInputManager.h"
+#include "Memory.h"
 #include "activities/Activity.h"
 #include "activities/apps/lua/LuaRunner.h"
+#include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "Memory.h"
-#include <HalLuaHttp.h>
-#include "activities/network/WifiSelectionActivity.h"
 
 template <typename Runner = ink::LuaRunner>
 class LuaAppActivityAdapter : public Activity {
  public:
   LuaAppActivityAdapter(GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& appDir,
-                 const std::string& appName, const std::string& entryScript = "main.lua",
-                 airdrop::browser::LaunchHandle launch = {}, bool transferredWifi = false)
+                        const std::string& appName, const std::string& entryScript = "main.lua",
+                        airdrop::browser::LaunchHandle launch = {}, bool transferredWifi = false)
       : Activity(appName.c_str(), renderer, mappedInput),
         appDir_(appDir),
         appName_(appName),
-        entryScript_(entryScript), launch_(std::move(launch)) {
+        entryScript_(entryScript),
+        launch_(std::move(launch)) {
     ownsWifi_ = transferredWifi;
     // Generate a simple appId from folder name
     size_t lastSlash = appDir_.find_last_of("/\\");
@@ -42,18 +43,25 @@ class LuaAppActivityAdapter : public Activity {
     initialOrientation_ = renderer.getOrientation();
     if (launch_) {
       launchAttempt_ = launch_->beginAttempt();
-      if (!launchAttempt_) { finish(); return; }
+      if (!launchAttempt_) {
+        finish();
+        return;
+      }
     }
     runner_ = makeUniqueNoThrow<Runner>(renderer, mappedInput, appDir_, appId_);
 
     if (!runner_) {
       LOG_ERR("LUA", "Runner allocation failed");
       failLaunch(airdrop::browser::LaunchError::InitFailed);
-      finish(); return;
+      finish();
+      return;
     }
     if (!runner_->init()) {
       failLaunch(airdrop::browser::LaunchError::InitFailed);
-      if (launch_) { finish(); return; }
+      if (launch_) {
+        finish();
+        return;
+      }
       const std::string& err = runner_->getErrorMessage();
       renderError(err.empty() ? "Failed to initialize Lua VM" : err.c_str());
       return;
@@ -62,29 +70,33 @@ class LuaAppActivityAdapter : public Activity {
     if (launch_) {
       if (!runner_->cooperativeBrowser()) {
         failLaunch(airdrop::browser::LaunchError::IncompatibleBrowser);
-        finish(); return;
+        finish();
+        return;
       }
       if (!runner_->networkEnabled()) {
         failLaunch(airdrop::browser::LaunchError::NetworkUnavailable);
-        finish(); return;
+        finish();
+        return;
       }
       // Existing mock runners and ordinary apps need no launch extension.
       if constexpr (requires(Runner& r) { r.setBrowserLaunch(launch_, launchAttempt_); }) {
         if (!runner_->setBrowserLaunch(launch_, launchAttempt_)) {
           failLaunch(airdrop::browser::LaunchError::IncompatibleBrowser);
-          finish(); return;
+          finish();
+          return;
         }
       } else {
         failLaunch(airdrop::browser::LaunchError::IncompatibleBrowser);
-        finish(); return;
+        finish();
+        return;
       }
     }
     prepareNetwork();
   }
 
   bool handleHomeGesture() override {
-    if(runner_ && runner_->cooperativeBrowser())runner_->requestNativeCancel();
-    return false; // ActivityManager's existing global Home path owns navigation.
+    if (runner_ && runner_->cooperativeBrowser()) runner_->requestNativeCancel();
+    return false;  // ActivityManager's existing global Home path owns navigation.
   }
 
   bool preventAutoSleep() override { return runner_ && runner_->preventAutoSleep(); }
@@ -93,20 +105,24 @@ class LuaAppActivityAdapter : public Activity {
     // Return handoff failures to the still-owning coordinator's Retry/Cancel UI.
     // Ordinary manually launched apps retain their existing error screen and Back flow.
     if (launch_ && scriptStarted_ && launch_->state() == airdrop::browser::LaunchState::Pending) {
-      finish();return;
+      finish();
+      return;
     }
     if (wifiPending_) {
-      wifiPending_=false;
-      auto selector=makeUniqueNoThrow<WifiSelectionActivity>(renderer,mappedInput);
+      wifiPending_ = false;
+      auto selector = makeUniqueNoThrow<WifiSelectionActivity>(renderer, mappedInput);
       if (!selector) {
-        LOG_ERR("LHTTP","WiFi dialog allocation failed");
+        LOG_ERR("LHTTP", "WiFi dialog allocation failed");
         failLaunch(airdrop::browser::LaunchError::NetworkUnavailable);
-        finish(); return;
+        finish();
+        return;
       }
-      ownsWifi_=true;
+      ownsWifi_ = true;
       startActivityForResult(std::move(selector), [this](const ActivityResult& result) {
-        if(result.isCancelled || !HalLuaHttp::wifiConnected()){
-          failLaunch(airdrop::browser::LaunchError::NetworkUnavailable);finish();return;
+        if (result.isCancelled || !HalLuaHttp::wifiConnected()) {
+          failLaunch(airdrop::browser::LaunchError::NetworkUnavailable);
+          finish();
+          return;
         }
         startScript();
       });
@@ -129,26 +145,33 @@ class LuaAppActivityAdapter : public Activity {
 
     // Browser render/cache blits must never make the input loop wait for the
     // Lua mutex. Latch Back out of band, then deliver once VM ownership returns.
-    std::unique_lock<std::mutex> ownership(luaMutex_,std::defer_lock);
-    if(runner_->cooperativeBrowser()){
-      if(mappedInput.wasReleased(MappedInputManager::Button::Back)){
-        pendingBack_=true;runner_->requestNativeCancel();
+    std::unique_lock<std::mutex> ownership(luaMutex_, std::defer_lock);
+    if (runner_->cooperativeBrowser()) {
+      if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+        pendingBack_ = true;
+        runner_->requestNativeCancel();
       }
-      if(!ownership.try_lock()){
+      if (!ownership.try_lock()) {
         // Touch events are one-frame snapshots too. Save one without querying
         // Lua (hasLongPressHandler would need this mutex), then deliver it once.
-        int x=0,y=0;
-        if(!pendingTap_ && mappedInput.wasScreenTapped(x,y)){
-          pendingTap_=true;pendingTapX_=x;pendingTapY_=y;runner_->requestNativeCancel();
+        int x = 0, y = 0;
+        if (!pendingTap_ && mappedInput.wasScreenTapped(x, y)) {
+          pendingTap_ = true;
+          pendingTapX_ = x;
+          pendingTapY_ = y;
+          runner_->requestNativeCancel();
         }
         return;
       }
       runner_->clearNativeCancel();
-    }else ownership.lock();
+    } else
+      ownership.lock();
     bool buttonHandled = false;
 
     if (mappedInput.wasReleased(MappedInputManager::Button::Back) || pendingBack_) {
-      pendingBack_=false;pendingTap_=false;runner_->clearNativeCancel();
+      pendingBack_ = false;
+      pendingTap_ = false;
+      runner_->clearNativeCancel();
       runner_->onButton("back", true);
       buttonHandled = true;
     }
@@ -180,10 +203,13 @@ class LuaAppActivityAdapter : public Activity {
     }
 
     {
-      if(pendingTap_){
-        pendingTap_=false;runner_->onTap(pendingTapX_,pendingTapY_);
-        runner_->onTouch(pendingTapX_,pendingTapY_,"tap");buttonHandled=true;
-      }else buttonHandled = dispatchLuaTouch(mappedInput, *runner_) || buttonHandled;
+      if (pendingTap_) {
+        pendingTap_ = false;
+        runner_->onTap(pendingTapX_, pendingTapY_);
+        runner_->onTouch(pendingTapX_, pendingTapY_, "tap");
+        buttonHandled = true;
+      } else
+        buttonHandled = dispatchLuaTouch(mappedInput, *runner_) || buttonHandled;
     }
 
     auto swipe = mappedInput.wasSwipe();
@@ -254,13 +280,15 @@ class LuaAppActivityAdapter : public Activity {
   void failLaunch(airdrop::browser::LaunchError reason) {
     if (launch_) launch_->failAttempt(launchAttempt_, reason);
   }
-  bool pendingBack_=false,pendingTap_=false;
-  int pendingTapX_=0,pendingTapY_=0;
+  bool pendingBack_ = false, pendingTap_ = false;
+  int pendingTapX_ = 0, pendingTapY_ = 0;
   bool wifiPending_ = false;
   bool ownsWifi_ = false;
   void prepareNetwork() {
-    if (runner_->networkEnabled() && !HalLuaHttp::wifiConnected()) wifiPending_=true;
-    else startScript();
+    if (runner_->networkEnabled() && !HalLuaHttp::wifiConnected())
+      wifiPending_ = true;
+    else
+      startScript();
   }
   bool scriptStarted_ = false;
   void startScript() {
@@ -272,7 +300,8 @@ class LuaAppActivityAdapter : public Activity {
     }
     if (launch_ && runner_->hasError()) {
       failLaunch(airdrop::browser::LaunchError::ScriptFailed);
-      finish();return;
+      finish();
+      return;
     }
     requestUpdate();
   }

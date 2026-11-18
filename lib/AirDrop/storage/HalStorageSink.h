@@ -51,7 +51,7 @@ class HalFiles final : public Files {
   unsigned inventoryEntries_ = 0;
   mbedtls_sha256_context hash_{};
   std::atomic<bool> cancelRequested_{false};
-  uint64_t deadlineMs_ = 0; // Listener-owner only; UI cancellation remains atomic.
+  uint64_t deadlineMs_ = 0;  // Listener-owner only; UI cancellation remains atomic.
   // Directory paths/names are session storage, not >256-byte task locals.
   char parent_[PathBytes]{};
   char entryName_[256]{};
@@ -69,7 +69,7 @@ class HalStorageSink {
   void requestCancel() { files_.requestCancel(); }
   void setDeadlineMs(uint64_t deadline) { files_.setDeadlineMs(deadline); }
   void cancel();
-  void abortTransfer(); // Close only this stage; keep the receiver available for a new consent/nonce.
+  void abortTransfer();  // Close only this stage; keep the receiver available for a new consent/nonce.
   State state() const { return sink_.state(); }
   const char* error() const { return sink_.error(); }
   const char* savedPath() const { return sink_.savedPath(); }
@@ -78,7 +78,9 @@ class HalStorageSink {
   uint32_t committedBytes() const { return sink_.committedBytes(); }
   State inspect(const char* token);
   State inspectJournal(const char* token);
-  bool recoveryToken(unsigned index, char token[33], bool& scanOk) { return files_.recoveryToken(index, token, scanOk); }
+  bool recoveryToken(unsigned index, char token[33], bool& scanOk) {
+    return files_.recoveryToken(index, token, scanOk);
+  }
 
  private:
   HalFiles files_;

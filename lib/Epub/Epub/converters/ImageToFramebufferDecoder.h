@@ -1,8 +1,8 @@
 #pragma once
 #include <HalStorage.h>
 
-#include <cstdint>
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -19,22 +19,23 @@ struct RenderConfig {
   bool useGrayscale = true;
   bool useDithering = true;
   bool performanceMode = false;
-  bool useExactDimensions = false;  // If true, use maxWidth/maxHeight as exact output size (no recalculation)
-  std::string cachePath;            // If non-empty, decoder will write pixel cache to this path
-  bool cacheOnly = false;          // Isolated browser worker; no live renderer access.
+  bool useExactDimensions = false;   // If true, use maxWidth/maxHeight as exact output size (no recalculation)
+  std::string cachePath;             // If non-empty, decoder will write pixel cache to this path
+  bool cacheOnly = false;            // Isolated browser worker; no live renderer access.
   bool useMonochromeDither = false;  // Browser BW output; existing four-level callers keep their behavior.
 };
 
 struct ImageDecodeControl {
- const std::atomic<bool>* cancel=nullptr;
- uint32_t start=0,timeout=30000;
- bool stopped()const;
+  const std::atomic<bool>* cancel = nullptr;
+  uint32_t start = 0, timeout = 30000;
+  bool stopped() const;
 };
 class ImageDecodeScope {
- const ImageDecodeControl* previous;
+  const ImageDecodeControl* previous;
+
  public:
- explicit ImageDecodeScope(const ImageDecodeControl* control);
- ~ImageDecodeScope();
+  explicit ImageDecodeScope(const ImageDecodeControl* control);
+  ~ImageDecodeScope();
 };
 class ImageToFramebufferDecoder {
  public:

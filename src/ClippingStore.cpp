@@ -591,10 +591,10 @@ bool ClippingStore::beginRenameMigration(const std::string& oldFilePath, const s
   // Clippings are not merged. Manual Move refuses every retained destination
   // candidate rather than silently discarding another book's records.
   if (preserveOnRenameFailure &&
-      (Storage.exists(migration.destinationPath.c_str()) ||
-       Storage.exists(migration.destinationBackupPath.c_str()) ||
+      (Storage.exists(migration.destinationPath.c_str()) || Storage.exists(migration.destinationBackupPath.c_str()) ||
        Storage.exists((migration.destinationPath + ".bak").c_str()) ||
-       Storage.exists((migration.destinationPath + ".tmp").c_str()))) return false;
+       Storage.exists((migration.destinationPath + ".tmp").c_str())))
+    return false;
   if (!Storage.exists(migration.destinationPath.c_str()) && Storage.exists(migration.destinationBackupPath.c_str())) {
     if (!Storage.rename(migration.destinationBackupPath.c_str(), migration.destinationPath.c_str())) {
       LOG_ERR("CLIP", "Failed to recover interrupted clipping rename backup: %s",

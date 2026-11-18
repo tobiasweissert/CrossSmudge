@@ -8,7 +8,17 @@ constexpr uint32_t MaxPayloadBytes = 30000000;
 constexpr size_t ChunkBytes = 1024;
 constexpr size_t PathBytes = 192;
 
-enum class State : uint8_t { Idle, Receiving, CompleteStaged, PublishAttempted, PublishedVerified, Uncertain, Failed, Cancelled, RetainedPartial };
+enum class State : uint8_t {
+  Idle,
+  Receiving,
+  CompleteStaged,
+  PublishAttempted,
+  PublishedVerified,
+  Uncertain,
+  Failed,
+  Cancelled,
+  RetainedPartial
+};
 enum class PathState : uint8_t { Missing, File, Directory, Unreadable };
 
 // All operations are checked. stat(Missing) must come from a healthy parent

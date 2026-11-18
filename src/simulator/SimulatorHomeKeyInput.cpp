@@ -9,7 +9,6 @@ SimulatorHomeKeyInput simulatorHomeKeyInput;
 void SimulatorHomeKeyInput::update() {
   tappedThisFrame = false;
   longPressedThisFrame = false;
-
 }
 
 void SimulatorHomeKeyInput::updateState(const bool pressed, const uint32_t now) {

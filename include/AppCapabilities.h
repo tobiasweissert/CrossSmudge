@@ -2,11 +2,11 @@
 
 // A firmware image must select the Sticky SDK profile. The reusable SDK keeps
 // its own hardware catalogue; Crosscub does not expose those product targets.
-#if defined(ARDUINO_ARCH_ESP32) && \
+#if defined(ARDUINO_ARCH_ESP32) &&                                                                          \
     (!defined(FREEINK_DEVICE_STICKY) || !FREEINK_DEVICE_STICKY || FREEINK_DEVICE_X3 || FREEINK_DEVICE_X4 || \
-     FREEINK_DEVICE_X4PRO || FREEINK_DEVICE_X4CLASSIC || FREEINK_DEVICE_WS397 || FREEINK_DEVICE_ONEPAGE || \
+     FREEINK_DEVICE_X4PRO || FREEINK_DEVICE_X4CLASSIC || FREEINK_DEVICE_WS397 || FREEINK_DEVICE_ONEPAGE ||  \
      FREEINK_DEVICE_PAPERMONO || FREEINK_DEVICE_EEGO_A4 || FREEINK_DEVICE_M5 || FREEINK_DEVICE_MURPHY_M4 || \
-     FREEINK_DEVICE_MURPHY || FREEINK_DEVICE_DELINK || FREEINK_DEVICE_LILYGO || FREEINK_DEVICE_M5PAPER || \
+     FREEINK_DEVICE_MURPHY || FREEINK_DEVICE_DELINK || FREEINK_DEVICE_LILYGO || FREEINK_DEVICE_M5PAPER ||   \
      FREEINK_DEVICE_PAPERS3)
 #error "Crosscub firmware requires the reTerminal Sticky profile exclusively"
 #endif

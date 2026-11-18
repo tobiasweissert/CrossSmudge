@@ -21,7 +21,7 @@ namespace {
 constexpr fui::ActionId ACTION_ROW = 1;
 
 constexpr NetworkMode menuModes[] = {
-    NetworkMode::JOIN_NETWORK, NetworkMode::CONNECT_CALIBRE, NetworkMode::CREATE_HOTSPOT,
+    NetworkMode::JOIN_NETWORK,        NetworkMode::CONNECT_CALIBRE,   NetworkMode::CREATE_HOTSPOT,
 #if CROSSINK_APP_CAP_USB_DRIVE
     NetworkMode::USB_DRIVE,
 #endif
@@ -31,7 +31,7 @@ constexpr NetworkMode menuModes[] = {
 #endif
 };
 constexpr StrId menuItems[] = {
-    StrId::STR_JOIN_NETWORK, StrId::STR_CALIBRE_WIRELESS, StrId::STR_CREATE_HOTSPOT,
+    StrId::STR_JOIN_NETWORK,        StrId::STR_CALIBRE_WIRELESS,  StrId::STR_CREATE_HOTSPOT,
 #if CROSSINK_APP_CAP_USB_DRIVE
     StrId::STR_USB_DRIVE,
 #endif
@@ -41,17 +41,20 @@ constexpr StrId menuItems[] = {
 #endif
 };
 constexpr StrId menuDescs[] = {
-    StrId::STR_JOIN_DESC, StrId::STR_CALIBRE_DESC, StrId::STR_HOTSPOT_DESC,
+    StrId::STR_JOIN_DESC,
+    StrId::STR_CALIBRE_DESC,
+    StrId::STR_HOTSPOT_DESC,
 #if CROSSINK_APP_CAP_USB_DRIVE
     StrId::STR_USB_DRIVE_DESC,
 #endif
-    StrId::STR_RECEIVE_NEARBY_BOOK_DESC, StrId::STR_NEARBY_STATS_SYNC_DESC,
+    StrId::STR_RECEIVE_NEARBY_BOOK_DESC,
+    StrId::STR_NEARBY_STATS_SYNC_DESC,
 #if CROSSINK_APP_CAP_AIRDROP
     StrId::STR_AIRDROP_DESC,
 #endif
 };
 constexpr UIIcon menuIcons[] = {
-    UIIcon::Wifi, UIIcon::Library, UIIcon::Hotspot,
+    UIIcon::Wifi,     UIIcon::Library,  UIIcon::Hotspot,
 #if CROSSINK_APP_CAP_USB_DRIVE
     UIIcon::Transfer,
 #endif

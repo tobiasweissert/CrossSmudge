@@ -28,8 +28,12 @@ inline int resumeWork(lua_State* L) {
   lua_sethook(co, nullptr, 0, 0);
   *static_cast<Slice**>(lua_getextraspace(co)) = nullptr;
   lua_pushboolean(L, status == LUA_OK || status == LUA_YIELD);
-  if (status != LUA_OK && status != LUA_YIELD) lua_xmove(co, L, 1);
-  else { lua_pop(co, results); lua_pushnil(L); }
+  if (status != LUA_OK && status != LUA_YIELD)
+    lua_xmove(co, L, 1);
+  else {
+    lua_pop(co, results);
+    lua_pushnil(L);
+  }
   lua_pushinteger(L, slice.instructions);
   return 3;
 }
@@ -51,7 +55,9 @@ inline int openBrowserWork(lua_State* L) {
   return lua_pcall(L, 0, 0, 0);
 }
 inline void registerWork(lua_State* L) {
-  lua_pushcfunction(L, resumeWork); lua_setfield(L, -2, "browser_resume");
-  lua_pushcfunction(L, atomicWork); lua_setfield(L, -2, "browser_atomic");
+  lua_pushcfunction(L, resumeWork);
+  lua_setfield(L, -2, "browser_resume");
+  lua_pushcfunction(L, atomicWork);
+  lua_setfield(L, -2, "browser_atomic");
 }
-} // namespace ink::browser
+}  // namespace ink::browser

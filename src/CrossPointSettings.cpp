@@ -242,9 +242,7 @@ uint8_t migrateTiltDirectionValue(const uint8_t direction) {
 
 }  // namespace
 
-const char* CrossPointSettings::getDefaultDeviceName() {
-  return "Crosscub Sticky";
-}
+const char* CrossPointSettings::getDefaultDeviceName() { return "Crosscub Sticky"; }
 
 const char* CrossPointSettings::getEffectiveDeviceName() const {
   return isValidDeviceName(deviceName) ? deviceName : getDefaultDeviceName();

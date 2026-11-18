@@ -1,2 +1,4 @@
 #pragma once
-namespace ink {class LuaRunner;}
+namespace ink {
+class LuaRunner;
+}

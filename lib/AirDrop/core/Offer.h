@@ -28,7 +28,7 @@ struct OfferScratch {
     uint8_t height = 0;
     bool entered = false;
   };
-  Frame frames[17]{}; // Explicit graph stack keeps hostile nesting off the task stack.
+  Frame frames[17]{};  // Explicit graph stack keeps hostile nesting off the task stack.
   uint32_t visits = 0;
   uint32_t decodedStringBytes = 0;
 };

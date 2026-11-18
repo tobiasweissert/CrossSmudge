@@ -24,6 +24,7 @@ class Consent {
   uint64_t deadlineMs() const { return deadline; }
   const Offer& offer() const { return incoming; }
   const OfferIdentity& identity() const { return owner; }
+
  private:
   Offer incoming{};
   OfferIdentity owner{};

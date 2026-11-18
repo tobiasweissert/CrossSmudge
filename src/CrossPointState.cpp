@@ -167,8 +167,9 @@ bool CrossPointState::loadFromFile() {
     }
     // Existing JSON/recovery data is not a first boot. Never resurrect an old
     // binary reference after a failed JSON cleanup or unreadable recovery root.
-    if (Storage.exists(STATE_FILE_JSON) || Storage.exists(STATE_JSON_BACKUP) ||
-        Storage.exists(STATE_JSON_TEMP) || Storage.exists(STATE_JSON_PENDING)) return false;
+    if (Storage.exists(STATE_FILE_JSON) || Storage.exists(STATE_JSON_BACKUP) || Storage.exists(STATE_JSON_TEMP) ||
+        Storage.exists(STATE_JSON_PENDING))
+      return false;
   }
 
   // Fall back to binary migration

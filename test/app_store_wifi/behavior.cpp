@@ -42,8 +42,7 @@ int main() {
     Fixture f(dimensions.first, dimensions.second);
     const Rect b = f.button();
     check(b.x >= f.renderer.safe[3] && b.y >= f.renderer.safe[0] &&
-              b.x + b.width <= f.renderer.w - f.renderer.safe[1] &&
-              b.y + b.height <= f.renderer.h - f.renderer.safe[2],
+              b.x + b.width <= f.renderer.w - f.renderer.safe[1] && b.y + b.height <= f.renderer.h - f.renderer.safe[2],
           "button within oriented safe area");
     f.tap(b.x + b.width / 2, b.y + b.height / 2);
     check(f.app.children == 1, "visible center tap opens Wi-Fi selection");
@@ -156,6 +155,7 @@ int main() {
     std::fprintf(stderr, "%d behavioral assertions failed\n", failures);
     return 1;
   }
-  std::puts("PASS: App Store production render/input/callback behavior "
-            "(portrait, landscape, safe areas, edges, cancel, success, navigation)");
+  std::puts(
+      "PASS: App Store production render/input/callback behavior "
+      "(portrait, landscape, safe areas, edges, cancel, success, navigation)");
 }

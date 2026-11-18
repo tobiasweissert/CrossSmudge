@@ -24,6 +24,4 @@ inline bool deviceUsesSideButtonHintGutters(const HalGPIO& gpio) {
 
 // Touch readers can safely dedicate both side buttons to a chord because Back
 // and Confirm remain available on-screen.
-inline bool deviceSupportsSideButtonChord(const HalGPIO& gpio) {
-  return gpio.hasTouch();
-}
+inline bool deviceSupportsSideButtonChord(const HalGPIO& gpio) { return gpio.hasTouch(); }

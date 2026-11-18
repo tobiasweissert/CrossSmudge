@@ -51,7 +51,7 @@ struct JpegContext {
 // File I/O callbacks use pFile->fHandle to access the FsFile*,
 // avoiding the need for global file state.
 void* jpegOpen(const char* filename, int32_t* size) {
-  if(ImageToFramebufferDecoder::cancelled())return nullptr;
+  if (ImageToFramebufferDecoder::cancelled()) return nullptr;
   auto f = makeUniqueNoThrow<FsFile>();
   if (!f) {
     LOG_ERR("JPG", "OOM: JPEG file handle (%u free, %u max alloc)", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
@@ -182,7 +182,8 @@ constexpr int32_t FP_MASK = FP_ONE - 1;
 
 int jpegDrawCallback(JPEGDRAW* pDraw) {
   JpegContext* ctx = reinterpret_cast<JpegContext*>(pDraw->pUser);
-  if (ImageToFramebufferDecoder::cancelled() || !ctx || !ctx->config || (!ctx->renderer && !ctx->config->cacheOnly)) return 0;
+  if (ImageToFramebufferDecoder::cancelled() || !ctx || !ctx->config || (!ctx->renderer && !ctx->config->cacheOnly))
+    return 0;
 
   ImageToFramebufferDecoder::yieldDuringDecode(ctx->lastYieldMs);
 
@@ -231,7 +232,7 @@ int jpegDrawCallback(JPEGDRAW* pDraw) {
 
   // Pre-compute orientation and render-mode state once per callback invocation
   DirectPixelWriter pw{};
-  if(ctx->renderer)pw.init(*ctx->renderer);
+  if (ctx->renderer) pw.init(*ctx->renderer);
 
   // The cache streams to disk one MCU-row band at a time. Flushing rows below
   // this block (raster order guarantees they are final) repositions the band;
@@ -449,8 +450,9 @@ bool JpegToFramebufferConverter::decodeToFramebuffer(const std::string& imagePat
                                                      const RenderConfig& config) {
   return decode(imagePath, &renderer, config);
 }
-bool JpegToFramebufferConverter::decode(const std::string& imagePath, GfxRenderer* renderer, const RenderConfig& config) {
-  if(ImageToFramebufferDecoder::cancelled() || (!renderer && !config.cacheOnly))return false;
+bool JpegToFramebufferConverter::decode(const std::string& imagePath, GfxRenderer* renderer,
+                                        const RenderConfig& config) {
+  if (ImageToFramebufferDecoder::cancelled() || (!renderer && !config.cacheOnly)) return false;
   HeapObject<JPEGDEC> jpeg;
   if (!initJpegDecoder(jpeg, imagePath.c_str())) {
     LOG_ERR("JPG", "Failed to allocate JPEG decoder");
@@ -552,8 +554,8 @@ bool JpegToFramebufferConverter::decode(const std::string& imagePath, GfxRendere
   if (ctx.caching) {
     const int maxBlockDstRows = (int)(((int64_t)16 * ctx.fineScaleFPY) >> FP_SHIFT) + 2;
     if (!ctx.cache.begin(config.cachePath, destWidth, destHeight, config.x, config.y,
-                         config.cacheOnly && maxBlockDstRows>destHeight?destHeight:maxBlockDstRows,
-                         config.cacheOnly?ImageToFramebufferDecoder::cancelled:nullptr)) {
+                         config.cacheOnly && maxBlockDstRows > destHeight ? destHeight : maxBlockDstRows,
+                         config.cacheOnly ? ImageToFramebufferDecoder::cancelled : nullptr)) {
       LOG_ERR("JPG", "Failed to start cache stream, continuing without caching");
       ctx.caching = false;
     }
@@ -574,8 +576,8 @@ bool JpegToFramebufferConverter::decode(const std::string& imagePath, GfxRendere
   // Finalize the streamed cache file. Note: a flush failure mid-decode clears
   // ctx.caching (the partial file is dropped), so re-read the flag here.
   if (ctx.caching) {
-    bool saved=ctx.cache.finalize();
-    if(config.cacheOnly && !saved)return false;
+    bool saved = ctx.cache.finalize();
+    if (config.cacheOnly && !saved) return false;
   }
 
   return !config.cacheOnly || ctx.caching;

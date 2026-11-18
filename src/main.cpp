@@ -808,7 +808,7 @@ void putTiltSensorToSleepForDeepSleep() {
 }
 
 bool executeCapacitiveHomeButtonAction(const uint8_t action,
-                                  const QuickLockTrigger quickLockTrigger = QuickLockTrigger::None) {
+                                       const QuickLockTrigger quickLockTrigger = QuickLockTrigger::None) {
   switch (action) {
     case CrossPointSettings::HOME_BUTTON_BACK_HOME:
       return activityManager.handleHomeButtonBackOrHome();
@@ -1019,9 +1019,7 @@ static bool preflightSleepFrameBuffer() {
   return false;
 }
 
-bool shouldClearX4WakeGhosting() {
-  return false;
-}
+bool shouldClearX4WakeGhosting() { return false; }
 
 // Wake validation runs before the SD card and its settings file are available.
 // Mirror the one setting that changes its behavior while entering sleep, so a
@@ -1111,7 +1109,6 @@ void enterDeepSleep(bool fromTimeout) {
 }
 
 void setupDisplayAndFonts(const bool seamless, const bool loadReaderResources, const bool useReaderRenderStack) {
-
 #ifdef SIMULATOR
   (void)seamless;
   display.begin();
@@ -1328,8 +1325,7 @@ void setup() {
   Frontlight.begin(SETTINGS.frontlightBrightness, SETTINGS.frontlightWarmth, restoreLightOn);
 
   if (recoveryFirmwareMode) {
-    LOG_INF("MAIN", "Recovery firmware mode (%s + POWER held at boot)",
-            "UP");
+    LOG_INF("MAIN", "Recovery firmware mode (%s + POWER held at boot)", "UP");
   }
 
   // First serial output only here to avoid timing inconsistencies for power button press duration verification
@@ -1366,13 +1362,16 @@ void setup() {
                             : skipSplashOnWake ? BootResume::SplashlessWake
                                                : BootResume::Splash;
   constexpr bool needsInitialControllerResync = false;
-  const bool hasValidSleepFrame = resume == BootResume::SplashlessWake && needsInitialControllerResync && preflightSleepFrameBuffer();
+  const bool hasValidSleepFrame =
+      resume == BootResume::SplashlessWake && needsInitialControllerResync && preflightSleepFrameBuffer();
   const bool shouldRestoreSleepFrame =
-      resume == BootResume::SplashlessWake && (needsInitialControllerResync ? hasValidSleepFrame : Storage.exists(SLEEP_FRAME_FILE));
+      resume == BootResume::SplashlessWake &&
+      (needsInitialControllerResync ? hasValidSleepFrame : Storage.exists(SLEEP_FRAME_FILE));
   bool allowFastInitialReaderRefresh = false;
 
-  setupDisplayAndFonts(SleepWakePolicy::shouldInitializeSeamlessly(resume, needsInitialControllerResync, hasValidSleepFrame),
-                       resume != BootResume::Network, useReaderRenderStack);
+  setupDisplayAndFonts(
+      SleepWakePolicy::shouldInitializeSeamlessly(resume, needsInitialControllerResync, hasValidSleepFrame),
+      resume != BootResume::Network, useReaderRenderStack);
   logBootHeap("display and selected fonts ready");
 
   switch (resume) {

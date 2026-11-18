@@ -29,8 +29,8 @@
 #include "SettingsList.h"
 #include "WebDAVHandler.h"
 #include "WifiCredentialStore.h"
-#include "activities/boot_sleep/ImageFolderIndex.h"
 #include "activities/apps/lua/AppPackage.h"
+#include "activities/boot_sleep/ImageFolderIndex.h"
 #include "html/ApplicationsPageHtml.generated.h"
 #include "html/FilesPageHtml.generated.h"
 #include "html/FontsPageHtml.generated.h"
@@ -2357,13 +2357,8 @@ bool isValidAppIdentifier(const char* id) {
 }
 
 std::string findAppDirectory(const char* appId) {
-  const char* candidates[] = {
-      "/.crosssmudge/applications",
-      "/applications",
-      "/apps",
-      "/.smudge/applications",
-      "/.crosspoint/applications"
-  };
+  const char* candidates[] = {"/.crosssmudge/applications", "/applications", "/apps", "/.smudge/applications",
+                              "/.crosspoint/applications"};
   for (const char* base : candidates) {
     std::string path = std::string(base) + "/" + appId;
     if (Storage.exists(path.c_str())) {
@@ -2510,9 +2505,12 @@ void CrossPointWebServer::handleApplicationsFileDownload() const {
   }
 
   String contentType = "application/octet-stream";
-  if (fileRel.endsWith(".json")) contentType = "application/json";
-  else if (fileRel.endsWith(".lua")) contentType = "text/plain";
-  else if (fileRel.endsWith(".txt")) contentType = "text/plain";
+  if (fileRel.endsWith(".json"))
+    contentType = "application/json";
+  else if (fileRel.endsWith(".lua"))
+    contentType = "text/plain";
+  else if (fileRel.endsWith(".txt"))
+    contentType = "text/plain";
 
   const char* baseName = strrchr(fileRel.c_str(), '/');
   String downloadName = baseName ? String(baseName + 1) : fileRel;
@@ -2685,13 +2683,8 @@ void CrossPointWebServer::handleAppDelete() {
   }
 
   bool removedAny = false;
-  const char* baseDirs[] = {
-      "/.crosssmudge/applications",
-      "/applications",
-      "/apps",
-      "/.smudge/applications",
-      "/.crosspoint/applications"
-  };
+  const char* baseDirs[] = {"/.crosssmudge/applications", "/applications", "/apps", "/.smudge/applications",
+                            "/.crosspoint/applications"};
   for (const char* base : baseDirs) {
     std::string path = std::string(base) + "/" + appId;
     if (Storage.exists(path.c_str())) {
@@ -2710,4 +2703,3 @@ void CrossPointWebServer::handleAppDelete() {
     server->send(404, "application/json", "{\"error\":\"Application not found or could not be removed\"}");
   }
 }
-

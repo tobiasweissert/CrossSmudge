@@ -27,7 +27,15 @@ struct AppPackage {
   bool preventSleep = false;
   int minApi = 0;
 
-  enum class BrowserResolveError : uint8_t { None, Missing, InvalidManifest, Incompatible, InvalidEntry, StorageIo, Allocation };
+  enum class BrowserResolveError : uint8_t {
+    None,
+    Missing,
+    InvalidManifest,
+    Incompatible,
+    InvalidEntry,
+    StorageIo,
+    Allocation
+  };
 
   // Same package precedence as the ordinary launcher, narrowed to the trusted browser
   // folder/id. An earlier installed-but-stale Browser blocks fallback to another copy.
@@ -76,8 +84,8 @@ struct AppPackage {
       for (size_t count = 0; count <= maxDirectoryEntries; ++count) {
         HalFile child = directory.openNextFile();
         if (!child) {
-          const bool healthy = !directory.iterationFailed() && !directory.allocationFailed() &&
-                               !child.allocationFailed();
+          const bool healthy =
+              !directory.iterationFailed() && !directory.allocationFailed() && !child.allocationFailed();
           const bool childClosed = child.close();
           const bool directoryClosed = directory.close();
           return healthy && childClosed && directoryClosed ? Presence::Missing : Presence::IoError;
@@ -200,8 +208,8 @@ struct AppPackage {
       }
       for (size_t i = 0; i < length; ++i) {
         const unsigned char c = entry[i];
-        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-              c == '.' || c == '_' || c == '-')) {
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '_' ||
+              c == '-')) {
           LOG_ERR("APP", "Installed Browser entry path rejected");
           error = BrowserResolveError::InvalidEntry;
           return false;

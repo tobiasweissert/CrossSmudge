@@ -42,8 +42,7 @@ bool readBookmarkString(FsFile& file, std::string& value) {
   uint32_t length = 0;
   if (!serialization::tryReadPod(file, length)) return false;
   const int remaining = file.available();
-  if (remaining < 0 || length > static_cast<uint32_t>(remaining) ||
-      length > value.max_size()) return false;
+  if (remaining < 0 || length > static_cast<uint32_t>(remaining) || length > value.max_size()) return false;
   value.resize(length);
   return length == 0 || file.read(&value[0], length) == static_cast<int>(length);
 }
@@ -198,7 +197,8 @@ bool readBookmarkFileHeader(const std::string& fullPath, const char* name, Bookm
     return false;
   }
 
-  if (!readBookmarkString(f, header.title) || !readBookmarkString(f, header.author) || !readBookmarkString(f, header.path)) {
+  if (!readBookmarkString(f, header.title) || !readBookmarkString(f, header.author) ||
+      !readBookmarkString(f, header.path)) {
     f.close();
     return false;
   }
@@ -470,8 +470,8 @@ bool BookmarkStore::readFromFile(const std::string& path, std::vector<Bookmark>&
     return false;
   }
 
-  const size_t recordSize = sizeof(Bookmark::spineIndex) + sizeof(Bookmark::progress) +
-                            sizeof(Bookmark::timestamp) + BOOKMARK_CHAPTER_TITLE_MAX +
+  const size_t recordSize = sizeof(Bookmark::spineIndex) + sizeof(Bookmark::progress) + sizeof(Bookmark::timestamp) +
+                            BOOKMARK_CHAPTER_TITLE_MAX +
                             (version >= PARAGRAPH_ANCHOR_VERSION ? sizeof(Bookmark::paragraphIndex) : 0) +
                             (version >= VERSION ? BOOKMARK_SNIPPET_MAX : 0);
   const int remaining = f.available();
@@ -553,8 +553,9 @@ bool BookmarkStore::readFromFile(const std::string& path, std::vector<Bookmark>&
 
 bool BookmarkStore::writeToFile() const {
   // Reject unrepresentable records before opening (and truncating) any file.
-  if (bookmarks.size() > MAX_BOOKMARKS || bookTitle.size() > UINT32_MAX ||
-      bookAuthor.size() > UINT32_MAX || bookFilePath.size() > UINT32_MAX) return false;
+  if (bookmarks.size() > MAX_BOOKMARKS || bookTitle.size() > UINT32_MAX || bookAuthor.size() > UINT32_MAX ||
+      bookFilePath.size() > UINT32_MAX)
+    return false;
   Storage.mkdir(BOOKMARKS_DIR);
   FsFile f;
   if (!Storage.openFileForWrite("BKS", storeFilePath, f)) return false;
@@ -568,8 +569,8 @@ bool BookmarkStore::writeToFile() const {
       uint8_t buffer[64];
       while (size) {
         const size_t chunk = std::min(size, sizeof(buffer));
-        if (file.read(buffer, chunk) != static_cast<int>(chunk) ||
-            !std::equal(buffer, buffer + chunk, expected)) return false;
+        if (file.read(buffer, chunk) != static_cast<int>(chunk) || !std::equal(buffer, buffer + chunk, expected))
+          return false;
         expected += chunk;
         size -= chunk;
       }
@@ -583,12 +584,11 @@ bool BookmarkStore::writeToFile() const {
     const uint16_t count = static_cast<uint16_t>(bookmarks.size());
     if (!pod(VERSION) || !pod(count) || !string(bookTitle) || !string(bookAuthor) || !string(bookFilePath))
       return false;
-    for (const auto& bm : bookmarks) {
-      if (!pod(bm.spineIndex) || !pod(bm.progress) || !pod(bm.timestamp) ||
-          !bytes(bm.chapterTitle, sizeof(bm.chapterTitle)) || !pod(bm.paragraphIndex) ||
-          !bytes(bm.snippet, sizeof(bm.snippet))) return false;
-    }
-    return true;
+    return std::all_of(bookmarks.begin(), bookmarks.end(), [&](const Bookmark& bm) {
+      return pod(bm.spineIndex) && pod(bm.progress) && pod(bm.timestamp) &&
+             bytes(bm.chapterTitle, sizeof(bm.chapterTitle)) && pod(bm.paragraphIndex) &&
+             bytes(bm.snippet, sizeof(bm.snippet));
+    });
   };
   const bool written = transfer(f, false) && f.sync();
   f.close();
@@ -751,9 +751,8 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
 
   // Manual Move cannot establish whether retained rename candidates alias.
   // Leave recovery to an explicit operation, never discard or rename them here.
-  if (preserveOnRenameFailure &&
-      (Storage.exists(migration.destinationCurrentBackupPath.c_str()) ||
-       Storage.exists(migration.destinationLegacyBackupPath.c_str()))) {
+  if (preserveOnRenameFailure && (Storage.exists(migration.destinationCurrentBackupPath.c_str()) ||
+                                  Storage.exists(migration.destinationLegacyBackupPath.c_str()))) {
     migration.uncertain = true;
     return false;
   }
@@ -787,12 +786,11 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
   }
 
   const auto mergeForRename = [&](std::vector<Bookmark>& destination, const std::vector<Bookmark>& source) {
-    size_t count = destination.size();
-    for (const auto& bookmark : source) {
-      if (std::none_of(destination.begin(), destination.end(), [&](const Bookmark& existing) {
-            return bookmarksMatchIdentity(existing, bookmark);
-          })) ++count;
-    }
+    const size_t count =
+        destination.size() + std::count_if(source.begin(), source.end(), [&](const Bookmark& bookmark) {
+          return std::none_of(destination.begin(), destination.end(),
+                              [&](const Bookmark& existing) { return bookmarksMatchIdentity(existing, bookmark); });
+        });
     if (preserveOnRenameFailure && count > MAX_BOOKMARKS) return false;
     mergeBookmarks(destination, source);
     return true;

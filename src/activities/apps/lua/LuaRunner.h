@@ -1,12 +1,14 @@
 #pragma once
 
+#include <BrowserImage.h>
+#include <HalStorage.h>
+#include <LuaHttp.h>
+
 #include <atomic>
 #include <cstdint>
 #include <functional>
 #include <string>
-#include <LuaHttp.h>
-#include <BrowserImage.h>
-#include <HalStorage.h>
+
 #include "../../../../lib/AirDrop/browser/LuaLaunch.h"
 
 extern "C" {
@@ -54,12 +56,15 @@ class LuaRunner {
   bool hasError() const { return hasError_; }
   const std::string& getErrorMessage() const { return errorMessage_; }
 
-  bool cooperativeBrowser()const{return browser_ && http_.cooperative;}
-  void requestNativeCancel(){
-    renderCancel_.store(true,std::memory_order_relaxed);
-    if(cooperativeBrowser()){http_.requestCancel();images_.requestCancel();}
+  bool cooperativeBrowser() const { return browser_ && http_.cooperative; }
+  void requestNativeCancel() {
+    renderCancel_.store(true, std::memory_order_relaxed);
+    if (cooperativeBrowser()) {
+      http_.requestCancel();
+      images_.requestCancel();
+    }
   }
-  void clearNativeCancel(){renderCancel_.store(false,std::memory_order_relaxed);}
+  void clearNativeCancel() { renderCancel_.store(false, std::memory_order_relaxed); }
   bool networkEnabled() const { return http_.allowed; }
   const http::Domains& networkDomains() const { return http_.domains; }
 
@@ -79,11 +84,11 @@ class LuaRunner {
   bool browser_ = false;
   std::atomic<bool> renderCancel_{false};
   browser::ImageSession images_;
-  HalFile browserFile_,browserDirectory_;
+  HalFile browserFile_, browserDirectory_;
   std::string browserDirectoryPath_;
   std::string browserFilePath_;
-  size_t browserFileOffset_=0;
-  std::atomic<bool> requestedExit_{false},hasError_{false},redrawRequested_{false},fullRefreshRequested_{false};
+  size_t browserFileOffset_ = 0;
+  std::atomic<bool> requestedExit_{false}, hasError_{false}, redrawRequested_{false}, fullRefreshRequested_{false};
   bool touchHoldActive_ = false;
   int touchHoldX_ = 0, touchHoldY_ = 0;
   std::atomic<bool> preventAutoSleep_{false};

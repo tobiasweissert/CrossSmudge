@@ -1,9 +1,9 @@
 #pragma once
 
+#include <MinizConfig.h>
+
 #include <cstddef>
 #include <cstdint>
-
-#include <MinizConfig.h>
 
 namespace airdrop::stream {
 

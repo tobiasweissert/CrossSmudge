@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+
 #include "MappedInputManager.h"
 
 // App-local consent fence. No SDK/OptionPopup policy changes. A completed paint
@@ -29,7 +30,8 @@ class FileMutationInputGate {
       bool held = input.isScreenContactActive();
       for (const auto button : buttons) held = held || input.isPhysicalPressed(button);
       if (!held && !down && !tapped && !input.wasAnyPressed() && !input.wasAnyReleased() &&
-          !input.wasScreenTouchReleased()) waitingForNeutral = false;
+          !input.wasScreenTouchReleased())
+        waitingForNeutral = false;
       return false;
     }
     bool allowed = false;
@@ -44,8 +46,14 @@ class FileMutationInputGate {
         buttonsArmed &= ~bit;
       }
     }
-    if (down) { touchArmed = true; allowed = true; }
-    if (tapped) { allowed = allowed || touchArmed; touchArmed = false; }
+    if (down) {
+      touchArmed = true;
+      allowed = true;
+    }
+    if (tapped) {
+      allowed = allowed || touchArmed;
+      touchArmed = false;
+    }
     if (input.wasScreenTouchReleased()) touchArmed = false;
     // Idle frames must reach popup lifecycle handling (Back/outside dismissal
     // is completed by ConfirmationActivity on its following idle loop).
@@ -55,9 +63,8 @@ class FileMutationInputGate {
 
  private:
   inline static constexpr MappedInputManager::Button buttons[] = {
-      MappedInputManager::Button::Back, MappedInputManager::Button::Confirm,
-      MappedInputManager::Button::Left, MappedInputManager::Button::Right,
-      MappedInputManager::Button::Up, MappedInputManager::Button::Down,
+      MappedInputManager::Button::Back,  MappedInputManager::Button::Confirm, MappedInputManager::Button::Left,
+      MappedInputManager::Button::Right, MappedInputManager::Button::Up,      MappedInputManager::Button::Down,
       MappedInputManager::Button::Power};
   std::atomic<uint32_t> paintEpoch{0};
   uint32_t observedEpoch = 0;

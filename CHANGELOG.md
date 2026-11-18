@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- Corrected CI formatting and static-analysis failures; restored GitHub Pages configuration for documentation deployment.
+
 - File deletion preserves reading metadata when removal fails; moving a file preserves its reading state and refuses existing destinations.
 
 - Assisted Browser rejects forbidden response fields and oversized JSON, validates exact protocol values, and finds saved phrases across styled text with accurate Find-next positions.

@@ -18,8 +18,8 @@
 #include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "network/HttpDownloader.h"
 #include "network/AppStoreSource.h"
+#include "network/HttpDownloader.h"
 
 #if !defined(SIMULATOR)
 #include <WiFi.h>
@@ -286,8 +286,7 @@ class AppStoreActivity : public Activity {
   static bool safeAppId(const std::string& id) {
     if (id.empty() || id.size() > 64) return false;
     for (unsigned char c : id) {
-      if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-            c == '-' || c == '_')) {
+      if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_')) {
         return false;
       }
     }
@@ -323,7 +322,8 @@ class AppStoreActivity : public Activity {
     // Paths/URL are bounded by the 64-byte ID limit; allocated only on this cold
     // path, never during render. Reuse the existing 128-byte per-app pixel store.
     if (readAppIcon(app, "/.crosssmudge/applications/" + app.id + "/icon.raw") ||
-        readAppIcon(app, "/.smudge/applications/" + app.id + "/icon.raw")) return;
+        readAppIcon(app, "/.smudge/applications/" + app.id + "/icon.raw"))
+      return;
     const std::string cachePath = "/.crosssmudge/cache/icons/" + app.id + ".raw";
     if (readAppIcon(app, cachePath)) return;
 
@@ -361,7 +361,8 @@ class AppStoreActivity : public Activity {
           memcpy(pixels + received, data, size);
           received += size;
           return true;
-        }, nullptr, "", "", options);
+        },
+        nullptr, "", "", options);
     if (err != HttpDownloader::OK || received != sizeof(pixels)) {
       LOG_ERR("STORE", "Icon download failed: %s (%d, %zu bytes)", app.id.c_str(), err, received);
       return;
@@ -402,7 +403,8 @@ class AppStoreActivity : public Activity {
     // Input always gets a loop between requests. Synchronous connect/read can still
     // block until the transport timeout; input is not polled inside that transport.
     if (state_ != State::CATALOG_READY || !isWifiConnected() || millis() - lastIconWorkMs_ < 250 ||
-        mappedInput.isPressed(MappedInputManager::Button::Back)) return;
+        mappedInput.isPressed(MappedInputManager::Button::Back))
+      return;
     const auto layout = catalogLayout();
     const int start = selectedIndex_ / layout.rowsPerPage * layout.rowsPerPage;
     const int end = std::min(static_cast<int>(apps_.size()), start + layout.rowsPerPage);
@@ -510,7 +512,10 @@ class AppStoreActivity : public Activity {
       app.files.reserve(files.size());
       bool validFiles = true;
       for (const char* f : files) {
-        if (!AppStoreSource::safePackagePath(f)) { validFiles = false; break; }
+        if (!AppStoreSource::safePackagePath(f)) {
+          validFiles = false;
+          break;
+        }
         app.files.push_back(f);
       }
       if (!validFiles) {
@@ -582,7 +587,8 @@ class AppStoreActivity : public Activity {
       selectedIndex_ = (selectedIndex_ + 1) % count;
       requestUpdate();
       return true;
-    } else if (count > 0 && (swipe == MappedInputManager::SwipeDir::Down || swipe == MappedInputManager::SwipeDir::Right)) {
+    } else if (count > 0 &&
+               (swipe == MappedInputManager::SwipeDir::Down || swipe == MappedInputManager::SwipeDir::Right)) {
       selectedIndex_ = (selectedIndex_ - 1 + count) % count;
       requestUpdate();
       return true;
@@ -907,10 +913,9 @@ class AppStoreActivity : public Activity {
   TouchActionButtons::Layout wifiActionLayout() const {
     const auto safe = wifiSafeRect();
     const auto& m = UITheme::getInstance().getMetrics();
-    return TouchActionButtons::vertical(
-        Rect{safe.x + m.contentSidePadding, safe.y + safe.height / 2 + 30,
-             safe.width - 2 * m.contentSidePadding, TouchActionButtons::kDefaultHeight},
-        1);
+    return TouchActionButtons::vertical(Rect{safe.x + m.contentSidePadding, safe.y + safe.height / 2 + 30,
+                                             safe.width - 2 * m.contentSidePadding, TouchActionButtons::kDefaultHeight},
+                                        1);
   }
 
   void beginWifiSelection() {
@@ -935,7 +940,8 @@ class AppStoreActivity : public Activity {
     if (mappedInput.hasTouch()) {
       TouchHeaderBackButton::draw(renderer, wifiHeaderRect(), "App Store", false, 0, "Offline");
     } else {
-      GUI.drawHeader(renderer, Rect{0, m.topPadding, renderer.getScreenWidth(), m.headerHeight}, "App Store", "Offline");
+      GUI.drawHeader(renderer, Rect{0, m.topPadding, renderer.getScreenWidth(), m.headerHeight}, "App Store",
+                     "Offline");
     }
 
     const int centerY = mappedInput.hasTouch() ? safe.y + safe.height / 2 : renderer.getScreenHeight() / 2;
@@ -1030,8 +1036,9 @@ class AppStoreActivity : public Activity {
       } else {
         renderer.drawRoundedRect(iconX, iconY, 32, 32, 1, 4, !isSelected);
       }
-      const char* status = !app.isInstalled ? tr(STR_STORE_INSTALL)
-                           : app.installedVersion != app.version ? tr(STR_UPDATE) : tr(STR_INSTALLED);
+      const char* status = !app.isInstalled                      ? tr(STR_STORE_INSTALL)
+                           : app.installedVersion != app.version ? tr(STR_UPDATE)
+                                                                 : tr(STR_INSTALLED);
       char statusBuf[64];
       snprintf(statusBuf, sizeof(statusBuf), "%s", status);
       fitCatalogText(statusBuf, SMALL_FONT_ID, (layout.right - layout.left) / 3, EpdFontFamily::BOLD);
@@ -1066,9 +1073,10 @@ class AppStoreActivity : public Activity {
       char label[64];
       snprintf(label, sizeof(label), "%s", actions[i]);
       fitCatalogText(label, SMALL_FONT_ID, end - x - 10);
-      renderer.drawText(SMALL_FONT_ID, x + (end - x - renderer.getTextWidth(SMALL_FONT_ID, label)) / 2,
-                        layout.controlsY + (layout.bottom - layout.controlsY - renderer.getLineHeight(SMALL_FONT_ID)) / 2,
-                        label, true);
+      renderer.drawText(
+          SMALL_FONT_ID, x + (end - x - renderer.getTextWidth(SMALL_FONT_ID, label)) / 2,
+          layout.controlsY + (layout.bottom - layout.controlsY - renderer.getLineHeight(SMALL_FONT_ID)) / 2, label,
+          true);
     }
     const auto labels = mappedInput.mapLabels(actions[0], actions[1], actions[2], actions[3]);
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

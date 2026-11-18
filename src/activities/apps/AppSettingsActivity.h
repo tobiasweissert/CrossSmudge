@@ -1,11 +1,12 @@
 #pragma once
 
+#include <HalLuaHttp.h>
+
 #include <algorithm>
 #include <cstdio>
 #include <string>
 
 #include "SmudgeSettings.h"
-#include <HalLuaHttp.h>
 #include "activities/Activity.h"
 #include "components/UITheme.h"
 
@@ -82,7 +83,8 @@ class AppSettingsActivity : public Activity {
             return (settings.sortMode == MenuSortMode::MostUsed) ? "Most Frequently Used  [Active]"
                                                                  : "Most Frequently Used";
           }
-          if (index == 2) return HalLuaHttp::networkEnabled() ? tr(STR_LUA_NETWORK_DISABLE) : tr(STR_LUA_NETWORK_ENABLE);
+          if (index == 2)
+            return HalLuaHttp::networkEnabled() ? tr(STR_LUA_NETWORK_DISABLE) : tr(STR_LUA_NETWORK_ENABLE);
           return "";
         },
         [](int index) { return (index == 0) ? UIIcon::Applications : UIIcon::Recent; });
@@ -112,7 +114,6 @@ class AppSettingsActivity : public Activity {
         requestUpdate();
         return;
       }
-
     }
     settings.save();
     requestUpdate();

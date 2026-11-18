@@ -124,10 +124,7 @@ constexpr uint8_t PUBLISHER_PAGE_NUMBER_LEFT_MARGIN_MIN = 15;
 constexpr int PUBLISHER_PAGE_NUMBER_X = 5;
 constexpr uint16_t CLIP_ADVANCE_CODEPOINT_CAPACITY = 256;
 
-int publisherPageNumberX(const GfxRenderer& renderer) {
-
-  return PUBLISHER_PAGE_NUMBER_X;
-}
+int publisherPageNumberX(const GfxRenderer& renderer) { return PUBLISHER_PAGE_NUMBER_X; }
 
 struct ClipAdvanceCollector {
   static constexpr uint8_t STYLE_COUNT = 4;
@@ -4140,9 +4137,7 @@ void EpubReaderActivity::onFrontlightPanelOpened() {
   pauseReadingPaceTimer("frontlight_panel");
 }
 
-void EpubReaderActivity::onFrontlightPanelClosed() {
-  handleBookStatsReturn(false);
-}
+void EpubReaderActivity::onFrontlightPanelClosed() { handleBookStatsReturn(false); }
 
 bool EpubReaderActivity::handleFrontlightPanelResult(const FrontlightPanelResult& result) {
   if (!epub || result.action == FrontlightPanelAction::None) return false;

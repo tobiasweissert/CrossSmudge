@@ -53,9 +53,9 @@ std::string formatSettingValue(const SettingInfo& setting) {
 }
 
 SettingInfo buildReaderRenderModeSetting() {
-  return SettingInfo::Enum(
-             StrId::STR_EPUB_RENDER_MODE, &CrossPointSettings::epubRenderMode,
-             {StrId::STR_RENDER_MODE_CROSSSMUDGE_DEFAULT, StrId::STR_RENDER_MODE_BALANCED, StrId::STR_RENDER_MODE_LIGHT})
+  return SettingInfo::Enum(StrId::STR_EPUB_RENDER_MODE, &CrossPointSettings::epubRenderMode,
+                           {StrId::STR_RENDER_MODE_CROSSSMUDGE_DEFAULT, StrId::STR_RENDER_MODE_BALANCED,
+                            StrId::STR_RENDER_MODE_LIGHT})
       .withEnumRawValues({static_cast<uint8_t>(EpubRenderMode::CrossSmudgeDefault),
                           static_cast<uint8_t>(EpubRenderMode::Balanced), static_cast<uint8_t>(EpubRenderMode::Light)});
 }

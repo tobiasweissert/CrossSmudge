@@ -1,7 +1,9 @@
-#include "stubs/TestPlatform.h"
 #include <ArduinoJson.h>
+
 #include <cstdio>
 #include <cstdlib>
+
+#include "stubs/TestPlatform.h"
 #include "stubs/network/HttpDownloader.h"
 // Expose state only to seed deterministic catalog fixtures and inspect outcomes.
 // All loading, rendering, input and scheduling behavior runs production methods.
@@ -12,20 +14,24 @@
 #include APP_STORE_ACTIVITY_HEADER
 #undef private
 static int failures = 0;
-#define CHECK(c) do {if (!(c)){std::printf("FAIL %s:%d: %s\n", __func__, __LINE__, #c); ++failures; }}while (0)
+#define CHECK(c)                                               \
+  do {                                                         \
+    if (!(c)) {                                                \
+      std::printf("FAIL %s:%d: %s\n", __func__, __LINE__, #c); \
+      ++failures;                                              \
+    }                                                          \
+  } while (0)
 struct Fixture {
   GfxRenderer renderer;
   MappedInputManager input;
-  AppStoreActivity app {
-    renderer, input
-  };
+  AppStoreActivity app{renderer, input};
   Fixture(int count = 16) {
-    Storage = FakeStorage {};
+    Storage = FakeStorage{};
     WiFi.connected = true;
     HalFile::syncOK = HalFile::closeOK = true;
     HalFile::corruptReads = false;
     fakeMillis = 1000;
-    UITheme::getInstance().metrics = Metrics {};
+    UITheme::getInstance().metrics = Metrics{};
     UITheme::statusInset = 0;
     HttpDownloader::requests.clear();
     HttpDownloader::transports.clear();
@@ -37,18 +43,16 @@ struct Fixture {
     HttpDownloader::chunkSize = 31;
     app.baseUrl_ = "https://example.invalid/apps/";
     app.state_ = AppStoreActivity::State::CATALOG_READY;
-    for (int i = 0; i<count; ++i) {
+    for (int i = 0; i < count; ++i) {
       AppStoreActivity::CatalogApp a;
-      a.id = "fixture-"+std::to_string(i);
-      a.name = "Fixture "+std::to_string(i);
+      a.id = "fixture-" + std::to_string(i);
+      a.name = "Fixture " + std::to_string(i);
       a.version = "1.0";
       a.author = "Author";
       app.apps_.push_back(a);
     }
   }
-  ~Fixture() {
-    CHECK(HalFile::openCount == 0);
-  }
+  ~Fixture() { CHECK(HalFile::openCount == 0); }
   void tick() {
     fakeMillis += 300;
     app.loop();
@@ -57,37 +61,28 @@ struct Fixture {
     input.swipe = MappedInputManager::SwipeDir::None;
   }
   std::vector<Draw> rows() {
-    app.render(RenderLock {});
+    app.render(RenderLock{});
     std::vector<Draw> v;
-    for (auto&d:renderer.draws)if (d.kind == "row" && d.w>renderer.width/2 && d.h>= 48)v.push_back(d);
+    for (auto& d : renderer.draws)
+      if (d.kind == "row" && d.w > renderer.width / 2 && d.h >= 48) v.push_back(d);
     return v;
   }
-  static std::string cache() {
-    return "/.crosssmudge/cache/icons/fixture-0.raw";
-  }
-  static std::string installed() {
-    return "/.crosssmudge/applications/fixture-0/icon.raw";
-  }
-  static std::string legacy() {
-    return "/.smudge/applications/fixture-0/icon.raw";
-  }
+  static std::string cache() { return "/.crosssmudge/cache/icons/fixture-0.raw"; }
+  static std::string installed() { return "/.crosssmudge/applications/fixture-0/icon.raw"; }
+  static std::string legacy() { return "/.smudge/applications/fixture-0/icon.raw"; }
 };
 void lazyIcons() {
   Fixture f;
-  f.app.render(RenderLock {});
+  f.app.render(RenderLock{});
   CHECK(HttpDownloader::requests.empty());
   f.tick();
   CHECK(HttpDownloader::requests.size() == 1);
   CHECK(f.app.apps_[0].hasIcon);
   CHECK(!f.app.apps_[0].isInstalled);
-  CHECK(HttpDownloader::transports == std::vector<HttpDownloader::Transport> {
-    HttpDownloader::Transport::ESP_HTTP
-  });
-  CHECK(HttpDownloader::lockDepths == std::vector<int> {
-    0
-  });
-  for (int depth:Storage.ioLockDepths)CHECK(depth>0);
-  f.app.render(RenderLock {});
+  CHECK(HttpDownloader::transports == std::vector<HttpDownloader::Transport>{HttpDownloader::Transport::ESP_HTTP});
+  CHECK(HttpDownloader::lockDepths == std::vector<int>{0});
+  for (int depth : Storage.ioLockDepths) CHECK(depth > 0);
+  f.app.render(RenderLock{});
   CHECK(HttpDownloader::requests.size() == 1);
   f.app.loop();
   CHECK(HttpDownloader::requests.size() == 1);
@@ -95,8 +90,8 @@ void lazyIcons() {
 void portrait() {
   Fixture f;
   auto rows = f.rows();
-  CHECK(rows.size()>8);
-  CHECK(rows.back().y+rows.back().h>650);
+  CHECK(rows.size() > 8);
+  CHECK(rows.back().y + rows.back().h > 650);
 }
 void landscape() {
   Fixture f;
@@ -105,12 +100,10 @@ void landscape() {
   f.renderer.orientation = GfxRenderer::Orientation::LandscapeClockwise;
   auto rows = f.rows();
   CHECK(!rows.empty());
-  for (auto&r:rows)CHECK(r.y+r.h<440);
+  for (auto& r : rows) CHECK(r.y + r.h < 440);
 }
 void localIconValidation() {
-  for (size_t n: {
-    size_t(0), size_t(127), size_t(129), size_t(512)
-  }) {
+  for (size_t n : {size_t(0), size_t(127), size_t(129), size_t(512)}) {
     Fixture f(1);
     Storage.files[Fixture::cache()].bytes.assign(n, 0xcc);
     f.app.loadAppIcon(f.app.apps_[0], false);
@@ -145,9 +138,7 @@ void localIconValidation() {
   }
 }
 void downloadValidation() {
-  for (size_t n: {
-    size_t(0), size_t(127), size_t(129), size_t(512)
-  }) {
+  for (size_t n : {size_t(0), size_t(127), size_t(129), size_t(512)}) {
     Fixture f(1);
     HttpDownloader::body.assign(n, 0xcc);
     HttpDownloader::chunkSize = 128;
@@ -163,13 +154,13 @@ void downloadValidation() {
     CHECK(!f.app.apps_[0].hasIcon);
     CHECK(Storage.writes.empty());
   }
-  for (int failure = 0; failure<5; ++failure) {
+  for (int failure = 0; failure < 5; ++failure) {
     Fixture f(1);
-    if (failure == 0)Storage.directories = false;
-    if (failure == 1)Storage.writeOpen = false;
-    if (failure == 2)Storage.nextWriteLimit = 127;
-    if (failure == 3)HalFile::syncOK = false;
-    if (failure == 4)HalFile::closeOK = false;
+    if (failure == 0) Storage.directories = false;
+    if (failure == 1) Storage.writeOpen = false;
+    if (failure == 2) Storage.nextWriteLimit = 127;
+    if (failure == 3) HalFile::syncOK = false;
+    if (failure == 4) HalFile::closeOK = false;
     f.app.loadAppIcon(f.app.apps_[0], true);
     CHECK(!f.app.apps_[0].hasIcon);
     CHECK(!Storage.exists(Fixture::cache().c_str()));
@@ -197,9 +188,8 @@ void corruptedReadback() {
   CHECK(!Storage.exists(Fixture::cache().c_str()));
 }
 void safeIds() {
-  for (const auto&id:std::vector<std::string> {
-    "", "..", "../escape", "a/b", "a\\b", "%2e%2e", "a?x", "a#x", "a.b", std::string(65, 'a'), std::string("a\0b", 3)
-  }) {
+  for (const auto& id : std::vector<std::string>{"", "..", "../escape", "a/b", "a\\b", "%2e%2e", "a?x", "a#x", "a.b",
+                                                 std::string(65, 'a'), std::string("a\0b", 3)}) {
     Fixture f(1);
     f.app.apps_[0].id = id;
     f.app.loadAppIcon(f.app.apps_[0], true);
@@ -213,7 +203,7 @@ void attemptsAndBack() {
   {
     Fixture f(1);
     HttpDownloader::result = HttpDownloader::HTTP_ERROR;
-    for (int i = 0; i<5; ++i)f.tick();
+    for (int i = 0; i < 5; ++i) f.tick();
     CHECK(HttpDownloader::requests.size() == 1);
     f.app.ensureAppIcon(f.app.apps_[0]);
     CHECK(HttpDownloader::requests.size() == 1);
@@ -221,12 +211,12 @@ void attemptsAndBack() {
   {
     Fixture f;
     auto count = f.rows().size();
-    for (int i = 0; i<30; ++i)f.tick();
+    for (int i = 0; i < 30; ++i) f.tick();
     CHECK(HttpDownloader::requests.size() == count);
-    for (size_t i = count; i<f.app.apps_.size(); ++i)CHECK(!f.app.apps_[i].hasIcon);
+    for (size_t i = count; i < f.app.apps_.size(); ++i) CHECK(!f.app.apps_[i].hasIcon);
     f.app.selectedIndex_ = count;
     f.tick();
-    CHECK(HttpDownloader::requests.size() == count+1);
+    CHECK(HttpDownloader::requests.size() == count + 1);
     CHECK(f.app.apps_[count].hasIcon);
   }
   {
@@ -247,22 +237,21 @@ void attemptsAndBack() {
   }
 }
 void inputAndPages() {
-  for (bool landscape: {
-    false, true
-  }) {
+  for (bool landscape : {false, true}) {
     Fixture f;
-    f.renderer.width = landscape?800:480;
-    f.renderer.height = landscape?480:800;
-    f.renderer.orientation = landscape?GfxRenderer::Orientation::LandscapeClockwise:GfxRenderer::Orientation::Portrait;
+    f.renderer.width = landscape ? 800 : 480;
+    f.renderer.height = landscape ? 480 : 800;
+    f.renderer.orientation =
+        landscape ? GfxRenderer::Orientation::LandscapeClockwise : GfxRenderer::Orientation::Portrait;
     auto rows = f.rows();
-    CHECK(rows.size()>1);
+    CHECK(rows.size() > 1);
     auto target = rows.back();
-    f.input.tap(target.x+2, target.y+2);
+    f.input.tap(target.x + 2, target.y + 2);
     f.tick();
-    CHECK(f.app.selectedIndex_ == static_cast<int>(rows.size())-1);
+    CHECK(f.app.selectedIndex_ == static_cast<int>(rows.size()) - 1);
     CHECK(f.app.state_ == AppStoreActivity::State::CATALOG_READY);
     CHECK(HttpDownloader::requests.empty());
-    f.input.tap(target.x+2, target.y+2);
+    f.input.tap(target.x + 2, target.y + 2);
     f.tick();
     CHECK(f.app.state_ == AppStoreActivity::State::APP_DETAIL);
     f.input.released.insert(MappedInputManager::Button::Back);
@@ -273,7 +262,7 @@ void inputAndPages() {
     f.tick();
     CHECK(f.app.selectedIndex_ == 15);
     auto lastRows = f.rows();
-    CHECK(lastRows.size() == 16%rows.size() || (lastRows.size() == rows.size() && 16%rows.size() == 0));
+    CHECK(lastRows.size() == 16 % rows.size() || (lastRows.size() == rows.size() && 16 % rows.size() == 0));
     f.input.released.insert(MappedInputManager::Button::PageForward);
     f.tick();
     CHECK(f.app.selectedIndex_ == 0);
@@ -283,18 +272,19 @@ void inputAndPages() {
   }
   {
     Fixture f(0);
-    f.app.render(RenderLock {});
+    f.app.render(RenderLock{});
     f.tick();
     CHECK(HttpDownloader::requests.empty());
   }
 }
 void safeGeometry() {
-  for (auto orientation: {
-    GfxRenderer::Orientation::Portrait, GfxRenderer::Orientation::PortraitInverted, GfxRenderer::Orientation::LandscapeClockwise, GfxRenderer::Orientation::LandscapeCounterClockwise
-  }) {
+  for (auto orientation :
+       {GfxRenderer::Orientation::Portrait, GfxRenderer::Orientation::PortraitInverted,
+        GfxRenderer::Orientation::LandscapeClockwise, GfxRenderer::Orientation::LandscapeCounterClockwise}) {
     Fixture f;
     f.renderer.orientation = orientation;
-    if (orientation == GfxRenderer::Orientation::LandscapeClockwise || orientation == GfxRenderer::Orientation::LandscapeCounterClockwise) {
+    if (orientation == GfxRenderer::Orientation::LandscapeClockwise ||
+        orientation == GfxRenderer::Orientation::LandscapeCounterClockwise) {
       f.renderer.width = 800;
       f.renderer.height = 480;
     }
@@ -305,7 +295,7 @@ void safeGeometry() {
     UITheme::statusInset = 9;
     f.renderer.smallHeight = 22;
     f.renderer.titleHeight = 26;
-    for (auto&a:f.app.apps_) {
+    for (auto& a : f.app.apps_) {
       a.name = std::string(150, 'N');
       a.author = std::string(120, 'A');
       a.version = std::string(70, 'V');
@@ -314,20 +304,22 @@ void safeGeometry() {
     }
     auto rows = f.rows();
     auto safe = UITheme::getInstance().getScreenSafeArea(f.renderer, true);
-    int left = std::max(safe.x, f.renderer.left), right = std::min(safe.right(), f.renderer.width-f.renderer.right), bottom = std::min(safe.bottom(), f.renderer.height-f.renderer.bottom);
-    for (auto&r:rows) {
-      CHECK(r.x>= left);
-      CHECK(r.x+r.w<= right);
-      CHECK(r.y>= f.renderer.top);
-      CHECK(r.y+r.h<bottom);
+    int left = std::max(safe.x, f.renderer.left), right = std::min(safe.right(), f.renderer.width - f.renderer.right),
+        bottom = std::min(safe.bottom(), f.renderer.height - f.renderer.bottom);
+    for (auto& r : rows) {
+      CHECK(r.x >= left);
+      CHECK(r.x + r.w <= right);
+      CHECK(r.y >= f.renderer.top);
+      CHECK(r.y + r.h < bottom);
     }
-    for (auto&d:f.renderer.draws)if (d.kind == "text") {
-      CHECK(d.x>= left);
-      CHECK(d.x+d.w<= right);
-      CHECK(d.y+d.h<= bottom);
-    }
+    for (auto& d : f.renderer.draws)
+      if (d.kind == "text") {
+        CHECK(d.x >= left);
+        CHECK(d.x + d.w <= right);
+        CHECK(d.y + d.h <= bottom);
+      }
     auto before = f.app.selectedIndex_;
-    f.input.tap(-1, f.renderer.height-1);
+    f.input.tap(-1, f.renderer.height - 1);
     f.tick();
     CHECK(!f.app.finished);
     CHECK(f.app.selectedIndex_ == before);
@@ -337,21 +329,20 @@ void footerBoundaries() {
 #if defined(APP_STORE_BASELINE)
   std::puts("SKIP: new footer-only boundary cases on baseline without catalogLayout()");
 #else
-  for (int width: {
-    479, 480, 481, 800
-  })for (int action = 0; action<4; ++action) {
-    Fixture f;
-    f.input.touch = true;
-    f.renderer.width = width;
-    const auto l = f.app.catalogLayout();
-    const int x = l.left+(l.right-l.left)*action/4;
-    f.input.tap(x, l.controlsY+3);
-    f.tick();
-    if (action == 0)CHECK(f.app.finished);
-    if (action == 1)CHECK(f.app.state_ == AppStoreActivity::State::APP_DETAIL);
-    if (action == 2)CHECK(f.app.selectedIndex_ == 15);
-    if (action == 3)CHECK(f.app.selectedIndex_ == 1);
-  }
+  for (int width : {479, 480, 481, 800})
+    for (int action = 0; action < 4; ++action) {
+      Fixture f;
+      f.input.touch = true;
+      f.renderer.width = width;
+      const auto l = f.app.catalogLayout();
+      const int x = l.left + (l.right - l.left) * action / 4;
+      f.input.tap(x, l.controlsY + 3);
+      f.tick();
+      if (action == 0) CHECK(f.app.finished);
+      if (action == 1) CHECK(f.app.state_ == AppStoreActivity::State::APP_DETAIL);
+      if (action == 2) CHECK(f.app.selectedIndex_ == 15);
+      if (action == 3) CHECK(f.app.selectedIndex_ == 1);
+    }
   {
     Fixture f(0);
     f.input.touch = true;
@@ -363,17 +354,8 @@ void footerBoundaries() {
   {
     Fixture f;
     auto l = f.app.catalogLayout();
-    for (auto xy:std::vector<std::pair<int, int>> {
-      {
-        l.left-1, l.controlsY
-      }, {
-        l.right, l.controlsY
-      }, {
-        l.left, l.bottom
-      }, {
-        l.left, l.startY+l.rowH-1
-      }
-    }) {
+    for (auto xy : std::vector<std::pair<int, int> >{
+             {l.left - 1, l.controlsY}, {l.right, l.controlsY}, {l.left, l.bottom}, {l.left, l.startY + l.rowH - 1}}) {
       f.input.tap(xy.first, xy.second);
       f.tick();
       CHECK(!f.app.finished);
@@ -391,7 +373,8 @@ void footerBoundaries() {
 }
 void catalogParsing() {
   Fixture f(0);
-  const std::string json = R"({"apps":[{"id":"../bad"},{"id":"fixture-0","name":"Remote app","version":"2"},{"id":"fixture-1","version":"1"}]})";
+  const std::string json =
+      R"({"apps":[{"id":"../bad"},{"id":"fixture-0","name":"Remote app","version":"2"},{"id":"fixture-1","version":"1"}]})";
   HttpDownloader::body.assign(json.begin(), json.end());
   const std::string manifest = R"({"version":"1"})";
   Storage.files["/.crosssmudge/applications/fixture-1/manifest.json"].bytes.assign(manifest.begin(), manifest.end());
@@ -406,22 +389,24 @@ void catalogParsing() {
   CHECK(HttpDownloader::requests.size() == 1);
   CHECK(HttpDownloader::requests[0] == f.app.catalogUrl_);
 }
-bool validUtf8(const std::string&s) {
-  for (size_t i = 0; i<s.size(); ) {
+bool validUtf8(const std::string& s) {
+  for (size_t i = 0; i < s.size();) {
     auto c = static_cast<unsigned char>(s[i]);
-    size_t n = c<128?1:(c&0xe0) == 0xc0?2:(c&0xf0) == 0xe0?3:(c&0xf8) == 0xf0?4:0;
-    if (!n || i+n>s.size())return false;
-    for (size_t j = 1; j<n; ++j)if ((static_cast<unsigned char>(s[i+j])&0xc0) != 0x80)return false;
+    size_t n = c < 128 ? 1 : (c & 0xe0) == 0xc0 ? 2 : (c & 0xf0) == 0xe0 ? 3 : (c & 0xf8) == 0xf0 ? 4 : 0;
+    if (!n || i + n > s.size()) return false;
+    for (size_t j = 1; j < n; ++j)
+      if ((static_cast<unsigned char>(s[i + j]) & 0xc0) != 0x80) return false;
     i += n;
   }
   return true;
 }
 void utf8Names() {
   Fixture f(1);
-  f.app.apps_[0].name = std::string(94, 'a')+"é";
+  f.app.apps_[0].name = std::string(94, 'a') + "é";
   f.renderer.width = 4000;
   f.rows();
-  for (auto&d:f.renderer.draws)if (d.kind == "text")CHECK(validUtf8(d.text));
+  for (auto& d : f.renderer.draws)
+    if (d.kind == "text") CHECK(validUtf8(d.text));
 }
 #if 1  // Combined production header includes Wi-Fi navigation
 void wifiComposition() {
@@ -456,13 +441,16 @@ void sourceRouting() {
   Fixture f(0);
   f.app.onEnter();
 #if defined(CROSSSMUDGE_OWNER_TEST)
-  const std::string root = "https://raw.githubusercontent.com/tobiasweissert/Crosscub/integration/sticky-test-all/apps/";
+  const std::string root =
+      "https://raw.githubusercontent.com/tobiasweissert/Crosscub/integration/sticky-test-all/apps/";
 #else
-  const std::string root = "https://raw.githubusercontent.com/tobiasweissert/Crosscub/integration/sticky-test-all/apps/";
+  const std::string root =
+      "https://raw.githubusercontent.com/tobiasweissert/Crosscub/integration/sticky-test-all/apps/";
 #endif
   CHECK(f.app.baseUrl_ == root);
   CHECK(f.app.catalogUrl_ == root + "catalog.json");
-  const std::string catalog = R"({"repo":"attacker/other","branch":"wrong","apps":[{"id":"safe-app","files":["manifest.json","main.lua","data/0.txt"]},{"id":"bad-path","files":["../escape"]},{"id":"preview","requires_psram":true,"files":["main.lua"]}]})";
+  const std::string catalog =
+      R"({"repo":"attacker/other","branch":"wrong","apps":[{"id":"safe-app","files":["manifest.json","main.lua","data/0.txt"]},{"id":"bad-path","files":["../escape"]},{"id":"preview","requires_psram":true,"files":["main.lua"]}]})";
   HttpDownloader::body.assign(catalog.begin(), catalog.end());
   f.app.fetchCatalog();
 #if defined(FREEINK_FB_PSRAM)
@@ -480,7 +468,8 @@ void sourceRouting() {
   CHECK(HttpDownloader::requests.size() == 3);
   for (size_t i = 0; i < HttpDownloader::requests.size(); ++i)
     CHECK(HttpDownloader::requests[i] == root + "safe-app/" + f.app.apps_[0].files[i]);
-  for (const char* path : {"../escape", "/absolute", "a//b", "a/./b", "a/../b", "a%2fb", "https://evil/x", "a?x", "a#x", "a\\b"})
+  for (const char* path :
+       {"../escape", "/absolute", "a//b", "a/./b", "a/../b", "a%2fb", "https://evil/x", "a?x", "a#x", "a\\b"})
     CHECK(!AppStoreSource::safePackagePath(path));
 }
 static void updatePreservesUserFiles() {
@@ -488,14 +477,16 @@ static void updatePreservesUserFiles() {
     Fixture f(1);
     auto& app = f.app.apps_[0];
     app.files = {"main.lua", "manifest.json", "cp_core.lua"};
-    const std::vector<std::string> protectedPaths = {
-      "/.smudge/saved_data/fixture-0/game", "/.smudge/saved_data/fixture-0/crossplay-a.dat",
-      "/.crosssmudge/applications/fixture-0/notes.txt", "/.smudge/applications/fixture-0/main.lua",
-      "/books/book.epub", "/.crosspoint/settings.bin"};
+    const std::vector<std::string> protectedPaths = {"/.smudge/saved_data/fixture-0/game",
+                                                     "/.smudge/saved_data/fixture-0/crossplay-a.dat",
+                                                     "/.crosssmudge/applications/fixture-0/notes.txt",
+                                                     "/.smudge/applications/fixture-0/main.lua",
+                                                     "/books/book.epub",
+                                                     "/.crosspoint/settings.bin"};
     for (const auto& path : protectedPaths) Storage.files[path].bytes = {1, 2, 3, 4};
     HttpDownloader::result = outcome;
     f.app.installApp(app);
-    for (const auto& path : protectedPaths) CHECK(Storage.files[path].bytes == std::vector<uint8_t>({1,2,3,4}));
+    for (const auto& path : protectedPaths) CHECK(Storage.files[path].bytes == std::vector<uint8_t>({1, 2, 3, 4}));
     for (const auto& path : Storage.writes) CHECK(path.find("/.crosssmudge/applications/fixture-0/") == 0);
     // An interrupted package may need retry, but saves remain recoverable.
     HttpDownloader::result = HttpDownloader::OK;
@@ -504,19 +495,20 @@ static void updatePreservesUserFiles() {
   }
 }
 
-
 void verifiedStoreTransport() {
   for (auto outcome : {HttpDownloader::OK, HttpDownloader::HTTP_ERROR, HttpDownloader::ABORTED}) {
     Fixture f(1);
     HttpDownloader::result = outcome;
     // A broken peer could satisfy an unverified client: it must never be tried.
     HttpDownloader::insecureWouldSucceed = true;
-    const std::string catalog = R"({"apps":[{"id":"fixture-0","name":"Fixture","version":"1.0","files":["main.lua","manifest.json"]}]})";
+    const std::string catalog =
+        R"({"apps":[{"id":"fixture-0","name":"Fixture","version":"1.0","files":["main.lua","manifest.json"]}]})";
     HttpDownloader::body.assign(catalog.begin(), catalog.end());
     f.app.fetchCatalog();
     CHECK(HttpDownloader::transports.size() == 1);
     for (auto t : HttpDownloader::transports) CHECK(t == HttpDownloader::Transport::ESP_HTTP);
-    CHECK(f.app.state_ == (outcome == HttpDownloader::OK ? AppStoreActivity::State::CATALOG_READY : AppStoreActivity::State::ERROR));
+    CHECK(f.app.state_ ==
+          (outcome == HttpDownloader::OK ? AppStoreActivity::State::CATALOG_READY : AppStoreActivity::State::ERROR));
     HttpDownloader::transports.clear();
     auto& app = f.app.apps_[0];
     app.files = {"main.lua", "manifest.json"};
@@ -554,38 +546,23 @@ int main() {
   wifiComposition();
   std::printf("Wi-Fi composition failures: %d\n", failures);
 #endif
-  const std::pair<const char*, void(*)()> cases[] = {
-    {
-      "lazy icons and render isolation", lazyIcons
-    }, {
-      "portrait full screen", portrait
-    }, {
-      "landscape containment", landscape
-    }, {
-      "local cache validation", localIconValidation
-    }, {
-      "download and write failures", downloadValidation
-    }, {
-      "safe app IDs", safeIds
-    }, {
-      "attempt scheduling and Back", attemptsAndBack
-    }, {
-      "input and pages", inputAndPages
-    }, {
-      "bezel/font/text geometry", safeGeometry
-    }, {
-      "footer exact boundaries", footerBoundaries
-    }, {
-      "real catalog parsing", catalogParsing
-    }, {
-      "UTF-8 truncation", utf8Names
-    }
-  };
-  for (const auto& c:cases) {
+  const std::pair<const char*, void (*)()> cases[] = {{"lazy icons and render isolation", lazyIcons},
+                                                      {"portrait full screen", portrait},
+                                                      {"landscape containment", landscape},
+                                                      {"local cache validation", localIconValidation},
+                                                      {"download and write failures", downloadValidation},
+                                                      {"safe app IDs", safeIds},
+                                                      {"attempt scheduling and Back", attemptsAndBack},
+                                                      {"input and pages", inputAndPages},
+                                                      {"bezel/font/text geometry", safeGeometry},
+                                                      {"footer exact boundaries", footerBoundaries},
+                                                      {"real catalog parsing", catalogParsing},
+                                                      {"UTF-8 truncation", utf8Names}};
+  for (const auto& c : cases) {
     int before = failures;
     c.second();
-    std::printf("%s: %s\n", failures == before?"PASS":"FAIL", c.first);
+    std::printf("%s: %s\n", failures == before ? "PASS" : "FAIL", c.first);
   }
   std::printf("%d failures\n", failures);
-  return failures?1:0;
+  return failures ? 1 : 0;
 }

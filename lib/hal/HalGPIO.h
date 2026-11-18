@@ -53,7 +53,6 @@ class HalGPIO {
 
   HalGPIO() = default;
 
-
   // True when the board's page buttons sit on the left/right screen edges
   // rather than an off-screen vertical rocker. Drives side-hint
   // placement, the flipped large-step direction in selection activities, and

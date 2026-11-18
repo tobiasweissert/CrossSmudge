@@ -14,17 +14,17 @@
 #include <Xtc.h>
 
 #include <algorithm>
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 
 #include "BookActions.h"
-#include "FileActionPaths.h"
-#include "FileMutationConfirmationActivity.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "FileActionPaths.h"
 #include "FileBrowserActionActivity.h"
+#include "FileMutationConfirmationActivity.h"
 #include "MappedInputManager.h"
 #include "activities/boot_sleep/ImageFolderIndex.h"
 #include "activities/reader/EpubReaderActivity.h"
@@ -237,8 +237,9 @@ bool FileBrowserActivity::loadFilesIntoVector(size_t cap, bool& overflow) {
   }
 
   const auto accept =
-      mode == Mode::PickFirmware ? acceptFirmware : (mode == Mode::PickDirectory ? acceptDirectory :
-          (isInboxPath(basepath) ? acceptInbox : acceptCommon));
+      mode == Mode::PickFirmware
+          ? acceptFirmware
+          : (mode == Mode::PickDirectory ? acceptDirectory : (isInboxPath(basepath) ? acceptInbox : acceptCommon));
 
   files.reserve(std::min<size_t>(cap, INDEX_THRESHOLD));
   for (auto file = root.openNextFile(); file; file = root.openNextFile()) {
@@ -321,8 +322,9 @@ void FileBrowserActivity::loadFilesLocked() {
     GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
 
     const auto accept =
-        mode == Mode::PickFirmware ? acceptFirmware : (mode == Mode::PickDirectory ? acceptDirectory :
-            (isInboxPath(basepath) ? acceptInbox : acceptCommon));
+        mode == Mode::PickFirmware
+            ? acceptFirmware
+            : (mode == Mode::PickDirectory ? acceptDirectory : (isInboxPath(basepath) ? acceptInbox : acceptCommon));
     if (fileIndex->open(basepath.c_str(), accept)) {
       usingIndex = true;
       return;
@@ -893,8 +895,8 @@ void FileBrowserActivity::showFileActionMenu(const std::string& entry, bool igno
 
 void FileBrowserActivity::startMoveFile(const std::string& fullPath, const std::string& entry) {
   // ActivityManager owns this screen until folder selection completes.
-  auto picker = makeUniqueNoThrow<FileBrowserActivity>(renderer, mappedInput,
-                                                       FsHelpers::extractFolderPath(fullPath), Mode::PickDirectory);
+  auto picker = makeUniqueNoThrow<FileBrowserActivity>(renderer, mappedInput, FsHelpers::extractFolderPath(fullPath),
+                                                       Mode::PickDirectory);
   if (!picker) {
     fileOperationError(tr(STR_FILES_MEMORY_FAILED));
     return;
@@ -909,15 +911,16 @@ void FileBrowserActivity::startMoveFile(const std::string& fullPath, const std::
 }
 
 void FileBrowserActivity::moveFile(const std::string& fullPath, const std::string& entry,
-                                  const std::string& directory) {
+                                   const std::string& directory) {
   if (FileActionPaths::mutationBlocked) {
     fileOperationError(tr(STR_FILES_MOVE_UNCERTAIN));
     return;
   }
   const std::string folder = normalizeDirectoryPath(directory);
-  if (!FileActionPaths::isUserPath(fullPath) || !FileActionPaths::isUserPath(folder) ||
-      entry.empty() || entry.front() == '.' || !FsHelpers::isSafePathComponent(entry) ||
-      fullPath.substr(fullPath.rfind('/') + 1) != entry) return;
+  if (!FileActionPaths::isUserPath(fullPath) || !FileActionPaths::isUserPath(folder) || entry.empty() ||
+      entry.front() == '.' || !FsHelpers::isSafePathComponent(entry) ||
+      fullPath.substr(fullPath.rfind('/') + 1) != entry)
+    return;
   const std::string destination = buildFullPath(folder, entry);
   if (destination == fullPath) return;
   auto source = Storage.open(fullPath.c_str());
@@ -947,14 +950,14 @@ void FileBrowserActivity::moveFile(const std::string& fullPath, const std::strin
     std::string title = getFileName(entry);
     std::string author;
     const auto& books = RECENT_BOOKS.getBooks();
-    const auto recent = std::find_if(books.begin(), books.end(),
-                                    [&fullPath](const RecentBook& book) { return book.path == fullPath; });
+    const auto recent =
+        std::find_if(books.begin(), books.end(), [&fullPath](const RecentBook& book) { return book.path == fullPath; });
     if (recent != books.end()) {
       if (!recent->title.empty()) title = recent->title;
       author = recent->author;
     }
-    const auto result = BookMoveUtils::migrateRenamedBookState(fullPath, destination, oldCachePath, title, author,
-                                                              bookType, true);
+    const auto result =
+        BookMoveUtils::migrateRenamedBookState(fullPath, destination, oldCachePath, title, author, bookType, true);
     if (result != BookMoveUtils::RenameMigrationResult::Success) {
       if (result != BookMoveUtils::RenameMigrationResult::RolledBack) {
         FileActionPaths::mutationBlocked = true;
@@ -1577,8 +1580,8 @@ void FileBrowserActivity::buildListScreen(UiApp::ScreenType& screen) {
     renderer.drawText(SMALL_FONT_ID, band.x + metrics.contentSidePadding, pathY, pathDisplay);
   }
 
-  const bool selectedFile = mode == Mode::Books && selectorIndex < entryCount() &&
-                            std::string(entryNameAt(selectorIndex)).back() != '/';
+  const bool selectedFile =
+      mode == Mode::Books && selectorIndex < entryCount() && std::string(entryNameAt(selectorIndex)).back() != '/';
   if (mode == Mode::PickDirectory || selectedFile) {
     const int16_t height = std::max<int16_t>(48, screen.theme().minTouchSize);
     const auto rect = screen.takeBottom(height);

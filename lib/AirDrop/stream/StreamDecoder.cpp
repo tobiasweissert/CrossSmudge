@@ -28,14 +28,16 @@ bool octal(const uint8_t* in, size_t n, uint32_t& out) {
 // Validate all numeric header fields, including the 33-bit odc mtime. File sizes
 // are separately constrained to uint32_t and the accepted manifest.
 bool odcDigits(const uint8_t* in, size_t n) {
-  for (size_t i = 0; i < n; ++i) if (in[i] < '0' || in[i] > '7') return false;
+  for (size_t i = 0; i < n; ++i)
+    if (in[i] < '0' || in[i] > '7') return false;
   return true;
 }
 
 char lower(char c) { return c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c; }
 bool insensitive(const char* s, size_t n, const char* expected) {
   if (std::strlen(expected) != n) return false;
-  for (size_t i = 0; i < n; ++i) if (lower(s[i]) != expected[i]) return false;
+  for (size_t i = 0; i < n; ++i)
+    if (lower(s[i]) != expected[i]) return false;
   return true;
 }
 
@@ -45,10 +47,20 @@ bool safeUtf8(const char* s, size_t n) {
     uint32_t point = first;
     size_t extra = 0;
     uint32_t minimum = 0;
-    if (first >= 0xc2 && first <= 0xdf) { point &= 0x1f; extra = 1; minimum = 0x80; }
-    else if (first >= 0xe0 && first <= 0xef) { point &= 0x0f; extra = 2; minimum = 0x800; }
-    else if (first >= 0xf0 && first <= 0xf4) { point &= 7; extra = 3; minimum = 0x10000; }
-    else if (first >= 0x80) return false;
+    if (first >= 0xc2 && first <= 0xdf) {
+      point &= 0x1f;
+      extra = 1;
+      minimum = 0x80;
+    } else if (first >= 0xe0 && first <= 0xef) {
+      point &= 0x0f;
+      extra = 2;
+      minimum = 0x800;
+    } else if (first >= 0xf0 && first <= 0xf4) {
+      point &= 7;
+      extra = 3;
+      minimum = 0x10000;
+    } else if (first >= 0x80)
+      return false;
     if (extra > n - i) return false;
     for (size_t j = 0; j < extra; ++j) {
       const auto c = static_cast<uint8_t>(s[i++]);
@@ -56,8 +68,10 @@ bool safeUtf8(const char* s, size_t n) {
       point = (point << 6) | (c & 0x3f);
     }
     if (point < minimum || point > 0x10ffff || (point >= 0xd800 && point <= 0xdfff)) return false;
-    if (point < 0x20 || (point >= 0x7f && point <= 0x9f) || point == 0x200e || point == 0x200f || point == 0x2028 || point == 0x2029 || point == 0xfeff ||
-        (point >= 0x202a && point <= 0x202e) || (point >= 0x2066 && point <= 0x2069)) return false;
+    if (point < 0x20 || (point >= 0x7f && point <= 0x9f) || point == 0x200e || point == 0x200f || point == 0x2028 ||
+        point == 0x2029 || point == 0xfeff || (point >= 0x202a && point <= 0x202e) ||
+        (point >= 0x2066 && point <= 0x2069))
+      return false;
   }
   return true;
 }
@@ -65,7 +79,8 @@ bool safeUtf8(const char* s, size_t n) {
 
 bool safeName(const char* name, size_t length) {
   if (!name || length == 0 || length > kMaxName || (name[0] == '.' || name[0] == ' ') || name[length - 1] == '.' ||
-      name[length - 1] == ' ' || !safeUtf8(name, length)) return false;
+      name[length - 1] == ' ' || !safeUtf8(name, length))
+    return false;
   size_t stem = length;
   for (size_t i = 0; i < length; ++i) {
     const char c = name[i];
@@ -76,7 +91,8 @@ bool safeName(const char* name, size_t length) {
   }
   if (!stem || name[stem - 1] == ' ' || name[stem - 1] == '.') return false;
   if (insensitive(name, stem, "con") || insensitive(name, stem, "prn") || insensitive(name, stem, "aux") ||
-      insensitive(name, stem, "nul")) return false;
+      insensitive(name, stem, "nul"))
+    return false;
   if (stem == 4 && (insensitive(name, 3, "com") || insensitive(name, 3, "lpt")) && name[3] >= '1' && name[3] <= '9')
     return false;
   return true;
@@ -120,14 +136,16 @@ bool Decoder::reset(const Manifest& manifest, const Sink sink) {
 
 bool Decoder::parseHeader() {
   if (std::memcmp(cpioHeader_, "070707", 6) || !odcDigits(cpioHeader_ + 6, 70) || ++entries_ > kMaxEntries) {
-    fail("unsupported or invalid odc header"); return false;
+    fail("unsupported or invalid odc header");
+    return false;
   }
   uint32_t rdev = 0;
   if (!octal(cpioHeader_ + 18, 6, memberMode_) || !octal(cpioHeader_ + 36, 6, memberLinks_) ||
       !octal(cpioHeader_ + 42, 6, rdev) || !octal(cpioHeader_ + 59, 6, nameSize_) ||
       !octal(cpioHeader_ + 65, 11, memberSize_) || nameSize_ == 0 || nameSize_ > sizeof memberName_ ||
       memberSize_ > kMaxPayload || memberMode_ > 0177777 || rdev != 0) {
-    fail("odc fields exceed policy"); return false;
+    fail("odc fields exceed policy");
+    return false;
   }
   nameBytes_ = 0;
   cpioState_ = CpioState::Name;
@@ -143,12 +161,14 @@ void Decoder::endMember() {
 
 bool Decoder::admitName() {
   if (memberName_[nameSize_ - 1] != 0 || std::memchr(memberName_, 0, nameSize_ - 1)) {
-    fail("invalid member name termination"); return false;
+    fail("invalid member name termination");
+    return false;
   }
   const char* name = memberName_;
   if (!std::strcmp(name, "TRAILER!!!")) {
     if (memberSize_ || !fileSeen_ || memberMode_ != 0 || memberLinks_ != 1) {
-      fail("invalid or premature trailer"); return false;
+      fail("invalid or premature trailer");
+      return false;
     }
     cpioState_ = CpioState::Trailer;
     return true;
@@ -156,27 +176,46 @@ bool Decoder::admitName() {
   if (!std::strcmp(name, ".")) {
     // The sender's directory link count describes its source filesystem,
     // not the number of files in this archive. This empty wrapper is discarded.
-    if (rootSeen_) { fail("duplicate root wrapper"); return false; }
-    if ((memberMode_ & kTypeMask) != kDirectory) { fail("non-directory root wrapper"); return false; }
-    if (memberSize_) { fail("nonempty root wrapper"); return false; }
+    if (rootSeen_) {
+      fail("duplicate root wrapper");
+      return false;
+    }
+    if ((memberMode_ & kTypeMask) != kDirectory) {
+      fail("non-directory root wrapper");
+      return false;
+    }
+    if (memberSize_) {
+      fail("nonempty root wrapper");
+      return false;
+    }
     rootSeen_ = true;
     endMember();
     return true;
   }
   if (name[0] == '.' && name[1] == '/') name += 2;
   if ((memberMode_ & kTypeMask) != kRegular || memberLinks_ != 1) {
-    fail("nonregular or linked member"); return false;
+    fail("nonregular or linked member");
+    return false;
   }
   currentFile_ = false;
   if (!std::strcmp(memberName_, manifest_.archivePath)) {
-    if (fileSeen_ || memberSize_ != manifest_.size) { fail("member does not match accepted manifest"); return false; }
+    if (fileSeen_ || memberSize_ != manifest_.size) {
+      fail("member does not match accepted manifest");
+      return false;
+    }
     currentFile_ = true;
   } else if (name[0] == '.' && name[1] == '_' && !std::strcmp(name + 2, manifest_.name) &&
              ((memberName_[0] == '.' && memberName_[1] == '/') ==
               (manifest_.archivePath[0] == '.' && manifest_.archivePath[1] == '/'))) {
-    if (sidecarSeen_ || memberSize_ > kMaxSidecar) { fail("AppleDouble quota or duplicate"); return false; }
+    if (sidecarSeen_ || memberSize_ > kMaxSidecar) {
+      fail("AppleDouble quota or duplicate");
+      return false;
+    }
     sidecarSeen_ = true;
-  } else { fail("unexpected member path"); return false; }
+  } else {
+    fail("unexpected member path");
+    return false;
+  }
   memberRemaining_ = memberSize_;
   cpioState_ = CpioState::Body;
   if (!memberRemaining_) endMember();
@@ -189,8 +228,8 @@ Status Decoder::cpio(const uint8_t* bytes, const size_t length, size_t& consumed
     if (cancelled()) return fail("cancelled");
     if (archiveBytes_ >= kMaxArchive) return fail("archive byte quota");
     if (cpioState_ == CpioState::Body && currentFile_) {
-      size_t n = std::min({length - consumed, size_t(memberRemaining_), kWriteChunk,
-                           size_t(kMaxArchive - archiveBytes_)});
+      size_t n =
+          std::min({length - consumed, size_t(memberRemaining_), kWriteChunk, size_t(kMaxArchive - archiveBytes_)});
       if (n > kMaxPayload - payloadBytes_) return fail("payload byte quota");
       const auto result = sink_.append(sink_.context, bytes + consumed, n);
       if (result == WriteResult::WouldBlock) return Status::WouldBlock;
@@ -286,10 +325,10 @@ Status Decoder::feed(const uint8_t* input, const size_t length, size_t& consumed
     }
     size_t produced = sizeof window_ - windowPosition_;
     size_t used = available;
-    const uint32_t flags = TINFL_FLAG_PARSE_ZLIB_HEADER |
-                           (available < recordRemaining_ ? TINFL_FLAG_HAS_MORE_INPUT : 0);
-    const auto status = tinfl_decompress(&inflater_, input + consumed, &used, window_,
-                                         window_ + windowPosition_, &produced, flags);
+    const uint32_t flags =
+        TINFL_FLAG_PARSE_ZLIB_HEADER | (available < recordRemaining_ ? TINFL_FLAG_HAS_MORE_INPUT : 0);
+    const auto status =
+        tinfl_decompress(&inflater_, input + consumed, &used, window_, window_ + windowPosition_, &produced, flags);
     consumed += used;
     encodedBytes_ += used;
     recordRemaining_ -= used;
@@ -311,9 +350,8 @@ Status Decoder::feed(const uint8_t* input, const size_t length, size_t& consumed
 }
 
 bool Decoder::archiveComplete() const {
-  return initialized_ && !recordRemaining_ && !recordHeaderBytes_ && !pendingBytes_ &&
-         (!compressed_ || inflateDone_) && cpioState_ == CpioState::Trailer && fileSeen_ &&
-         payloadBytes_ == manifest_.size;
+  return initialized_ && !recordRemaining_ && !recordHeaderBytes_ && !pendingBytes_ && (!compressed_ || inflateDone_) &&
+         cpioState_ == CpioState::Trailer && fileSeen_ && payloadBytes_ == manifest_.size;
 }
 
 Status Decoder::finish() {
@@ -321,8 +359,7 @@ Status Decoder::finish() {
   if (cancelled()) return fail("cancelled");
   const auto drained = drain();
   if (drained != Status::Progress) return drained;
-  if (!archiveComplete())
-    return fail("incomplete DVZip/archive/manifest");
+  if (!archiveComplete()) return fail("incomplete DVZip/archive/manifest");
   done_ = true;
   return Status::Complete;
 }

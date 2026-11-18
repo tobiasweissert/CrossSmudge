@@ -36,13 +36,12 @@
 #include "RecentBookProgress.h"
 #include "RecentBooksStore.h"
 #include "SavedItemsHomeActivity.h"
+#include "activities/apps/ApplicationsActivity.h"
 #include "components/UITheme.h"
 #include "components/themes/dashboard/DashboardTheme.h"
 #include "components/themes/lyra/LyraCarouselTheme.h"
 #include "components/themes/minimal/MinimalTheme.h"
 #include "fontIds.h"
-
-#include "activities/apps/ApplicationsActivity.h"
 
 namespace {
 constexpr uint32_t CAROUSEL_CACHE_MAGIC = 0x43434152;  // "CCAR"
@@ -267,7 +266,7 @@ const char* savedItemsLabel(bool hasBookmarks, bool hasClippings) {
 }
 
 void appendHomeMenuItems(HomeMenuEntries& items, bool hasOpdsServers, bool hasReadingStats, bool hasBookmarks,
-                          bool hasClippings) {
+                         bool hasClippings) {
   items.push({tr(STR_BROWSE_FILES), UIIcon::Folder, HomeMenuAction::BrowseFiles});
   items.push({tr(STR_MENU_RECENT_BOOKS), UIIcon::Recent, HomeMenuAction::RecentBooks});
   items.push({"Applications", UIIcon::Applications, HomeMenuAction::Applications});
@@ -489,8 +488,8 @@ void appendCarouselMenuStateToKey(std::string& key, const bool hasOpdsServers, c
 }
 
 void buildCarouselCacheKey(const std::vector<RecentBook>& recentBooks, const bool hasOpdsServers,
-                            const bool hasReadingStats, const bool hasBookmarks, const bool hasClippings,
-                            std::string& key, uint64_t& keyHash) {
+                           const bool hasReadingStats, const bool hasBookmarks, const bool hasClippings,
+                           std::string& key, uint64_t& keyHash) {
   key.clear();
   key.reserve(512);
   // Framebuffer snapshots include both UI pixels and counter-inverted cover
@@ -690,9 +689,9 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
     if (!book.coverBmpPath.empty()) {
       if (isCarouselTheme) {
         const std::string centerPath = UITheme::getCoverThumbPath(book.coverBmpPath, LyraCarouselTheme::kCenterThumbW,
-                                                                   LyraCarouselTheme::kCenterThumbH);
+                                                                  LyraCarouselTheme::kCenterThumbH);
         const std::string sidePath = UITheme::getCoverThumbPath(book.coverBmpPath, LyraCarouselTheme::kSideCoverW,
-                                                                 LyraCarouselTheme::kSideCoverH);
+                                                                LyraCarouselTheme::kSideCoverH);
         const bool centerMissing = !Storage.exists(centerPath.c_str());
         const bool sideMissing = !Storage.exists(sidePath.c_str());
 
@@ -1221,8 +1220,8 @@ void HomeActivity::renderCarouselFrameToCurrentBuffer(int bookIdx, BookReadingSt
   GUI.drawButtonMenu(
       renderer,
       Rect{0, metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.verticalSpacing, pageWidth,
-            pageHeight - (metrics.headerHeight + metrics.homeTopPadding + metrics.verticalSpacing * 2 +
-                          metrics.buttonHintsHeight)},
+           pageHeight - (metrics.headerHeight + metrics.homeTopPadding + metrics.verticalSpacing * 2 +
+                         metrics.buttonHintsHeight)},
       static_cast<int>(menuItems.size()), -1, [&menuItems](int index) { return menuItems[index].label; },
       [&menuItems](int index) { return menuItems[index].icon; });
 
@@ -2330,10 +2329,8 @@ void HomeActivity::onContinueReading() {
 }
 
 void HomeActivity::onApplicationsOpen() {
-  startActivityForResult(
-      std::make_unique<ApplicationsActivity>(renderer, mappedInput),
-      [this](const ActivityResult&) { requestUpdate(); }
-  );
+  startActivityForResult(std::make_unique<ApplicationsActivity>(renderer, mappedInput),
+                         [this](const ActivityResult&) { requestUpdate(); });
 }
 
 void HomeActivity::onRecentsOpen() { activityManager.goToRecentBooks(); }

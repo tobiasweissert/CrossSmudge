@@ -8,9 +8,7 @@
 #include "util/QuickLockTrigger.h"
 
 // Explicit manual refresh retains the full waveform on Sticky.
-inline HalDisplay::RefreshMode manualScreenRefreshMode() {
-  return HalDisplay::FULL_REFRESH;
-}
+inline HalDisplay::RefreshMode manualScreenRefreshMode() { return HalDisplay::FULL_REFRESH; }
 
 inline bool isPowerButtonActionAvailableOutsideReader(const CrossPointSettings::SHORT_PWRBTN action) {
   switch (action) {

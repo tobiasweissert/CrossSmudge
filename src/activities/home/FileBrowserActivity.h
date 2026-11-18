@@ -11,8 +11,8 @@
 #include <string>
 #include <vector>
 
-#include "RecentBooksStore.h"
 #include "FileMutationInputGate.h"
+#include "RecentBooksStore.h"
 #include "activities/Activity.h"
 #include "util/ButtonNavigator.h"
 

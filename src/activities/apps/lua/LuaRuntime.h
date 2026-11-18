@@ -8,9 +8,9 @@ namespace ink::runtime {
 // Keep the offline library set unchanged. Library allocations belong to the
 // bounded Lua heap; protected calls turn startup OOM into a recoverable error.
 inline int essential(lua_State* L) {
-  static const luaL_Reg libraries[] = {{LUA_GNAME, luaopen_base}, {LUA_TABLIBNAME, luaopen_table},
-                                     {LUA_STRLIBNAME, luaopen_string}, {LUA_MATHLIBNAME, luaopen_math},
-                                     {LUA_OSLIBNAME, luaopen_os}, {nullptr, nullptr}};
+  static const luaL_Reg libraries[] = {{LUA_GNAME, luaopen_base},        {LUA_TABLIBNAME, luaopen_table},
+                                       {LUA_STRLIBNAME, luaopen_string}, {LUA_MATHLIBNAME, luaopen_math},
+                                       {LUA_OSLIBNAME, luaopen_os},      {nullptr, nullptr}};
   for (const luaL_Reg* lib = libraries; lib->func; ++lib) {
     luaL_requiref(L, lib->name, lib->func, 1);
     lua_pop(L, 1);
@@ -33,4 +33,4 @@ inline int openNetwork(lua_State* L, bool declared) {
   lua_pushcfunction(L, network);
   return lua_pcall(L, 0, 0, 0);
 }
-}
+}  // namespace ink::runtime

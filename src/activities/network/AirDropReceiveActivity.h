@@ -1,15 +1,17 @@
 #pragma once
 #include "AppCapabilities.h"
 #if CROSSINK_APP_CAP_AIRDROP
+#include <browser/BrowserLaunch.h>
+
 #include <cstdint>
 #include <string>
+
 #include "activities/Activity.h"
-#include "activities/apps/lua/AppPackage.h"
 #include "activities/ScreenTransitionRefresh.h"
-#include "components/UiAppHost.h"
+#include "activities/apps/lua/AppPackage.h"
 #include "components/AirDropConsentInput.h"
+#include "components/UiAppHost.h"
 #include "network/AirDropReceiver.h"
-#include <browser/BrowserLaunch.h>
 
 // Foreground coordinator only. Receiver has process lifetime and owns all workers;
 // activity destruction never frees a live socket, callback context or radio owner.

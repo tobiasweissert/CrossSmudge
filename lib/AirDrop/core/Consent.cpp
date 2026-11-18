@@ -1,4 +1,5 @@
 #include "Consent.h"
+
 #include <algorithm>
 #include <cstring>
 #include <limits>
