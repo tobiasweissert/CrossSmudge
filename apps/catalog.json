@@ -1782,7 +1782,7 @@
     {
       "id": "browser",
       "name": "Browser",
-      "version": "0.3.3",
+      "version": "0.3.5",
       "author": "CrossSmudge",
       "description": "Public keyless Assisted reader with shared capacity, Direct/Offline modes, checked saves, links and search forms. Assisted needs public-mode firmware.",
       "min_api": 6,

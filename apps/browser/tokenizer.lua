@@ -1,6 +1,6 @@
 -- Streaming, quote-aware HTML/XML tokenizer. No DOM or token array retained.
 local T={}
-function T.scan(s,emit)
+function T.scan(s,emit,styleRange)
  local at,count=1,0
  local function text(first,last)
   while first<=last do
@@ -47,12 +47,21 @@ function T.scan(s,emit)
       end
      end
     end
-    emit(closing and 'close'or 'open',name,attrs,s:sub(math.max(lt+1,p-32),p-1):match('/%s*$')~=nil)
+    -- Most tags fit entirely in the bounded raw prefix. Its last bytes are
+    -- already resident in Lua; rereading a suffix can otherwise bounce back
+    -- across the SD block edge. Oversized tags still inspect the real ending.
+    local suffix
+    if p-lt-1<=4096 then suffix=raw:sub(-32)
+    else suffix=s:sub(math.max(lt+1,p-32),p-1)end
+    emit(closing and 'close'or 'open',name,attrs,suffix:match('/%s*$')~=nil)
     if not closing and (name=='script'or name=='style')then
      -- Raw text tags: '<' inside JavaScript/CSS never creates HTML nodes.
      local a,b
      if type(s)=='table'then a,b=s:rawClose(name,p+1)else a,b=s:find('</%s*'..name:gsub('%a',function(c)return '['..c..c:upper()..']'end)..'%s*>',p+1)end
-     if name=='style'then emit('style',s:sub(p+1,math.min(p+24576,a and a-1 or #s)))end
+     if name=='style'then
+      emit('style',s:sub(p+1,math.min(p+24576,a and a-1 or #s)))
+      if styleRange then styleRange({raw=s,first=p+1,last=a and a-1 or #s})end
+     end
      emit('close',name);p=b or #s
     end
    end

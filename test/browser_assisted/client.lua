@@ -96,15 +96,15 @@ now=499;on_update();assert(not request);now=500;on_update();endpoint('poll');del
 -- Adjacent 44px links never overlap.
 local hits={};for _,b in ipairs(modules['ui.lua'].buttons)do if b[6]=='Adjacent A'or b[6]=='Adjacent B'then hits[#hits+1]=b end end
 assert(#hits==2,'both adjacent links visible');if #hits==2 then local a,b=hits[1],hits[2];assert(a[1]+a[3]<=b[1]or b[1]+b[3]<=a[1]or a[2]+a[4]<=b[2]or b[2]+b[4]<=a[2])end
-click('Next');on_update();assert(endpoint('chunk').chunk==1);deliver7(ready(1));assert(text:find('Original ending',1,true));capture('assisted-ending-portrait')
-click('Previous');assert(text:find('Original opening',1,true));assert(not request)
+on_button('page_forward',true);draw();on_update();assert(endpoint('chunk').chunk==1);deliver7(ready(1));assert(text:find('Original ending',1,true));capture('assisted-ending-portrait')
+on_button('page_back',true);draw();assert(text:find('Original opening',1,true));assert(not request)
 -- Remote find resolves a global block into the saved later chunk.
 menu('Find on page');edit('ending');on_update();endpoint('find');deliver7({v=1,found=true,chunk=1,block=11,run=1,byte=1});assert(text:find('Original ending',1,true))
 -- Bad JSON/unknown fields cannot replace the readable page.
 menu('Refresh page');on_update();endpoint('open');deliver7('{"v":1,"state":"ready","unknown":true}');assert(text:find('Original ending',1,true),text);assert(text:find('Invalid assisted',1,true),text)
 menu('Refresh page');cancelServer();on_update();if not request then on_update()end
 if request and request.q.path=='/v1/cancel'then cancelServer();on_update()end
-endpoint('open');local stale=request;request=nil;on_button('back',true);resources[999]='{}';on_http{id=stale.id,handle=999,size=2,status=200};draw();assert(not resources[999]);assert(text:find('Original ending',1,true));cancelServer()
+endpoint('open');local stale=request;request=nil;on_button('back',true);resources[999]='{}';on_http{id=stale.id,handle=999,size=2,status=200};draw();assert(not resources[999]);cancelServer();assert(text:find('Original ending',1,true))
 -- Explicit Offline must not start a request on paging or Find; B7 survives reopen.
 menu('Mode:');click('Offline');assert(not request,request and request.q.path);menu('Find on page');edit('opening');assert(not request,request and request.q.path);assert(text:find('opening',1,true),text)
 on_exit();dofile('main.lua');on_init();draw();assert(text:find('Original opening',1,true));assert(not request,'startup must never forward saved URL')
@@ -114,6 +114,8 @@ w,h=800,480;draw();capture('assisted-opening-landscape');w,h=480,800;draw()
 menu('Refresh page');on_update();endpoint('open');local t=ready(0);t.doc=string.rep('d',32);deliver7(t)
 menu('Save offline');on_update();assert(endpoint('chunk').chunk==1);t=ready(1);t.doc=string.rep('d',32);deliver7(t);assert(text:find('Saved complete',1,true))
 -- Typed GET forms and opaque PNG assets use the selected assisted lane.
+-- This legacy fixture specifically exercises manual failure/retry behavior.
+menu('Images: Automatic')
 menu('Refresh page');on_update();endpoint('open');local feature=ready(0);feature.doc=string.rep('f',32);feature.chunks=1
 feature.blocks=J.array{{id=1,kind='h1',runs=J.array{{text='Original forms and image'}}},{id=2,kind='form',form={action='https://example.org/search',fields=J.array{{name='q',value='a & b',type='search'},{name='lang',value='en',type='hidden'}}}},{id=3,kind='image',image={asset=string.rep('9',32),alt='Original synthetic palette',width=128,height=64}}};feature.anchors=J.array()
 deliver7(feature);click('GET search form');click('q:');edit('new value');click('Submit GET');on_update();assert(endpoint('open').url=='https://example.org/search?q=new%20value&lang=en')
@@ -125,9 +127,12 @@ on_exit();dofile('main.lua');on_init();draw();assert(text:find('Original forms',
 -- A legal 6KiB chunk can span over 512 narrow landscape screens. Find/reflow
 -- walk only this chunk, retain the actual local page number, and history keeps
 -- one semantic position rather than retaining every screen anchor.
-w,h=800,480;draw();menu('Refresh page');on_update();endpoint('open');local dense=ready(0);dense.doc=string.rep('7',32);dense.chunks=1;dense.blocks=J.array{{id=1,kind='p',runs=J.array{{text=string.rep('x\n',1000)},{text=string.rep('y\n',1000)},{text=string.rep('z\n',1000)},{text='Original dense tail'}}}};dense.anchors=J.array{{id='dense-tail',block=1,run=4,byte=1}}
+-- Footerless reading adds rows: use large-font runs to retain the independent
+-- >512-local-pages stress contract with the same legal 6KiB chunk.
+w,h=800,400;draw();menu('Refresh page');on_update();endpoint('open');local dense=ready(0);dense.doc=string.rep('7',32);dense.chunks=1;dense.blocks=J.array{{id=1,kind='p',runs=J.array{{text=string.rep('x\n',1000)},{text=string.rep('y\n',1000)},{text=string.rep('z\n',1000)},{text='Original dense tail'}}}};dense.anchors=J.array{{id='dense-tail',block=1,run=4,byte=1}}
+for _,run in ipairs(dense.blocks[1].runs)do run.size=2 end
 deliver7(dense);menu('Find on page');edit('dense tail');on_update();endpoint('find');deliver7({v=1,found=true,chunk=0,block=1,run=4,byte=1});assert(text:find('Original dense tail',1,true),text);local densePage=tonumber(text:match('P(%d+) C1/1'));assert(densePage and densePage>512,'dense chunk must reach its actual local page beyond 512')
-menu('Refresh page');on_update();endpoint('open');local other=ready(0);other.doc=string.rep('8',32);other.chunks=1;deliver7(other);click('<');assert(text:find('Original dense tail',1,true));click('Previous');assert(text:find('P',1,true));w,h=480,800;draw()
+menu('Refresh page');on_update();endpoint('open');local other=ready(0);other.doc=string.rep('8',32);other.chunks=1;deliver7(other);click('<');assert(text:find('Original dense tail',1,true));on_button('page_back',true);draw();assert(text:find('P',1,true));w,h=480,800;draw()
 -- Bounded history stores positions and cache references, never all chunk models.
 for n=1,26 do menu('Refresh page');on_update();endpoint('open');local t=ready(0);t.doc=string.format('%032x',n);t.url='https://example.org/'..n;t.chunks=1;deliver7(t)end
 menu('History');local seen={}
@@ -151,10 +156,10 @@ assert(hasRetried,'stale Retry index overwrote another history entry');on_button
 local old1,old2=files['saved/b7-index1'],files['saved/b7-index2'];local page=modules['layout.lua'].page
 modules['layout.lua'].page=function(doc,...)if doc.srp and doc.srp.doc==string.rep('e',32)then error('synthetic layout failure')end;return page(doc,...)end
 menu('Refresh page');on_update();endpoint('open');local broken=ready(0);broken.doc=string.rep('e',32);deliver7(broken)
-modules['layout.lua'].page=page;assert(files['saved/b7-index1']==old1 and files['saved/b7-index2']==old2,'layout failure published a root');assert(text:find('Original opening',1,true));cancelServer()
+modules['layout.lua'].page=page;assert(files['saved/b7-index1']==old1 and files['saved/b7-index2']==old2,'layout failure published a root');cancelServer();assert(files['saved/b7-index1']==old1 and files['saved/b7-index2']==old2,'cancel acknowledgement published a root');assert(text:find('Original opening',1,true))
 -- Failed SD publication preserves view and marks cache uncertain.
 menu('Refresh page');on_update();endpoint('open');fail=true;t=ready(0);t.doc=string.rep('e',32);deliver7(t);fail=false;assert(text:find('Original opening',1,true));assert(text:find('Assisted save failed',1,true))
-menu('Refresh page');on_update();endpoint('open');failRoot=true;deliver7(t);failRoot=false;assert(text:find('Original opening',1,true));assert(text:find('SD cache read-only',1,true),text)
+menu('Refresh page');on_update();endpoint('open');failRoot=true;deliver7(t);failRoot=false;cancelServer();assert(text:find('Original opening',1,true));assert(text:find('SD cache read-only',1,true),text)
 -- Existing B5/B1 namespaces and approved icon are untouched.
 files['saved/page1.cache']='B1:legacy';on_exit();assert(files['saved/page1.cache']=='B1:legacy')
 for _ in pairs(resources)do error('resource leaked')end

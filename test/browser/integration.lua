@@ -41,6 +41,11 @@ if font_width then
 end
 local function capture(name)if font_capture and os.getenv('BROWSER_CAPTURE')then font_capture(os.getenv('BROWSER_CAPTURE')..'/'..name..'.pgm')end end
 if font_image_data then smudge.browser_image=function(path,...)return files[path]and font_image_data(files[path],...)or false end end
+-- A framebuffer clear starts a new visible snapshot even when app-local
+-- chrome does not call the legacy native header helper. Do not accumulate
+-- every historical paint in bodyText (a false 4 MiB OOM under inline work).
+local clearFrame=smudge.clear
+smudge.clear=function(...)bodyText='';return clearFrame(...)end
 local function draw()
  local idle=0
  for i=1,20000 do
@@ -60,9 +65,9 @@ local function deliver(s,url)
 end
 local article='<html><head><title>My article</title></head><body><article><h1 id="top">Useful story</h1><p>'..string.rep('Words for pagination. ',250)..'<a href="/two">Next article</a></p><img src="/photo" alt="Photo"></article></body></html>'
 dofile('main.lua');on_init();draw();click('Address');edit('https://example.org/one');on_update();assert(request.q.url=='https://example.org/one');deliver(article);assert(text:find('Useful story',1,true));capture('article-portrait')
-click('Next');assert(text:find('Page 2',1,true))
+on_button('page_forward',true);draw();assert(text:find('Page 2',1,true))
 click('...');click('Address');edit('https://example.org/two');on_update();deliver('<article><h1>Second story</h1><p>Another useful body of text with enough content.</p></article>');assert(text:find('Second story',1,true))
-click('<');assert(text:find('Page 2',1,true)and not text:find('Second story',1,true));click('Previous');assert(text:find('Useful story',1,true));click('Next') -- truthful history pagination
+click('<');assert(text:find('Page 2',1,true)and not text:find('Second story',1,true));on_button('page_back',true);draw();assert(text:find('Useful story',1,true));on_button('page_forward',true);draw() -- truthful history pagination
 click('...');click('Forward website');assert(text:find('Second story',1,true))
 click('...');click('Address');edit('https://example.org/fail');on_update();local old=assert(request);on_button('back',true);on_http{id=old.id,status=200,body='<p>STALE</p>'};draw();assert(text:find('Second story',1,true)and not text:find('STALE',1,true))
 click('...');click('Address');edit('https://example.org/diskfail');on_update();fail=true;deliver('<p>Should never replace current</p>');fail=false;assert(text:find('Second story',1,true))
@@ -105,7 +110,7 @@ assert(A and B and A[1]+A[3]<=B[1],'link hits overlap');on_tap(B[1]+1,B[2]+1);dr
 w,h=800,480;click('...');click('Address');local ed=modules['ui.lua'].editor;ed.value='https://example.org/'..string.rep('abcdefghi ',40)..'TAIL';ed.cursor=#ed.value+1;draw();assert(text:find('TAIL',1,true)and text:find('|',1,true),'cursor viewport lost tail');capture('keyboard-long-landscape');on_button('back',true)
 w,h=480,800;click('...');click('Address');edit('https://example.org/mixed');on_update();deliver('<article><h1>Browser field test</h1><p>Original synthetic fixture • 15 November 2026</p><p>Read <strong>bold emphasis</strong> and <a href="/details">an inline link</a> with reserved image geometry.</p><img src="/photo" alt="Original test gradient"><ul><li>First useful item</li><li>Second useful item</li></ul><pre>  code stays indented</pre><table><tr><th>Name</th><th>Value</th></tr><tr><td>Bound</td><td>1024 KiB</td></tr></table><p style="border:1px solid black;background:#eee">Bounded CSS border and background.</p></article>')
 if font_image_data then
- draw();click('Image');on_update();deliver(test_read('test/browser/fixtures/gradient.png',0,test_size('test/browser/fixtures/gradient.png')));capture('mixed-portrait-image');click('Image');capture('image-zoom-portrait');on_button('back',true);draw();click('Next');capture('mixed-portrait-blocks')
+ draw();click('Image');on_update();deliver(test_read('test/browser/fixtures/gradient.png',0,test_size('test/browser/fixtures/gradient.png')));capture('mixed-portrait-image');click('Image');capture('image-zoom-portrait');on_button('back',true);draw();on_button('page_forward',true);draw();capture('mixed-portrait-blocks')
 end
 if os.getenv('BROWSER_LIVE_BODY')then
  local path=os.getenv('BROWSER_LIVE_BODY');local size=test_size(path);local hash=1
@@ -121,10 +126,15 @@ assert(successful,err);draw();assert(modules['ui.lua'].buttons[2][6]==retainedAd
 -- Cached and network history must restore the mode together with its anchors.
 w,h=480,800;menuItem('Reader mode');click('...');click('Address');edit('https://example.org/history-c');on_update();deliver('<article><p>Reader C stable position and useful text for history.</p></article>')
 local historyHTML='<nav><p>'..string.rep('NAVIGATION ',900)..'</p></nav><article><p>Actual short article text.</p></article>'
-click('...');click('Address');edit('https://example.org/history-a');on_update();deliver(historyHTML);menuItem('Simplified page mode');click('Next');click('Next');click('Next');assert(text:find('Page 4',1,true))
-click('<');assert(text:find('Reader C stable',1,true));menuItem('Forward website');assert(text:find('Page 4',1,true)and text:find('NAVIGATION',1,true),'cached history lost mode/position');click('Previous');assert(text:find('Page 3',1,true));click('Next')
+click('...');click('Address');edit('https://example.org/history-a');on_update();deliver(historyHTML);menuItem('Simplified page mode');on_button('page_forward',true);draw();on_button('page_forward',true);draw();on_button('page_forward',true);draw();assert(text:find('Page 4',1,true))
+click('<');assert(text:find('Reader C stable',1,true));menuItem('Forward website');assert(text:find('Page 4',1,true)and text:find('NAVIGATION',1,true),'cached history lost mode/position');on_button('page_back',true);draw();assert(text:find('Page 3',1,true));on_button('page_forward',true);draw()
 click('<');local index=modules['cache.lua'].open();for _,e in ipairs(index.entries)do if e.url=='https://example.org/history-a'then files['saved/'..e.file]=nil end end
-menuItem('Forward website');on_update();assert(request and text:find('Reader C stable',1,true),'failed history candidate changed current view');deliver(historyHTML);assert(text:find('Page 4',1,true)and text:find('NAVIGATION',1,true),'network history lost mode/position')
+menuItem('Forward website');on_update()
+assert(request and request.q.url=='https://example.org/history-a'and text:find('Loading - previous page retained',1,true),'missing history loading state')
+assert(modules['ui.lua'].buttons[2][6]:find('example.org/history-c',1,true),'candidate changed retained address')
+click('Cancel');assert(text:find('Reader C stable',1,true)and text:find('Page 1',1,true),'Cancel lost retained history page')
+menuItem('Forward website');on_update();assert(request and request.q.url=='https://example.org/history-a','Cancel changed history cursor')
+deliver(historyHTML);assert(text:find('Page 4',1,true)and text:find('NAVIGATION',1,true),'network history lost mode/position')
 
 -- Final repair regressions use only production UI callbacks and captured draws.
 local repair=os.getenv('BROWSER_REPAIR_CASE')
@@ -152,7 +162,7 @@ if not repair or repair=='history'then
  on_exit();files={};dofile('main.lua');on_init();draw()
  click('Address');edit('https://example.org/bounded');on_update()
  local body='<p>'..string.rep('Remember this pagination anchor. ',150)..'</p>';deliver(body)
- for i=1,30 do click('Next');assert(text:find('Page 2',1,true));menuItem('Offline pages');click('https://example.org/bounded')end
+ for i=1,30 do on_button('page_forward',true);draw();assert(text:find('Page 2',1,true));menuItem('Offline pages');click('https://example.org/bounded')end
  for i=1,23 do click('<');assert(text:find('History',1,true)and text:find('Page 2',1,true),'retained offline anchor lost '..text)end
  click('<');assert(text:find('No previous website',1,true),'offline history exceeded 24 entries')
  -- Network push after back must prune forward entries; mixing paths shares cap.

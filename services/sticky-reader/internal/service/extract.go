@@ -240,6 +240,7 @@ func convertWithCSS(data []byte, target, mode string, css []string) (*Document, 
 	}
 	title, lang, dir := "", "", "auto"
 	selectors := []string{}
+	layoutSheets := append([]string(nil), css...)
 	fragments := map[string]bool{}
 	originalForms := []*html.Node{}
 	navigation := []*html.Node{}
@@ -267,6 +268,9 @@ func convertWithCSS(data []byte, target, mode string, css []string) (*Document, 
 				}
 			case "style":
 				s := nodeText(n)
+				if len(s) <= 128<<10 && len(layoutSheets) < 32 {
+					layoutSheets = append(layoutSheets, s)
+				}
 				if len(s) <= 64<<10 {
 					css = append(css, s)
 				}
@@ -283,6 +287,19 @@ func convertWithCSS(data []byte, target, mode string, css []string) (*Document, 
 		return nil, e
 	}
 	cssBytes := 0
+	layout := displayLayout{}
+	layoutOrder := 0
+	layoutBytes := 0
+	for _, sheet := range layoutSheets {
+		layoutBytes += len(sheet)
+		if layoutBytes > 128<<10 {
+			break
+		}
+		for _, rule := range cssRules(sheet) {
+			layoutOrder++
+			layout.collect(rule, layoutOrder)
+		}
+	}
 	for _, sheet := range css {
 		cssBytes += len(sheet)
 		if cssBytes > 128<<10 {
@@ -349,6 +366,7 @@ func convertWithCSS(data []byte, target, mode string, css []string) (*Document, 
 		}
 	}
 	prune(root)
+	layout.separate(root)
 	var collect func(*html.Node)
 	collect = func(n *html.Node) {
 		if id := attr(n, "id"); id != "" && len(fragments) < 256 && len(id) <= 256 {

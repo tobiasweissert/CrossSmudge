@@ -15,9 +15,27 @@ static int testRead(lua_State* L){const char* path=luaL_checkstring(L,1);int off
 #ifdef BROWSER_FONT_HOST
 void registerFontHost(lua_State*);
 #endif
-int main(int argc,char** argv){assert(argc==2);Heap heap;if(getenv("BROWSER_LUA_LIMIT"))heap.limit=atoi(getenv("BROWSER_LUA_LIMIT"));lua_State* L=lua_newstate(Heap::alloc,&heap);assert(L);assert(ink::runtime::openEssential(L)==LUA_OK);assert(ink::runtime::openNetwork(L,true)==LUA_OK);
+int main(int argc,char** argv){assert(argc==2);Heap heap;if(getenv("BROWSER_LUA_LIMIT"))heap.limit=atoi(getenv("BROWSER_LUA_LIMIT"));lua_State* L=lua_newstate(Heap::alloc,&heap);assert(L);
+// Match LuaRunner.cpp's production incremental collector, not host defaults.
+lua_gc(L,LUA_GCINC,105,250,0);
+// Lua stores these parameters divided by four (lgc.h); verify the
+// effective production values while setting the same requested values again.
+assert(lua_gc(L,LUA_GCSETPAUSE,105)==(105/4)*4);
+assert(lua_gc(L,LUA_GCSETSTEPMUL,250)==(250/4)*4);
+assert(ink::runtime::openEssential(L)==LUA_OK);assert(ink::runtime::openNetwork(L,true)==LUA_OK);
 #ifdef BROWSER_FONT_HOST
 registerFontHost(L);
+// Production drawing accepts Boolean bold flags as well as style names;
+// the shared font capture adapter exposes style names only.
+assert(luaL_dostring(L,R"lua(
+local function style(s)if type(s)=='boolean' then return s and 'bold' or 'regular' end;return s end
+local width,advance,text=font_width,font_advance,font_text
+font_width=function(s,f,b)return width(s,f,style(b))end
+font_advance=function(s,f,b)return advance(s,f,style(b))end
+font_text=function(x,y,s,f,b,...)return text(x,y,s,f,style(b),...)end
+assert(font_width('Bold fixture','ui12',true)==width('Bold fixture','ui12','bold'))
+assert(font_width('Regular fixture','ui12',false)==width('Regular fixture','ui12','regular'))
+)lua")==LUA_OK);
 #endif
 assert(ink::browser::openBrowserWork(L)==LUA_OK);lua_newtable(L);ink::browser::registerWork(L);lua_setglobal(L,"browser_native");
 lua_register(L,"test_read",testRead);lua_register(L,"test_size",testSize);

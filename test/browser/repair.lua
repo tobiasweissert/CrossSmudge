@@ -179,3 +179,64 @@ if case=='all'or case=='LUA-3-reopen'or case=='LUA-3-cleanup'or case=='LUA-3-ui'
  files={};assert(not C.open().uncertain);assert(C.open():save('https://example.org/empty','EMPTY'))
  print('PASS LUA-3 healthy reopen selects ORIGINAL NEW; OLD/CSS retained; readable corruption and empty startup writable')
 end
+
+if case=='all'or case=='UI-MENU'then
+ files={};init()
+ for _,size in ipairs({{800,480},{480,800}})do
+  w,h=size[1],size[2];draw();click('...')
+  local seen={};local pages=0
+  repeat
+   draw();local more;local count=0
+   for _,b in ipairs(modules['ui.lua'].buttons)do
+    assert(b[6]~='Previous'and b[6]~='Next','document pager on menu')
+    if b[6]:match('^More ')then more=b else seen[b[6]]=true end
+    if b[2]>=modules['ui.lua'].content(0).y and not b[6]:match('^More ')then count=count+1 end
+   end
+   if pages==0 and w>h then assert(count>=8,'landscape menu too sparse')end
+   pages=pages+1
+   if not more then break end
+   on_tap(more[1]+1,more[2]+1);draw()
+  until pages>=10 or text:find('More 1/',1,true)
+  for _,label in ipairs({'Document details','Address / search','Bookmarks','Offline pages','History','Find on page','Cancel loading','Mode: Direct'})do assert(seen[label],'unreachable '..label)end
+  on_button('back',true);draw()
+ end
+ on_exit();print('PASS UI-MENU all actions shared geometry and no document pagers')
+end
+
+if case=='all'or case=='UI-GEOMETRY'then
+ for _,size in ipairs({{800,480},{480,800}})do
+  w,h=size[1],size[2];files={};init()
+  local L,U=modules['layout.lua'],modules['ui.lua'];local page=L.page;local count=0;local prepared
+  L.page=function(doc,anchor,width,height,font)
+   local r=U.content(font);assert(width==r.width and height==r.height,'prepared/drawn content geometry differs')
+   count=count+1;local rows,nexta,done=page(doc,anchor,width,height,font);prepared=rows;return rows,nexta,done
+  end
+  navigate('https://example.org/geometry');deliver('<p>GEOMETRY SENTINEL '..string.rep('bounded prose ',90)..'</p>')
+  assert(count==1,'adoption scheduled duplicate layout: '..count)
+  local painted={};local native=smudge.text
+  smudge.text=function(x,y,s,font,...)painted[#painted+1]={x=x,y=y,text=s};return native(x,y,s,font,...)end
+  for i=1,3 do on_draw();on_update();assert(not text:find('Loading - previous page retained',1,true),'adopted page flashes loading')end
+  smudge.text=native;assert(count==1,'stable draw requested extra layout')
+  local r=U.content(0)
+  for _,row in ipairs(prepared)do for _,run in ipairs(row.runs or {})do
+   local seen=false;for _,p in ipairs(painted)do if p.text==run.text and p.x==r.x+run.x and p.y==r.y+row.y then seen=true;break end end
+   assert(seen,'prepared row not drawn at its exact geometry')
+  end end
+  L.page=page;on_exit()
+ end
+ print('PASS UI-GEOMETRY exact prepared/drawn rows and one layout without post-adoption loading')
+end
+
+if case=='all'or case=='UI-FOCUS'then
+ files={};init()
+ for _,size in ipairs({{800,480},{480,800}})do
+  w,h=size[1],size[2];draw();click('...');modules['ui.lua'].focus=12
+  click('Offline pages');assert(modules['ui.lua'].focus==1,'new view retained stale focus')
+  on_button('back',true);draw();click('...')
+  local U=modules['ui.lua'];local more
+  for i,b in ipairs(U.buttons)do if b[6]:match('^More ')then more=b;U.focus=i end end
+  assert(more,'missing menu pager');on_button('confirm',true);draw();assert(U.focus==1,'menu paging retained old action focus')
+  on_button('back',true);draw()
+ end
+ on_exit();print('PASS UI-FOCUS both orientations view change and Confirm menu paging own visible focus')
+end

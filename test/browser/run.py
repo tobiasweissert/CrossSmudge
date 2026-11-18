@@ -9,7 +9,8 @@ subprocess.run(['python3','test/browser_assisted/run.py'],env=dict(os.environ,AS
 candidates=[os.environ.get('ARDUINOJSON_INCLUDE',''),str(R/'.pio/libdeps/sticky-owner-test/ArduinoJson/src'),'/root/github/crosssmudge-appstore-fix/.pio/libdeps/sticky-owner-test/ArduinoJson/src']
 JSON=next((p for p in candidates if p and pathlib.Path(p,'ArduinoJson.h').is_file()),None)
 if not JSON:raise SystemExit('Set ARDUINOJSON_INCLUDE to an existing pinned ArduinoJson/src; no package installs performed')
-env=dict(os.environ,ASAN_OPTIONS='detect_leaks=0',UBSAN_OPTIONS='halt_on_error=1',SMUDGE_X3_CONSTRAINTS='1')
+env=dict(os.environ,ASAN_OPTIONS='detect_leaks=0',UBSAN_OPTIONS='halt_on_error=1',SMUDGE_X3_CONSTRAINTS='1',ASSISTED_PNG_FIXTURE=str(pathlib.Path(os.environ.get('ASSISTED_TEST_OUT',str(OUT/'assisted'))).resolve()/'palette.png'))
+assert pathlib.Path(env['ASSISTED_PNG_FIXTURE']).is_file(), 'Assisted prerequisite must generate the PNG fixture'
 flags=['-O1','-g','-fno-omit-frame-pointer','-Ilib/Memory','-Ilib/miniz/src','-Ilib/LuaBrowser','-Ilib/Lua/src','-Ilib/LuaHttp','-Isrc/activities/apps/lua','-I'+JSON]
 sanitized=os.environ.get('BROWSER_TEST_SANITIZE','1')!='0'
 if sanitized:flags+=['-fsanitize=address,undefined']
@@ -26,7 +27,7 @@ for source in sorted(pathlib.Path('lib/Lua/src').glob('l*.c')):
  obj=OUT/(source.stem+'.o');run(['cc',*flags,'-c',source,'-o',obj]);objects.append(obj)
 run(['cc',*flags,'-c','lib/miniz/src/miniz_impl.c','-o',OUT/'miniz.o'])
 run(['c++','-std=c++20',*flags,'test/browser/runner.cpp',*objects,'-lm','-ldl','-o',OUT/'lua'])
-for suite in ('parser','layout','integration','advisory','source','cancel','work','css_budget','repair'):
+for suite in ('parser','layout','integration','advisory','source','cancel','work','css_budget','repair','ui_regression','reading_flow','reading_flow_assisted','spacing','card_spacing','auto_images','reading_navigation'):
  run([OUT/'lua',f'test/browser/{suite}.lua'])
 for suite,source,extra in [('resource','test/browser/resource.cpp',[]),('redirects','test/browser/redirects.cpp',[]),('framing','test/browser/framing.cpp',['-lz']),('memory','test/browser/memory.cpp',[]),('transport','test/browser/transport.cpp',[]),('api3-policy','test/lua_http/policy_test.cpp',[]),('api3-protocol','test/lua_http/protocol_test.cpp',[]),('api3-protocol-psram','test/lua_http/protocol_test.cpp',['-DBOARD_HAS_PSRAM=1']),('api3-budget','test/lua_http/budget_test.cpp',[]),('api3-manifest','test/lua_http/manifest_test.cpp',[]),('bindings','test/browser/bindings.cpp',['lib/LuaHttp/LuaHttp.cpp',*objects,'-lm','-ldl']),('api3-async','test/lua_http/async_test.cpp',['lib/LuaHttp/LuaHttp.cpp',*objects,'-lm','-ldl','-pthread'])]:
  run(['c++','-std=c++20',*flags,source,'lib/LuaHttp/HttpCore.cpp','lib/LuaHttp/HttpGzip.cpp','lib/hal/HalLuaResources.cpp',OUT/'miniz.o',*extra,'-o',OUT/suite]);run([OUT/suite])
@@ -52,7 +53,8 @@ run(['c++','-std=c++20',*imageFlags,'test/browser/images.cpp','src/activities/ap
 run([OUT/'images'])
 fontFlags=[*imageFlags,'-DBROWSER_FONT_HOST=1','-DBROWSER_IMAGE_HOST=1','-Ilib/Utf8']
 run(['c++','-std=c++20',*fontFlags,'test/browser/runner.cpp','test/browser/font_host.cpp','lib/EpdFont/EpdFont.cpp','lib/EpdFont/EpdFontFamily.cpp','lib/Utf8/Utf8.cpp','src/activities/apps/lua/BrowserImage.cpp',*pathlib.Path('lib/Epub/Epub/converters').glob('*ToFramebufferConverter.cpp'),'lib/Epub/Epub/converters/ImageDecoderFactory.cpp','lib/Epub/Epub/converters/ImageToFramebufferDecoder.cpp',OUT/'jpeg.o',codec/'PNGdec/src/PNGdec.cpp',*pngObjects,OUT/'miniz.o',*objects,'-lm','-ldl','-pthread','-o',OUT/'font-lua'])
-run([OUT/'font-lua','test/browser/integration.lua'])
+for suite in ('integration','reading_flow','reading_flow_assisted','spacing','card_spacing','auto_images','reading_navigation'):
+ run([OUT/'font-lua',f'test/browser/{suite}.lua'])
 
 if os.environ.get('BROWSER_TEST_RECEIPT'):
  pathlib.Path(os.environ['BROWSER_TEST_RECEIPT']).write_text(json.dumps(receipts,indent=2)+'\n')
