@@ -358,7 +358,7 @@ bool ClippingStore::readFromFile(const std::string& path, std::vector<Clipping>&
 }
 
 bool ClippingStore::writeToFile(const std::string* replacementText, const size_t replacementIndex,
-                                const std::string* sourcePathOverride) {
+                                const std::string* sourcePathOverride, const bool preserveOnRenameFailure) {
   Storage.mkdir("/.crosspoint");
   Storage.mkdir(CLIPPINGS_DIR);
 
@@ -470,6 +470,7 @@ bool ClippingStore::writeToFile(const std::string* replacementText, const size_t
   }
   if (!Storage.rename(tmpPath.c_str(), storeFilePath.c_str())) {
     LOG_ERR("CLIP", "Failed to replace clipping file: %s", storeFilePath.c_str());
+    if (preserveOnRenameFailure) return false;
     Storage.remove(tmpPath.c_str());
     if (replacingDestination) Storage.rename(backupPath.c_str(), storeFilePath.c_str());
     return false;
@@ -575,7 +576,8 @@ bool ClippingStore::migrateForFilePath(const std::string& oldFilePath, const std
 
 bool ClippingStore::beginRenameMigration(const std::string& oldFilePath, const std::string& newFilePath,
                                          const std::string& title, const std::string& author,
-                                         const std::string& bookType, RenameMigration& migration) {
+                                         const std::string& bookType, RenameMigration& migration,
+                                         const bool preserveOnRenameFailure) {
   migration = {};
   if (bookType != "epub") {
     LOG_ERR("CLIP", "Unknown clipping book type for rename migration: %s", bookType.c_str());
@@ -586,6 +588,13 @@ bool ClippingStore::beginRenameMigration(const std::string& oldFilePath, const s
   migration.sourcePath = storeFilePathForBook(oldFilePath, bookType);
   migration.destinationPath = storeFilePathForBook(newFilePath, bookType);
   migration.destinationBackupPath = migration.destinationPath + ".rename.bak";
+  // Clippings are not merged. Manual Move refuses every retained destination
+  // candidate rather than silently discarding another book's records.
+  if (preserveOnRenameFailure &&
+      (Storage.exists(migration.destinationPath.c_str()) ||
+       Storage.exists(migration.destinationBackupPath.c_str()) ||
+       Storage.exists((migration.destinationPath + ".bak").c_str()) ||
+       Storage.exists((migration.destinationPath + ".tmp").c_str()))) return false;
   if (!Storage.exists(migration.destinationPath.c_str()) && Storage.exists(migration.destinationBackupPath.c_str())) {
     if (!Storage.rename(migration.destinationBackupPath.c_str(), migration.destinationPath.c_str())) {
       LOG_ERR("CLIP", "Failed to recover interrupted clipping rename backup: %s",
@@ -638,15 +647,18 @@ bool ClippingStore::beginRenameMigration(const std::string& oldFilePath, const s
   writer.bookAuthor = author;
   writer.storeFilePath = migration.destinationPath;
   writer.clippings = std::move(migratedClippings);
-  if (!writer.writeToFile(nullptr, SIZE_MAX, &migration.sourcePath)) {
+  migration.uncertain = preserveOnRenameFailure;
+  if (!writer.writeToFile(nullptr, SIZE_MAX, &migration.sourcePath, preserveOnRenameFailure)) {
     LOG_ERR("CLIP", "Failed to write transactional clipping rename: %s", migration.destinationPath.c_str());
-    rollbackRenameMigration(migration);
+    if (!preserveOnRenameFailure) rollbackRenameMigration(migration);
     return false;
   }
+  migration.uncertain = false;
   return true;
 }
 
 bool ClippingStore::commitRenameMigration(RenameMigration& migration) {
+  if (migration.uncertain) return false;
   if (!migration.active) return true;
   bool ok = true;
   if (Storage.exists(migration.sourcePath.c_str()) && !Storage.remove(migration.sourcePath.c_str())) {
@@ -663,6 +675,7 @@ bool ClippingStore::commitRenameMigration(RenameMigration& migration) {
 }
 
 bool ClippingStore::rollbackRenameMigration(RenameMigration& migration) {
+  if (migration.uncertain) return false;
   if (!migration.active) return true;
   bool ok = true;
   if (Storage.exists(migration.destinationPath.c_str()) && !Storage.remove(migration.destinationPath.c_str())) {

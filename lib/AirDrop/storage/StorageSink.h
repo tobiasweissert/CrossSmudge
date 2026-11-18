@@ -70,6 +70,7 @@ class StorageSink {
   const char* error_ = nullptr;
   bool stageOpen_ = false;
   bool publicationAttempted_ = false;
+  uint8_t journalVersion_ = 2;
   uint32_t expected_ = 0;
   uint32_t written_ = 0;
   char token_[33]{};

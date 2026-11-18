@@ -29,7 +29,7 @@ void FileBrowserActionActivity::onEnter() {
   }
   optionLabels.resize(items.size());
   std::transform(items.begin(), items.end(), optionLabels.begin(),
-                 [](const MenuItem& item) { return std::string(I18N.get(item.labelId)); });
+                 [](const MenuItem& item) { return std::string(item.label ? item.label : I18N.get(item.labelId)); });
   optionPopup.show(title.c_str(), optionLabels, 0, [this](const int index) {
     if (index < 0 || index >= static_cast<int>(items.size())) return;
     selectionMade = true;

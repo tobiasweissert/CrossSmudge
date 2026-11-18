@@ -130,7 +130,7 @@ void serve(Workspace& w,Io& io,Backend& backend,const OfferIdentity& connection,
       // MIME metadata is not authoritative for AirDrop's DVZip envelope.
       // Validate the actual bounded archive below, including its exact manifest.
       w.deadline=w.requestStart+1800000;
-      if(!backend.beginFile(backend.context,w.consent.offer())){error(w,"cannot stage file",507);goto closed;}
+      if(!backend.beginFile(backend.context,w.consent.offer())){error(w,"cannot stage file: destination exists or SD unavailable; no overwrite",507);goto closed;}
       w.upload=true;
       memcpy(w.manifest.name,w.consent.offer().filename,sizeof w.manifest.name);memcpy(w.manifest.archivePath,w.consent.offer().archivePath,sizeof w.manifest.archivePath);w.manifest.size=w.consent.offer().fileSize;
       if(!w.decoder.reset(w.manifest,{&w,append,cancelled})){error(w,"invalid archive manifest");goto closed;}

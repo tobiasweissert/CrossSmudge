@@ -25,10 +25,15 @@ file={'SenderComputerName':'Sender','Items':[],'Files':[{'FileName':'book.txt','
 for name,value in [('url',url),('file',file),('file-noid',{k:v for k,v in file.items()if k!='TransferID'})]:
     (OUT/(name+'.plist')).write_bytes(plistlib.dumps(value,fmt=plistlib.FMT_BINARY))
 def member(name,data,mode=0o100644):
-    h=('070707'+''.join(f'{v:06o}'for v in [0,1,mode,0,0,1,0])+f'{0:011o}'+f'{len(name)+1:06o}'+f'{len(data):011o}').encode()
+    h=('070707'+''.join(f'{v:06o}'for v in [0,1,mode,0,0,1,0])+f'{0:011o}'+f'{len(name.encode())+1:06o}'+f'{len(data):011o}').encode()
     assert len(h)==76
     return h+name.encode()+b'\0'+data
 archive=member('./book.txt',b'abc')+member('TRAILER!!!',b'',0)
+utf8_name='Résumé e\u0301 你好.EPUB'
+utf8_file={**file,'Files':[{**file['Files'][0],'FileName':utf8_name,'FileBomPath':'./'+utf8_name}]}
+(OUT/'utf8.plist').write_bytes(plistlib.dumps(utf8_file,fmt=plistlib.FMT_BINARY))
+utf8_archive=member('./'+utf8_name,b'abc')+member('TRAILER!!!',b'',0)
+(OUT/'utf8.dvzip').write_bytes(struct.pack('>I',len(utf8_archive)|0x80000000)+utf8_archive+b'\0'*4)
 for compressed,name in [(False,'stored'),(True,'zlib')]:
     body=zlib.compress(archive)if compressed else archive
     word=len(body)|(0 if compressed else 0x80000000)

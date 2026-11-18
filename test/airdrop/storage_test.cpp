@@ -147,7 +147,7 @@ static void finalRecordCancellation() {
     assert(!sink.finish());
     assert(sink.state() == State::Uncertain && sink.committedBytes() == 0);
     assert(files.stage.empty() && files.reader.empty() && files.renames == 1);
-    const std::string final = "/Inbox/book (AirDrop 01020304050000000000000000000000).txt";
+    const std::string final = "/Inbox/book.txt";
     assert(files.files[final].size() == 2049);
     assert(std::all_of(files.files[final].begin(), files.files[final].end(), [](uint8_t c) { return c == 'a'; }));
     const auto retained = files.files;
@@ -307,7 +307,7 @@ static void recoveryFaults() {
   StorageSink staged(complete); assert(staged.inspect("01020304050000000000000000000000") == State::CompleteStaged);
   const unsigned renames = complete.renames; assert(!staged.finish()); assert(complete.renames == renames);
   MemoryFiles collision; collision.directories.insert("/Inbox"); collision.files[final] = {'o', 'l', 'd'};
-  StorageSink receiving(collision); assert(receiving.begin("book.txt", 3, token)); assert(write(receiving, 3)); assert(!receiving.finish());
+  StorageSink receiving(collision); assert(!receiving.begin("book.txt", 3, token));
   assert(collision.renames == 0 && collision.files[final] == std::vector<uint8_t>({'o', 'l', 'd'}));
   std::puts("PASS torn/gapped/unreadable journals and existing destination collisions preserve candidates without republish");
 }

@@ -43,6 +43,9 @@ class BookmarkStore {
     bool destinationCurrentBackedUp = false;
     bool destinationLegacyBackedUp = false;
     bool active = false;
+    // Rollback may remove only a record this preparation attempted to write.
+    bool destinationWritten = false;
+    bool uncertain = false;
   };
 
   static BookmarkStore& getInstance() { return instance; }
@@ -81,9 +84,11 @@ class BookmarkStore {
   // Transactional variant used by file rename. Source files and destination
   // backups remain in place until commit, so a later failure can restore both
   // logical books without reverse-merging their metadata.
+  // Manual Move passes true: preserve candidates on any unacknowledged IO;
+  // uncertain transactions may neither commit nor roll back. Legacy default stays false.
   static bool beginRenameMigration(const std::string& oldFilePath, const std::string& newFilePath,
                                    const std::string& title, const std::string& author, const std::string& bookType,
-                                   RenameMigration& migration);
+                                   RenameMigration& migration, bool preserveOnRenameFailure = false);
   static bool commitRenameMigration(RenameMigration& migration);
   static bool rollbackRenameMigration(RenameMigration& migration);
 

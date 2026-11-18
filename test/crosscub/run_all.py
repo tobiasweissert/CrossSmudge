@@ -46,7 +46,7 @@ for key in ['ARDUINOJSON_INCLUDE_DIR','CP_FIXTURES','ESP_IDF_SOURCE_ROOT']:
  if not os.environ.get(key)or not Path(os.environ[key]).is_dir():raise SystemExit('Set '+key+' to the existing read-only dependency/fixture directory')
 env={**os.environ,'ASSISTED_TEST_OUT':str(O/'browser'),'AIRDROP_SESSION_TEST_OUTPUT':str(O/'receiver'),'PYTHONDONTWRITEBYTECODE':'1'}
 env.setdefault('BROWSER_CODEC_ROOT',str(Path(env['ARDUINOJSON_INCLUDE_DIR']).resolve().parents[1]))
-commands=airdrop_commands+reader_commands+[[sys.executable,str(R/'test/crosscub'/('test_'+name+'.py'))]for name in ['product','web','release','ota_activity','logo','stopwatch']]
+commands=airdrop_commands+reader_commands+[[sys.executable,str(R/'test/file_actions/run_all.py'),'--output',str(O/'file-actions')]]+[[sys.executable,str(R/'test/crosscub'/('test_'+name+'.py'))]for name in ['product','web','release','ota_activity','logo','stopwatch']]
 commands+=[
  [sys.executable,str(R/'test/integration_catalog/check_catalog.py')],
  [sys.executable,str(R/'test/crosscub/run_preservation.py'),'--group','apps','--output',str(O/'apps')],
