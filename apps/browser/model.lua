@@ -68,18 +68,21 @@ end
 -- Stylesheet discovery does not construct a throwaway article model. Full
 -- validation and semantic extraction still happen exactly once in parse().
 function M.discover(raw,url)
- local base=U.resolve(nil,url);local result={stylesheets={},styles={},raw=raw,url=base};local baseSet=false;local bytes=0
+ local base=U.resolve(nil,url);local result={stylesheets={},styles={},styleOrders={},layoutStyles={},raw=raw,url=base};local baseSet=false;local bytes=0;local sheet=0
  if not base then return result end
  local ok,err=T.scan(raw,function(kind,name,a)
-  if kind=='style'and bytes<24576 then local css=name:sub(1,24576-bytes);result.styles[#result.styles+1]=css;bytes=bytes+#css end
+  if kind=='style'then
+   sheet=sheet+1
+   if bytes<24576 then local css=name:sub(1,24576-bytes);result.styles[#result.styles+1]=css;result.styleOrders[#result.styles]=sheet;bytes=bytes+#css end
+  end
   if kind=='open'and name=='base'and a.href and not baseSet then base=U.resolve(base,M.decode(a.href))or base;baseSet=true end
   if kind=='open'and name=='link'and (a.rel or ''):lower()=='stylesheet'and a.href and #result.stylesheets<2 then
    local target=U.resolve(base,M.decode(a.href));if target then
-    if #result.stylesheets==0 then result.styles[#result.styles+1]=false end
+    if #result.stylesheets==0 then sheet=sheet+1;result.styles[#result.styles+1]=false;result.styleOrders[#result.styles]=sheet end
     result.stylesheets[#result.stylesheets+1]=target
    end
   end
- end)
+ end,function(range)if #result.layoutStyles<32 then range.sheet=sheet;result.layoutStyles[#result.layoutStyles+1]=range end end)
  if not ok then return nil,err end
  result.base=base;return result
 end
@@ -92,12 +95,24 @@ function M.parse(raw,url,options)
  if not discovery or discovery.raw~=raw or discovery.url~=url then
   local err;discovery,err=M.discover(raw,url);if not discovery then return nil,err end
  end
- local styles={};local styleBytes=0;local sheetUrls=discovery.stylesheets;local base=discovery.base
- for _,part in ipairs(discovery.styles)do
+ local styles,positions={},{};local styleBytes=0;local sheetUrls=discovery.stylesheets;local base=discovery.base
+ for i,part in ipairs(discovery.styles)do
   local value=part==false and options.css or part
-  if value and styleBytes<24576 then value=value:sub(1,24576-styleBytes);styles[#styles+1]=value;styleBytes=styleBytes+#value end
+  if value and styleBytes<24576 then
+   value=value:sub(1,24576-styleBytes);styles[#styles+1]=value;styleBytes=styleBytes+#value
+   positions[#styles]=discovery.styleOrders and discovery.styleOrders[i]or i
+  end
  end
- local css=C.parse(table.concat(styles,'\n'));styles=nil
+ local css=C.parse(table.concat(styles,'\n'))
+ -- Restore original sheet/byte positions after joining the presentation prefix.
+ local at,first=1,1
+ for _,rule in ipairs(css)do
+  while styles[at]and rule.order>=first+#styles[at]do first=first+#styles[at]+1;at=at+1 end
+  if positions[at]then rule.sheet=positions[at];rule.order=rule.order-first+1 end
+ end
+ styles,positions=nil,nil
+ css.layout={}
+ for _,range in ipairs(discovery.layoutStyles or {})do C.layout(css.layout,range)end
  local d={title='',url=url,blocks={},links={},images={},forms={},stylesheets=sheetUrls}
  local stack={};local active,bytes,spans= nil,0,0;local title=false;local preferred=false;local form
  -- IDs are bounded independently of blocks; defer empty wrappers to the next
@@ -126,6 +141,10 @@ function M.parse(raw,url,options)
   else runs[#runs+1]={text=text,href=node.href,bold=node.style.bold,size=node.style.size,pre=node.style.pre};spans=spans+1 end
   bytes=bytes+#text
  end
+ local function gap(node)
+  local runs=active and active.spans;local last=runs and runs[#runs]
+  if last and last.text:find('%S$')then add(' ',node)end
+ end
  local function process(kind,name,a,selfClose)
   local parent=stack[#stack]
   if kind=='text'then if title then d.title=prefix(d.title..M.decode(name),200)else add(name,parent)end;return end
@@ -133,7 +152,10 @@ function M.parse(raw,url,options)
   if kind=='close'then
    if name=='title'then title=false end
    for i=#stack,1,-1 do if stack[i].tag==name then
-    if blockTags[name]and not stack[i].style.inline then boundary()end
+    if not stack[i].hidden and not stack[i].style.hidden then
+     if stack[i].style.gapAfter then gap(stack[i])end
+     if (blockTags[name]and not stack[i].style.inline)or stack[i].style.block then boundary()end
+    end
     if name=='form'then form=nil end
     for j=#stack,i,-1 do stack[j]=nil end;break
    end end;return
@@ -150,7 +172,10 @@ function M.parse(raw,url,options)
   node.kind=blockTags[name]and name or parent and parent.kind
   node.href=parent and parent.href
   if name=='a'and a.href then node.href=U.resolve(base,M.decode(a.href))end
-  if (blockTags[name]and not node.style.inline)or node.style.block then boundary()end
+  if not node.hidden and not node.style.hidden then
+   if (blockTags[name]and not node.style.inline)or node.style.block then boundary()end
+   if node.style.gapBefore then gap(node)end
+  end
   if a.id and #a.id>0 and #a.id<=256 and not node.hidden and not node.style.hidden and not ids[a.id]and idCount<256 then
    ids[a.id]=true;idCount=idCount+1;pendingIds[#pendingIds+1]=a.id
   end

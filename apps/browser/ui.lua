@@ -3,10 +3,11 @@ local U={buttons={},focus=1,notice=''}
 local F=dofile('unified_ui.lua')
 U.style=F
 function U.redraw() U.buttons={};smudge.request_update() end
-function U.begin(title,subtitle)
+local function readingBottom(m)return m.h-smudge.line_height('small')-16 end
+function U.begin(title,subtitle,reading)
  if not U.editor then U.editorDraw=nil end
  local m=F.metrics();U.w,U.h=m.w,m.h;U.m=smudge.get_metrics()
- U.pad,U.top,U.bottom=m.pad,m.body_top,m.body_bottom
+ U.pad,U.top,U.bottom=m.pad,m.body_top,reading and readingBottom(m)or m.body_bottom
  U.buttons={};smudge.clear();F.header(title,subtitle or '')
  if U.notice~='' then
   local r=smudge.wrapped_text(U.notice,U.w-2*U.pad,'ui10','regular',4)
@@ -23,7 +24,7 @@ end
 -- Reserve one fitted status line: transient work text must never reflow a page.
 function U.content(font)
  local m=F.metrics();local y=m.body_top+60+smudge.line_height('small')
- local width,height=m.w-2*m.pad,m.body_bottom-y
+ local width,height=m.w-2*m.pad,readingBottom(m)-y
  return {x=m.pad,y=y,width=width,height=height,key=width..':'..height..':'..font,sw=m.w,sh=m.h}
 end
 function U.wrap(s,x,y,width,lines,font,bold)

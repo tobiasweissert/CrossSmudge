@@ -1,6 +1,31 @@
 -- One visible page at a time. Anchors refer to semantic block/span/UTF-8 offsets.
 local L={}
-local function measure(text,font,style)return (smudge.browser_advance or smudge.text_width)(text,font,style)end
+-- Display only: keep source runs and semantic UTF-8 offsets untouched. The
+-- built-in Lexend faces suppress U+202F; ui12 has a real narrow-space glyph.
+function L.displayText(text,font)
+ if font=='lexend14'or font=='lexend16'then return (text:gsub('\226\128\175',' '))end
+ return text
+end
+local sentinel={}
+function L.advance(text,font,style)
+ text=L.displayText(text,font)
+ if smudge.browser_advance then return smudge.browser_advance(text,font,style)end
+ if text==''then return 0 end
+ -- CJK may select an SD fallback for the entire string. Without a native
+ -- advance/font-context API, primary-font sentinel metrics are not valid.
+ -- Retain the legacy measurement there rather than inventing an advance.
+ for _,cp in utf8.codes(text)do
+  if (cp>=0x1100 and cp<=0x11ff)or(cp>=0x2e80 and cp<=0xa97f)or(cp>=0xac00 and cp<=0xd7ff)or(cp>=0xf900 and cp<=0xfaff)or(cp>=0xfe10 and cp<=0xffef)or cp>=0x20000 then return smudge.text_width(text,font,style)end
+ end
+ -- Bracketing exposes leading/trailing spaces and bearings, not just ink.
+ -- Only six fixed body font/style metrics are retained, never article text.
+ if font~='ui12'and font~='lexend14'and font~='lexend16'then return smudge.text_width(text,font,style)end
+ local key=font..(style=='bold'and ':bold'or ':regular')
+ local pair=sentinel[key]
+ if not pair then pair=smudge.text_width('||',font,style);sentinel[key]=pair end
+ return math.max(0,smudge.text_width('|'..text..'|',font,style)-pair)
+end
+local measure=L.advance
 local function copy(a)return {b=a.b or 1,s=a.s or 1,p=a.p or 1}end
 function L.font(run,delta)
  local n=math.max(0,math.min(2,(run.size or 0)+(delta or 0)))

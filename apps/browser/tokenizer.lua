@@ -1,6 +1,6 @@
 -- Streaming, quote-aware HTML/XML tokenizer. No DOM or token array retained.
 local T={}
-function T.scan(s,emit)
+function T.scan(s,emit,styleRange)
  local at,count=1,0
  local function text(first,last)
   while first<=last do
@@ -58,7 +58,10 @@ function T.scan(s,emit)
      -- Raw text tags: '<' inside JavaScript/CSS never creates HTML nodes.
      local a,b
      if type(s)=='table'then a,b=s:rawClose(name,p+1)else a,b=s:find('</%s*'..name:gsub('%a',function(c)return '['..c..c:upper()..']'end)..'%s*>',p+1)end
-     if name=='style'then emit('style',s:sub(p+1,math.min(p+24576,a and a-1 or #s)))end
+     if name=='style'then
+      emit('style',s:sub(p+1,math.min(p+24576,a and a-1 or #s)))
+      if styleRange then styleRange({raw=s,first=p+1,last=a and a-1 or #s})end
+     end
      emit('close',name);p=b or #s
     end
    end
