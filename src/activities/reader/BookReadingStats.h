@@ -17,7 +17,7 @@ struct BookReadingStats {
   bool startDateManual = false;           // Permanent user override for the reading start date
   bool finishedDateManual = false;        // Permanent user override for the finished date
   ReadingStatsDate startDate;             // First qualifying reading date (or manual override)
-  ReadingStatsDate finishedDate;          // Manual or auto-finished date on X3
+  ReadingStatsDate finishedDate;          // Manual or auto-finished date
   std::array<uint32_t, READING_TIME_BUCKET_COUNT> timeOfDaySeconds{};
   std::array<uint32_t, READING_DAY_OF_WEEK_COUNT> dayOfWeekSeconds{};
 

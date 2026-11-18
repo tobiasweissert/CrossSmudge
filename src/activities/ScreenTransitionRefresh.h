@@ -6,7 +6,7 @@
 #include <cstdint>
 
 // Network workflows replace large parts of the screen as their state changes.
-// X4-class panels use a single-pass clean refresh for those transitions;
+// Sticky uses a single-pass clean refresh for those transitions;
 // repeated renders within the same state (progress, signal strength, selection)
 // remain fast.
 class ScreenTransitionRefresh {
@@ -15,7 +15,7 @@ class ScreenTransitionRefresh {
     const bool screenChanged = !hasRendered_ || screenState != lastScreenState_;
     lastScreenState_ = screenState;
     hasRendered_ = true;
-    return screenChanged && !gpio.deviceIsX3() ? HalDisplay::HALF_REFRESH : HalDisplay::FAST_REFRESH;
+    return screenChanged ? HalDisplay::HALF_REFRESH : HalDisplay::FAST_REFRESH;
   }
 
  private:

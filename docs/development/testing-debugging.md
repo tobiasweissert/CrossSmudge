@@ -6,7 +6,7 @@ nav_order: 4
 
 # Testing and Debugging
 
-CrossSmudge runs on real hardware, so debugging usually combines local build checks, simulator checks, and on-device logs.
+Crosscub runs on real hardware, so debugging usually combines local build checks, simulator checks, and on-device logs.
 
 ## Local checks
 
@@ -20,7 +20,7 @@ pio run -e simulator
 pio run -e default
 ```
 
-`pio run` without `-e` builds the X3/X4 and Sticky firmware targets from `platformio.ini`. Use it for a comprehensive build check, but prefer explicit environments while iterating.
+`pio run` without `-e` builds only the Sticky firmware target from `platformio.ini`. Use it for a comprehensive build check, but prefer explicit environments while iterating.
 
 ## Flash and monitor
 

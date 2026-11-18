@@ -29,8 +29,8 @@ function rewriteMarkdownLinks() {
       }
 
       const rootDocUrl = node.url
-        .replace(/^(\.\.\/)+SCOPE\.md(#.*)?$/i, "https://github.com/Mumfee/CrossSmudge/blob/main/SCOPE.md$2")
-        .replace(/^(\.\.\/)+GOVERNANCE\.md(#.*)?$/i, "https://github.com/Mumfee/CrossSmudge/blob/main/GOVERNANCE.md$2");
+        .replace(/^(\.\.\/)+SCOPE\.md(#.*)?$/i, "https://github.com/tobiasweissert/Crosscub/blob/feat/crosscub-sticky-only/SCOPE.md$2")
+        .replace(/^(\.\.\/)+GOVERNANCE\.md(#.*)?$/i, "https://github.com/tobiasweissert/Crosscub/blob/feat/crosscub-sticky-only/GOVERNANCE.md$2");
       if (rootDocUrl !== node.url) {
         node.url = rootDocUrl;
         return;
@@ -61,5 +61,5 @@ export default defineConfig({
   vite: {
     plugins: [watchExternalDocs()],
   },
-  site: "https://mumfee.github.io/CrossSmudge",
+  site: "https://tobiasweissert.github.io/Crosscub",
 });

@@ -574,7 +574,7 @@ void EpubReaderMenuActivity::loop() {
     return;
   }
 
-  // On X4 Pro, the top-edge down-swipe is the opposite of the reader menu's
+  // On legacy Home-key profiles, the top-edge down-swipe is the opposite of the reader menu's
   // upward opening gesture. It dismisses before generic swipe scrolling.
   if (ReaderUtils::isTouchMenuDismissGesture(mappedInput)) {
     finishCancelled();
@@ -657,7 +657,7 @@ void EpubReaderMenuActivity::buildMenuScreen(UiApp::ScreenType& screen) {
 #if CROSSINK_APP_CAP_TOUCH
   const bool tabsAtBottom = readerMenuTabsAtBottom(mappedInput);
   // Sticky has touch but no frontlight, so this is compile-time false there;
-  // X4 Pro still evaluates the runtime placement check.
+  // Legacy Home-key profiles still evaluate the runtime placement check.
   const int contentTop = safe.y + metrics.topPadding + TouchHeaderBackButton::height(metrics, mappedInput) +
                          metrics.tabBarHeight +
                          // cppcheck-suppress knownConditionTrueFalse

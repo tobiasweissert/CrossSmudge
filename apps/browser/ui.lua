@@ -1,19 +1,24 @@
 -- App-local UI: bounded text, shared touch/button hit targets, no framebuffer.
 local U={buttons={},focus=1,notice=''}
-function U.redraw() smudge.request_update() end
+local F=dofile('unified_ui.lua')
+U.style=F
+function U.redraw() U.buttons={};smudge.request_update() end
 function U.begin(title,subtitle)
  if not U.editor then U.editorDraw=nil end
- U.w,U.h=smudge.get_bounds(); U.m=smudge.get_metrics()
- U.pad=math.max(12,U.m.content_side_padding or 20)
- U.top=U.m.top_padding+U.m.header_height+12
- U.bottom=U.h-U.m.button_hints_height-12
- U.buttons={};smudge.clear();smudge.header(title,subtitle or '')
+ local m=F.metrics();U.w,U.h=m.w,m.h;U.m=smudge.get_metrics()
+ U.pad,U.top,U.bottom=m.pad,m.body_top,m.body_bottom
+ U.buttons={};smudge.clear();F.header(title,subtitle or '')
+ if U.notice~='' then
+  local r=smudge.wrapped_text(U.notice,U.w-2*U.pad,'ui10','regular',4)
+  for i,line in ipairs(r.lines)do F.text(U.pad,U.top+(i-1)*smudge.line_height('ui10'),line,'ui10')end
+  U.top=U.top+#r.lines*smudge.line_height('ui10')+8
+ end
 end
 function U.text(x,y,s,font,bold,align,color)
- smudge.text(math.floor(x),math.floor(y),tostring(s),font or 'ui12',bold and 'bold' or 'regular',align or 'left',color~=false)
+ smudge.text(math.floor(x),math.floor(y),tostring(s),font or 'ui10',bold and 'bold' or 'regular',align or 'left',color~=false)
 end
 function U.fit(s,width,font,style)
- font=font or 'ui12'
+ font=font or 'ui10'
  while #s>0 and smudge.text_width(s,font,style)>width do
   local at=#s;while at>1 and s:byte(at)>=128 and s:byte(at)<192 do at=at-1 end
   s=s:sub(1,at-1)
@@ -21,34 +26,42 @@ function U.fit(s,width,font,style)
  return s
 end
 function U.wrap(s,x,y,width,lines,font,bold)
- font=font or 'ui12'
+ font=font or 'ui10'
  local result=smudge.wrapped_text(s,width,font,bold and 'bold' or 'regular',lines)
  for i,line in ipairs(result.lines) do U.text(x,y+(i-1)*smudge.line_height(font),line,font,bold) end
  return y+#result.lines*smudge.line_height(font)
 end
+-- Inset square ring: focus is independent of the semantic primary/selected fill.
+local function focusRing(r,filled)
+ if U.focus==#U.buttons then
+  smudge.rect(r.x+3,r.y+3,r.w-6,r.h-6,false,2,not filled)
+ end
+end
 function U.button(label,x,y,w,h,action,filled,value)
- local i=#U.buttons+1; U.buttons[i]={x,y,w,h,action,label,value}
- smudge.rounded_rect(x,y,w,h,math.min(14,h//4),filled or false,U.focus==i and 3 or 1)
- U.text(x+w/2,y+(h-smudge.line_height('ui12'))/2,U.fit(label,w-12,'ui12','bold'),'ui12',true,'center',not filled)
+ x,y,w,h=math.floor(x),math.floor(y),math.floor(w),math.floor(h)
+ local r=F.button(label,{x=x,y=y,w=w,h=h},filled or false)
+ U.buttons[#U.buttons+1]={r.x,r.y,r.w,r.h,action,label,value}
+ focusRing(r,filled)
+end
+function U.actions(actions,primary)
+ local labels={};for i,a in ipairs(actions)do labels[i]=a[1]end
+ local rects=F.footer(labels,primary)
+ for i,r in ipairs(rects)do local a=actions[i];U.buttons[#U.buttons+1]={r.x,r.y,r.w,r.h,a[2],a[1]};focusRing(r,i==primary)end
 end
 function U.hit(x,y,w,h,action,label)
  U.buttons[#U.buttons+1]={math.floor(x),math.floor(y),math.floor(w),math.floor(h),action,label or 'Link'}
 end
-function U.footer()
- if U.notice~='' then U.text(U.pad,U.bottom-25,U.fit(U.notice,U.w-2*U.pad,'small'),'small') end
- smudge.button_hints('Back','Select','Prev','Next')
-end
+function U.footer() end
 function U.activate(button)
- if button.immediate then button[5](button[7])
- else (U.action or function(f,v)f(v)end)(button[5],button[7])end
+ local action,value=button[5],button[7];U.buttons={}
+ if button.immediate then action(value)
+ else (U.action or function(f,v)f(v)end)(action,value)end
 end
 function U.tap(x,y)
  for i=#U.buttons,1,-1 do local b=U.buttons[i]
-  if smudge.in_rect(x,y,b[1],b[2],b[3],b[4]) then U.focus=i;U.activate(b);U.redraw();return true end
+  if F.hit({x=b[1],y=b[2],w=b[3],h=b[4]},x,y)then U.focus=i;U.activate(b);U.redraw();return true end
  end
- if y>=U.h-U.m.button_hints_height then
-  local keys={'back','confirm','up','down'};on_button(keys[math.min(4,x*4//U.w+1)],true);return true
- end
+ return false
 end
 function U.key(key)
  local n=#U.buttons;if n==0 then return end

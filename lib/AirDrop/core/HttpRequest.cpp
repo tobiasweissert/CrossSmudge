@@ -78,7 +78,9 @@ BodyState BodyDecoder::feed(const uint8_t* data,size_t size,size_t& consumed,Bod
     uint8_t c=data[consumed++];++wire;
     switch(phase){
       case Phase::Size:{int v=hex(c);if(v>=0){if(digits>=16||chunk>(std::numeric_limits<uint64_t>::max()-v)/16){phase=Phase::Failed;break;}chunk=chunk*16+v;++digits;}else if(c=='\r'&&digits){phase=Phase::SizeLf;}else phase=Phase::Failed;break;}
-      case Phase::SizeLf:if(c!='\n'||++chunks>16384||chunk>bodyLimit-payload){phase=Phase::Failed;break;}remaining=chunk;phase=chunk?Phase::Data:Phase::EndCr;chunk=0;digits=0;break;
+      // The terminal zero is framing, not another data chunk. Keep the data
+      // work cap and all zero-chunk CRLF/wire-limit validation independent.
+      case Phase::SizeLf:if(c!='\n'||(chunk&&++chunks>16384)||chunk>bodyLimit-payload){phase=Phase::Failed;break;}remaining=chunk;phase=chunk?Phase::Data:Phase::EndCr;chunk=0;digits=0;break;
       case Phase::DataCr:phase=c=='\r'?Phase::DataLf:Phase::Failed;break;
       case Phase::DataLf:
         phase=c=='\n'?Phase::Size:Phase::Failed;

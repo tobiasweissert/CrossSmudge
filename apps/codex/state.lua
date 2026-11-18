@@ -25,6 +25,8 @@ state = {
     phase = "battle",
     rewardIdx = 1,
     savedScreen = "combat",
+    turn = 1,
+    pendingDiscard = 0,
     eventId = 0
 }
 
@@ -37,36 +39,13 @@ function has_relic(id)
     return false
 end
 function save_game_state()
-    if not state.inRun then
-        smudge.save("codex_save", "")
-        return
-    end
-    local s = "floor=" .. state.floor ..
-        "\ngold=" .. state.gold ..
-        "\nhp=" .. state.playerHp ..
-        "\nmaxHp=" .. state.playerMaxHp ..
-        "\nward=" .. state.playerWard ..
-        "\nink=" .. state.ink ..
-        "\ndeck=" .. table.concat(state.deck, ",") ..
-        "\nrelics=" .. table.concat(state.relics, ",") ..
-        "\nhand=" .. table.concat(state.hand, ",") ..
-        "\ndraw=" .. table.concat(state.drawPile, ",") ..
-        "\ndisc=" .. table.concat(state.discardPile, ",") ..
-        "\nsavedScreen=" .. (state.savedScreen or active_screen_name or "combat") ..
-        "\neventId=" .. (state.eventId or 0)
-    if state.enemy then
-        local e = state.enemy
-        s = s .. "\nenemyName=" .. e.name ..
-            "\nenemyHp=" .. e.hp ..
-            "\nenemyMaxHp=" .. e.maxHp ..
-            "\nenemyWard=" .. e.ward ..
-            "\nenemySpriteId=" .. e.spriteId ..
-            "\nenemyIsElite=" .. (e.isElite and "1" or "0") ..
-            "\nenemyIsBoss=" .. (e.isBoss and "1" or "0") ..
-            "\nenemyIntent=" .. e.intent ..
-            "\nenemyIntentVal=" .. e.intentVal
-    end
-    smudge.save("codex_save", s)
+    if state.saveBlocked then return false end
+    if not state.inRun then smudge.save("codex_save", ""); return end
+    local codec = dofile("save_codec.lua")
+    local data = codec.encode()
+    if not pcall(codec.decode, data) then return false end
+    smudge.save("codex_save", data)
+    return true
 end
 
 function delete_save_state()
@@ -74,6 +53,10 @@ function delete_save_state()
 end
 
 function start_new_run()
+    state.saveBlocked = false
+    state.saveNotice = nil
+    state.turn = 1
+    state.outcomeText = ""
     state.playerHp = 50
     state.playerMaxHp = 50
     state.gold = 50

@@ -132,12 +132,10 @@ bool LuaRunner::init() {
   currentAllocatedBytes_ = 0;
   preventAutoSleep_.store(false, std::memory_order_relaxed);
 
-#if defined(SIMULATOR_DEVICE_X3)
-  maxLuaHeapBytes_ = 75 * 1024;  // 75 KB exact X3 hardware DRAM ceiling
-#elif defined(SIMULATOR)
-  const char* simX3Env = getenv("SMUDGE_X3_CONSTRAINTS");
-  if (simX3Env && simX3Env[0] == '1') {
-    maxLuaHeapBytes_ = 75 * 1024;  // 75 KB exact X3 simulation via env var
+#if defined(SIMULATOR)
+  const char* lowMemoryStressEnv = getenv("SMUDGE_X3_CONSTRAINTS");
+  if (lowMemoryStressEnv && lowMemoryStressEnv[0] == '1') {
+    maxLuaHeapBytes_ = 75 * 1024;  // Retained 75 KB legacy stress-fixture alias; not a board target
   } else {
     maxLuaHeapBytes_ = 2 * 1024 * 1024;  // 2 MB default simulator host
   }
@@ -1985,14 +1983,8 @@ int LuaRunner::l_getBattery(lua_State* L) {
 int LuaRunner::l_getDevice(lua_State* L) {
 #if defined(SIMULATOR)
   lua_pushstring(L, "simulator");
-#elif defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY
-  lua_pushstring(L, "sticky");
-#elif defined(FREEINK_DEVICE_X4PRO) && FREEINK_DEVICE_X4PRO
-  lua_pushstring(L, "x4pro");
-#elif defined(FREEINK_DEVICE_X4CLASSIC) && FREEINK_DEVICE_X4CLASSIC
-  lua_pushstring(L, "x4");
 #else
-  lua_pushstring(L, "x3");
+  lua_pushstring(L, "sticky");
 #endif
   return 1;
 }

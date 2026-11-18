@@ -52,7 +52,9 @@ func preflight(data []byte) error {
 		return fail("too_large")
 	}
 	z := html.NewTokenizer(bytes.NewReader(data))
-	count, depth := 0, 0
+	// Lexical tag balance is not DOM depth: HTML permits implied end tags.
+	// Bound parser input here; inspect the actual tree depth after html.Parse.
+	count := 0
 	for {
 		tt := z.Next()
 		if tt == html.ErrorToken {
@@ -69,15 +71,6 @@ func preflight(data []byte) error {
 			if len(z.Raw()) > 8192 {
 				return fail("too_large")
 			}
-			t := z.Token()
-			if tt == html.StartTagToken && !strings.Contains(" area base br col embed hr img input link meta param source track wbr ", " "+t.Data+" ") {
-				depth++
-				if depth > 128 {
-					return fail("too_large")
-				}
-			}
-		} else if tt == html.EndTagToken && depth > 0 {
-			depth--
 		}
 	}
 }
@@ -117,8 +110,111 @@ func stylesheets(data []byte, base *url.URL) []string {
 	return out
 }
 
-var cssRule = regexp.MustCompile(`(?s)([^{}]+)\{([^{}]*)\}`)
+// cssRules recognizes only complete, unconditional, flat rules. All at-rule
+// groups (including screen queries) are intentionally unsupported, not promoted
+// to unconditional visibility. One bounded scan; no recursion or CSS execution.
+func cssRules(sheet string) [][2]string {
+	out := [][2]string{}
+	var prelude, body strings.Builder
+	depth, rules := 0, 0
+	quote := byte(0)
+	comment, nested := false, false
+	write := func(c byte) {
+		if depth == 0 {
+			prelude.WriteByte(c)
+		} else if depth == 1 {
+			body.WriteByte(c)
+		}
+	}
+	for i := 0; i < len(sheet); i++ {
+		c := sheet[i]
+		if comment {
+			if c == '*' && i+1 < len(sheet) && sheet[i+1] == '/' {
+				comment = false
+				i++
+			}
+			continue
+		}
+		if quote != 0 {
+			if c == '\\' {
+				i++
+			} else if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		if c == '/' && i+1 < len(sheet) && sheet[i+1] == '*' {
+			comment = true
+			i++
+			write(' ')
+			continue
+		}
+		if c == '\'' || c == '"' {
+			quote = c
+			write('?')
+			continue
+		}
+		// Escaped selector/property syntax is unsupported. Do not interpret its
+		// escaped delimiter as a new group boundary or hide declaration.
+		if c == '\\' {
+			write('?')
+			i++
+			continue
+		}
+		switch c {
+		case '{':
+			rules++
+			if rules > 1024 {
+				return out
+			}
+			if depth == 0 {
+				body.Reset()
+				nested = false
+			} else {
+				nested = true
+			}
+			depth++
+		case '}':
+			if depth == 0 {
+				return out
+			} // malformed remainder
+			depth--
+			if depth == 0 {
+				s := strings.TrimSpace(prelude.String())
+				if !nested && s != "" && s[0] != '@' {
+					out = append(out, [2]string{s, body.String()})
+				}
+				prelude.Reset()
+				body.Reset()
+			}
+		case ';':
+			if depth == 0 {
+				prelude.Reset()
+			} else {
+				write(c)
+			}
+		default:
+			write(c)
+		}
+	}
+	return out // incomplete groups, comments and strings never publish a rule
+}
+
 var simpleSelector = regexp.MustCompile(`^(?:[a-zA-Z][a-zA-Z0-9-]*)?(?:[.#][a-zA-Z_][a-zA-Z0-9_-]*)?$`)
+
+// HTML class tokens are case-sensitive and separated only by ASCII whitespace.
+func hasHTMLClass(classes, want string) bool {
+	start := 0
+	for i := 0; i <= len(classes); i++ {
+		if i == len(classes) || strings.ContainsRune(" \t\n\r\f", rune(classes[i])) {
+			if classes[start:i] == want {
+				return true
+			}
+			start = i + 1
+		}
+	}
+	return false
+}
 
 func hiddenStyle(s string) bool {
 	s = strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(s, " ", ""), "\n", ""), "\t", ""))
@@ -192,9 +288,9 @@ func convertWithCSS(data []byte, target, mode string, css []string) (*Document, 
 		if cssBytes > 128<<10 {
 			break
 		}
-		for _, m := range cssRule.FindAllStringSubmatch(sheet, 1024) {
-			if hiddenStyle(m[2]) {
-				for _, s := range strings.Split(m[1], ",") {
+		for _, m := range cssRules(sheet) {
+			if hiddenStyle(m[1]) {
+				for _, s := range strings.Split(m[0], ",") {
 					s = strings.TrimSpace(s)
 					if simpleSelector.MatchString(s) && len(selectors) < 256 {
 						selectors = append(selectors, s)
@@ -234,7 +330,7 @@ func convertWithCSS(data []byte, target, mode string, css []string) (*Document, 
 			if qual[0] == '#' && attr(n, "id") == qual[1:] {
 				return true
 			}
-			if qual[0] == '.' && strings.Contains(" "+attr(n, "class")+" ", " "+qual[1:]+" ") {
+			if qual[0] == '.' && hasHTMLClass(attr(n, "class"), qual[1:]) {
 				return true
 			}
 		}
@@ -591,8 +687,9 @@ func convertWithCSS(data []byte, target, mode string, css []string) (*Document, 
 			marks = nil
 			runs := []Run{}
 			inline(n, Run{}, &runs)
-			for _, r := range runs {
-				add(Block{Kind: "p", Runs: []Run{r}}, nil)
+			for i, r := range runs {
+				// Only successors from this single source text node are contiguous.
+				add(Block{Kind: "p", Runs: []Run{r}, Continued: i > 0}, nil)
 			}
 		}
 		for c := n.FirstChild; c != nil; c = c.NextSibling {

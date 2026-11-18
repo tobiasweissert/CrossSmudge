@@ -18,6 +18,7 @@ OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback, void*, s
 #include <utility>
 
 #include "AppVersion.h"
+#include "CrosscubOtaPolicy.h"
 #include "FirmwareFlasher.h"
 #include "OtaUpdater.h"
 #include "esp_http_client.h"
@@ -27,19 +28,10 @@ OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback, void*, s
 #include "network/WifiPowerSaveGuard.h"
 
 namespace {
-#ifndef CROSSSMUDGE_OTA_RELEASE_URL
-#define CROSSSMUDGE_OTA_RELEASE_URL "https://api.github.com/repos/Mumfee/CrossSmudge/releases/latest"
-#endif
+constexpr const char* latestReleaseUrl = crosscub_ota::releaseUrl;
 
-constexpr char latestReleaseUrl[] = CROSSSMUDGE_OTA_RELEASE_URL;
-
-#ifdef CROSSSMUDGE_FIRMWARE_DEVICE_TYPE
-constexpr char firmwareAssetStem[] = "firmware-" CROSSSMUDGE_FIRMWARE_DEVICE_TYPE;
-constexpr char firmwareAssetName[] = "firmware-" CROSSSMUDGE_FIRMWARE_DEVICE_TYPE ".bin";
-#else
-constexpr char firmwareAssetStem[] = "firmware";
-constexpr char firmwareAssetName[] = "firmware.bin";
-#endif
+constexpr char firmwareAssetStem[] = "crosscub-sticky";
+constexpr char firmwareAssetName[] = "crosscub-sticky.bin";
 
 constexpr char binSuffix[] = ".bin";
 constexpr size_t VERSION_SEGMENT_COUNT = 4;
@@ -287,6 +279,7 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
 
   esp_http_client_config_t client_config = {
       .url = latestReleaseUrl,
+      .disable_auto_redirect = true,
       .event_handler = release_manifest_event_handler,
       // 4096 holds the API response headers; the 32KB body streams through the
       // parser in chunks so RX needn't be larger. TX only carries our GET.
@@ -307,7 +300,7 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
     return INTERNAL_UPDATE_ERROR;
   }
 
-  esp_err = esp_http_client_set_header(client_handle, "User-Agent", "CrossSmudge-ESP32-" CROSSSMUDGE_VERSION);
+  esp_err = esp_http_client_set_header(client_handle, "User-Agent", "Crosscub-ESP32-" CROSSSMUDGE_VERSION);
   if (esp_err != ESP_OK) {
     LOG_ERR("OTA", "esp_http_client_set_header Failed : %s", esp_err_to_name(esp_err));
     esp_http_client_cleanup(client_handle);
@@ -321,7 +314,10 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
     return HTTP_ERROR;
   }
 
+  const int status = esp_http_client_get_status_code(client_handle);
   esp_err = esp_http_client_cleanup(client_handle);
+  if (status == 404) return NO_UPDATE;  // Own-product feed has not been published yet.
+  if (status != 200) return HTTP_ERROR;
   if (esp_err != ESP_OK) {
     LOG_ERR("OTA", "esp_http_client_cleanup Failed : %s", esp_err_to_name(esp_err));
     return INTERNAL_UPDATE_ERROR;
@@ -337,6 +333,7 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
   }
 
   latestVersion = releaseParser.getTagName();
+  if (!crosscub_ota::version(latestVersion.c_str())) return NO_UPDATE;
 
   if (!releaseParser.foundFirmware()) {
     LOG_ERR("OTA", "No matching %s asset found for release %s", firmwareAssetStem, latestVersion.c_str());
@@ -346,6 +343,10 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
   otaUrl = releaseParser.getFirmwareUrl();
   otaSha256 = releaseParser.getFirmwareSha256();
   otaSize = releaseParser.getFirmwareSize();
+  if (!crosscub_ota::acceptsDownload(latestVersion.c_str(), otaUrl.c_str(), otaSha256.c_str(), otaSize)) {
+    LOG_ERR("OTA", "Release is not a pinned Crosscub Sticky update");
+    return NO_UPDATE;
+  }
   totalSize = otaSize;
   updateAvailable = true;
 
@@ -360,7 +361,7 @@ bool OtaUpdater::isUpdateNewer() const {
     return false;
   }
 
-  const int comparison = compareVersions(latestVersion.c_str(), CROSSSMUDGE_VERSION);
+  const int comparison = compareVersions(crosscub_ota::version(latestVersion.c_str()), CROSSSMUDGE_VERSION);
   LOG_DBG("OTA", "Version comparison latest=%s current=%s result=%d", latestVersion.c_str(), CROSSSMUDGE_VERSION,
           comparison);
   return comparison > 0;
@@ -391,6 +392,9 @@ OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback onProgres
     return JSON_PARSE_ERROR;
   }
 
+  if (!crosscub_ota::acceptsDownload(latestVersion.c_str(), otaUrl.c_str(), otaSha256.c_str(), otaSize)) {
+    return JSON_PARSE_ERROR;
+  }
   processedSize = 0;
 
   const esp_partition_t* updatePartition = esp_ota_get_next_update_partition(nullptr);
@@ -500,6 +504,15 @@ OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback onProgres
     return INTERNAL_UPDATE_ERROR;
   }
 
+  uint8_t descriptor[112];
+  if (!stagedFile.seek(0) || stagedFile.read(descriptor, sizeof(descriptor)) != sizeof(descriptor) ||
+      !crosscub_ota::acceptsImageVersion(descriptor, sizeof(descriptor), latestVersion.c_str(),
+                                         CROSSSMUDGE_VERSION, compareVersions)) {
+    LOG_ERR("OTA", "Refusing an unbound, malformed or non-newer Crosscub application descriptor");
+    stagedFile.close();
+    Storage.remove(OTA_STAGE_PATH);
+    return WRONG_DEVICE_ERROR;
+  }
   const auto validationResult = firmware_flash::validateOpenImageFile(stagedFile, updatePartition->size);
   if (validationResult != firmware_flash::Result::OK) {
     LOG_ERR("OTA", "Staged firmware validation failed: %s", firmware_flash::resultName(validationResult));

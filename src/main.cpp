@@ -18,9 +18,6 @@
 #include <Logging.h>
 #include <Memory.h>
 #include <SPI.h>
-#if !defined(SIMULATOR) && !FREEINK_MCU_C3
-#include <XteinkDetect.h>
-#endif
 #include <builtinFonts/all.h>
 #include <uzlib.h>
 
@@ -129,8 +126,8 @@ DictionaryRegistry dictionaryRegistry;
 FontCacheManager fontCacheManager(renderer.getFontMap(), renderer.getSdCardFonts());
 static unsigned long allowSleepAt = 0;
 static ButtonShortcutController buttonShortcutController;
-static unsigned long lastX4ProHomeKeyTapAt = 0;
-static bool x4ProHomeKeyTapPending = false;
+static unsigned long lastCapacitiveHomeKeyTapAt = 0;
+static bool capacitiveHomeKeyTapPending = false;
 // A held power button can span deep-sleep wake and the first main-loop frame.
 // Do not treat that wake gesture as an in-session shortcut until it has been released.
 static bool powerButtonReleasedSinceWake = false;
@@ -139,7 +136,7 @@ static bool powerButtonReleasedSinceWake = false;
 static bool wakePowerReleasePending = false;
 
 namespace {
-constexpr unsigned long X4PRO_HOME_KEY_DOUBLE_TAP_MS = 300;
+constexpr unsigned long HOME_KEY_DOUBLE_TAP_MS = 300;
 
 struct QuickLockBadgeBackdrop {
   static constexpr int SIZE = 40;
@@ -535,7 +532,7 @@ CrossPointSettings::SHORT_PWRBTN getPowerButtonAction() {
 
 void notifyQuickLockChanged() {
   const bool locked = buttonShortcutController.isQuickLocked();
-  x4ProHomeKeyTapPending = false;
+  capacitiveHomeKeyTapPending = false;
   mappedInputManager.clearInjectedReleases();
   LOG_DBG("MAIN", "Quick Lock %s", locked ? "enabled" : "disabled");
   if (locked) {
@@ -810,7 +807,7 @@ void putTiltSensorToSleepForDeepSleep() {
   LOG_ERR("MAIN", "Tilt sensor did not confirm sleep before deep sleep");
 }
 
-bool executeX4ProHomeButtonAction(const uint8_t action,
+bool executeCapacitiveHomeButtonAction(const uint8_t action,
                                   const QuickLockTrigger quickLockTrigger = QuickLockTrigger::None) {
   switch (action) {
     case CrossPointSettings::HOME_BUTTON_BACK_HOME:
@@ -845,7 +842,7 @@ bool executeX4ProHomeButtonAction(const uint8_t action,
   return true;
 }
 
-bool wasX4ProHomeKeyTapped() {
+bool wasCapacitiveHomeKeyTapped() {
 #ifdef SIMULATOR
   return simulatorHomeKeyInput.wasTapped();
 #else
@@ -853,7 +850,7 @@ bool wasX4ProHomeKeyTapped() {
 #endif
 }
 
-bool wasX4ProHomeKeyLongPressed() {
+bool wasCapacitiveHomeKeyLongPressed() {
 #ifdef SIMULATOR
   return simulatorHomeKeyInput.wasLongPressed();
 #else
@@ -861,7 +858,7 @@ bool wasX4ProHomeKeyLongPressed() {
 #endif
 }
 
-bool unlockX4ProHomeQuickLock(const QuickLockTrigger trigger) {
+bool unlockCapacitiveHomeQuickLock(const QuickLockTrigger trigger) {
   if (!buttonShortcutController.tryUnlockWithTrigger(millis(), trigger)) {
     return false;
   }
@@ -869,40 +866,40 @@ bool unlockX4ProHomeQuickLock(const QuickLockTrigger trigger) {
   return true;
 }
 
-bool handleX4ProHomeKeyQuickLockUnlock() {
+bool handleCapacitiveHomeKeyQuickLockUnlock() {
   if (!mappedInputManager.hasHomeKey()) {
     return false;
   }
 
   const QuickLockTrigger trigger = buttonShortcutController.quickLockTrigger();
   if (trigger == QuickLockTrigger::HomeTap) {
-    return wasX4ProHomeKeyTapped() && unlockX4ProHomeQuickLock(trigger);
+    return wasCapacitiveHomeKeyTapped() && unlockCapacitiveHomeQuickLock(trigger);
   }
   if (trigger == QuickLockTrigger::HomeLongPress) {
-    return wasX4ProHomeKeyLongPressed() && unlockX4ProHomeQuickLock(trigger);
+    return wasCapacitiveHomeKeyLongPressed() && unlockCapacitiveHomeQuickLock(trigger);
   }
   if (trigger != QuickLockTrigger::HomeDoubleTap) {
     return false;
   }
 
   const unsigned long now = millis();
-  if (x4ProHomeKeyTapPending && now - lastX4ProHomeKeyTapAt > X4PRO_HOME_KEY_DOUBLE_TAP_MS) {
-    x4ProHomeKeyTapPending = false;
+  if (capacitiveHomeKeyTapPending && now - lastCapacitiveHomeKeyTapAt > HOME_KEY_DOUBLE_TAP_MS) {
+    capacitiveHomeKeyTapPending = false;
   }
-  if (!wasX4ProHomeKeyTapped()) {
+  if (!wasCapacitiveHomeKeyTapped()) {
     return false;
   }
-  if (!x4ProHomeKeyTapPending) {
-    lastX4ProHomeKeyTapAt = now;
-    x4ProHomeKeyTapPending = true;
+  if (!capacitiveHomeKeyTapPending) {
+    lastCapacitiveHomeKeyTapAt = now;
+    capacitiveHomeKeyTapPending = true;
     return true;
   }
 
-  x4ProHomeKeyTapPending = false;
-  return unlockX4ProHomeQuickLock(trigger);
+  capacitiveHomeKeyTapPending = false;
+  return unlockCapacitiveHomeQuickLock(trigger);
 }
 
-bool handleX4ProHomeKeyShortcuts() {
+bool handleCapacitiveHomeKeyShortcuts() {
   if (!mappedInputManager.hasHomeKey()) {
     return false;
   }
@@ -910,66 +907,66 @@ bool handleX4ProHomeKeyShortcuts() {
   // A modal owns Home too. Clear a pending single tap so a gesture started
   // while Quick Actions is open cannot fire after the popup closes.
   if (activityManager.blocksGlobalInput()) {
-    const bool hadPendingTap = x4ProHomeKeyTapPending;
-    x4ProHomeKeyTapPending = false;
+    const bool hadPendingTap = capacitiveHomeKeyTapPending;
+    capacitiveHomeKeyTapPending = false;
     mappedInputManager.clearDeferredHomeGesture();
-    return hadPendingTap || wasX4ProHomeKeyTapped() || wasX4ProHomeKeyLongPressed();
+    return hadPendingTap || wasCapacitiveHomeKeyTapped() || wasCapacitiveHomeKeyLongPressed();
   }
 
   // Reader menus set the touchscreen override while they are active, which
   // intentionally lets Home work there. On a page, consume every Home edge
   // and discard a deferred single tap so nothing fires after it is re-enabled.
   if (mappedInputManager.isHomeButtonLockedInReader()) {
-    const bool hadPendingTap = x4ProHomeKeyTapPending;
-    x4ProHomeKeyTapPending = false;
+    const bool hadPendingTap = capacitiveHomeKeyTapPending;
+    capacitiveHomeKeyTapPending = false;
     mappedInputManager.clearDeferredHomeGesture();
-    return hadPendingTap || wasX4ProHomeKeyTapped() || wasX4ProHomeKeyLongPressed();
+    return hadPendingTap || wasCapacitiveHomeKeyTapped() || wasCapacitiveHomeKeyLongPressed();
   }
 
   // A lower-bezel swipe can report a capacitive Home tap as well. Let the
   // screen gesture win and cancel any delayed single-tap interpretation so it
   // cannot navigate Home after the list has already handled the swipe.
   if (mappedInputManager.wasSwipe() != MappedInputManager::SwipeDir::None) {
-    x4ProHomeKeyTapPending = false;
+    capacitiveHomeKeyTapPending = false;
     mappedInputManager.clearDeferredHomeGesture();
     return false;
   }
 
   const unsigned long now = millis();
   bool completedPendingTap = false;
-  if (x4ProHomeKeyTapPending && now - lastX4ProHomeKeyTapAt > X4PRO_HOME_KEY_DOUBLE_TAP_MS) {
+  if (capacitiveHomeKeyTapPending && now - lastCapacitiveHomeKeyTapAt > HOME_KEY_DOUBLE_TAP_MS) {
     // A single-tap action must wait briefly so the reader does not navigate
     // away before a second capacitive-key tap can be recognized.
-    x4ProHomeKeyTapPending = false;
+    capacitiveHomeKeyTapPending = false;
     if (SETTINGS.homeButtonTapAction == CrossPointSettings::HOME_BUTTON_BACK_HOME) {
       // Keep reader menus and other overlays on their existing local Home route.
       mappedInputManager.queueDeferredHomeGesture();
     } else {
-      executeX4ProHomeButtonAction(SETTINGS.homeButtonTapAction, QuickLockTrigger::HomeTap);
+      executeCapacitiveHomeButtonAction(SETTINGS.homeButtonTapAction, QuickLockTrigger::HomeTap);
       completedPendingTap = true;
     }
   }
 
-  if (wasX4ProHomeKeyLongPressed()) {
+  if (wasCapacitiveHomeKeyLongPressed()) {
     // A hold is a separate gesture, not the second half of a double tap.
-    x4ProHomeKeyTapPending = false;
+    capacitiveHomeKeyTapPending = false;
     if (SETTINGS.homeButtonLongPressAction == CrossPointSettings::HOME_BUTTON_READER_MENU) {
       return completedPendingTap;
     }
-    executeX4ProHomeButtonAction(SETTINGS.homeButtonLongPressAction, QuickLockTrigger::HomeLongPress);
+    executeCapacitiveHomeButtonAction(SETTINGS.homeButtonLongPressAction, QuickLockTrigger::HomeLongPress);
     return true;
   }
 
-  if (!wasX4ProHomeKeyTapped()) return completedPendingTap;
+  if (!wasCapacitiveHomeKeyTapped()) return completedPendingTap;
 
-  if (!x4ProHomeKeyTapPending) {
-    lastX4ProHomeKeyTapAt = now;
-    x4ProHomeKeyTapPending = true;
+  if (!capacitiveHomeKeyTapPending) {
+    lastCapacitiveHomeKeyTapAt = now;
+    capacitiveHomeKeyTapPending = true;
     return true;
   }
 
-  x4ProHomeKeyTapPending = false;
-  executeX4ProHomeButtonAction(SETTINGS.homeButtonDoubleTapAction, QuickLockTrigger::HomeDoubleTap);
+  capacitiveHomeKeyTapPending = false;
+  executeCapacitiveHomeButtonAction(SETTINGS.homeButtonDoubleTapAction, QuickLockTrigger::HomeDoubleTap);
   return true;
 }
 }  // namespace
@@ -1007,8 +1004,7 @@ static bool preflightSleepFrameBuffer() {
   }
 
 #ifdef SIMULATOR
-  // The simulator's legacy display stub has no X3 runtime geometry. This path
-  // is unreachable there because it cannot identify a UC8279 X3 profile.
+  // The simulator uses the legacy display stub's fixed buffer geometry.
   const size_t expectedSize = HalDisplay::BUFFER_SIZE;
 #else
   const size_t expectedSize = EInkDisplay::X3_BUFFER_SIZE;
@@ -1024,11 +1020,7 @@ static bool preflightSleepFrameBuffer() {
 }
 
 bool shouldClearX4WakeGhosting() {
-#if FREEINK_DEVICE_X4
-  return gpio.deviceIsX4();
-#else
   return false;
-#endif
 }
 
 // Wake validation runs before the SD card and its settings file are available.
@@ -1103,7 +1095,7 @@ void enterDeepSleep(bool fromTimeout) {
     }
   }
 
-  // Last chance to sample: startDeepSleep() cuts the SD rail on X3, so nothing
+  // Last chance to sample before deep sleep, when nothing
   // can be written again until the next wake.
   BatteryDiagnosticLog::record(BatteryDiagnosticLog::Event::Sleep, BoardConfig::ACTIVE.name);
   // All sleep-time file writes are complete. Stop SDMMC before the power path
@@ -1119,18 +1111,6 @@ void enterDeepSleep(bool fromTimeout) {
 }
 
 void setupDisplayAndFonts(const bool seamless, const bool loadReaderResources, const bool useReaderRenderStack) {
-#if !defined(SIMULATOR) && !FREEINK_MCU_C3
-  // C3 X3/X4 detection already runs in HalGPIO::begin() before SPI owns the
-  // panel pins. S3 boards initialize display SPI inside display.begin(), so an
-  // X4 Pro must resolve a UC8179 replacement panel here, before driver selection.
-  static bool controllerResolved = false;
-  if (!controllerResolved) {
-    controllerResolved = true;
-    if (freeink::applyXteinkDisplayController()) {
-      LOG_DBG("MAIN", "Panel controller: UltraChip UC81xx variant detected");
-    }
-  }
-#endif
 
 #ifdef SIMULATOR
   (void)seamless;
@@ -1191,18 +1171,11 @@ void setup() {
   // Web Serial sends file data in 256-byte chunks and waits for a 1-byte ACK.
   // Native USB CDC needs a larger queue because TinyUSB can deliver several
   // chunks before the cooperative transfer loop runs.
-#if !defined(SIMULATOR) && FREEINK_DEVICE_X4PRO && !ARDUINO_USB_MODE
-  logSerial.setRxBufferSize(4096);
-#else
   logSerial.setRxBufferSize(1024);
-#endif
 #if ARDUINO_USB_MODE
   logSerial.setTxBufferSize(1024);
 #endif
   Serial.begin(115200);
-#if !defined(SIMULATOR) && FREEINK_DEVICE_X4PRO && !ARDUINO_USB_MODE
-  UsbSerialFileTransfer::registerUsbCdcOverflowHandler();
-#endif
 #if !defined(SIMULATOR) && LOG_SERIAL_HAS_TX_TIMEOUT
   logSerial.setTxTimeoutMs(1);  // This is a load-bearing 1. Do not modify.
 #endif
@@ -1260,12 +1233,8 @@ void setup() {
 #endif
 
 #ifndef SIMULATOR
-  // X4 Pro and X4 Classic both map Up to the GPIO0 boot strap. Use Down for
-  // recovery so holding the recovery chord cannot strand either S3 board in a
-  // boot-mode loop.
-  const auto recoveryButton = (BoardConfig::isX4Pro() || CROSSINK_APP_DEVICE_X4CLASSIC)
-                                  ? MappedInputManager::Button::Down
-                                  : MappedInputManager::Button::Up;
+  // Use the safe recovery input so holding the chord cannot cause a boot-mode loop.
+  const auto recoveryButton = MappedInputManager::Button::Up;
   const bool recoveryFirmwareMode = wakeupReason == HalGPIO::WakeupReason::PowerButton && !BoardConfig::isPaperMono() &&
                                     mappedInputManager.isPressed(recoveryButton);
 #else
@@ -1275,17 +1244,10 @@ void setup() {
   halTiltSensor.begin();
   halClock.begin();
 
-#if FREEINK_DEVICE_X4 || FREEINK_DEVICE_X3
-  LOG_INF("MAIN", "Hardware detect: %s", gpio.deviceIsX3() ? "X3" : "X4");
-  LOG_INF("BOOT", "Post-GPIO diagnostic: device=%s usb=%d silentReboot=%d silentTarget=%lu",
-          gpio.deviceIsX3() ? "X3" : "X4", gpio.isUsbConnected() ? 1 : 0, isSilentReboot ? 1 : 0,
-          static_cast<unsigned long>(snapshotTarget));
-#else
 #ifdef SIMULATOR
   LOG_INF("MAIN", "Device: Simulator");
 #else
   LOG_INF("MAIN", "Device: %s", BoardConfig::ACTIVE.name);
-#endif
 #endif
 
   LOG_INF("BOOT", "Wake route: %s", wakeupRouteName(wakeupReason));
@@ -1366,15 +1328,15 @@ void setup() {
 
   if (recoveryFirmwareMode) {
     LOG_INF("MAIN", "Recovery firmware mode (%s + POWER held at boot)",
-            (BoardConfig::isX4Pro() || CROSSINK_APP_DEVICE_X4CLASSIC) ? "DOWN" : "UP");
+            "UP");
   }
 
   // First serial output only here to avoid timing inconsistencies for power button press duration verification
-  LOG_DBG("MAIN", "Starting CrossSmudge version " CROSSSMUDGE_VERSION);
+  LOG_DBG("MAIN", "Starting Crosscub version " CROSSSMUDGE_VERSION);
   logMemoryStats("Boot");
 
   // Resolve the single boot-presentation decision. Skipping the splash also
-  // skips the panel-clearing pass and the X3 initial-full-sync arming (see
+  // skips the panel-clearing pass and SDK initial-full-sync arming (see
   // HalDisplay::begin), so the first paint is FAST_REFRESH (~500ms) over the
   // retained frame and input dispatches against a visible UI.
   if (APP_STATE.quickLockResumePending) {
@@ -1402,16 +1364,13 @@ void setup() {
                             : isSilentReboot   ? BootResume::Silent
                             : skipSplashOnWake ? BootResume::SplashlessWake
                                                : BootResume::Splash;
-  bool isUc8279X3 = false;
-#ifndef SIMULATOR
-  isUc8279X3 = gpio.deviceIsX3() && BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX3Uc8279;
-#endif
-  const bool hasValidSleepFrame = resume == BootResume::SplashlessWake && isUc8279X3 && preflightSleepFrameBuffer();
+  constexpr bool needsInitialControllerResync = false;
+  const bool hasValidSleepFrame = resume == BootResume::SplashlessWake && needsInitialControllerResync && preflightSleepFrameBuffer();
   const bool shouldRestoreSleepFrame =
-      resume == BootResume::SplashlessWake && (isUc8279X3 ? hasValidSleepFrame : Storage.exists(SLEEP_FRAME_FILE));
+      resume == BootResume::SplashlessWake && (needsInitialControllerResync ? hasValidSleepFrame : Storage.exists(SLEEP_FRAME_FILE));
   bool allowFastInitialReaderRefresh = false;
 
-  setupDisplayAndFonts(SleepWakePolicy::shouldInitializeSeamlessly(resume, isUc8279X3, hasValidSleepFrame),
+  setupDisplayAndFonts(SleepWakePolicy::shouldInitializeSeamlessly(resume, needsInitialControllerResync, hasValidSleepFrame),
                        resume != BootResume::Network, useReaderRenderStack);
   logBootHeap("display and selected fonts ready");
 
@@ -1431,9 +1390,9 @@ void setup() {
       APP_STATE.showBootScreen = true;
       APP_STATE.saveToFile();
       if (shouldRestoreSleepFrame && loadSleepFrameBuffer()) {
-        const bool useDifferentialRefresh = gpio.deviceIsX3();
+        constexpr bool useDifferentialRefresh = false;
         if (useDifferentialRefresh) {
-          // begin() clears the X3 controller RAM, so restore the saved frame as
+          // The SDK may clear controller RAM during begin(), so restore the saved frame as
           // the baseline before replacing the moon with the loading icon.
           renderer.cleanupGrayscaleWithFrameBuffer();
         }
@@ -1446,21 +1405,21 @@ void setup() {
         } else {
           renderer.displayBuffer(HalDisplay::HALF_REFRESH);
           if (shouldClearX4WakeGhosting()) {
-            // The X4's explicit wake refresh has already cleaned the retained
+            // The explicit wake refresh has already cleaned the retained
             // frame, so the reader can use its fast initial cycle as well.
             allowFastInitialReaderRefresh = true;
           }
         }
-      } else if (isUc8279X3 && hasValidSleepFrame) {
+      } else if (needsInitialControllerResync && hasValidSleepFrame) {
         // The frame passed the size preflight but could not be read after display
         // setup. Do one clean, device-specific recovery rather than painting
         // differentially against an invalid controller baseline.
-        LOG_ERR("BOOT", "Quick Resume frame load failed; rebuilding UC8279 X3 display baseline");
+        LOG_ERR("BOOT", "Quick Resume frame load failed; rebuilding controller display baseline");
         Storage.remove(SLEEP_FRAME_FILE);
         renderer.clearScreen();
         renderer.displayBuffer(HalDisplay::HALF_REFRESH);
       } else if (shouldClearX4WakeGhosting() && SETTINGS.fadingFix != 0) {
-        LOG_INF("BOOT", "X4 wake: clearing retained sleep image with half refresh");
+        LOG_INF("BOOT", "Sticky wake: clearing retained sleep image with half refresh");
         renderer.clearScreen();
         renderer.displayBuffer(HalDisplay::HALF_REFRESH);
         // The explicit HALF refresh above has already established a clean panel
@@ -1540,9 +1499,8 @@ void setup() {
     // target == home (or reader with no open book): land on home — don't fall
     // through to the sleep-wake "resume reader" logic, which fires on stale
     // openEpubPath + lastSleepFromReader from a prior session.
-    // X4's HALF refresh is the same single-pass clean transition already used
-    // by network screens. Keep X3's existing full refresh behavior unchanged.
-    const auto homeRefreshMode = gpio.deviceIsX3() ? HalDisplay::FULL_REFRESH : HalDisplay::HALF_REFRESH;
+    // HALF refresh is the same single-pass clean transition used by network screens.
+    const auto homeRefreshMode = HalDisplay::HALF_REFRESH;
     activityManager.goHome(HomeMenuItem::NONE, homeRefreshMode);
   } else if (APP_STATE.openEpubPath.empty() || !APP_STATE.lastSleepFromReader ||
              mappedInputManager.isPressed(MappedInputManager::Button::Back) || APP_STATE.readerActivityLoadCount > 0) {
@@ -1712,7 +1670,7 @@ void loop() {
       lastActivityTime = millis();
       return;
     }
-    if (handleX4ProHomeKeyQuickLockUnlock()) {
+    if (handleCapacitiveHomeKeyQuickLockUnlock()) {
       lastActivityTime = millis();
       return;
     }
@@ -1749,7 +1707,7 @@ void loop() {
 #endif
   // Home-key taps are consumed until their single- or double-tap action is
   // known.
-  if (handleX4ProHomeKeyShortcuts()) {
+  if (handleCapacitiveHomeKeyShortcuts()) {
     // Simulator Home-key events bypass HalGPIO's raw touch activity signal.
     activityManager.notifyUserInput();
     return;
@@ -1795,7 +1753,7 @@ void loop() {
   }
 
   // While on external power the percent climbs with no user interaction to
-  // repaint it (gauge boards like the X4 Pro report SoC continuously), so poll
+  // repaint it (fuel gauges can report SoC continuously), so poll
   // for a change once a minute. Off-charger the percent moves too slowly to
   // justify unsolicited e-ink refreshes.
 #ifdef SIMULATOR

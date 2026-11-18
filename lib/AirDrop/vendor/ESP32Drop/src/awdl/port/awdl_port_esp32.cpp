@@ -1780,9 +1780,9 @@ static void raw_tx_done_cb(const esp_80211_tx_info_t *ti) {
     const bool mcast = (f[4] & 0x01) != 0;
     if (mcast) {
       if (ok) g_diag.txdone_mcast_ok++; else g_diag.txdone_mcast_fail++;
-      return;                         // multicast has no link-layer ACK to recover
+    } else {
+      if (ok) g_diag.txdone_ucast_ok++; else g_diag.txdone_ucast_fail++;
     }
-    if (ok) g_diag.txdone_ucast_ok++; else g_diag.txdone_ucast_fail++;
 
     /* Only our AWDL/IPv6 netif shape. This excludes hidden-AP traffic and makes every
        offset below guarded: LLC ends at 31, AWDL seq is 34..35, IPv6 starts at 40. */
@@ -1792,7 +1792,7 @@ static void raw_tx_done_cb(const esp_80211_tx_info_t *ti) {
        admitted by the queued netif. Do not let it release the gate or enter retry. */
     if (!netif_inflight_done(seq)) return;
     if (g_cadence_task) xTaskNotifyGive(g_cadence_task);
-    if (ok) return;
+    if (ok || mcast) return; // Multicast releases its owned credit, but has no ACK/retry.
     const uint8_t slot = (uint8_t)(seq & (NETIF_TX_RETRY_SLOTS - 1));
     if (g_retry_seq[slot] != seq || g_retry_n[slot] >= NETIF_TX_RETRY_MAX) {
       g_diag.netif_retry_exhausted++;

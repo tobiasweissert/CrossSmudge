@@ -1,4 +1,4 @@
-# CrossSmudge — Shared Agent Guide
+# Crosscub — Shared Agent Guide
 
 This is the canonical repo instruction file.
 `CLAUDE.md` should point here so Codex and Claude read the same guidance.
@@ -45,16 +45,16 @@ SDK.
 
 ### Target Selection
 
-- `default`: Xteink X3/X4, ESP32-C3, buttons, SPI SD, no touch/PSRAM/USB Drive.
-- `sticky`: reTerminal Sticky, ESP32-S3, touch, SPI SD, PSRAM framebuffer.
-- `x4-pro`: Xteink X4 Pro, ESP32-S3, touch, SDMMC, PSRAM framebuffer, and USB Drive capability.
-- `simulator`, `simulator-X3`, `sticky-simulator`, and `x4-pro-simulator`: native profiles. Match the simulator profile to the capability/device branch being changed.
-- `platformio.ini` is the capability-source build matrix. Read the matching environment's flags before adding `#if` branches; use `AppCapabilities`/device capability helpers rather than duplicating macro checks in activities.
+- `sticky`: the production/default reTerminal Sticky profile (ESP32-S3R8, 16 MiB DIO flash, PSRAM, SPI SD, GT911 touch).
+- `sticky-debug`: Sticky diagnostics; `default` and `debug` are Sticky-only aliases.
+- `sticky-owner-test`: compatibility alias for the existing build cache, not a different product or App Store.
+- `sticky-simulator` and `simulator`: the Sticky native simulator.
+- SDK hardware profiles are third-party internals, not selectable Crosscub targets.
 
 ## Core Rules
 
 - Role: Senior Embedded Systems Engineer for ESP-IDF / Arduino-ESP32 work.
-- Support both constrained ESP32-C3 devices and PSRAM-equipped ESP32-S3 devices. Keep shared code safe for the C3 unless it is explicitly capability-gated; stability beats features.
+- Support reTerminal Sticky; preserve existing memory budgets and data compatibility.
 - Cite file paths and line numbers before proposing non-trivial changes.
 - Do not assume ESP-IDF or SDK API availability. Verify in `freeink-sdk/` or the live code.
 - Do not claim performance or memory wins without explaining the mechanism, such as reduced heap churn, flash vs DRAM placement, or smaller stack use.
@@ -82,11 +82,10 @@ SDK.
 
 ## Hardware Constraints
 
-- ESP32-C3 targets (Xteink X3/X4): single-core RISC-V at 160 MHz, no PSRAM, and about 380 KB usable internal RAM.
-- ESP32-S3R8 targets (Seeed reTerminal Sticky/Xteink X4 Pro): dual-core Xtensa at up to 240 MHz with 8 MB PSRAM. PSRAM is slower than internal DRAM and is not suitable for every DMA, ISR, or latency-sensitive buffer.
+- ESP32-S3R8 targets (Seeed reTerminal Sticky): dual-core Xtensa at up to 240 MHz with 8 MB PSRAM. PSRAM is slower than internal DRAM and is not suitable for every DMA, ISR, or latency-sensitive buffer.
 - Current displays use an 800x480 1-bit e-ink framebuffer: `800 * 480 / 8 = 48000` bytes. Use runtime renderer dimensions because orientation and future device profiles may differ.
 - Use one framebuffer only. C3 targets keep it in internal RAM; current S3 targets place it in PSRAM via `FREEINK_FB_PSRAM`.
-- Storage is exposed through SdFat, but the transport is device-specific (SPI SD on X3/X4/Sticky and SDMMC on X4 Pro). On real hardware, only one reader can hold a file open at a time.
+- Storage is exposed through SdFat, but the transport is device-specific (SPI SD on Sticky). On real hardware, only one reader can hold a file open at a time.
 
 ## Resource Rules
 
@@ -150,17 +149,16 @@ SDK.
 ## Build And Verification
 
 - PlatformIO is the source of truth. Personal overrides belong in `platformio.local.ini`.
-- **Selective Builds During Development:** When working on features, fixes, or iterations, do NOT build all environments. Only compile the single relevant target (e.g., `pio run -e simulator` for UI/logic or `pio run -e default` for C3). Reserve full matrix builds (`default`, `sticky`, `x4-pro`, `simulator`) strictly for when preparing and publishing a release.
+- Build only the Sticky target needed for the task; never run shared PlatformIO cache jobs concurrently.
 - Host environment may be macOS, Linux, WSL, or Windows Git Bash. Check `uname -s` before recommending platform-specific shell commands.
 - Logging uses `LOG_INF`, `LOG_DBG`, and `LOG_ERR`.
 - The simulator env in this repo is `simulator`.
 - For simulator work, build from this firmware repo unless the change belongs in `crosssmudge-simulator` itself.
 - Common validation commands:
-  - `SMUDGE_X3_CONSTRAINTS=1 .pio/build/simulator/program` to test apps and Lua under the exact 75 KB ESP32-C3 hardware DRAM limit. Always test apps with this constraint active.
+  - `python3 test/crosscub/run_preservation.py --output PATH` for existing Lua behavior, save and geometry fixtures. Low-budget runs are stress tests, not the Sticky production budget.
   - `pio run -e simulator` for simulator-facing UI/reader work.
-  - `pio run -e default` for the ESP32-C3 X3/X4 firmware.
+  - `pio run -e default` as a Sticky compatibility alias.
   - `pio run -e sticky` for the ESP32-S3 Sticky firmware.
-  - `pio run -e x4-pro` for the ESP32-S3 X4 Pro firmware.
   - `pio check -e default --fail-on-defect low --fail-on-defect medium --fail-on-defect high` for static analysis.
   - `find src lib include test -name "*.cpp" -o -name "*.h" | xargs clang-format -i` for formatting touched C++ files.
 - For crash debugging, check serial logs, internal heap with `ESP.getFreeHeap()` and `ESP.getMaxAllocHeap()`, task stack high-water marks, and whether cache files need clearing. On S3 targets, also inspect PSRAM free space and largest allocatable block; abundant PSRAM does not prove that internal-RAM or DMA-capable allocations can succeed.
@@ -184,7 +182,7 @@ SDK.
 
 - Check `git status --short` before edits and before reporting results. Preserve unrelated user changes.
 - When resolving merge, rebase, or cherry-pick conflicts, inspect the relevant commit messages for upstream PR references such as `#2608`. Open the PR in its source repository and read its description and changed files before resolving the conflict so the intended behavior is understood.
-- Do not resolve conflicts by automatically keeping CrossSmudge's current implementation or by discarding the upstream change wholesale. Preserve or adapt the upstream intent unless it is already fully implemented, would introduce a regression, or would substantially and unjustifiably change CrossSmudge's UX or behavior. When rejecting an upstream change, state the concrete reason.
+- Do not resolve conflicts by automatically keeping Crosscub's current implementation or by discarding the upstream change wholesale. Preserve or adapt the upstream intent unless it is already fully implemented, would introduce a regression, or would substantially and unjustifiably change Crosscub's UX or behavior. When rejecting an upstream change, state the concrete reason.
 - If a referenced PR cannot be accessed, inspect the source commit diff and nearby history, then report that the PR intent could not be verified instead of guessing.
 - Do not commit unless the user explicitly asks or committing is part of the skill utilized.
 - Before staging, ensure ignored/generated/local files such as `.pio/`, `*.generated.h`, `compile_commands.json`, and `platformio.local.ini` are not included.

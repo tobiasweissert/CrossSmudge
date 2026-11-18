@@ -1,4 +1,4 @@
-"""Build the CrossSmudge web portal: compose pages from shared templates/assets,
+"""Build the Crosscub web portal: compose pages from shared templates/assets,
 minify, gzip, and emit the C headers that the firmware serves from flash.
 
 Source of truth lives under web/:
@@ -26,11 +26,11 @@ JS_OUT = os.path.join(OUT, "js")
 
 # slug -> (generated identifier, <title>, active nav, extra <head> markup)
 PAGES = {
-    "home":         ("HomePageHtml",         "CrossSmudge",                   "home",         ""),
-    "files":        ("FilesPageHtml",        "Files - CrossSmudge",           "files",        '  <script src="/js/jszip.min.js"></script>'),
-    "applications": ("ApplicationsPageHtml", "Applications - CrossSmudge",    "applications", '  <script src="/js/jszip.min.js"></script>'),
-    "settings":     ("SettingsPageHtml",     "Settings - CrossSmudge Reader", "settings",     ""),
-    "fonts":        ("FontsPageHtml",        "Fonts - CrossSmudge",           "fonts",        ""),
+    "home":         ("HomePageHtml",         "Crosscub",                   "home",         ""),
+    "files":        ("FilesPageHtml",        "Files - Crosscub",           "files",        '  <script src="/js/jszip.min.js"></script>'),
+    "applications": ("ApplicationsPageHtml", "Applications - Crosscub",    "applications", '  <script src="/js/jszip.min.js"></script>'),
+    "settings":     ("SettingsPageHtml",     "Settings - Crosscub Reader", "settings",     ""),
+    "fonts":        ("FontsPageHtml",        "Fonts - Crosscub",           "fonts",        ""),
 }
 
 PRESERVE_TAGS = "pre|code|textarea|script|style"

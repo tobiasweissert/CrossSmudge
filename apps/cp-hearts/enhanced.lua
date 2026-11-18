@@ -19,7 +19,7 @@ local function act(action)
  smudge.request_update()
 end
 function on_init()
- closed=false;local ok,value=pcall(smudge.get_orientation);if ok and type(value)=='string'then orientation=value;smudge.set_orientation('landscape_ccw')end
+ closed=false;local ok,value=pcall(smudge.get_orientation);if ok and type(value)=='string'then orientation=value end
  g=S.load(M.decode);local saved=g~=nil;g=g or M.new(smudge.millis());R.load();R.observe(M,g);R.save();V.init(saved,R);smudge.request_update()
 end
 function on_draw()if not closed then V.draw(M,g,notice)end end

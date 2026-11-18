@@ -45,10 +45,11 @@ for endpoint,body in (('locate',{'doc':doc,'fragment':'top'}),('find',{'doc':doc
  if status!=200:raise RuntimeError(endpoint+' failed')
  if type(result.get('found')) is not bool or 'error' in result:raise RuntimeError(endpoint+' result')
  if result['found']:
-  # Found.chunk is a required pointer; Go omits zero block/run/byte fields.
-  for field,upper in (('chunk',chunks-1),('block',1024),('run',256),('byte',2049)):
-   value=result.get(field) if field=='chunk' else result.get(field,0)
-   if type(value) is not int or not 0<=value<=upper:raise RuntimeError(endpoint+' result position')
+  # Match Browser P.position's explicit typed envelope, plus known chunk count.
+  # Membership/UTF-8 boundaries in an unrequested chunk are not qualified here.
+  for field,lower,upper in (('chunk',0,min(chunks-1,63)),('block',1,1024),('run',1,512),('byte',1,2049)):
+   value=result.get(field)
+   if type(value) is not int or not lower<=value<=upper:raise RuntimeError(endpoint+' result position')
 if asset:
  status,result=request('image',{'doc':doc,'asset':asset,'width':160,'height':160},True)
  if status!=200:raise RuntimeError('image failed')

@@ -285,7 +285,7 @@ bool NearbyBookPositionSyncActivity::prepareLocalPosition() {
   peerPosition_.pageNumber = peerCrossPoint_.pageNumber;
   peerPosition_.totalPages = peerCrossPoint_.totalPages;
   peerPosition_.xpath = localPosition_.xpath;
-  peerName_ = "Simulator X4";
+  peerName_ = "Crosscub Simulator";
   peerId_ = "simulator";
 
   localPrepared_ = true;
@@ -903,7 +903,7 @@ void NearbyBookPositionSyncActivity::enqueueEspNowPacket(const uint8_t* sourceMa
 
     // ESP-NOW retries are expected while the receiver maps a position. Keep
     // only the newest copy of an idempotent packet from each peer so a slow
-    // X4 render or EPUB lookup cannot fill this fixed-size inbox.
+    // Slow render or EPUB lookup cannot fill this fixed-size inbox.
     for (uint8_t offset = 0; offset < eventCount_; ++offset) {
       const uint8_t eventIndex = static_cast<uint8_t>((eventHead_ + offset) % MAX_SYNC_EVENTS);
       SyncEvent& queuedEvent = events_[eventIndex];

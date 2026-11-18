@@ -275,11 +275,6 @@ int UITheme::getTopStatusBarInset(const GfxRenderer& renderer) {
   // status-bar layout assumes. Keep the clock and battery in that space.
   (void)renderer;
   return -5;
-#elif (defined(FREEINK_DEVICE_X4PRO) && FREEINK_DEVICE_X4PRO) || \
-    (defined(FREEINK_DEVICE_X4CLASSIC) && FREEINK_DEVICE_X4CLASSIC)
-  // The X4 Pro and X4 Classic panels sit slightly recessed behind the
-  // portrait top bezel.
-  return renderer.getOrientation() == GfxRenderer::Orientation::Portrait ? 5 : 0;
 #endif
 
   return 0;

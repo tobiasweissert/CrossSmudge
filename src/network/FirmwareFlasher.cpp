@@ -157,7 +157,7 @@ Result validateOpenImageFile(HalFile& file, size_t partitionSize) {
   uint8_t xorAccum = CHECKSUM_SEED;
   size_t pos = HEADER_SIZE;
   // Scan the segment stream already read for integrity validation, avoiding
-  // additional SD I/O or a whole-image buffer on memory-constrained X3/X4.
+  // additional SD I/O or a whole-image buffer on memory-constrained devices.
   board_tag::Scanner tagScanner;
 
   for (uint8_t i = 0; i < segCount; i++) {

@@ -2,7 +2,7 @@ name: Compile Release
 on:
   push:
     tags:
-      - "v*"
+      - "crosscub-v*"
   workflow_dispatch:
     inputs:
       version:
@@ -37,8 +37,9 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION="${{ inputs.version }}"
           else
-            VERSION="${GITHUB_REF_NAME#v}"
+            VERSION="${GITHUB_REF_NAME#crosscub-v}"
           fi
+          VERSION="${VERSION#crosscub-v}"
           VERSION="${VERSION#v}"
           echo "release_version=$VERSION" >> "$GITHUB_OUTPUT"
 
@@ -49,14 +50,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - environment: default
-            firmware: firmware-x3-x4
           - environment: sticky
-            firmware: firmware-sticky
-          - environment: x4-pro
-            firmware: firmware-x4-pro
-          - environment: x4-classic
-            firmware: firmware-x4-classic
+            firmware: crosscub-sticky
     steps:
       - uses: actions/checkout@v6
         with:
@@ -92,7 +87,7 @@ jobs:
           sed -i "/^\[crosssmudge\]$/,/^\[/s/^version = .*/version = $RELEASE_VERSION/" platformio.ini
           sed -i "/^\[crossink\]$/,/^\[/s/^version = .*/version = $RELEASE_VERSION/" platformio.ini
 
-      - name: Build CrossSmudge
+      - name: Build Crosscub
         env:
           CROSSSMUDGE_RELEASE_VERSION: ${{ needs.prepare-release.outputs.release_version }}
           CROSSINK_RELEASE_VERSION: ${{ needs.prepare-release.outputs.release_version }}
@@ -134,10 +129,7 @@ jobs:
           python3 scripts/generate_release_catalog.py \
             --version "${{ env.RELEASE_VERSION }}" \
             --repo "${{ github.repository }}" \
-            --firmware "release-firmware/firmware-x3-x4-v${{ env.RELEASE_VERSION }}.bin" \
-            --firmware "release-firmware/firmware-sticky-v${{ env.RELEASE_VERSION }}.bin" \
-            --firmware "release-firmware/firmware-x4-pro-v${{ env.RELEASE_VERSION }}.bin" \
-            --firmware "release-firmware/firmware-x4-classic-v${{ env.RELEASE_VERSION }}.bin" \
+            --firmware "release-firmware/crosscub-sticky-v${{ env.RELEASE_VERSION }}.bin" \
             --output ".pio/build/catalog"
 
       - name: Publish catalog to GitHub Pages source
@@ -176,12 +168,9 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.RELEASE_PAT || github.token }}
-          tag_name: v${{ env.RELEASE_VERSION }}
-          name: CrossSmudge Firmware v${{ env.RELEASE_VERSION }}
+          tag_name: crosscub-v${{ env.RELEASE_VERSION }}
+          name: Crosscub Firmware v${{ env.RELEASE_VERSION }}
           target_commitish: ${{ github.sha }}
-          draft: false
+          draft: true
           files: |
-            release-firmware/firmware-x3-x4-v${{ env.RELEASE_VERSION }}.bin
-            release-firmware/firmware-sticky-v${{ env.RELEASE_VERSION }}.bin
-            release-firmware/firmware-x4-pro-v${{ env.RELEASE_VERSION }}.bin
-            release-firmware/firmware-x4-classic-v${{ env.RELEASE_VERSION }}.bin
+            release-firmware/crosscub-sticky-v${{ env.RELEASE_VERSION }}.bin

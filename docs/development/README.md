@@ -6,7 +6,7 @@ has_children: true
 
 # Development Docs
 
-This section contains technical information for building, testing, and understanding CrossSmudge.
+This section contains technical information for building, testing, and understanding Crosscub.
 It is written for software developers who may be new to embedded development.
 
 - [Getting Started](./getting-started.md)

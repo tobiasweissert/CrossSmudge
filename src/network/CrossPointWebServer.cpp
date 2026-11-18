@@ -615,15 +615,7 @@ void CrossPointWebServer::handleStatus() const {
   doc["rssi"] = apMode ? 0 : WiFi.RSSI();
   doc["freeHeap"] = ESP.getFreeHeap();
   doc["uptime"] = millis() / 1000;
-#if FREEINK_DEVICE_X4 || FREEINK_DEVICE_X3
-  doc["device"] = gpio.deviceIsX3() ? "X3" : "X4";
-#else
-#ifdef SIMULATOR
-  doc["device"] = "Simulator";
-#else
-  doc["device"] = BoardConfig::ACTIVE.name;
-#endif
-#endif
+  doc["device"] = "Sticky";
 
   char snBuf[33] = {0};
   bool valid = false;
@@ -2109,7 +2101,7 @@ void CrossPointWebServer::handleFontList() const {
   bool firstFamily = true;
   for (const auto& family : families) {
     // Hydrate and emit one family's paths at a time. Keeping every family's
-    // paths resident is what made larger catalogs exhaust the X3 network heap.
+    // paths resident is what made larger catalogs exhaust a constrained network heap.
     if (!family.ensureDetails()) continue;
 
     if (!firstFamily) json.append(",");

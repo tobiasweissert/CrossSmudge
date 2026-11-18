@@ -571,7 +571,7 @@ class SimulatorSmokeTest {
         inputScript.push_back(release(MappedInputManager::Button::Power));
         inputScript.push_back(assertHomeButtonEnabled());
 
-        // X4 Pro reserves the top-edge swipe for its frontlight overlay and
+        // Legacy frontlight profiles reserve the top-edge swipe for its frontlight overlay and
         // moves the reader menu to the bottom edge.
         inputScript.push_back(touchDown(width / 2, 8));
         inputScript.push_back(touchMove(width / 2, height / 4));
@@ -596,7 +596,7 @@ class SimulatorSmokeTest {
         inputScript.push_back(touchRelease(20, 8));
         inputScript.push_back(render("Frontlight Panel remains open after in-drawer swipe up", 4));
         inputScript.push_back(assertActivity("FrontlightPanel"));
-        // X4 Pro's portrait frontlight sheet ends just below mid-screen; this
+        // The legacy portrait frontlight sheet ends just below mid-screen; this
         // point lands in its centered 29 px handle band.
         inputScript.push_back(touchDown(width / 2, height * 21 / 40));
         inputScript.push_back(touchMove(width / 2, 8));
@@ -682,7 +682,7 @@ class SimulatorSmokeTest {
         inputScript.push_back(touchMove(width / 2, height * 3 / 4));
         inputScript.push_back(touchRelease(width / 2, height * 3 / 4));
       } else {
-        // Sticky uses the same vertical gesture split as X4 Pro: swipe down
+        // Sticky uses the existing vertical gesture split: swipe down
         // opens reader details/actions and swipe up opens the bottom menu.
         inputScript.push_back(touchDown(width / 2, 8));
         inputScript.push_back(touchMove(width / 2, height / 4));

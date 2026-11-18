@@ -1,6 +1,9 @@
 -- Stopwatch
 -- Pixel cartoon stopwatch with digital display and lap split recording
 
+local U = dofile('unified_ui.lua')
+local P = dofile('primary_numerals.lua')
+local footer = {}
 local w, h = 480, 800
 if smudge and smudge.get_bounds then
     w, h = smudge.get_bounds()
@@ -18,6 +21,20 @@ local plunger_down = false
 local plunger_timer = 0
 local split_flash_timer = 0
 
+-- Shared draw/hit geometry: portrait keeps the original watch/card positions.
+-- Landscape fits the same artwork beside the split card instead of clipping
+-- its fixed portrait bottom below the Sticky screen.
+local function screen_layout()
+    local landscape = w > h
+    local x = landscape and 320 or 14
+    local y = landscape and 112 or 240
+    local ch = h - 68 - y
+    return {cx=landscape and 160 or w//2, cy=landscape and 180 or 140,
+        timer={x=14,y=112,w=landscape and 292 or w-28,h=100},
+        card_x=x,sy=y,card_w=w-14-x,card_h=ch,footer_y=h-60,
+        visible_rows=math.max(1,(ch-120)//38)}
+end
+
 local function get_now_ms()
     if smudge and smudge.millis then
         return smudge.millis()
@@ -25,10 +42,21 @@ local function get_now_ms()
     return math.floor(os.time() * 1000)
 end
 
+local notice = ""
+local blocked_save = false
+local MAX_SPLITS, MAX_SAVE_BYTES = 512, 65536
+local lap_bytes = 0
+local MAX_ELAPSED = 2147483647
 local function get_elapsed_ms()
     if is_running then
-        return accumulated_ms + (get_now_ms() - start_time_ms)
+        local delta = get_now_ms() - start_time_ms
+        if delta < 0 or accumulated_ms > MAX_ELAPSED - delta then
+            notice = "Time limit reached"
+            return MAX_ELAPSED
+        end
+        return accumulated_ms + delta
     end
+    if accumulated_ms == MAX_ELAPSED then notice = "Time limit reached" end
     return accumulated_ms
 end
 
@@ -49,61 +77,59 @@ local function format_time(ms)
 end
 
 local function save_data()
-    if not (smudge and smudge.write_file) then return end
+    if blocked_save or not (smudge and smudge.write_file) then return end
     local el = get_elapsed_ms()
     local lines = { string.format("%d;%d", is_running and 1 or 0, el) }
     for _, sp in ipairs(splits) do
         table.insert(lines, string.format("%d;%d", sp.lap_ms, sp.total_ms))
     end
-    smudge.write_file("stopwatch.dat", table.concat(lines, "\n"))
+    local data = table.concat(lines, "\n")
+    if #data > MAX_SAVE_BYTES then notice = "Saved data preserved";blocked_save = true;return end
+    smudge.write_file("stopwatch.dat", data)
 end
 
 local function load_data()
     if not (smudge and smudge.read_file) then return end
-    local content = smudge.read_file("stopwatch.dat")
+    -- One extra byte distinguishes a complete legacy file from a capped prefix.
+    local content = smudge.read_file("stopwatch.dat", MAX_SAVE_BYTES + 1)
     if not content or content == "" then return end
-    local lines = {}
-    for line in string.gmatch(content, "[^\r\n]+") do
-        table.insert(lines, line)
-    end
-    if #lines >= 1 then
-        local p = {}
-        for x in string.gmatch(lines[1], "[^;]+") do table.insert(p, x) end
-        if #p >= 2 then
-            local saved_running = (tonumber(p[1]) == 1)
-            accumulated_ms = tonumber(p[2]) or 0
-            if saved_running then
-                is_running = true
-                start_time_ms = get_now_ms()
-            else
-                is_running = false
-            end
+    local function invalid()blocked_save = true;notice = "Saved data preserved" end
+    if #content > MAX_SAVE_BYTES then invalid();return end
+    local header = content:match("^[^\r\n]+") or ""
+    local running,elapsed = header:match("^([01]);(%d+)$")
+    elapsed = tonumber(elapsed)
+    local function valid(n)return math.type(n) == "integer" and n >= 0 and n <= MAX_ELAPSED end
+    if not running or not valid(elapsed) then invalid();return end
+    local restored,previous,bytes = {},0,0
+    local first = true
+    for line in content:gmatch("[^\r\n]+") do
+        if first then first = false else
+            local lap,total = line:match("^(%d+);(%d+)$")
+            lap,total = tonumber(lap),tonumber(total)
+            if #restored >= 4096 or not valid(lap) or not valid(total) or total < previous or total > elapsed or lap ~= total - previous then invalid();return end
+            restored[#restored + 1] = {lap_ms=lap,total_ms=total}
+            previous = total;bytes = bytes + #line + 1
         end
     end
-    splits = {}
-    for i = 2, #lines do
-        local p = {}
-        for x in string.gmatch(lines[i], "[^;]+") do table.insert(p, x) end
-        if #p >= 2 then
-            local lap = tonumber(p[1]) or 0
-            local tot = tonumber(p[2]) or 0
-            table.insert(splits, { lap_ms = lap, total_ms = tot })
-            last_split_total = tot
-        end
-    end
+    splits,last_split_total,lap_bytes = restored,previous,bytes
+    accumulated_ms,is_running = elapsed,running == "1"
+    start_time_ms = get_now_ms()
+    if #splits >= MAX_SPLITS then notice = "Lap list full" end
 end
 
 local function trigger_start_stop()
+    if blocked_save then return end
     local now = get_now_ms()
     plunger_down = true
     plunger_timer = now + 160
 
     if not is_running then
+        if accumulated_ms == MAX_ELAPSED then notice = "Time limit reached";smudge.request_update();return end
         is_running = true
         start_time_ms = now
     else
+        accumulated_ms = get_elapsed_ms()
         is_running = false
-        accumulated_ms = accumulated_ms + (now - start_time_ms)
         save_data()
     end
     if smudge and smudge.request_update then smudge.request_update() end
@@ -117,6 +143,12 @@ local function trigger_split()
     end
 
     local lap_time = elapsed - last_split_total
+    local bytes = #string.format("%d;%d",lap_time,elapsed) + 1
+    if blocked_save or #splits >= MAX_SPLITS or 12 + lap_bytes + bytes > MAX_SAVE_BYTES then
+        if not blocked_save then notice = "Lap list full" end
+        smudge.request_update();return
+    end
+    lap_bytes = lap_bytes + bytes
     last_split_total = elapsed
     table.insert(splits, { lap_ms = lap_time, total_ms = elapsed })
     scroll_offset = 0
@@ -126,6 +158,8 @@ local function trigger_split()
 end
 
 local function trigger_reset()
+    if blocked_save then return end
+    notice = "";lap_bytes = 0
     is_running = false
     accumulated_ms = 0
     start_time_ms = 0
@@ -170,241 +204,41 @@ function on_update()
     end
 end
 
-local function draw_stopwatch_art(cx, cy, elapsed_ms)
-    local R = 100
-    local top_y = cy - R
-
-    -- Top metal lanyard loop (clean 24px clearance below header line)
-    smudge.circle(cx, top_y - 18, 16, false)
-    smudge.circle(cx, top_y - 18, 14, false)
-
-    -- Top crown plunger
-    local py = plunger_down and (top_y - 6) or (top_y - 10)
-    smudge.rounded_rect(cx - 14, py, 28, 8, 3, true)
-    smudge.rect(cx - 6, py + 8, 12, top_y - (py + 8), true)
-
-    -- Angled secondary buttons (ears at 10 and 2 o'clock)
-    local l_bx, l_by = cx - 64, cy - 64
-    smudge.rect(l_bx - 8, l_by - 8, 12, 7, true)
-    local r_bx, r_by = cx + 64, cy - 64
-    smudge.rect(r_bx - 4, r_by - 8, 12, 7, true)
-
-    -- Outer circular casing (double bezel)
-    smudge.circle(cx, cy, R, false)
-    smudge.circle(cx, cy, R - 1, false)
-    smudge.circle(cx, cy, R - 5, false)
-
-    -- 12 Dial tick marks
-    for hr = 0, 11 do
-        local angle = hr * (2 * math.pi / 12) - (math.pi / 2)
-        local r1 = R - 7
-        local is_cardinal = (hr % 3 == 0)
-        local r2 = is_cardinal and (R - 15) or (R - 11)
-        local x1 = cx + math.floor(math.cos(angle) * r1)
-        local y1 = cy + math.floor(math.sin(angle) * r1)
-        local x2 = cx + math.floor(math.cos(angle) * r2)
-        local y2 = cy + math.floor(math.sin(angle) * r2)
-        if is_cardinal then
-            smudge.thick_line(x1, y1, x2, y2, 2, true)
-        else
-            smudge.line(x1, y1, x2, y2, true)
-        end
+local function draw_splits_card(x,y,cw,ch)
+    U.panel({x=x,y=y,w=cw,h=ch})
+    U.text(x+12,y+10,'SPLITS','ui10',true)
+    U.text(x+cw-12,y+10,tostring(#splits)..' LAPS','ui10',true,'right')
+    U.text(x+12,y+42,'LAP','ui10',true)
+    U.text(x+cw//2,y+42,'SPLIT TIME','ui10',true,'center')
+    U.text(x+cw-12,y+42,'TOTAL TIME','ui10',true,'right')
+    smudge.line(x+12,y+72,x+cw-12,y+72,true)
+    local cap=screen_layout().visible_rows
+    scroll_offset=math.min(scroll_offset,math.max(0,#splits-cap))
+    local last=#splits-scroll_offset
+    if #splits==0 then U.text(x+cw//2,y+100,'No splits recorded','ui10',false,'center') end
+    for row=0,math.min(cap,last)-1 do
+        local i=last-row;local sp=splits[i];local ry=y+82+row*38
+        U.text(x+12,ry,string.format('#%02d',i),'ui10',true)
+        local font='ui10'
+        local lap='+'..format_time(sp.lap_ms);local total=format_time(sp.total_ms)
+        if smudge.text_width(lap,font,true)>cw*0.40 or smudge.text_width(total,font,true)>cw*0.40 then font='small' end
+        U.text(x+cw//2,ry,lap,font,true,'center')
+        U.text(x+cw-12,ry,total,font,true,'right')
     end
-
-    -- Second sweep indicator dot on rim when running
-    if is_running then
-        local sec_frac = (elapsed_ms % 60000) / 60000
-        local sec_ang = sec_frac * 2 * math.pi - (math.pi / 2)
-        local dot_x = cx + math.floor(math.cos(sec_ang) * (R - 9))
-        local dot_y = cy + math.floor(math.sin(sec_ang) * (R - 9))
-        smudge.circle(dot_x, dot_y, 4, true)
-    end
-
-    -- Cute Cartoon Face
-    local eye_y = cy - 34
-    for _, ex in ipairs({cx - 32, cx + 32}) do
-        if is_running then
-            -- Blinked / effort squint eyes (^ ^) - trying hard!
-            smudge.thick_line(ex - 8, eye_y, ex, eye_y - 4, 2, true)
-            smudge.thick_line(ex, eye_y - 4, ex + 8, eye_y, 2, true)
-        else
-            -- Wide sparkly eyes
-            smudge.rounded_rect(ex - 8, eye_y - 10, 16, 20, 6, true)
-            -- Double white pupil shines (big top-right, small bottom-left)
-            smudge.circle(ex + 3, eye_y - 4, 3, true, false)
-            smudge.circle(ex - 3, eye_y + 3, 2, true, false)
-        end
-        -- Cheeks: 2 cute diagonal blush lines
-        smudge.line(ex - 11, eye_y + 14, ex - 7, eye_y + 18, true)
-        smudge.line(ex - 7, eye_y + 14, ex - 3, eye_y + 18, true)
-    end
-
-    -- Energetic sweat drop on cheek when running hard
-    if is_running and ((elapsed_ms % 2000) > 400) then
-        local sx, sy = cx + 54, cy - 26
-        smudge.circle(sx, sy, 3, true)
-        smudge.line(sx, sy - 4, sx + 2, sy - 1, true)
-    end
-
-    -- Cute smile
-    smudge.thick_line(cx - 6, cy - 14, cx, cy - 12, 2, true)
-    smudge.thick_line(cx, cy - 12, cx + 6, cy - 14, 2, true)
-
-    -- Digital Clock LCD Window
-    local win_w, win_h = 164, 48
-    local win_x = cx - math.floor(win_w / 2)
-    local win_y = cy + 4
-    smudge.rounded_rect(win_x, win_y, win_w, win_h, 7, false)
-    smudge.rounded_rect(win_x + 2, win_y + 2, win_w - 4, win_h - 4, 5, false)
-
-    -- Digital time display
-    local time_str = format_time(elapsed_ms)
-    smudge.text(cx, win_y + 9, time_str, 16, true, "center", true)
-
-    -- State Pill Badge below clock window
-    local tag_w, tag_h = 88, 22
-    local tag_x = cx - math.floor(tag_w / 2)
-    local tag_y = cy + 58
-
-    if is_running then
-        smudge.rounded_rect(tag_x, tag_y, tag_w, tag_h, 6, true)
-        smudge.text(cx, tag_y + 2, "RUNNING", 8, true, "center", false)
-    elseif elapsed_ms > 0 then
-        smudge.rounded_rect(tag_x, tag_y, tag_w, tag_h, 6, false)
-        smudge.text(cx, tag_y + 2, "STOPPED", 8, true, "center", true)
-    else
-        smudge.rounded_rect(tag_x, tag_y, tag_w, tag_h, 6, false)
-        smudge.text(cx, tag_y + 2, "READY", 8, true, "center", true)
-    end
-end
-
-local function draw_splits_card(card_x, sy, card_w, card_h)
-    smudge.rounded_rect(card_x, sy, card_w, card_h, 8, false)
-
-    -- Header row
-    smudge.text(card_x + 16, sy + 12, "SPLITS", 10, true, "left", true)
-
-    -- Best split calculation
-    local best_ms = nil
-    local worst_ms = nil
-    if #splits > 0 then
-        best_ms = splits[1].lap_ms
-        worst_ms = splits[1].lap_ms
-        for _, sp in ipairs(splits) do
-            if sp.lap_ms < best_ms then best_ms = sp.lap_ms end
-            if sp.lap_ms > worst_ms then worst_ms = sp.lap_ms end
-        end
-
-        -- Lap count pill badge (offset to card_x + 106 to prevent overlap)
-        local cnt_str = string.format("%d %s", #splits, #splits == 1 and "LAP" or "LAPS")
-        local pw = 64
-        smudge.rounded_rect(card_x + 106, sy + 10, pw, 22, 5, false)
-        smudge.text(card_x + 106 + math.floor(pw / 2), sy + 12, cnt_str, 8, true, "center", true)
-
-        if #splits >= 2 then
-            local best_str = string.format("BEST: +%s", format_time(best_ms))
-            smudge.text(card_x + card_w - 16, sy + 12, best_str, 9, true, "right", true)
-        end
-    end
-
-    smudge.line(card_x + 12, sy + 36, card_x + card_w - 12, sy + 36, true)
-
-    -- Column headers
-    local col_y = sy + 44
-    smudge.text(card_x + 18, col_y, "LAP", 9, true, "left", true)
-    smudge.text(card_x + math.floor(card_w / 2), col_y, "SPLIT TIME", 9, true, "center", true)
-    smudge.text(card_x + card_w - 18, col_y, "TOTAL TIME", 9, true, "right", true)
-    smudge.line(card_x + 12, sy + 68, card_x + card_w - 12, sy + 68, true)
-
-    -- Splits list or empty state
-    local num_splits = #splits
-    if num_splits == 0 then
-        local empty_cy = sy + math.floor((card_h - 70) / 2) + 14
-        -- Cute mini stopwatch icon in empty state
-        smudge.circle(card_x + math.floor(card_w / 2), empty_cy - 24, 18, false)
-        smudge.rounded_rect(card_x + math.floor(card_w / 2) - 4, empty_cy - 46, 8, 4, 1, true)
-        smudge.circle(card_x + math.floor(card_w / 2), empty_cy - 24, 2, true)
-        smudge.line(card_x + math.floor(card_w / 2), empty_cy - 24, card_x + math.floor(card_w / 2) + 6, empty_cy - 30, true)
-
-        smudge.text(card_x + math.floor(card_w / 2), empty_cy + 10, "No Splits Recorded", 12, true, "center", true)
-        smudge.text(card_x + math.floor(card_w / 2), empty_cy + 38, "Press [Start] then [Split] to record laps", 9, false, "center", true)
-    else
-        local max_visible = 6
-        local start_idx = math.max(1, num_splits - scroll_offset - max_visible + 1)
-        local end_idx = math.max(1, num_splits - scroll_offset)
-
-        local row_y = sy + 76
-        local row_h = 44
-
-        -- Display from newest to oldest
-        local display_count = 0
-        for i = end_idx, start_idx, -1 do
-            local sp = splits[i]
-            local is_best = (num_splits >= 2 and sp.lap_ms == best_ms)
-
-            -- Lap badge
-            local badge_w, badge_h = 46, 24
-            local bx = card_x + 16
-            local by = row_y + 8
-            if is_best then
-                smudge.rounded_rect(bx, by, badge_w, badge_h, 5, true)
-                smudge.text(bx + math.floor(badge_w / 2), by + 3, string.format("#%02d", i), 8, true, "center", false)
-            else
-                smudge.rounded_rect(bx, by, badge_w, badge_h, 5, false)
-                smudge.text(bx + math.floor(badge_w / 2), by + 3, string.format("#%02d", i), 8, true, "center", true)
-            end
-
-            -- Split lap time
-            local split_str = string.format("+%s", format_time(sp.lap_ms))
-            if is_best then
-                split_str = string.format("* +%s", format_time(sp.lap_ms))
-            end
-            smudge.text(card_x + math.floor(card_w / 2), row_y + 8, split_str, 10, is_best, "center", true)
-
-            -- Total cumulative time
-            local tot_str = format_time(sp.total_ms)
-            smudge.text(card_x + card_w - 18, row_y + 8, tot_str, 10, false, "right", true)
-
-            -- Row separator line
-            if display_count < max_visible - 1 and i > start_idx then
-                smudge.line(card_x + 14, row_y + row_h - 2, card_x + card_w - 14, row_y + row_h - 2, true)
-            end
-
-            row_y = row_y + row_h
-            display_count = display_count + 1
-        end
-
-        -- Scroll hint if more splits exist
-        if num_splits > max_visible then
-            local footer_str = string.format("Showing %d-%d of %d (scroll with UP/DOWN)", start_idx, end_idx, num_splits)
-            smudge.text(card_x + math.floor(card_w / 2), sy + card_h - 20, footer_str, 8, false, "center", true)
-        end
-    end
+    if #splits>cap then U.text(x+cw//2,y+ch-30,'Tap upper / lower table to scroll','small',false,'center') end
 end
 
 function on_draw()
+    w,h=smudge.get_bounds()
     smudge.clear()
-
-    local elapsed_ms = get_elapsed_ms()
-    local status_sub = is_running and "Running" or (elapsed_ms > 0 and "Paused" or "Ready")
-    smudge.header("Stopwatch", status_sub)
-
-    local cx = math.floor(w / 2)
-    local cy = 230
-
-    -- Draw Cartoon Stopwatch
-    draw_stopwatch_art(cx, cy, elapsed_ms)
-
-    -- Draw Splits Card under the stopwatch
-    local card_x = 24
-    local card_w = w - 48
-    local sy = 352
-    local card_h = 380
-    draw_splits_card(card_x, sy, card_w, card_h)
-
-    -- Bottom button hints
-    local b2_label = is_running and "Stop" or "Start"
-    smudge.button_hints("Exit", b2_label, "Split", "Reset")
+    local elapsed=get_elapsed_ms()
+    U.header('Stopwatch',is_running and 'RUNNING' or (elapsed>0 and 'PAUSED' or 'READY'))
+    if notice~='' then U.text(14,78,notice,'ui10',true) end
+    local l=screen_layout()
+    local value=format_time(elapsed)
+    P.draw(value,l.timer.x,l.timer.y,l.timer.w,l.timer.h)
+    draw_splits_card(l.card_x,l.sy,l.card_w,l.card_h)
+    footer=U.footer({'Exit',is_running and 'Stop' or 'Start','Split','Reset'},2,{[2]=not blocked_save,[3]=is_running and not blocked_save,[4]=not blocked_save})
 end
 
 function on_button(btn, pressed)
@@ -420,46 +254,30 @@ function on_button(btn, pressed)
     elseif btn == "btn4" or btn == "right" or btn == "page_forward" or btn == "down" then
         trigger_reset()
     elseif btn == "up" then
-        if #splits > 6 then
-            scroll_offset = math.min(#splits - 6, scroll_offset + 1)
+        local visible = screen_layout().visible_rows
+        if #splits > visible then
+            scroll_offset = math.min(#splits - visible, scroll_offset + 1)
             if smudge and smudge.request_update then smudge.request_update() end
         end
     end
 end
 
 function on_tap(x, y)
-    -- Tap cartoon stopwatch to toggle Start / Stop
-    local cx = math.floor(w / 2)
-    local cy = 230
-    local dx = x - cx
-    local dy = y - cy
-    if (dx * dx + dy * dy) <= (106 * 106) then
-        trigger_start_stop()
-        return
+    local layout=screen_layout()
+    for i,r in ipairs(footer) do
+        if U.hit(r,x,y) then on_button(({'back','confirm','left','right'})[i],true);return end
     end
-
-    -- Tap bottom button regions
-    if y >= 740 then
-        local btn_w = math.floor(w / 4)
-        if x < btn_w then
-            save_data()
-            smudge.exit()
-        elseif x < btn_w * 2 then
-            trigger_start_stop()
-        elseif x < btn_w * 3 then
-            trigger_split()
-        else
-            trigger_reset()
-        end
-        return
-    end
+    if y>=layout.footer_y then return end
+    if U.hit(layout.timer,x,y) then trigger_start_stop();return end
 
     -- Tap splits card to scroll
-    if y >= 352 and y <= 732 then
-        if y < 540 and #splits > 6 then
-            scroll_offset = math.min(#splits - 6, scroll_offset + 1)
+    if x >= layout.card_x and x < layout.card_x + layout.card_w and
+       y >= layout.sy and y < layout.sy + layout.card_h then
+        local middle = layout.sy + math.floor(layout.card_h / 2)
+        if y < middle and #splits > layout.visible_rows then
+            scroll_offset = math.min(#splits - layout.visible_rows, scroll_offset + 1)
             if smudge and smudge.request_update then smudge.request_update() end
-        elseif y >= 540 and scroll_offset > 0 then
+        elseif y >= middle and scroll_offset > 0 then
             scroll_offset = math.max(0, scroll_offset - 1)
             if smudge and smudge.request_update then smudge.request_update() end
         end

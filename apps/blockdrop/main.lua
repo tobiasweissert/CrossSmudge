@@ -1,3 +1,5 @@
+local U=dofile('unified_ui.lua')
+local footer, extra, painted = {}, {}, false
 -- Block Drop game for CrossSmudge (Lua)
 -- Classic falling block game with real-time gravity, 7 piece patterns, dithering & background render
 
@@ -201,10 +203,18 @@ local function lock_piece()
     check_and_start_line_clear()
 end
 
+local legacy_original, save_notice
+local function backup_legacy()
+    if not legacy_original then return true end
+    if smudge.load("state_legacy9") ~= legacy_original then smudge.save("state_legacy9", legacy_original) end
+    if smudge.load("state_legacy9") ~= legacy_original then save_notice="Save failed: old file retained";return false end
+    legacy_original=nil;save_notice=nil;return true
+end
 local function save_game_state()
+    if not backup_legacy() then return end
     local rows = {}
     for y = 0, kGridHeight - 1 do
-        table.insert(rows, table.concat(grid[y], ","))
+        table.insert(rows, table.concat(grid[y], ",", 0, kGridWidth - 1))
     end
     local gridStr = table.concat(rows, ";")
     local data = string.format("%d|%d|%d|%d|%d|%d|%d|%d|%s",
@@ -230,22 +240,32 @@ local function load_game_state()
     next_piece = tonumber(parts[8]) or 2
     local gridStr = parts[9]
     local y = 0
+    local loaded = {};local legacy = false
     for row in string.gmatch(gridStr, "[^;]+") do
-        if y < kGridHeight then
-            local x = 0
-            for val in string.gmatch(row, "[^,]+") do
-                if x < kGridWidth then
-                    grid[y][x] = tonumber(val) or 0
-                    x = x + 1
-                end
-            end
-            y = y + 1
+        if y >= kGridHeight then return false end
+        local cells = {}
+        for val in string.gmatch(row, "[^,]+") do
+            local n = tonumber(val)
+            if not n or n % 1 ~= 0 or n < 0 or n > 7 then return false end
+            cells[#cells + 1] = n
         end
+        if #cells ~= kGridWidth and #cells ~= kGridWidth - 1 then return false end
+        local first = #cells == kGridWidth and 0 or 1
+        if first == 1 then legacy = true end
+        loaded[y] = {[0] = 0}
+        for i,n in ipairs(cells) do loaded[y][first + i - 1] = n end
+        y = y + 1
     end
+    if y ~= kGridHeight then return false end
+    -- Old writers omitted original column0. Keep a verbatim recovery record;
+    -- restore known columns to 1..9, with unknown column0 empty (not recovered).
+    if legacy then legacy_original=data;backup_legacy() end
+    grid = loaded
     return true
 end
 
 local function delete_save_state()
+    if not backup_legacy() then return end
     smudge.save("state", "")
 end
 
@@ -380,27 +400,26 @@ local function draw_block(x, y, size, style)
 end
 
 -- Render function for game board, next piece, and stats
+local restart_rect
 function on_draw()
+    restart_rect = nil
+    painted=true
     smudge.clear()
 
-    local m = smudge.get_metrics()
-    local topBound = m.top_padding + m.header_height
-    local bottomBound = h - m.button_hints_height
-    local availableHeight = bottomBound - topBound - 12
-
-    -- 1. Fill Main Background with Light Gray Dither (Classic look restored!)
-    smudge.rect_dither(0, topBound, w, bottomBound - topBound, false)
-
-    -- 2. Header with Score, Lines, Level
-    local headerRight = string.format("Score:%d | Lns:%d | Lvl:%d", score, lines_cleared, level)
-    smudge.header("Block Drop", headerRight)
-
-    -- Calculate grid tile dimensions
-    local blockSize = math.min(math.floor(availableHeight / kGridHeight), math.floor((w - 110) / kGridWidth))
-    local boardPixelW = blockSize * kGridWidth
-    local boardPixelH = blockSize * kGridHeight
-    local boardX = 20
-    local boardY = topBound + 6 + math.floor((availableHeight - boardPixelH) / 2)
+    local m=U.metrics(); w,h=m.w,m.h
+    local topBound=m.body_top
+    U.header('Block Drop','LVL '..level)
+    if save_notice then
+        for _,line in ipairs(smudge.wrapped_text(save_notice,w-28,'small',true,3).lines or {}) do
+            U.text(14,topBound,line,'small',true);topBound=topBound+smudge.line_height('small')
+        end
+        topBound=topBound+8
+    end
+    local availableHeight=h-190-topBound
+    local blockSize=math.max(4,math.min(26,availableHeight//kGridHeight,(w-180)//kGridWidth))
+    local boardPixelW,boardPixelH=blockSize*kGridWidth,blockSize*kGridHeight
+    local boardX=m.landscape and 40 or 44
+    local boardY=topBound+4
 
     -- 3. Draw Solid White Board Area & Outer Boundary
     smudge.rect(boardX, boardY, boardPixelW, boardPixelH, true, false) -- Solid white board
@@ -420,11 +439,6 @@ function on_draw()
                 if cellVal > 0 then
                     local style = kPieceStyles[cellVal] or 1
                     draw_block(cellX, cellY, blockSize, style)
-                else
-                    -- Background dot grid
-                    local dotX = cellX + math.floor(blockSize / 2)
-                    local dotY = cellY + math.floor(blockSize / 2)
-                    smudge.pixel(dotX, dotY, true)
                 end
             end
         end
@@ -453,15 +467,14 @@ function on_draw()
     local sidebarX = boardX + boardPixelW + 16
     local sidebarY = boardY + 12
 
-    smudge.text(sidebarX, sidebarY, "Next", 12, true, "left")
+    U.text(sidebarX,sidebarY,"NEXT","ui10",true)
     sidebarY = sidebarY + 28
 
-    local previewBoxSize = 56
-    smudge.rounded_rect(sidebarX, sidebarY, previewBoxSize, previewBoxSize, 4, true, false)
-    smudge.rounded_rect(sidebarX, sidebarY, previewBoxSize, previewBoxSize, 4, false, true, 1)
+    local previewBoxSize = 104
+    U.panel({x=sidebarX,y=sidebarY,w=previewBoxSize,h=64})
 
     -- Center piece inside preview box
-    local pBlockSize = 10
+    local pBlockSize = 18
     local nextShape = kTetrominoes[next_piece][1]
     local nextStyle = kPieceStyles[next_piece] or 1
 
@@ -480,7 +493,7 @@ function on_draw()
     local shapePixelW = (maxX - minX + 1) * pBlockSize
     local shapePixelH = (maxY - minY + 1) * pBlockSize
     local startPreviewX = sidebarX + math.floor((previewBoxSize - shapePixelW) / 2)
-    local startPreviewY = sidebarY + math.floor((previewBoxSize - shapePixelH) / 2)
+    local startPreviewY = sidebarY + math.floor((64 - shapePixelH) / 2)
 
     for py = minY, maxY do
         for px = minX, maxX do
@@ -491,6 +504,15 @@ function on_draw()
             end
         end
     end
+
+    local statsX=m.landscape and sidebarX+128 or sidebarX
+    local statsY=m.landscape and sidebarY-28 or sidebarY+78
+    U.text(statsX,statsY,'SCORE','ui10',true)
+    U.text(statsX,statsY+28,tostring(score),'ui12',true)
+    U.text(statsX,statsY+66,'LINES','ui10',true)
+    U.text(statsX,statsY+94,tostring(lines_cleared),'ui12',true)
+    extra={U.button('Rotate',{x=14,y=h-180,w=(w-36)//2,h=40}),U.button('Reset',{x=22+(w-36)//2,y=h-180,w=(w-36)//2,h=40})}
+    U.button(is_game_over and 'GAME OVER' or 'YOUR DROP',{x=14,y=h-128,w=w-28,h=48},true)
 
     -- 7. Modal Confirmation Dialog
     if show_reset_confirm then
@@ -511,22 +533,24 @@ function on_draw()
         smudge.rounded_rect(modalX, modalY, modalW, modalH, 6, true, false)
         smudge.rounded_rect(modalX, modalY, modalW, modalH, 6, false, true, 2)
         smudge.centered_text(modalY + 16, "GAME OVER", 12, true, true)
-        smudge.centered_text(modalY + 40, "Press Drop to Play", 10, false, true)
+        restart_rect = {x=modalX,y=modalY+32,w=modalW,h=38}
+        smudge.centered_text(modalY + 40, "Restart", 10, false, true)
     end
 
     -- 8. Footer Button Hints
     if show_reset_confirm then
-        smudge.button_hints("Cancel", "Confirm", "", "")
+        footer=U.footer({"Cancel","Confirm","",""},2)
     elseif is_game_over then
-        smudge.button_hints("Back", "Restart", "", "")
+        footer=U.footer({"Back","Restart","",""},2)
     else
-        smudge.button_hints("Back", "Drop", "Left", "Right")
+        footer=U.footer({"Back","Drop","Left","Right"},2)
     end
 end
 
 -- Button handling
 function on_button(btn, pressed)
     if not pressed then return end
+    painted=false
 
     -- 1. Reset Confirmation Modal Handling
     if show_reset_confirm then
@@ -606,6 +630,32 @@ end
 
 -- Touch handling for touchscreen devices
 function on_tap(x, y)
+    if not painted then return end
+    painted=false
+    if U.hit(extra[1],x,y) and not show_reset_confirm and not is_game_over then on_button('up',true);return end
+    if U.hit(extra[2],x,y) and not show_reset_confirm and not is_game_over then on_button('down',true);return end
+    for i,r in ipairs(footer) do
+        if U.hit(r,x,y) then
+            if show_reset_confirm or is_game_over then
+                if i<=2 then on_button(i==1 and 'back' or 'confirm',true) end
+            elseif i==2 then
+                if not is_clearing_lines then
+                    if can_move(current_piece,piece_x,piece_y+1,current_rot) then
+                        piece_y=piece_y+1;score=score+1;last_fall_time=smudge.millis()
+                    else lock_piece() end
+                    smudge.request_update()
+                end
+            else on_button(({'back','confirm','left','right'})[i],true) end
+            return
+        end
+    end
+    if y>=h-188 or y<64 then return end
+    local r = restart_rect
+    if is_game_over and not show_reset_confirm and r and x>=r.x and x<r.x+r.w and y>=r.y and y<r.y+r.h then
+        restart_rect = nil
+        on_button("confirm", true)
+        return
+    end
     local m = smudge.get_metrics()
     if y > h - m.button_hints_height then
         if show_reset_confirm then

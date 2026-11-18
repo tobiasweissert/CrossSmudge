@@ -14,39 +14,10 @@ function draw_codex_divider(y, dw, margin)
     smudge.line(midX + 32, y, dw - margin, y)
 end
 
-function draw_miniature_frame(x, y, fw, fh)
-    smudge.rect(x, y, fw, fh, false)
-    smudge.rect(x + 3, y + 3, fw - 6, fh - 6, false)
-    smudge.rect(x + 1, y + 1, 2, 2, true)
-    smudge.rect(x + fw - 3, y + 1, 2, 2, true)
-    smudge.rect(x + 1, y + fh - 3, 2, 2, true)
-    smudge.rect(x + fw - 3, y + fh - 3, 2, 2, true)
-    smudge.line(x + 2, y + fh + 1, x + fw + 1, y + fh + 1)
-    smudge.line(x + fw + 1, y + 2, x + fw + 1, y + fh + 1)
+function draw_miniature_frame(x,y,fw,fh)
+    U.panel({x=x,y=y,w=fw,h=fh})
 end
-
-function draw_page_frame(topY, bottomY, pw)
-    pw = pw or w
-    smudge.line(8, topY, 8, bottomY)
-    smudge.line(10, topY, 10, bottomY)
-    for py = topY + 25, bottomY - 20, 42 do
-        smudge.rect(2, py - 2, 6, 5, true)
-        smudge.line(8, py, 14, py)
-    end
-    smudge.line(pw - 11, topY, pw - 11, bottomY)
-    smudge.line(pw - 9, topY, pw - 9, bottomY)
-    for py = topY + 15, bottomY - 15, 8 do
-        smudge.pixel(pw - 5, py, true)
-        if math.floor(py / 8) % 2 == 0 then
-            smudge.pixel(pw - 6, py, true)
-            smudge.pixel(pw - 4, py + 1, true)
-        end
-    end
-    smudge.line(14, topY, pw - 15, topY)
-    smudge.line(14, topY + 2, pw - 15, topY + 2)
-    smudge.line(14, bottomY, pw - 15, bottomY)
-    smudge.line(14, bottomY - 2, pw - 15, bottomY - 2)
-end
+function draw_page_frame() end
 
 function draw_monster(x, y, spriteId)
     spriteId = spriteId or 0

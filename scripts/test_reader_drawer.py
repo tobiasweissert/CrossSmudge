@@ -69,7 +69,7 @@ def check_drawer(program: Path, orientation: int) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--env", choices=("x4-pro-simulator", "sticky-simulator"), default="x4-pro-simulator")
+    parser.add_argument("--env", choices=("sticky-simulator"), default="sticky-simulator")
     args = parser.parse_args()
     program = ROOT / ".pio/build" / args.env / "program"
     for orientation in (1, 3):

@@ -3,84 +3,52 @@ title: Installation
 nav_order: 2
 ---
 
-# Installation
+# Installing and updating Crosscub
 
-## Supported Devices
-
-- Xteink X3, X4
-- Xteink X4 Classic and X4 Pro
-- Seeed Studio Sticky
-
-Don't have a device yet? Get one directly from [Xteink](https://go.sjv.io/X4RGBb) or [Seeed Studio](https://www.seeedstudio.com/reTerminal-Sticky-p-6861.html?sensecap_affiliate=1Nxo3Gw&referring_service=link).
-
-Note: Your purchases using the above affiliate links help support ongoing development of Crossink.
-
-## Web Installation via USB
-
-#### For new installs and updates.
-
-1. Download the `firmware-*.bin` file for your device from the [CrossSmudge Releases](https://github.com/Mumfee/CrossSmudge/releases/latest).
-2. Connect your device (Xteink X3, X4, X4 Pro, Sticky) to your computer via USB-C and ensure it is powered on.
-3. Navigate to [https://crosspointreader.com/#flash-tools](https://crosspointreader.com/#flash-tools) in a WebSerial-compatible browser (Chrome, Edge, Brave, Opera).
-4. Select your device model from the list.
-5. Under firmware selection, choose **"Custom .bin"** (*Upload file*).
-6. Select the downloaded `firmware-*.bin` file and click **Flash**.
-
-Keep the reader connected during the download-mode and flashing steps.
-
-## USB Drive
-
-On X4 Pro, choose `Home > File Transfer > USB Drive` to expose the SD card to
-your computer. Eject the drive from the computer before disconnecting it; the
-reader restarts to Home when the drive is safely ejected or the cable is
-removed.
+Crosscub is for **Seeed reTerminal Sticky only**. Source is on
+[`feat/crosscub-sticky-only`](https://github.com/tobiasweissert/Crosscub/tree/feat/crosscub-sticky-only).
+There is **no published Crosscub firmware feed yet**. Do not install a different
+product's release just because it lives in the same historical repository.
 
 ## SD Card Firmware Update
 
-#### For installing newer versions of CrossSmudge. Can be used by USB locked devices.
+When a verified Sticky application image is available:
 
-1. Download the `firmware-*.bin` file from the [CrossSmudge Releases](https://github.com/Mumfee/CrossSmudge/releases/latest).
-2. Place the downloaded `firmware-*.bin` file on your SD card. You can place this file anywhere.
-3. On your device, go to `Settings > System > SD Card Firmware Update` and navigate to the `.bin` file and update.
+1. Back up the SD card and keep the previous working image.
+2. Copy the `.bin` application image to the SD card without formatting it.
+3. Open **Settings → System → SD Card Firmware Update**, select the image and
+   confirm the update. The existing recovery/update flow remains available.
+4. Let the device complete verification and reboot. Keep power connected.
 
-## USB Locked Devices
+The updater retains chip/integrity/board checks. It is not a factory-image or
+partition-migration tool. Existing reading progress, settings, custom fonts,
+boot/sleep pictures, apps and save directories remain at their current paths.
+Do not erase NVS or rename `.crosspoint`, `.crosssmudge` or `.smudge` to rebrand.
 
-If your device has USB data transfer disabled:
+## OTA
 
-1. Download the `firmware-*.bin` file from the [CrossSmudge Releases](https://github.com/Mumfee/CrossSmudge/releases/latest).
-2. Copy the `.bin` file to the root of your SD card using an SD card reader.
-3. Insert the card into your device, go to `Settings > System > SD Card Firmware Update`, and select the `.bin` file.
+**Settings → Firmware Update** checks the owner's repository. Only tagged
+`crosscub-v<VERSION>` releases with `crosscub-sticky-v<VERSION>.bin`, a SHA-256
+digest, the Sticky board identity and a `Crosscub` application descriptor can
+be installed. Redirected release manifests and legacy upstream products are
+not accepted. A missing/non-Crosscub latest release is a no-update result, not
+an invitation to install upstream firmware. No Crosscub update has been
+published yet; manual SD update/recovery remains usable independently.
 
-## Command Line
+## USB and first installation
 
-These instructions are for macOS and Linux. Windows users should use the web installer.
+USB upload and the original recovery routes are retained in source. A target
+build is not a physical flashing qualification. Use a device-specific verified
+procedure and distinguish an application image from a factory image before
+writing flash; do not guess offsets or overwrite partitions. Sticky does not
+expose an owned USB mass-storage product mode. Use the existing web file
+manager, WebDAV, Calibre, Nearby/AirDrop or a card reader for file transfers.
 
-Install `esptool`:
+## Build the application
 
-```sh
-pip3 install esptool
-```
-
-Download the `firmware-*.bin` file from the [CrossSmudge Releases](https://github.com/Mumfee/CrossSmudge/releases/latest), then connect your device with USB-C.
-
-Find the device port:
-
-```sh
-# Linux
-dmesg | grep tty
-
-# macOS
-ls /dev/cu.*
-```
-
-Flash the firmware:
-
-```sh
-# Linux
-esptool.py --chip esp32c3 --port /dev/ttyACM0 --baud 921600 write_flash 0x10000 /path/to/firmware.bin
-
-# macOS
-esptool.py --chip esp32c3 --port /dev/cu.usbmodem2101 --baud 921600 write_flash 0x10000 /path/to/firmware.bin
-```
-
-Replace the port and firmware path with your actual values.
+Use the pinned PlatformIO Core **6.1.19**, platform **55.03.37**, Arduino
+**3.3.7** and the pinned SDK/submodules. `pio run` selects `sticky`; explicit
+`pio run -e sticky` does the same. `sticky-owner-test` is a Sticky-only cache
+compatibility alias, not a separate App Store or product. Coordinate all jobs
+sharing a PlatformIO cache. No firmware build, flashing or physical acceptance
+is implied by the host tests.

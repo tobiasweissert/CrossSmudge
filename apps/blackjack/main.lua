@@ -34,6 +34,14 @@ local active_hand_idx = 1
 local review_hand_idx = 1
 local insurance_bet = 0
 
+
+local U = dofile('unified_ui.lua')
+local footer, split_rect, painted_phase = {}, nil, nil
+local function action_height() return 68 end
+local function action_hints(a,b,c,d)
+    footer=U.footer({a,b,c,d},phase=='player_turn' and 3 or 2)
+end
+
 local function card_rank(c)
     return ((c - 1) % 13) + 1
 end
@@ -290,13 +298,11 @@ local function save_state()
 end
 
 local function draw_empty_card_slot(x, y)
-    smudge.rounded_rect(x, y, kCardWidth, kCardHeight, kCardCornerRadius, true, false)
-    smudge.rounded_rect(x, y, kCardWidth, kCardHeight, kCardCornerRadius, false, 1, true)
+    U.panel({x=x,y=y,w=kCardWidth,h=kCardHeight})
 end
 
 local function draw_card_shape(x, y, card, is_face_down)
-    smudge.rounded_rect(x, y, kCardWidth, kCardHeight, kCardCornerRadius, true, false)
-    smudge.rounded_rect(x, y, kCardWidth, kCardHeight, kCardCornerRadius, false, 1, true)
+    U.panel({x=x,y=y,w=kCardWidth,h=kCardHeight})
 
     if is_face_down then
         smudge.rect_dither(x + 5, y + 5, kCardWidth - 10, kCardHeight - 10, false)
@@ -306,7 +312,7 @@ local function draw_card_shape(x, y, card, is_face_down)
     local r = card_rank(card)
     local s = card_suit(card)
     local rankStr = ranks[r]
-    smudge.text(x + 8, y + 8, rankStr, "ui12", true, "left")
+    smudge.text(x + kCardWidth//2, y + 6, rankStr, "ui12", true, "center")
 
     local iconX = x + math.floor((kCardWidth - 32) / 2)
     local iconY = y + math.floor(kCardHeight / 2) - 4
@@ -318,12 +324,13 @@ local function draw_card_shape(x, y, card, is_face_down)
     end
 end
 
-local function draw_hand_row(cards, cardY, hasHiddenCard)
-    local maxHandW = w - 40
+local function draw_hand_row(cards, cardY, hasHiddenCard, areaX, areaW)
+    areaX, areaW = areaX or 0, areaW or w
+    local maxHandW = areaW - 28
     local numCards = #cards
     if numCards == 0 then
         local totalW = 2 * kCardWidth + kCardGap
-        local startX = math.floor((w - totalW) / 2)
+        local startX = areaX + math.floor((areaW - totalW) / 2)
         draw_empty_card_slot(startX, cardY)
         draw_empty_card_slot(startX + kCardWidth + kCardGap, cardY)
         return
@@ -331,7 +338,7 @@ local function draw_hand_row(cards, cardY, hasHiddenCard)
 
     local totalW = numCards * kCardWidth + (numCards - 1) * kCardGap
     if totalW <= maxHandW or numCards == 1 then
-        local startX = math.floor((w - totalW) / 2)
+        local startX = areaX + math.floor((areaW - totalW) / 2)
         for i, card in ipairs(cards) do
             local cardX = startX + (i - 1) * (kCardWidth + kCardGap)
             local isFaceDown = (i == 2 and hasHiddenCard)
@@ -339,7 +346,7 @@ local function draw_hand_row(cards, cardY, hasHiddenCard)
         end
     else
         local step = math.floor((maxHandW - kCardWidth) / (numCards - 1))
-        local startX = math.floor((w - (kCardWidth + (numCards - 1) * step)) / 2)
+        local startX = areaX + math.floor((areaW - (kCardWidth + (numCards - 1) * step)) / 2)
         for i, card in ipairs(cards) do
             local cardX = startX + (i - 1) * step
             local isFaceDown = (i == 2 and hasHiddenCard)
@@ -351,13 +358,16 @@ end
 function on_draw()
     smudge.clear()
 
-    local m = smudge.get_metrics()
-    local topBound = m.top_padding + m.header_height
-    local bottomBound = h - m.button_hints_height
+    local m = U.metrics()
+    w,h=m.w,m.h
+    kCardWidth,kCardHeight = m.landscape and 72 or 94, m.landscape and 104 or 134
+    split_rect=nil
+    local topBound = m.body_top
+    local bottomBound = m.body_bottom
     local availableHeight = bottomBound - topBound
 
     -- 1. Header
-    smudge.header("Blackjack", "Bank: $" .. bankroll)
+    U.header("Blackjack", "BANK $" .. bankroll)
 
     -- 2. DEALER SECTION
     local dealerScore = hand_score(dealer_hand)
@@ -374,11 +384,11 @@ function on_draw()
         end
     end
 
-    local dealerTextY = topBound + math.floor(availableHeight * 0.04)
-    smudge.centered_text(dealerTextY, dealerHeader, "ui12", "bold", true)
+    local dealerTextY = m.landscape and topBound+20 or topBound + math.floor(availableHeight * 0.20)
+    U.text(m.landscape and w//4 or w//2, dealerTextY, string.upper(dealerHeader), "ui12", true, "center")
 
     local dealerCardY = dealerTextY + 36
-    draw_hand_row(dealer_hand, dealerCardY, hasHiddenCard)
+    draw_hand_row(dealer_hand, dealerCardY, hasHiddenCard, 0, m.landscape and w//2 or w)
 
     -- 3. PLAYER SECTION
     local activeH = player_hands[active_hand_idx]
@@ -398,14 +408,14 @@ function on_draw()
         end
     end
 
-    local playerTextY = topBound + math.floor(availableHeight * 0.38)
-    smudge.centered_text(playerTextY, playerHeader, "ui12", "bold", true)
+    local playerTextY = m.landscape and dealerTextY or topBound + math.floor(availableHeight * 0.53)
+    U.text(m.landscape and w*3//4 or w//2, playerTextY, U.fit(string.upper(playerHeader),m.landscape and w//2-28 or w-28,"ui12",true), "ui12", true, "center")
 
     local playerCardY = playerTextY + 36
     if activeH then
-        draw_hand_row(activeH.cards, playerCardY, false)
+        draw_hand_row(activeH.cards, playerCardY, false, m.landscape and w//2 or 0, m.landscape and w//2 or w)
     else
-        draw_hand_row({}, playerCardY, false)
+        draw_hand_row({}, playerCardY, false, m.landscape and w//2 or 0, m.landscape and w//2 or w)
     end
 
     -- Split Indicator / Button (if pairs are present and can split)
@@ -414,9 +424,8 @@ function on_draw()
         local splitBoxW = 280
         local splitBoxH = 36
         local splitX = math.floor((w - splitBoxW) / 2)
-        local splitY = playerCardY + kCardHeight + 16
-        smudge.rounded_rect(splitX, splitY, splitBoxW, splitBoxH, 6, true, true)
-        smudge.centered_text(splitY + 10, "SPLIT (Side Button / Tap)", "ui10", "bold", false)
+        local splitY = bottomBound - 90
+        split_rect=U.button("Split",{x=splitX,y=splitY,w=splitBoxW,h=splitBoxH},true)
     end
 
     -- 4. STATUS & BET READOUT
@@ -447,22 +456,24 @@ function on_draw()
         smudge.centered_text(modalY + 96, "[ Insure ]           [ Decline ]", "ui10", "bold", false)
     end
 
+    painted_phase=phase
     -- 6. FOOTER HINTS
     if phase == "betting" then
-        smudge.button_hints("Back", "Deal", "- Bet", "+ Bet")
+        action_hints("Back", "Deal", "- Bet", "+ Bet")
     elseif phase == "insurance" then
-        smudge.button_hints("Decline", "Insure", "Insure", "Decline")
+        action_hints("Decline", "Insure", "Insure", "Decline")
     elseif phase == "player_turn" then
         local btn2 = can_double_down() and "Double" or ""
-        smudge.button_hints("Back", btn2, "Hit", "Stand")
+        action_hints("Back", btn2, "Hit", "Stand")
     else
         local nextLabel = (#player_hands > 1 and review_hand_idx < #player_hands) and "Next Hand" or "Next"
-        smudge.button_hints("Back", nextLabel, "", "")
+        action_hints("Back", nextLabel, "", "")
     end
 end
 
 function on_button(btn, pressed)
     if not pressed then return end
+    painted_phase=nil
 
     if phase == "insurance" then
         if btn == "confirm" or btn == "left" or btn == "page_back" or btn == "up" then
@@ -533,102 +544,16 @@ function on_button(btn, pressed)
     end
 end
 
-function on_tap(x, y)
-    local m = smudge.get_metrics()
-
-    -- 1. Tap on Insurance Modal
-    if phase == "insurance" then
-        if y > h - m.button_hints_height then
-            if x < w / 2 then
-                resolve_insurance(x >= w / 4) -- btn1 Decline, btn2 Insure
-            else
-                resolve_insurance(x < 3 * w / 4) -- btn3 Insure, btn4 Decline
-            end
-            return
-        end
-        local modalW = w - 40
-        local modalH = 130
-        local modalX = math.floor((w - modalW) / 2)
-        local modalY = math.floor((h - modalH) / 2) - 10
-        if x >= modalX and x <= modalX + modalW and y >= modalY and y <= modalY + modalH then
-            if x < modalX + math.floor(modalW / 2) then
-                resolve_insurance(true)
-            else
-                resolve_insurance(false)
-            end
-            return
-        end
+function on_tap(x,y)
+    if painted_phase~=phase then return end
+    painted_phase=nil
+    for i,r in ipairs(footer) do
+        if U.hit(r,x,y) then on_button(({'back','confirm','left','right'})[i],true); smudge.request_update(); return end
     end
-
-    -- 2. Tap on Split Box
-    if phase == "player_turn" and can_split_hand() then
-        local topBound = m.top_padding + m.header_height
-        local bottomBound = h - m.button_hints_height
-        local availableHeight = bottomBound - topBound
-        local playerTextY = topBound + math.floor(availableHeight * 0.38)
-        local playerCardY = playerTextY + 36
-        local splitBoxW = 280
-        local splitBoxH = 36
-        local splitX = math.floor((w - splitBoxW) / 2)
-        local splitY = playerCardY + kCardHeight + 16
-        if x >= splitX and x <= splitX + splitBoxW and y >= splitY and y <= splitY + splitBoxH then
-            perform_split()
-            return
-        end
-    end
-
-    -- 3. Bottom Button Hints Tap
-    if y > h - m.button_hints_height then
-        if x < w / 4 then
-            save_state()
-            smudge.exit()
-        elseif phase == "betting" then
-            if x < w / 2 then
-                deal_round()
-            elseif x < 3 * w / 4 then
-                current_bet = math.max(1, current_bet - chip_values[chip_idx])
-            else
-                current_bet = math.min(bankroll, current_bet + chip_values[chip_idx])
-            end
-        elseif phase == "player_turn" then
-            if x >= w / 4 and x < w / 2 then
-                -- Double Down
-                if can_double_down() then
-                    perform_double_down()
-                    save_state()
-                end
-            elseif x >= w / 2 and x < 3 * w / 4 then
-                -- Hit
-                local h = player_hands[active_hand_idx]
-                table.insert(h.cards, draw_card())
-                local score = hand_score(h.cards)
-                if score >= 21 then
-                    if score > 21 then h.busted = true end
-                    advance_player_turn()
-                    save_state()
-                end
-            elseif x >= 3 * w / 4 then
-                -- Stand
-                advance_player_turn()
-                save_state()
-            end
-        elseif phase == "round_over" then
-            if x >= w / 4 and x < w / 2 then
-                if #player_hands > 1 and review_hand_idx < #player_hands then
-                    review_hand_idx = review_hand_idx + 1
-                    return
-                end
-                if bankroll <= 0 then
-                    bankroll = 50
-                end
-                current_bet = math.min(current_bet, bankroll)
-                if current_bet <= 0 then current_bet = 1 end
-                clear_table(dealer_hand)
-                clear_table(player_hands)
-                insurance_bet = 0
-                status_message = ""
-                phase = "betting"
-            end
-        end
+    if U.hit(split_rect,x,y) and phase=='player_turn' and can_split_hand() then perform_split();smudge.request_update();return end
+    -- Insurance body retains its explicit accept / decline dialog.
+    if phase=='insurance' then
+        local my=(h-130)//2-10
+        if y>=my and y<my+130 and x>=20 and x<w-20 then resolve_insurance(x<w//2);smudge.request_update() end
     end
 end

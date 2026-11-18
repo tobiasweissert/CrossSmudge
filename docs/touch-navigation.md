@@ -22,8 +22,6 @@ the indicated direction. The following swipe gestures do not need to start at th
 | Swipe **left**  | **Next recent book** |
 | Tap book cover  | Book             |
 
-On X4 Pro, keep a down-swipe for Settings away from the very top edge. A
-top-edge down-swipe opens the frontlight panel instead, but you can also access settings by tapping the settings icon in that panel.
 
 ### Swipe down to open Settings
 

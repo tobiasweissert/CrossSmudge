@@ -161,7 +161,7 @@ Available actions include:
 - Calibre Wireless
 - Join a Network
 - Create Hotspot
-- Tilt Page Turn (X3 only)
+- Tilt Page Turn (Sticky)
 - Footnotes
 - Dark Mode
 - Browse Files
@@ -186,7 +186,7 @@ shortcut is unchanged.
 ## Quick Actions Triggers
 
 In **Settings > Quick Actions**, assign the menu to one shortcut. Available
-triggers include short- or long-press Power, **Power + Up**, and on X4 Pro,
+triggers include short- or long-press Power, **Power + Up**, and, on hardware with a capacitive Home key,
 **Tap Home**, **Long-Press Home**, or **Double Tap Home**. Selecting a trigger
 there replaces any previous Quick Actions trigger; it does not change the five
 actions in the menu.
@@ -210,6 +210,6 @@ pause while Quick Lock is active.
 
 ## Footnote Shortcut
 
-When a shortcut is mapped to Footnotes, the shortcut opens the footnotes submenu while reading. If the current page has only one footnote, CrossSmudge opens that referenced page directly.
+When a shortcut is mapped to Footnotes, the shortcut opens the footnotes submenu while reading. If the current page has only one footnote, Crosscub opens that referenced page directly.
 
 The **Quick-return from Footnotes** setting controls whether the Power button acts like Back after opening a footnote page, making it faster to return to the original reading position.

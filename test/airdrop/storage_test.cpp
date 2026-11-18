@@ -312,4 +312,4 @@ static void recoveryFaults() {
   std::puts("PASS torn/gapped/unreadable journals and existing destination collisions preserve candidates without republish");
 }
 
-int main() { finalRecordCancellation(); assert(journalCrc32(reinterpret_cast<const uint8_t*>("123456789"), 9) == 0xcbf43926); contents(); recoveryFaults(); basic(); unsafeAndCancel(); uncertainty(); failures(); large(); }
+int main() { finalRecordCancellation(); assert(journalCrc32(reinterpret_cast<const uint8_t*>("123456789"), 9) == 0xcbf43926); contents(); recoveryFaults(); basic(); unsafeAndCancel(); uncertainty(); failures(); large(); return 0; }

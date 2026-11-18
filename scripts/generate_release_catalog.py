@@ -14,14 +14,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-DEVICE_TYPE_ORDER = ('x3-x4', 'sticky', 'x4-pro', 'x4-classic')
-DEFAULT_SUPPORTED_DEVICES = {
-    'x3-x4': ['x4', 'x3'],
-    'sticky': ['sticky'],
-    'x4-pro': ['x4pro'],
-    'x4-classic': ['x4c'],
-}
-FIRMWARE_NAME_PATTERN = re.compile(r'^firmware-(?P<variant>.+?)-v[^/]+\.bin$')
+DEVICE_TYPE_ORDER = ('sticky',)
+DEFAULT_SUPPORTED_DEVICES = {'sticky': ['sticky']}
+FIRMWARE_NAME_PATTERN = re.compile(r'^crosscub-(?P<variant>sticky)-v[^/]+\.bin$')
 
 
 def sha256_file(path):
@@ -42,7 +37,7 @@ def normalize_version(version):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Generate CrossSmudge release catalog JSON.')
+    parser = argparse.ArgumentParser(description='Generate Crosscub release catalog JSON.')
     parser.add_argument(
         '--firmware',
         required=True,
@@ -75,7 +70,7 @@ def parse_device_type(firmware_path):
     match = FIRMWARE_NAME_PATTERN.match(firmware_path.name)
     if match:
         return match.group('variant')
-    return firmware_path.parent.name
+    raise SystemExit('Only crosscub-sticky-v<VERSION>.bin artifacts are supported')
 
 
 def sort_key_for_device_type(device_type):
@@ -88,8 +83,12 @@ def sort_key_for_device_type(device_type):
 def main():
     args = parse_args()
     version = normalize_version(args.version)
-    notes = args.notes or f'CrossSmudge {version} {args.channel} firmware'
-    firmware_base_url = args.firmware_base_url or f'https://github.com/{args.repo}/releases/download/v{version}/'
+    if args.repo != 'tobiasweissert/Crosscub':
+        raise SystemExit('Crosscub release repository must be owner controlled')
+    if args.supported_devices and args.supported_devices != ['sticky']:
+        raise SystemExit('Crosscub supports only Sticky')
+    notes = args.notes or f'Crosscub {version} {args.channel} firmware'
+    firmware_base_url = args.firmware_base_url or f'https://github.com/{args.repo}/releases/download/crosscub-v{version}/'
     firmware_base_url = firmware_base_url.rstrip('/') + '/'
 
     releases = []

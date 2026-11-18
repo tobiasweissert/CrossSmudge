@@ -1,7 +1,7 @@
 # Webserver Endpoints
 
 This document describes the HTTP, WebSocket, WebDAV, and discovery endpoints
-available while CrossSmudge is in File Transfer or Calibre Wireless mode.
+available while Crosscub is in File Transfer or Calibre Wireless mode.
 
 - HTTP server: port 80
 - WebSocket upload server: port 81
@@ -39,7 +39,7 @@ Response:
   "rssi": -45,
   "freeHeap": 123456,
   "uptime": 3600,
-  "device": "X4",
+  "device": "Sticky",
   "serial": "Not found"
 }
 ```
@@ -52,7 +52,7 @@ Response:
 | `rssi` | number | Wi-Fi RSSI in dBm; `0` in AP mode |
 | `freeHeap` | number | Free heap in bytes |
 | `uptime` | number | Seconds since boot |
-| `device` | string | `"X3"` or `"X4"` hardware detection |
+| `device` | string | `"Sticky"` hardware identity |
 | `serial` | string | Device serial number from eFuse, or `"Not found"` when unavailable |
 
 ## File Management

@@ -21,7 +21,7 @@ constexpr StrId triggerLabels[] = {
 std::vector<QuickActions::Trigger> availableTriggers() {
   std::vector<QuickActions::Trigger> triggers = {QuickActions::Trigger::None, QuickActions::Trigger::ShortPower,
                                                  QuickActions::Trigger::LongPower, QuickActions::Trigger::PowerUp};
-#if CROSSINK_APP_CAP_TOUCH || CROSSINK_APP_DEVICE_X4CLASSIC || defined(SIMULATOR_DEVICE_X4_CLASSIC)
+#if CROSSINK_APP_CAP_TOUCH
   if (deviceSupportsSideButtonChord(gpio)) {
     triggers.push_back(QuickActions::Trigger::UpDown);
   }

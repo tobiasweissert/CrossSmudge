@@ -42,37 +42,30 @@ function screen.exit()
 end
 
 function screen.draw()
-    local m = smudge.get_metrics()
-    local cur = ev or get_event(evId)
-    smudge.header(cur.title, cur.sub)
-
-    local ty = m.top_padding + m.header_height + 2
-    draw_page_frame(ty, h - m.button_hints_height - 2)
-
-    ty = draw_codex_stats(ty + 6)
-    draw_miniature_frame(172, ty, 136, 136)
-    smudge.draw_sprite(176, ty + 4, 128, 128, "sprites/event_" .. cur.id .. ".raw")
-    ty = ty + 144
-
-    for i = 1, #cur.narrative do
-        smudge.centered_text(ty, cur.narrative[i], "small", "regular", true)
-        ty = ty + smudge.line_height("small") + 2
+    local m=U.metrics();local cur=ev or get_event(evId)
+    U.header(cur.title,cur.sub)
+    U.text(14,80,'HP '..state.playerHp..'/'..state.playerMaxHp..'  GOLD '..state.gold,'ui10',true)
+    draw_miniature_frame(14,114,136,136)
+    smudge.draw_sprite(18,118,128,128,'sprites/event_'..cur.id..'.raw')
+    local nx,ny,nw=160,114,m.landscape and 260 or w-174
+    for _,p in ipairs(cur.narrative)do
+        local res=smudge.wrapped_text(p,nw,'small',false,12)
+        for _,line in ipairs(res and res.lines or {})do U.text(nx,ny,line,'small');ny=ny+smudge.line_height('small')end
     end
-    ty = ty + 4
-    draw_codex_divider(ty, w, 28)
-    ty = ty + 10
-
-    screen.optY = ty
-    for i = 1, #cur.choices do
-        local c = cur.choices[i]
-        local sel = (i == choiceIdx)
-        local canAfford = not (c[5] < 0 and state.gold < -c[5])
-        local iy = ty + ((i - 1) * 82)
-        smudge.rect(22, iy, w - 44, 74, sel)
-        smudge.text(36, iy + 8, c[1], "ui12", "bold", "left", not sel)
-        smudge.text(36, iy + 36, canAfford and c[2] or ("[Requires " .. (-c[5]) .. " Gold]"), "small", "regular", "left", not sel)
+    screen.options={}
+    local x,y,cw=m.landscape and 440 or 14,m.landscape and 114 or math.max(266,ny+12),m.landscape and w-454 or w-28
+    local first=m.landscape and choiceIdx or 1
+    local last=m.landscape and choiceIdx or #cur.choices
+    for i=first,last do
+        local c=cur.choices[i];local r={x=x,y=y+(i-first)*90,w=cw,h=82};screen.options[i]=r
+        local selected=i==choiceIdx
+        U.panel(r,selected)
+        U.text(x+10,r.y+8,U.fit(c[1],cw-20,'ui10',true),'ui10',true,'left',not selected)
+        local text=(c[5]<0 and state.gold < -c[5])and ('Requires '..(-c[5])..' Gold')or c[2]
+        local dy=r.y+38
+        for _,line in ipairs(smudge.wrapped_text(text,cw-20,'small',false,2).lines or {})do U.text(x+10,dy,line,'small',false,'left',not selected);dy=dy+smudge.line_height('small')end
     end
-    smudge.button_hints("", "Select", "<", ">")
+    draw_actions('','Select','<','>')
 end
 
 function screen.on_button(btn, pressed)
@@ -99,16 +92,8 @@ function screen.on_button(btn, pressed)
     end
 end
 
-function screen.on_tap(x, y)
-    if not screen.optY then return end
-    for i = 1, #ev.choices do
-        local iy = screen.optY + (i - 1) * 82
-        if x >= 22 and x <= w - 22 and y >= iy and y <= iy + 74 then
-            choiceIdx = i
-            screen.on_button("confirm", true)
-            return
-        end
-    end
+function screen.on_tap(x,y)
+    for i,r in pairs(screen.options or {})do if U.hit(r,x,y)then choiceIdx=i;screen.on_button('confirm',true);return end end
 end
 
 return screen

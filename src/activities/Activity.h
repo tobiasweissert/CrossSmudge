@@ -89,7 +89,7 @@ class Activity {
   // Activities with a modal can keep global gestures from acting behind it.
   virtual bool blocksGlobalInput() const { return false; }
   // Lists that own vertical swipes can opt out of the global bottom-edge
-  // Home gesture while retaining the capacitive Home key on X4 Pro.
+  // Home gesture while retaining a legacy capacitive Home key if present.
   virtual bool allowGlobalHomeSwipeGesture() const { return true; }
   // Let overlays consume the global Home gesture as a dismiss action.
   virtual bool handleHomeGesture() { return false; }

@@ -1,6 +1,6 @@
-# CrossSmudge Application Developer Guide
+# Crosscub Application Developer Guide
 
-Welcome to the **CrossSmudge Application Platform**! CrossSmudge features a lightweight, sandboxed **Lua 5.4** application engine that enables anyone to build, share, and install custom e-paper applications directly from SD card storage—**no firmware compilation or flashing required**.
+Welcome to the **Crosscub Application Platform**! Crosscub features a lightweight, sandboxed **Lua 5.4** application engine that enables anyone to build, share, and install custom e-paper applications directly from SD card storage—**no firmware compilation or flashing required**.
 
 ---
 
@@ -29,9 +29,9 @@ Welcome to the **CrossSmudge Application Platform**! CrossSmudge features a ligh
 
 ## Architecture Overview
 
-- **Engine:** Sandboxed Lua 5.4 runtime embedded within CrossSmudge firmware.
+- **Engine:** Sandboxed Lua 5.4 runtime embedded within Crosscub firmware.
 - **Location on Device:** `/.crosssmudge/applications/<app_id>/` (fallback: `/.smudge/applications/<app_id>/`).
-- **Dynamic Discovery:** CrossSmudge discovers all installed applications on SD card startup and populates the **Applications** menu automatically.
+- **Dynamic Discovery:** Crosscub discovers all installed applications on SD card startup and populates the **Applications** menu automatically.
 - **Zero-Flash Iteration:** Changes made to Lua scripts or assets on the SD card take effect immediately the next time the app is launched.
 
 ---
@@ -54,7 +54,7 @@ apps/
 
 ## Manifest Specification (`manifest.json`)
 
-The `manifest.json` file describes your application to CrossSmudge, the App Store, and the Web Manager:
+The `manifest.json` file describes your application to Crosscub, the App Store, and the Web Manager:
 
 ```json
 {
@@ -62,7 +62,7 @@ The `manifest.json` file describes your application to CrossSmudge, the App Stor
   "name": "My Custom App",
   "version": "1.0.0",
   "author": "YourName",
-  "description": "A clean e-paper utility or game for CrossSmudge.",
+  "description": "A clean e-paper utility or game for Crosscub.",
   "entry": "main.lua"
 }
 ```
@@ -77,7 +77,7 @@ The `manifest.json` file describes your application to CrossSmudge, the App Stor
 | `author` | string | Creator name or handle. |
 | `description`| string | One-sentence summary displayed in the App Store / Web Viewer. |
 | `entry` | string | Entry point script filename (default: `"main.lua"`). |
-| `min_api` | integer | Optional: Minimum required CrossSmudge Lua API version (e.g. `2` for apps utilizing `prevent_sleep`, `set_orientation`, or `has_feature`). Firmware older than this version will prevent launching and show a clear update prompt rather than crashing. |
+| `min_api` | integer | Optional: Minimum required Crosscub Lua API version (e.g. `2` for apps utilizing `prevent_sleep`, `set_orientation`, or `has_feature`). Firmware older than this version will prevent launching and show a clear update prompt rather than crashing. |
 | `prevent_sleep` | boolean | Optional: If `true`, disables the device's automatic inactivity sleep timer while this app is running (e.g. for desk clocks, timers, dashboards). Standard auto-sleep resumes immediately when the app exits. |
 
 ---
@@ -91,7 +91,7 @@ Each application can provide an authentic 32x32 monochrome icon:
 - **Bit Convention:** 
   - `0` bit = **Drawn / Black pixel**
   - `1` bit = **White / Transparent background**
-- **Hardware Coordinate Alignment:** Because CrossSmudge operates in portrait mode on landscape e-ink hardware panels, the icon pixel stream is stored pre-rotated 90° counter-clockwise so the ESP32 can blit it directly into the screen framebuffer with zero rotation overhead.
+- **Hardware Coordinate Alignment:** Because Crosscub operates in portrait mode on landscape e-ink hardware panels, the icon pixel stream is stored pre-rotated 90° counter-clockwise so the ESP32 can blit it directly into the screen framebuffer with zero rotation overhead.
 
 ### Managing and Editing `icon.raw` with `scripts/convert_icon.py`
 
@@ -122,7 +122,7 @@ python scripts/convert_icon.py header icon.png my_icon
 
 ## Application Lifecycle Callbacks
 
-CrossSmudge calls global functions defined in your `main.lua` at specific events:
+Crosscub calls global functions defined in your `main.lua` at specific events:
 
 ### `on_init()`
 Called once when your app is launched. Initialize your state, seed random numbers, and load saved preferences here:
@@ -198,9 +198,9 @@ end
 
 ## Hardware Button & Touch Mapping
 
-CrossSmudge standardizes button names across all hardware variations:
+Crosscub standardizes button names across all hardware variations:
 
-| Button String | Action / Convention | Physical Button (Xteink X3/X4) |
+| Button String | Action / Convention | Logical input / touchscreen equivalent |
 | :--- | :--- | :--- |
 | `"back"` | Exit / Cancel / Previous menu | Bottom Left Button |
 | `"confirm"` | Select / Enter / OK / Action | Bottom Center-Left Button |
@@ -252,7 +252,7 @@ In vertical menu lists (settings menus, grimoires, selection menus):
   - `"landscape"` / `"landscape_cw"` (90° clockwise)
   - `"portrait_inverted"` (180° upside down)
   - `"landscape_ccw"` (270° counter-clockwise)  
-  *Note:* When the application exits, CrossSmudge automatically restores the system's prior orientation.
+  *Note:* When the application exits, Crosscub automatically restores the system's prior orientation.
 - **`smudge.get_orientation()`**  
   Returns the current display orientation string (`"portrait"`, `"landscape"`, `"portrait_inverted"`, or `"landscape_ccw"`).
 - **`smudge.popup(message)`** *(or `smudge.draw_popup(message)`)*  
@@ -272,7 +272,7 @@ In vertical menu lists (settings menus, grimoires, selection menus):
 
 ### Typography & Text Wrapping
 
-CrossSmudge includes high-quality embedded anti-aliased bitmap fonts:
+Crosscub includes high-quality embedded anti-aliased bitmap fonts:
 
 - **Supported Fonts:**
   - `"small"`: 8pt compact UI font (rubrics, metadata)
@@ -336,7 +336,7 @@ All shape drawing functions support a customizable line **thickness** (stroke wi
 - **`smudge.in_rect(px, py, rx, ry, rw, rh)`** *(or `smudge.point_in_rect(...)`)*  
   Hit-testing helper: returns `true` if coordinate `(px, py)` falls inside rectangle `(rx, ry, rw, rh)`.
 - **`smudge.header(title, [right_text])`**  
-  Draws standard CrossSmudge system header with title, battery indicator, and divider.
+  Draws standard Crosscub system header with title, battery indicator, and divider.
 - **`smudge.button_hints(btn1, btn2, btn3, btn4)`**  
   Draws bottom navigation pills corresponding to hardware buttons.
 
@@ -345,11 +345,11 @@ All shape drawing functions support a customizable line **thickness** (stroke wi
 ### Hardware Queries & Utilities
 
 - **`smudge.has_touch()`** *(or `smudge.has_touchscreen()`)*  
-  Returns `true` if the current device has hardware touchscreen support (e.g. Seeed reTerminal Sticky, Xteink X4 Pro), or `false` on button-only devices (e.g. Xteink X3/X4).
+  Returns `true` for Sticky touchscreen hardware.
 - **`smudge.get_battery()`** *(or `smudge.battery()`)*  
   Returns the current battery level as an integer percentage (`0`–`100`).
 - **`smudge.get_device()`**  
-  Returns a string identifying the hardware platform (`"Xteink X3"`, `"Seeed reTerminal Sticky"`, `"Xteink X4 Pro"`, or `"Simulator"`).
+  Returns `"sticky"` on hardware and `"simulator"` in the native simulator.
 - **`smudge.get_date()`** *(or `smudge.date()`)*  
   Returns a calendar date/time table from the device's hardware RTC clock:
   ```lua
@@ -370,7 +370,7 @@ All shape drawing functions support a customizable line **thickness** (stroke wi
 - **`smudge.is_prevent_sleep()`** *(or `smudge.is_keep_awake()`)*  
   Returns `true` if auto-sleep prevention is currently active, or `false` otherwise.
 - **`smudge.version()`** *(or `smudge.get_version()`)*  
-  Returns the current CrossSmudge firmware version string (e.g. `"1.6.5.3"`).
+  Returns the current Crosscub firmware version string (e.g. `"1.6.5.3"`).
 - **`smudge.api_version`** *(or `smudge.get_api_version()`)*  
   Returns the integer API level (currently `2`). API `1` was the initial app engine release; API `2` adds sleep prevention, dynamic orientation switching, full-refresh requests, and version/feature introspection.
 - **`smudge.has_feature(name)`**  
@@ -380,7 +380,7 @@ All shape drawing functions support a customizable line **thickness** (stroke wi
 
 ### Persistence & File I/O
 
-CrossSmudge provides key-value persistence, full sandboxed file operations, and high-performance streaming file section readers:
+Crosscub provides key-value persistence, full sandboxed file operations, and high-performance streaming file section readers:
 
 - **`smudge.save(key, value_string)`**  
   Persists a key-value string to the app's persistent storage on SD card (`/.crosspoint/data/<app_id>_<key>.dat`).
@@ -439,8 +439,8 @@ Any extra assets (like `.txt`, `.json`, `.raw` sprites, or level definitions) pl
 
 ## Memory Discipline & E-Paper Best Practices
 
-### The 75 KB Hardware DRAM Ceiling (ESP32-C3)
-Devices like the Xteink X3 and X4 run on a single-core ESP32-C3 microcontroller with **no PSRAM** and only **~75 KB total usable internal DRAM** for Lua applications. Any application intended for the App Store must run comfortably within this ceiling.
+### Sticky production budgets and low-memory stress tests
+Crosscub retains the current per-app Lua heap and PSRAM policies. Ordinary Sticky applications use the existing 2 MiB ceiling; Browser keeps its separately reviewed API7 allowance. Consult production admission rather than assuming that free PSRAM makes every allocation safe. The inherited 75 KiB fixture is a stress/legacy-data compatibility check, not a supported hardware target or a new production budget.
 
 Follow these proven patterns to ensure your app is rock-solid:
 
@@ -461,7 +461,7 @@ Follow these proven patterns to ensure your app is rock-solid:
    Static data (calendars, hymn stanzas, psalter schedules, monster stats, dialog trees) defined as large Lua tables consumes permanent Lua heap. Store them in `.txt` files in your app folder and stream them on-demand using `smudge.find_section()`.
 
 5. **Pace Garbage Collection:**  
-   Call `collectgarbage("collect")` prior to starting heavy operations and immediately after freeing large tables. CrossSmudge configures an aggressive incremental garbage collector (`LUA_GCINC`), but explicit collection before page transitions ensures peak heap headroom.
+   Call `collectgarbage("collect")` prior to starting heavy operations and immediately after freeing large tables. Crosscub configures an aggressive incremental garbage collector (`LUA_GCINC`), but explicit collection before page transitions ensures peak heap headroom.
 
 6. **Avoid Allocations in `on_draw()`:**  
    Do not allocate tables or format heavy strings inside `on_draw()` or `on_update()`. Mutate existing tables in place.
@@ -484,7 +484,7 @@ Follow these proven patterns to ensure your app is rock-solid:
      end
      ```
    - **Declaring Minimum API Level in Manifest:**  
-     If your application fundamentally depends on a newer capability to function (e.g. dynamic screen rotation), declare `"min_api": 2` in your `manifest.json`. CrossSmudge validates `min_api` before launching the script; if the device firmware is older, it gracefully displays an informative "Firmware update required" screen instead of executing and crashing.
+     If your application fundamentally depends on a newer capability to function (e.g. dynamic screen rotation), declare `"min_api": 2` in your `manifest.json`. Crosscub validates `min_api` before launching the script; if the device firmware is older, it gracefully displays an informative "Firmware update required" screen instead of executing and crashing.
    - **Querying API Version at Runtime:**  
      You can programmatically inspect the environment at runtime:
      ```lua
@@ -507,7 +507,7 @@ Here is a complete, working counter application:
   "name": "Clicker Counter",
   "version": "1.0.0",
   "author": "Mumfee",
-  "description": "Simple demonstration counter app for CrossSmudge.",
+  "description": "Simple demonstration counter app for Crosscub.",
   "entry": "main.lua"
 }
 ```
@@ -582,21 +582,19 @@ end
    pio run -e simulator
    .pio/build/simulator/program
    ```
-3. **MANDATORY FOR APP DEVELOPERS — Test Under Exact X3 Hardware Constraints:**
-   To guarantee your application runs on physical ESP32-C3 hardware (such as the Xteink X3 and X4) without crashing or running out of memory, launch the simulator with the `SMUDGE_X3_CONSTRAINTS=1` environment variable:
-   ```bash
-   SMUDGE_X3_CONSTRAINTS=1 .pio/build/simulator/program
-   ```
-   This clamps the host Lua heap to the exact **75 KB hardware DRAM limit** of the ESP32-C3. If your script or assets exceed 75 KB, the simulator will raise an out-of-memory error immediately, allowing you to catch and fix memory bloat before flashing to physical devices.
+3. Run the matching current-design host fixture in both 480×800 and 800×480.
+   The retained `SMUDGE_X3_CONSTRAINTS=1` environment name is a **legacy stress
+   alias** for a 75 KiB heap, not a physical Crosscub target or the Sticky
+   production budget. Do not use a stress refusal to claim feature removal.
 4. Open **Applications** from the simulator home menu to test keyboard inputs, button mappings, touch gestures, and rendering instantly.
 
 ---
 
 ## Submitting to the App Store
 
-CrossSmudge features an on-device **App Store** accessible directly over Wi-Fi. It queries the community catalog hosted at `https://raw.githubusercontent.com/Mumfee/CrossSmudge/main/apps/catalog.json`. Users can browse descriptions, see icons, install, update, and uninstall apps with a single click.
+Crosscub features an on-device **App Store** accessible directly over Wi-Fi. It queries the community catalog hosted at `https://raw.githubusercontent.com/tobiasweissert/Crosscub/integration/sticky-test-all/apps/catalog.json`. Users can browse descriptions, see icons, install, update, and uninstall apps with a single click.
 
-To publish your application to the official CrossSmudge App Store so any user can discover and install it:
+To publish your application to the official Crosscub App Store so any user can discover and install it:
 
 ### Step 1: Prepare Your App Directory
 Ensure your application is located in `apps/<app_id>/` with all required files:
@@ -635,10 +633,10 @@ Open [`apps/catalog.json`](./catalog.json) and add an entry under the `"apps"` a
 *Note: Make sure all files required by your app are listed in `files`. The on-device App Store downloads each file in this list.*
 
 ### Step 4: Open a GitHub Pull Request
-1. Fork [https://github.com/Mumfee/CrossSmudge](https://github.com/Mumfee/CrossSmudge).
+1. Fork [https://github.com/tobiasweissert/Crosscub](https://github.com/tobiasweissert/Crosscub).
 2. Commit your new application folder (`apps/<app_id>/...`) and your edit to `apps/catalog.json`.
 3. Submit a Pull Request with title `feat(apps): add <app_name>`.
-4. Once reviewed and merged into `main`, your application is immediately available in the on-device App Store across all CrossSmudge devices worldwide!
+4. Once reviewed and merged into `main`, your application is immediately available in the on-device App Store across all Crosscub devices worldwide!
 
 ---
 

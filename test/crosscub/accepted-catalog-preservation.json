@@ -1,0 +1,193 @@
+{
+  "source_commit": "e647c44634970b30bac13ff08f21eab6bdcd0538",
+  "scope": "Owner-accepted redesigned source catalog; original predecessor test/crosscub/catalog-preservation.json is retained unchanged",
+  "catalog_count": 37,
+  "branch": "feat/crosscub-sticky-only",
+  "apps": {
+    "dice": {
+      "version": "1.0.2",
+      "record_sha256": "d16efe56df772f13ea32ec7ea817e828db13fcdb57fdf968dbab55a054bfaf3f",
+      "manifest_sha256": "04831aef63c221a6f8b42505c62f47b56db137e94274826ad194556e263e2795"
+    },
+    "lifecounter": {
+      "version": "1.0.2",
+      "record_sha256": "03797994fadfd1efbfa5496081ade55010256fde5959ca9531eb126a396a5d27",
+      "manifest_sha256": "845729293dc443e2101a777f9c5c9f1c65a5c2598cab4d9b7d687edd4b0d4b92"
+    },
+    "rosary": {
+      "version": "1.0.2",
+      "record_sha256": "e10a74617467c01f5412441c0eba86160dce86c1aabc1fa0bb68a03069f9c021",
+      "manifest_sha256": "084aba9b609e0bd01c15ab609665d21609172749ef70868d4e52c86bb0bb78c2"
+    },
+    "dailyoffice": {
+      "version": "1.0.2",
+      "record_sha256": "9854b68531fa46fb01ed186e30e52eb770385e43e8e511ae1be085a7ab32ec17",
+      "manifest_sha256": "f106715d519ac5c48808a0e60a2c42fd06d8ad16576e499893dddf0604c2df07"
+    },
+    "wordle": {
+      "version": "1.2.1",
+      "record_sha256": "4cb073cd11fc318f8e3b3dbb186a1d6a51444c1d64db1995fbd27719da70ba14",
+      "manifest_sha256": "49c1687ff1b44e52b3aa82f802f25807bfbcbf0e7abdfbc51af564099fad1a38"
+    },
+    "2048": {
+      "version": "1.1.1",
+      "record_sha256": "deac416c6c87fa530572e41140460a54ebc98267879e9ad2ea1ac9cef140b057",
+      "manifest_sha256": "07e0cccaddafbf6b5f4520266b363c4cb3dcbf9c95d3112bf28235da046c02f9"
+    },
+    "sudoku": {
+      "version": "1.1.1",
+      "record_sha256": "c2ecfaca4a642da1fef474727af1daa8c37d25ad0bebce3e173d693eab245444",
+      "manifest_sha256": "fac6dd20b134353aeada68a1c688f026066c55c257cf9593d0c9fad5c5e66d77"
+    },
+    "blackjack": {
+      "version": "1.0.2",
+      "record_sha256": "bf8137325ae4f4d542af8ded4b6b12ffb4f62a602e0fafa00104f1699a60091d",
+      "manifest_sha256": "b5196b13f99615f8d2c030ba484f05b4557caeefb4065839ecd44decab562d08"
+    },
+    "blockdrop": {
+      "version": "1.0.3",
+      "record_sha256": "30a6cafa12150da4de5afe0bd1b3c13f274f63b967011bbee6e41918b249ce07",
+      "manifest_sha256": "9fceb6b632a7bd42163f39315d6726dd0febada898cca69c6a8537db05c9cff5"
+    },
+    "codex": {
+      "version": "1.0.2",
+      "record_sha256": "d0216d26d33902fe6d4188ca84b5caa9da963e7670da74f8ee3cf0b44b34734d",
+      "manifest_sha256": "8bca7cac0055976ae3865981b142a67057537bdc7298aff87b4b5fc215a3e609"
+    },
+    "watertracker": {
+      "version": "1.0.3",
+      "record_sha256": "1f9a20dcece024d675a5a2ef015dff2158414d3f0816d23c91ad45833a50320e",
+      "manifest_sha256": "541613f8facabcf2d7b1ff298440e41942f848bc4d91309ca6417974929f978c"
+    },
+    "stopwatch": {
+      "version": "1.0.3",
+      "record_sha256": "258702374f807048e04addc2dcab97e6f4d6f168c3fad412a9ea40368a68d5f1",
+      "manifest_sha256": "2cbaa2750e5d19411908653f9e83d976afd08e975f48195d2b4f0998bdf5021a"
+    },
+    "dashboard": {
+      "version": "1.0.4",
+      "record_sha256": "e3080e1459e428d110944fc03624a028fadb324d84281253b96e0576d48fbc17",
+      "manifest_sha256": "866afce47641e64c096b9cece3805b81c283dacf6bbc1e38d7e9bf1d762878cd"
+    },
+    "hourglass": {
+      "version": "1.0.3",
+      "record_sha256": "33e53aba0951ee78d060050fa842bdb80822eac7f8fa8433b852ca0a5e786b8f",
+      "manifest_sha256": "f9bf52561b831f84909b49f6ff0643a16e1ac83d895c45ec8db25b62c78e4b31"
+    },
+    "solitaire": {
+      "version": "1.1.1",
+      "record_sha256": "d2ec7d01426f7713ca439c7da8348b7c5eb74cecdc2ea0a8194eb34dea41c17a",
+      "manifest_sha256": "84136e84971e7e9e0755f7d40d926cfef933b15eac736551efc97cd572401895"
+    },
+    "chess": {
+      "version": "1.1.1",
+      "record_sha256": "67ba78191cee85ab74eafdaa65bb0921a9e27b7c3cf87c4ca73b9a0594351705",
+      "manifest_sha256": "b68d9314c12e9b6691bca6f6964ee8b9332a68bb3c82317ac56a1b7124bc3aa3"
+    },
+    "cp-battleship": {
+      "version": "0.1.4",
+      "record_sha256": "00972420452f3a639deb15660075a97552f6548d6f22d072d3cdb9ed3d110a43",
+      "manifest_sha256": "25a8559d7fe3b8e9ba24cc8883b53d638b9f764e6bccb086d208e424f9420d64"
+    },
+    "cp-calculator": {
+      "version": "0.1.4",
+      "record_sha256": "1c7fabc92f307c05dbf944f3ef652f40306914fe604dd95d6171c38d28938286",
+      "manifest_sha256": "6f1871fb9f377e8e09fa1a7924ffbe9e2f7298d664635d34a28a85935066f702"
+    },
+    "cp-checkers": {
+      "version": "0.1.4",
+      "record_sha256": "1501eddb860a6dc87fe3cc54cbd25b193b7fd2f1d622bb62fc565f7a2a30c8fe",
+      "manifest_sha256": "2b9538cb79096d4efebff6e6167d67911fa19b75a7b703d646fba2dd56d6c79b"
+    },
+    "cp-connectfour": {
+      "version": "0.1.4",
+      "record_sha256": "71a0744323043063ee0b3929b83b7eec0631c2ffcd6064b0191df709e01f9911",
+      "manifest_sha256": "5f1712c76d273c11a566f4b67982384239bbebaaf46c82c6fd90a7032ac2df4d"
+    },
+    "cp-forehead": {
+      "version": "0.1.5",
+      "record_sha256": "8769c57fd35d4c5077f2c3b909bd18e62658963dbfec8eab60ed4e293df3682b",
+      "manifest_sha256": "a75ef6dfffa6db491fc4e03f71fe8c2c47503e0e5704ca3b61229b791f4cae8f"
+    },
+    "cp-hearts": {
+      "version": "0.1.5",
+      "record_sha256": "3a0c56ae36b2c7865ab96cb86691ba24b8867a73d919dae49adba20b5725e826",
+      "manifest_sha256": "75ee4f814832f56c3e48daf64b9b4574ffc90d1c7fe7fe29f86cffa43466a3b3"
+    },
+    "cp-hex": {
+      "version": "0.1.4",
+      "record_sha256": "635c4081358d8d536e8526f8aa9f977ecf6ad551fb0bb12f4777cc22f51d9266",
+      "manifest_sha256": "91f7188b37173ff3d0484c48c5b766ed5afe85c0bb83ec74852c0eecd37b1965"
+    },
+    "cp-insider": {
+      "version": "0.1.4",
+      "record_sha256": "f6991410bad1f990d6fc6991812f72deb837a248722a31b5ceafaca106212f28",
+      "manifest_sha256": "55f40e085f918b73607fdece77cafc89efb878fcba9b1113d07878204cdf3883"
+    },
+    "cp-knucklebones": {
+      "version": "0.1.4",
+      "record_sha256": "dc894b8ca9437dbc169cf4e976553b36c59658e3cc8b9f8a2fdbaafc6439d7fc",
+      "manifest_sha256": "e7a26108b970954acd467b0ea2d00fd9ec482b0275de9b8e6f64dac0d850403b"
+    },
+    "cp-minesweeper": {
+      "version": "0.1.5",
+      "record_sha256": "6bd33b027749a967abc066d3acdae3c971a8a2aa13a9af021267bcb82a3f4fa6",
+      "manifest_sha256": "30a0042d2079f8f2449de0f9332dc283c9637a7a2bd36447a812090c3c835e5b"
+    },
+    "cp-notes": {
+      "version": "0.1.4",
+      "record_sha256": "37ad47d1f6321d58a4fa63bd9e80b9048121f7b1aa70acbb748628cbf22d4f1c",
+      "manifest_sha256": "f42819569db5247c91958f1e13e1793e147935bc18ce0e6d0865b4773c6f1386"
+    },
+    "cp-wavelength": {
+      "version": "0.1.5",
+      "record_sha256": "b5598e388fb20e4f56285593b04eb8c947f967c2e318b734fd829e177408c136",
+      "manifest_sha256": "9ccf5e969cd7da9c4e03de7ea5df79f109a88e16af767de50ef149a630e34e6b"
+    },
+    "cp-yahtzee": {
+      "version": "0.1.4",
+      "record_sha256": "cbc589b4b539bfdece481f2d540ce6da16f57327210e5e40167f3eb0e0ef465a",
+      "manifest_sha256": "a5a2ffae2cbd87793c21439136b62766dbc2a9c2cbdbd7490eb901b90bfd16d7"
+    },
+    "cp-jaipur": {
+      "version": "0.1.4",
+      "record_sha256": "c42b7d4eef13431be389fb7b07e1c14913731a333d87ea01db8bce81e0433bf8",
+      "manifest_sha256": "bf8e89a0e7cb3a71c230fa173654603d9627fbdac8316e0103b4f8070d96d09b"
+    },
+    "cp-seasalt": {
+      "version": "0.1.4",
+      "record_sha256": "314afbf485b78403a1f8cc753c20c4f9c6c663d35cbd17af50556094b3fb274f",
+      "manifest_sha256": "5370a617a27532639164823374517f51bbb960fbe24e11e210c449851e3e0f63"
+    },
+    "cp-toybattle": {
+      "version": "0.1.4",
+      "record_sha256": "c222b2d874d143342aa0cf60c9595da18b2fee13a871f5ff1c847c07e4f2380c",
+      "manifest_sha256": "2140b4ee3bf959d51cb2463340037d7b4932db03ff03a8ab16c46cb16967427e"
+    },
+    "cp-murdle": {
+      "version": "0.1.5",
+      "record_sha256": "1db9f742c119e3cf57c221cab67dda8239c21e7311392a2b39faa96beb6abe83",
+      "manifest_sha256": "98818766bcc828c9f4a98088d60bc93e159d995b755ac5574ebf000fcea24997"
+    },
+    "cp-go": {
+      "version": "0.1.4",
+      "record_sha256": "3834cdc102c3c171de40935a88fbab68fb1652c56405f0c79c9666dc4788da24",
+      "manifest_sha256": "cf487ea79c82d8780ace9c80b4c2c9c309e154c0861b8e50ac1fec0b85c25d1c"
+    },
+    "cp-hackernews": {
+      "version": "0.1.4",
+      "record_sha256": "2c60399dc792c12659eeebe777a5a768ee668ff9f700a4597bd5df99d5a3b616",
+      "manifest_sha256": "7e3efc0c4228280941c2cf81d10937e818a9c02daa8eee07e679c167575b0f99"
+    },
+    "cp-trivia": {
+      "version": "0.1.4",
+      "record_sha256": "640eee6ad3de9d99b926f523e47aaf4059c39e4c1191fc315baa315fa45c10f3",
+      "manifest_sha256": "5f87772d553a6b5a097def5cbc2f48f0039a0474171f2f3384a7e89599e722d3"
+    },
+    "browser": {
+      "version": "0.3.3",
+      "record_sha256": "32694fdc36a6282372c668cc53dd9ea6b27a0be1a23a20941e01f2e48421f920",
+      "manifest_sha256": "46a79bef46f3aa07e4ff0f57e3c4bdeb185f44480d1c8be616d945638f83bf75"
+    }
+  }
+}

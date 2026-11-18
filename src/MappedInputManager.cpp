@@ -652,11 +652,7 @@ bool MappedInputManager::wasLeftEdgeGesture() const { return wasBackGesture(); }
 
 bool MappedInputManager::hasHomeKeyHardware() const {
 #ifdef SIMULATOR
-#ifdef SIMULATOR_DEVICE_X4_PRO
-  return true;
-#else
   return false;
-#endif
 #else
   return gpio.hasHomeKey();
 #endif
@@ -691,7 +687,7 @@ bool MappedInputManager::wasBottomEdgeUpSwipe() const {
   return false;
 }
 
-// Home-key boards (X4 Pro) rearrange the edge gestures: the capacitive key
+// Legacy Home-key profiles rearrange the edge gestures: the capacitive key
 // takes over "exit to home", the bottom edge (freed by the key) becomes the
 // menu gesture, and the top edge opens the frontlight quick panel.
 bool MappedInputManager::wasMenuGesture() const {
@@ -708,7 +704,7 @@ bool MappedInputManager::wasReaderMenuGesture() const {
 }
 
 bool MappedInputManager::wasReaderHomeGesture() const {
-  // X4 Pro's capacitive Home key remains the reader's Home action. Only the
+  // A capacitive Home key remains the reader's Home action when present. Only the
   // touch gesture changes in reader mode: other touch boards use an upward
   // swipe across the page.
 #if defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY
@@ -739,7 +735,7 @@ bool MappedInputManager::wasHomeGesture() const {
   }
   if (SETTINGS.homeButtonTapAction != CrossPointSettings::HOME_BUTTON_BACK_HOME) return false;
   // A swipe starting on the lower bezel can also report a short capacitive Home
-  // tap on the X4 Pro. The screen gesture belongs to the active list/reader, so
+  // tap on legacy Home-key profiles. The screen gesture belongs to the active list/reader, so
   // give it priority over the global Home route for this release frame.
   if (wasSwipe() != SwipeDir::None) return false;
   if (deferredHomeGesture) {

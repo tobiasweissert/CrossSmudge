@@ -1,0 +1,16 @@
+{
+  "patches": [
+    {
+      "patch": "simulator-maintenance.patch",
+      "check_exit": 0,
+      "apply_exit": 0
+    },
+    {
+      "patch": "capture-only.patch",
+      "check_exit": 0,
+      "apply_exit": 0
+    }
+  ],
+  "all_postimages_exact": true,
+  "build_lock_released": true
+}

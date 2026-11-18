@@ -5,6 +5,7 @@ local page = 0
 local menuIdx = 1
 local retScreen = 'title'
 
+local capacity=8
 local TABS = {'Deck', 'Disc', 'Relics', 'Menu'}
 local OPTS = {'Resume', 'Save & Title', 'Exit', 'Abandon'}
 
@@ -19,76 +20,38 @@ function screen.enter(arg)
     menuIdx = 1
 end
 
-local function draw_menu(y, by)
-    for i = 1, 4 do
-        local iy = y + 10 + (i - 1) * 54
-        local sel = (i == menuIdx)
-        smudge.rect(30, iy, w - 60, 42, sel)
-        smudge.text(240, iy + 12, OPTS[i], 'ui12', sel and 'bold' or 'regular', 'center', not sel)
-    end
-    smudge.centered_text(by - 26, 'Auto-saved', 'small', 'regular', true)
-    smudge.button_hints('Back', 'Confirm', 'Up', 'Down')
-end
-
-local function draw_list(y, by)
-    local list = (tab == 1) and state.deck or ((tab == 2) and state.discardPile or state.relics)
-    local total = #list
-    local maxP = math.max(0, math.floor((total - 1) / 8))
-    if page > maxP then page = maxP end
-
-    if total == 0 then
-        smudge.centered_text(y + 40, '(Empty)', 'ui12', 'regular', true)
-    else
-        for i = page * 8 + 1, math.min(total, page * 8 + 8) do
-            local id = list[i]
-            if tab <= 2 then
-                local c = kCards[id + 1]
-                smudge.text(20, y, c.cost .. ' Ink ' .. c.name, 'small', 'bold', 'left', true)
-                smudge.text(w - 20, y, c.meter, 'small', 'bold', 'right', true)
-                smudge.text(20, y + 16, c.desc, 'small', 'regular', 'left', true)
-                smudge.line(20, y + 32, w - 20, y + 32)
-                y = y + 36
-            else
-                if not kRelics then dofile('relics.lua') end
-                local r = kRelics[id + 1]
-                smudge.rect(20, y + 4, 56, 56, false)
-                if id >= 0 and id < 12 then
-                    smudge.draw_sprite(24, y + 8, 48, 48, 'sprites/relic_' .. id .. '.raw')
-                end
-                smudge.text(84, y + 10, r.name, 'small', 'bold', 'left', true)
-                smudge.text(84, y + 32, r.desc, 'small', 'regular', 'left', true)
-                y = y + 70
-                smudge.line(20, y - 2, w - 20, y - 2)
-            end
-        end
-        if maxP > 0 then
-            smudge.centered_text(by - 22, (page + 1) .. '/' .. (maxP + 1), 'small', 'bold', true)
-        end
-    end
-    smudge.button_hints('Back', 'Tab', '<', '>')
-end
-
 function screen.draw()
-    local m = smudge.get_metrics()
-    local ty = m.top_padding + m.header_height + 2
-    local by = h - m.button_hints_height - 2
-    draw_page_frame(ty, by)
-    smudge.header(TABS[tab])
-
-    for i = 1, 4 do
-        local tx = 24 + (i - 1) * 108
-        local sel = (i == tab)
-        smudge.rect(tx, ty + 8, 104, 28, sel)
-        smudge.text(tx + 54, ty + 14, TABS[i], 'small', sel and 'bold' or 'regular', 'center', not sel)
+    local m=U.metrics();U.header('Grimoire',TABS[tab])
+    screen.tabs={};screen.menu={}
+    for i,label in ipairs(TABS)do
+        local cw=(w-52)//4
+        screen.tabs[i]=U.button(label,{x=14+(i-1)*(cw+8),y=78,w=cw,h=40},i==tab)
     end
-
-    draw_codex_divider(ty + 44, w, 24)
-    local y = ty + 54
-
-    if tab == 4 then
-        draw_menu(y, by)
+    local y=130
+    capacity=math.max(1,(m.body_bottom-y-32)//70)
+    if tab==4 then
+        for i,label in ipairs(OPTS)do screen.menu[i]=U.button(label,{x=30,y=y+(i-1)*54,w=w-60,h=44},i==menuIdx)end
+        draw_actions('Back','Confirm','Up','Down')
     else
-        draw_list(y, by)
+        local list=tab==1 and state.deck or tab==2 and state.discardPile or state.relics
+        local maxP=math.max(0,(#list-1)//capacity);page=math.min(page,maxP)
+        for i=page*capacity+1,math.min(#list,(page+1)*capacity)do
+            local id=list[i];local row=y+(i-page*capacity-1)*70
+            U.panel({x=14,y=row,w=w-28,h=64})
+            local x,width=24,w-48
+            local title,desc
+            if tab<=2 then local c=kCards[id+1];title=c.cost..' INK '..c.name..' / '..c.meter;desc=c.desc
+            else
+                if not kRelics then dofile('relics.lua')end
+                local r=kRelics[id+1];title=r.name;desc=r.desc
+                smudge.draw_sprite(20,row+8,48,48,'sprites/relic_'..id..'.raw');x=80;width=w-104
+            end
+            U.text(x,row+4,U.fit(title,width,'small',true),'small',true)
+            local dy=row+26
+            for _,line in ipairs(smudge.wrapped_text(desc,width,'small',false,2).lines or {})do U.text(x,dy,line,'small');dy=dy+smudge.line_height('small')end
+        end
+        U.text(w//2,m.body_bottom-25,(page+1)..'/'..(maxP+1),'small',false,'center')
+        draw_actions('Back','Tab','<','>')
     end
 end
 
@@ -112,20 +75,15 @@ function screen.on_button(btn, pressed)
         menuIdx = (btn == 'left') and ((menuIdx - 2 + 4) % 4 + 1) or ((menuIdx % 4) + 1)
     else
         local list = (tab == 1) and state.deck or ((tab == 2) and state.discardPile or state.relics)
-        local maxP = math.floor((#list - 1) / 8)
+        local maxP = math.floor((#list - 1) / capacity)
         if btn == 'left' and page > 0 then page = page - 1
         elseif btn == 'right' and page < maxP then page = page + 1 end
     end
     smudge.request_update()
 end
 
-function screen.on_tap(x, y)
-    if y < 100 then
-        screen.on_button('down', true)
-    elseif tab == 4 and y > 120 and y < 350 then
-        menuIdx = math.floor((y - 120) / 54) + 1
-        screen.on_button('confirm', true)
-    end
+function screen.on_tap(x,y)
+    for i,r in ipairs(screen.tabs or {})do if U.hit(r,x,y)then tab=i;page=0;smudge.request_update();return end end
+    for i,r in ipairs(screen.menu or {})do if U.hit(r,x,y)then menuIdx=i;screen.on_button('confirm',true);return end end
 end
-
 return screen

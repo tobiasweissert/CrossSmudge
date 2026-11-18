@@ -95,10 +95,18 @@ bool HalFiles::createStageExclusive(const char* path) {
   if (!stage_ || stage_.isDirectory()) { stage_.close(); return false; }
   return true;
 }
+void HalFiles::cooperate(size_t bytes) {
+  ioBytesSinceYield_ += bytes;
+  if (ioBytesSinceYield_ >= 4 * ChunkBytes || esp_timer_get_time() - ioLastYieldUs_ >= 1000) {
+    vTaskDelay(1); // No HAL SPI/storage lock is held here.
+    ioBytesSinceYield_ = 0;
+    ioLastYieldUs_ = esp_timer_get_time();
+  }
+}
 size_t HalFiles::writeStage(const uint8_t* bytes, size_t length) {
   if (!stage_ || length > ChunkBytes || cancelled()) return 0;
   const size_t written = stage_.write(bytes, length);
-  vTaskDelay(1); // Yield without holding the HAL's SPI/storage lock.
+  cooperate(length);
   return written;
 }
 bool HalFiles::syncStage() { return stage_ && stage_.sync(); }
@@ -122,7 +130,7 @@ bool HalFiles::openRead(const char* path, uint32_t& size) {
 int HalFiles::read(uint8_t* bytes, size_t length) {
   if (!reader_ || length > ChunkBytes || cancelled()) return -1;
   const int n = reader_.read(bytes, length);
-  vTaskDelay(1);
+  cooperate(length);
   return n;
 }
 bool HalFiles::seek(uint32_t offset) { return reader_ && !cancelled() && reader_.seek64(offset); }

@@ -1,27 +1,4 @@
-"""
-PlatformIO post-build script: copy firmware.bin to convenient artifact names
-in the same build directory.
-
-Default outputs:
-  .pio/build/default/firmware-x3-x4.bin
-  .pio/build/x4-pro/firmware-x4-pro.bin
-  .pio/build/x4-classic/firmware-x4-classic.bin
-  .pio/build/sticky/firmware-sticky.bin
-  .pio/build/x4-pro/firmware-x4-pro.bin
-
-Release-candidate outputs when CROSSSMUDGE_RC_ARTIFACTS=1:
-  .pio/build/default/firmware-x3-x4-<branch>-<hash>-RC.bin
-  .pio/build/sticky/firmware-sticky-<branch>-<hash>-RC.bin
-  .pio/build/x4-pro/firmware-x4-pro-<branch>-<hash>-RC.bin
-  .pio/build/x4-classic/firmware-x4-classic-<branch>-<hash>-RC.bin
-
-Release outputs when CROSSSMUDGE_RELEASE_VERSION is set:
-  .pio/build/default/firmware-x3-x4-v<version>.bin
-  .pio/build/x4-pro/firmware-x4-pro-v<version>.bin
-  .pio/build/x4-classic/firmware-x4-classic-v<version>.bin
-  .pio/build/sticky/firmware-sticky-v<version>.bin
-  .pio/build/x4-pro/firmware-x4-pro-v<version>.bin
-"""
+"""PlatformIO artifact aliases for Crosscub Sticky; firmware.bin remains recovery-compatible."""
 
 import os
 import re
@@ -86,7 +63,10 @@ def _sanitize_branch(branch):
 
 
 def _get_firmware_device_type(env):
-    return _get_project_option(env, 'custom_firmware_device_type') or env['PIOENV']
+    device = _get_project_option(env, 'custom_firmware_device_type')
+    if device != 'sticky':
+        raise ValueError('Crosscub only packages Sticky firmware')
+    return device
 
 
 def _get_rc_artifact_name(project_dir, env):
@@ -109,7 +89,7 @@ def _get_rc_artifact_name(project_dir, env):
     )
     branch = _sanitize_branch(branch)
     short_hash = re.sub(r'[^A-Za-z0-9]+', '', short_hash)[:12] or '00000'
-    return f'firmware-{device_type}-{branch}-{short_hash}-RC.bin'
+    return f'crosscub-{device_type}-{branch}-{short_hash}-RC.bin'
 
 
 def _is_rc_artifact_build(env):
@@ -135,7 +115,7 @@ def rename_firmware(source, target, env):
     build_dir = os.path.dirname(src)
 
     device_type = _get_firmware_device_type(env)
-    default_dst = os.path.join(build_dir, f'firmware-{device_type}.bin')
+    default_dst = os.path.join(build_dir, f'crosscub-{device_type}.bin')
     _copy_artifact(src, default_dst)
 
     if _is_rc_artifact_build(env):
@@ -144,7 +124,7 @@ def rename_firmware(source, target, env):
 
     release_version = _get_release_version(env)
     if release_version:
-        release_dst = os.path.join(build_dir, f'firmware-{device_type}-{release_version}.bin')
+        release_dst = os.path.join(build_dir, f'crosscub-{device_type}-{release_version}.bin')
         _copy_artifact(src, release_dst)
 
 

@@ -2,7 +2,7 @@
 
 Worktree base: `da264a5844e87abb4c694e4143b2972f435f99c8`, branch
 `feat/lua-network-apps`. Intended stacked PR: `feat/lua-network-apps` →
-`feat/lua-http-api` in `tobiasweissert/CrossSmudge`. Parent owns commit/push/draft
+`feat/lua-http-api` in `tobiasweissert/Crosscub`. Parent owns commit/push/draft
 PR creation. No host/API/firmware edits, firmware builds, flash, publishing,
 catalog edits, or changes to the other writers' worktrees are part of this work.
 
@@ -121,7 +121,7 @@ with source and emits sizes/SHA-256/file inventories. No catalog is edited,
 no existing version bumped, and nothing is pushed or published. Preview
 manifest versions apply only to these new app IDs.
 
-On **Sticky or X4 Pro**, sync time, independently verify UTC, trust it in App
+On **Sticky**, sync time, independently verify UTC, trust it in App
 Settings, launch, approve listed domains, and connect Wi-Fi. HN: Refresh, check
 real feed title and next/previous story order, open story, explicitly select
 linked article; small compatible articles should paginate, oversized ones

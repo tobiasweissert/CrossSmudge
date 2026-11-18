@@ -1,0 +1,44 @@
+{
+  "selected_option": 1,
+  "selection": "Owner: I like all 3, but lets go with 1",
+  "name": "Welcome",
+  "description": "Standing and waving cub, book under arm",
+  "source_format": "original generated raster PNG",
+  "editable_vector_source_available": false,
+  "master_dimensions": [
+    423,
+    587
+  ],
+  "firmware_dimensions": [
+    120,
+    120
+  ],
+  "packed_bytes": 1800,
+  "ink_bbox": [
+    23,
+    8,
+    96,
+    111
+  ],
+  "black_pixels": 853,
+  "pixel_polarity": "MSB first, 1 white,0 black",
+  "matches_owner_seen_120px_preview": true,
+  "files": {
+    "Crosscub-Welcome-Bear-120.png": {
+      "bytes": 688,
+      "sha256": "6cd90c5035754718efc11a45eae44fbe343d69547a77f5e4ef776b6e7132af1e"
+    },
+    "Crosscub-Welcome-Bear-firmware-preview.png": {
+      "bytes": 2432,
+      "sha256": "0dcb65ae6198f9cc0731dda12d94ae4aa0c7f06a751a16443105e865837bead6"
+    },
+    "Crosscub-Welcome-Bear.png": {
+      "bytes": 41708,
+      "sha256": "2110efa564fca96c43e406892bab1393a40dff2bffd94d0f64e49970007f629b"
+    },
+    "CrosscubBear120.h": {
+      "bytes": 11305,
+      "sha256": "dc812cfb672ae9bda1de2bc3edb211caf07f1028c27e58f308731d60a8666ad2"
+    }
+  }
+}

@@ -1,3 +1,5 @@
+> Historical provenance/checkpoint record, not Crosscub build or installation guidance. See [Crosscub](../README.md).
+
 # CrossPlay Lua ports — review scope
 
 **Incomplete collection: 18 local adaptations, 4 unchanged existing equivalents, 11 titles without a package (33 total).** No claim of complete original feature/UI/engine parity. No live publication has occurred.
@@ -48,7 +50,7 @@ All original thirteen port directories remain byte-for-byte unchanged against th
 
 Catalog entries describe local adaptations, not full CrossPlay ports. Every listed file must install at `/.crosssmudge/applications/<id>/<file>`. Individual ZIPs contain one `<id>/` root and can use the stock web uploader. The eighteen-new-port ZIP and the full 22-title feasible-local ZIP contain `.crosssmudge/applications/` and is SD-only. Do not overwrite an existing app directory or its saves.
 
-The fork source URL prefix is `https://raw.githubusercontent.com/tobiasweissert/CrossSmudge/feat/crossplay-lua-apps/apps/`. Generated URL/hash manifests describe the prepared local files; remote byte readback is pending the parent’s commit/push. Stock `AppStoreActivity.h:32,717` hardcodes `Mumfee/CrossSmudge/main/apps/`; catalog repo/branch metadata does not redirect it. Fork publication does not make these apps available in the original store. Maintainer merge of the upstream PR is required.
+The fork source URL prefix is `https://raw.githubusercontent.com/tobiasweissert/Crosscub/feat/crossplay-lua-apps/apps/`. Generated URL/hash manifests describe the prepared local files; remote byte readback is pending the parent’s commit/push. Stock `AppStoreActivity.h:32,717` hardcodes `Mumfee/CrossSmudge/main/apps/`; catalog repo/branch metadata does not redirect it. Fork publication does not make these apps available in the original store. Maintainer merge of the upstream PR is required.
 
 ## Exact missing host interfaces
 

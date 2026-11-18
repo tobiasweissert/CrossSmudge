@@ -1,18 +1,23 @@
 -- Pinned HackerNewsScreens Notice/List/Reader geometry and real original cuts.
 -- Reader/controller storage, requests, retries and comment cursors stay untouched.
-local F=dofile('original_graphics.lua')
+local F=dofile('original_graphics.lua');local U=dofile('unified_ui.lua')
 local V={page=1,pages=1,hit={},slice=0,feedMenu=false,menuFocus=1,visibleLines={}}
 local current,key,pendingSlice
 local feeds={'TOP','NEW','ASK','SHOW'}
 local function box(x,y,w,h)return{x=x,y=y,w=w,h=h}end
 local function hit(kind,id,b)V.hit[#V.hit+1]={kind=kind,id=id,x=b.x,y=b.y,w=b.w,h=b.h}end
-local function request()smudge.request_update()end
+function V.retire()V.hit={};V.painted=nil end
+function V.complete(s)
+ V.painted={screen=s.screen,tab=s.tab,listPage=s.listPage,items=s.items,selected=s.selected,feedMenu=V.feedMenu,slice=V.slice,page=V.page}
+end
+function V.valid(s)
+ local p=V.painted;s=s or current
+ return p and s and p.screen==s.screen and p.tab==s.tab and p.listPage==s.listPage and p.items==s.items and p.selected==s.selected and p.feedMenu==V.feedMenu and p.slice==V.slice and p.page==V.page
+end
+local function request()V.retire();smudge.request_update()end
 local function stroke(b,n)smudge.rect(b.x,b.y,b.w,b.h,false,n or 1,true)end
 local function button(label,b,kind,id,filled,enabled,radius)
- if enabled==false then smudge.rect_dither(b.x,b.y,b.w,b.h,true)
- elseif radius then smudge.rounded_rect(b.x,b.y,b.w,b.h,radius,filled,filled,1)
- else smudge.rect(b.x,b.y,b.w,b.h,true,filled==true);if not filled then stroke(b)end end
- F.lineBox(label,box(b.x+4,b.y+2,b.w-8,b.h-4),'body',filled or enabled==false,'center')
+ U.button(label,b,filled,enabled)
  if kind and enabled~=false then hit(kind,id,b)end
 end
 -- ToyboxText::fitLines: preserve word boundaries and mark discarded text.
@@ -46,38 +51,24 @@ local function fitLines(text,width,lines,key)
 end
 local function fitted(text,width,key)return fitLines(text,width,1,key)end
 local function header(title,pageLabel,reading)
- local w=smudge.get_bounds();smudge.rect(0,0,w,76,true,true);smudge.rect(0,80,w,3,true,true)
- local font=reading and'readerTitle'or'title';local available=w-32
- local pageWidth=pageLabel and F.width(pageLabel,'body')or 0
- if pageLabel then available=available-pageWidth-6 end
- if reading then
-  for _,candidate in ipairs({'readerTitle','body','readerSmall'})do font=candidate;if F.width(F.visible(title,candidate),candidate)<=available then break end end
- end
- F.lineBox(fitted(title,available,font),box(16,0,available,76),font,true)
- if pageLabel then
-  local height=F.metrics[font][1];local y=(76-height)//2+height-40
-  F.lineBox(pageLabel,box(w-16-pageWidth,y,pageWidth,40),'body',true,'right')
- end
+ U.header(title,pageLabel or(current and current.screen=='list'and feeds[current.tab]or''))
 end
-local function bodyBox(w,h)return box(16,119,w-32,h-199)end
+local function bodyBox(w,h)return box(14,78,w-28,h-154)end
 local function centerLines(lines,b,font)
  local lh=F.metrics[font][1];local y=b.y+math.max(0,(b.h-#lines*lh)//2)
  for _,line in ipairs(lines)do F.lineBox(line,box(b.x,y,b.w,lh),font,false,'center');y=y+lh end
 end
 local function notice(headline,message,kind,label)
  local w,h=smudge.get_bounds();V.hit={};smudge.clear();header('HACKER NEWS')
- local lines=F.wrap(headline,w-32,'title');while #lines>2 do table.remove(lines)end
- local y=119;local top=y+math.max(0,(126-#lines*63)//2)
- for _,line in ipairs(lines)do F.text(line,16,top,'title');top=top+63 end
- y=y+126+12;smudge.rect(16,y,w-32,3,true,true);y=y+27
- local capacity=math.max(0,(h-16-(label and 64 or 0)-y)//40);local count=0
- F.lines(message or'',w-32,'body',function(line)count=count+1;if count<=capacity then F.text(line,16,y+(count-1)*40,'body')end end)
- if label then button(label,box(16,h-68,w-32,52),kind,nil,true)end
+ local b=bodyBox(w,h);local head=F.wrap(headline,b.w,'title');local lines=F.wrap(message or'',b.w,'body')
+ local y=b.y+(b.h-#head*63-20-#lines*40)//2
+ centerLines(head,box(b.x,y,b.w,#head*63),'title');y=y+#head*63+20
+ for _,line in ipairs(lines)do U.text(w//2,y,U.fit(line,b.w,'ui10'),'ui10',false,'center');y=y+29 end
+ if label then local r=U.footer({label},1);hit(kind,nil,r[1])end
 end
 local function listFooter(s,w,h)
- local half=(w-44)//2
- button(feeds[s.tab],box(16,h-68,half,52),nil,nil,true)
- button('FEEDS',box(16+half+12,h-68,half,52),'feeds',nil,false)
+ local r=U.footer({feeds[s.tab],'Feeds',s.error~=''and'Try again'or'Load'},3)
+ hit('tab',s.tab,r[1]);hit('feeds',nil,r[2]);hit('refresh',nil,r[3])
 end
 function V.init()F.init()end
 function V.list(s)
@@ -90,7 +81,7 @@ function V.list(s)
  V.capacity=math.max(1,(b.h+4)//(rowHeight+4))
  if V.feedMenu then
   for index,name in ipairs(feeds)do
-   local row=box(16,119+(index-1)*66,w-32,62)
+   local row=box(14,78+(index-1)*66,w-32,62)
    local selected=index==s.tab
    smudge.rect(row.x,row.y,row.w,row.h,true,selected);if not selected then stroke(row)end
    F.lineBox(name,box(row.x+12,row.y,row.w-24,row.h),'body',selected)
@@ -103,10 +94,10 @@ function V.list(s)
   local headline=s.error~=''and'NO LUCK'or'NOT LOADED YET'
   local message=s.error~=''and s.error or'The current feed needs a connection.'
   local head=F.wrap(headline,b.w,'title');local lines=F.wrap(message,b.w,'body')
-  local height=#head*63+12+#lines*40+76;local y=b.y+(b.h-height)//2
+  local height=#head*63+20+#lines*40;local y=b.y+(b.h-height)//2
   centerLines(head,box(b.x,y,b.w,#head*63),'title');y=y+#head*63+12
-  centerLines(lines,box(b.x,y,b.w,#lines*40),'body');y=y+#lines*40+24
-  local bw=b.w*3//4;button(s.error~=''and'TRY AGAIN'or'LOAD',box(b.x+(b.w-bw)//2,y,bw,52),'refresh',nil,true,true,20)
+  for _,line in ipairs(lines)do U.text(w//2,y,U.fit(line,b.w,'ui10'),'ui10',false,'center');y=y+29 end;y=y+#lines*40+24
+  
   return
  end
  local count=math.min(6,#s.ids-(s.listPage-1)*6);local slices=math.max(1,(count+V.capacity-1)//V.capacity)
@@ -114,7 +105,7 @@ function V.list(s)
  local first=V.slice*V.capacity+1;local shown=math.min(V.capacity,count-first+1)
  local rowWidth=b.w-(count>V.capacity and 5 or 0)
  for row=1,shown do
-  local index=first+row-1;local item=s.items[index];local rb=box(16,119+(row-1)*96,rowWidth,92)
+  local index=first+row-1;local item=s.items[index];local rb=box(14,78+(row-1)*96,rowWidth,92)
   smudge.rect(rb.x,rb.y,rb.w,rb.h,true,false);stroke(rb)
   if item then
    local value=tostring(item.descendants or 0);local valueWidth=F.width(value,'small')
@@ -135,7 +126,7 @@ function V.list(s)
   end
  end
  if count>V.capacity then
-  smudge.rect_dither(w-19,119,3,b.h,false);local thumb=math.max(12,b.h*shown//count);local y=119+(b.h-thumb)*(first-1)//(count-shown)
+  smudge.rect_dither(w-19,78,3,b.h,false);local thumb=math.max(12,b.h*shown//count);local y=78+(b.h-thumb)*(first-1)//(count-shown)
   smudge.rect(w-19,y,3,thumb,true,true)
  end
 end
@@ -156,7 +147,7 @@ function V.thread(s)
  if s.error~=''and(article and(s.articleText or'')==''or not article and #s.comments==0 and(s.selfText or'')=='')then
   notice('NO LUCK',s.error,'back','BACK TO THE LIST');return
  end
- local body=bodyBox(w,h);local count=0;walk(s,body.w,function()count=count+1 end)
+ local body=bodyBox(w,h);if s.error~=''or not article and s.more then body.y=116;body.h=body.h-38 end;local count=0;walk(s,body.w,function()count=count+1 end)
  local capacity=math.max(1,body.h//40);V.pages=math.max(1,(count+capacity-1)//capacity);V.page=math.max(1,math.min(V.page,V.pages))
  smudge.clear();header(s.selected.title,V.page..' / '..V.pages,true)
  local first=(V.page-1)*capacity+1;local index=0
@@ -197,7 +188,9 @@ function V.beforeButton(button)
  return false
 end
 function V.at(x,y)
+ if not V.valid()then V.retire();return end
  for _,b in ipairs(V.hit)do if x>=b.x and x<b.x+b.w and y>=b.y and y<b.y+b.h then
+  V.retire() -- all input sources share the completed-paint fence
   if b.kind=='feeds'then V.feedMenu=not V.feedMenu;V.menuKeyboard=false;V.menuFocus=current.tab;request();return end
   if b.kind=='tab'then V.feedMenu=false;V.slice=0;key=nil end
   return b.kind,b.id

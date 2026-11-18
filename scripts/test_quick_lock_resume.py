@@ -50,7 +50,7 @@ def check_resume(program: Path, suffix: str, activity: str, orientation: int) ->
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--env", choices=("simulator", "x4-pro-simulator", "sticky-simulator"), default="simulator")
+    parser.add_argument("--env", choices=("simulator", "sticky-simulator"), default="simulator")
     args = parser.parse_args()
     program = ROOT / ".pio/build" / args.env / "program"
     for orientation in (0, 3):

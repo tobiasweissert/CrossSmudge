@@ -46,6 +46,7 @@ class GfxRenderer{public:
 code+='''\nstruct Runner{GfxRenderer renderer_;};static Runner runner;static Runner*s_activeRunner=&runner;
 '''
 code+=function(lua,'static inline int getInt(')+'\n'+function(lua,'static inline int getOptInt(')+'\n'
+code+='#include "'+str(R/'src/images/CrosscubLogo.h')+'"\nextern "C" int prod_crosscub_logo(lua_State*L){drawCrosscubLogo(runner.renderer_,getInt(L,1),getInt(L,2));return 0;}\n'
 funcs={'line':'l_line','thick_line':'l_thickLine','pixel':'l_pixel','rect':'l_rect','rect_dither':'l_rectDither','rounded_rect':'l_roundedRect','circle':'l_circle','get_bounds':'l_getBounds','get_orientation':'l_getOrientation','set_orientation':'l_setOrientation'}
 for api,fn in funcs.items():code+=function(lua,'int LuaRunner::'+fn+'(').replace('int LuaRunner::'+fn+'(','extern "C" int prod_'+api+'(')+'\n'
 # Storage-loading branch remains host adapter; raster loop is extracted unmodified from l_drawSprite.
@@ -65,9 +66,9 @@ assert 'adjustedMetrics.buttonHintsHeight = 0;' in theme
 c=c.replace('lua_pushinteger(L,40);lua_setfield(L,-2,"button_hints_height")','lua_pushinteger(L,0);lua_setfield(L,-2,"button_hints_height")')
 (O/'theme-adapter.json').write_text(json.dumps({'touch_present':True,'button_hints_height':0,'source_sha256':hashlib.sha256(theme.encode()).hexdigest(),'other_theme_metrics':'host fixture defaults; not physical/theme acceptance'},indent=2)+'\n')
 i=c.index('static const luaL_Reg api[]=')
-newfuncs=list(funcs)+['bitmap','clear','capture']
+newfuncs=list(funcs)+['bitmap','clear','capture','crosscub_logo']
 c=c[:i]+''.join('int prod_'+fn+'(lua_State*);\n' for fn in newfuncs)+'void prod_bounds(int,int);\n'+c[i:]
-c=c.replace('static const luaL_Reg api[]={','static const luaL_Reg api[]={ {\"get_orientation\",prod_get_orientation}, {\"set_orientation\",prod_set_orientation},')
+c=c.replace('static const luaL_Reg api[]={','static const luaL_Reg api[]={ {\"crosscub_logo\",prod_crosscub_logo}, {\"get_orientation\",prod_get_orientation}, {\"set_orientation\",prod_set_orientation},')
 for fn in newfuncs:c=c.replace('{"'+fn+'",draw}','{"'+fn+'",prod_'+fn+'}').replace('{"'+fn+'",bounds}','{"'+fn+'",prod_'+fn+'}')
 for unsupported_drawing in ['text','centered_text','header','button_hints']:
  c=c.replace('{"'+unsupported_drawing+'",draw}','{"'+unsupported_drawing+'",unsupported}')
@@ -82,10 +83,11 @@ def option(section,key):
  return re.sub(r'\$\{([^}.]+)\.([^}]+)\}',lambda m:option(m[1],m[2]),value)
 board_defines=re.findall(r'-D((?:FREEINK_DEVICE_|CROSSINK_APP_DEVICE_|CROSSINK_APP_CAP_)[A-Z0-9_]+)(?:=([^\s]+))?',option('env:sticky-owner-test','build_flags'))
 board_args=['-D'+name+'='+(value or '1') for name,value in board_defines]
-cap=(R/'include/AppCapabilities.h').read_text();mapping=re.search(r'#if defined\(FREEINK_DEVICE_X4CLASSIC\).*?#endif',cap,re.S).group()
-identity='#include <cstring>\n'+mapping+'\n#include "LuaRuntime.h"\nclass LuaRunner{public:static int l_getDevice(lua_State*);static int l_hasFeature(lua_State*);};\n'+function(lua,'int LuaRunner::l_getDevice(')+'\n'+function(lua,'int LuaRunner::l_hasFeature(')+'\nextern "C" int prod_get_device(lua_State*L){return LuaRunner::l_getDevice(L); }\nextern "C" int prod_open_libraries(lua_State*L){return ink::runtime::openEssential(L); }\n'
+cap=(R/'include/AppCapabilities.h').read_text();mapping=''
+identity='#include <cstring>\n'+mapping+'\n#include "LuaRuntime.h"\nclass LuaRunner{public:static LuaRunner* s_activeRunner;bool browser_=false;struct Http{struct Access{bool random=false;}backendAccess;}http_;static int l_getDevice(lua_State*);static int l_hasFeature(lua_State*);};\nLuaRunner* LuaRunner::s_activeRunner=nullptr;\n'+function(lua,'int LuaRunner::l_getDevice(')+'\n'+function(lua,'int LuaRunner::l_hasFeature(')+'\nextern "C" int prod_get_device(lua_State*L){return LuaRunner::l_getDevice(L); }\nextern "C" int prod_open_libraries(lua_State*L){return ink::runtime::openEssential(L); }\n'
 identity+='\nextern \"C\" int prod_has_feature(lua_State*L){return LuaRunner::l_hasFeature(L); }\n'
 (O/'production_identity.cpp').write_text(identity)
+c=c.replace('{"get_device",device}', '{"get_device",prod_get_device}')
 c=c.replace('static const luaL_Reg api[]={','int prod_get_device(lua_State*);\nint prod_has_feature(lua_State*);\nint prod_open_libraries(lua_State*);\nstatic const luaL_Reg api[]={ {"get_device",prod_get_device}, {"has_feature",prod_has_feature},')
 start=c.index(' const luaL_Reg libs[]=');end=c.index(' lua_newtable(L);',start)
 c=c[:start]+' if(prod_open_libraries(L)!=LUA_OK){fprintf(stderr,"Production Lua libraries failed\\n");lua_close(L);return 3;}\n'+c[end:]

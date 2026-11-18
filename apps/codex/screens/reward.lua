@@ -5,35 +5,16 @@ function screen.enter()
 end
 
 function screen.draw()
-    local m = smudge.get_metrics()
-    local ty = m.top_padding + m.header_height + 2
-    local by = h - m.button_hints_height - 2
-    draw_page_frame(ty, by)
-
-    smudge.header("Codex Delve", "Victory")
-    local y = ty + 8
-    local idx = 18 + (has_relic(6) and 15 or 0)
-    smudge.centered_text(y, "Victory +" .. idx .. " Gold", "ui12", "bold", true)
-    y = y + smudge.line_height("ui12") + 6
-    draw_codex_divider(y, w, 24)
-    y = y + 10
-
-    local n = #(state.cardRewards or {})
-    local sel = state.rewardIdx or 1
-    if sel > n and n > 0 then sel = 1 state.rewardIdx = 1 end
-    if sel <= n and n > 0 then
-        render_card_inspector(16, y, w - 32, 118, kCards[state.cardRewards[sel] + 1], false)
-    end
-    y = y + 132
-
-    local cw = math.floor((w - 48) / 3)
-    local ch = 220
-    local sx = math.floor((w - (cw * n)) / 2)
-    for i = 1, n do
-        draw_card_item(sx + (i - 1) * cw, (sel == i) and (y - 6) or y, cw - 4, ch, kCards[state.cardRewards[i] + 1], (sel == i))
-    end
-
-    smudge.button_hints("Skip", "Take", "<", ">")
+    local m=U.metrics()
+    U.header('Codex Delve','Victory')
+    U.text(14,80,'Victory +'..(18+(has_relic(6)and 15 or 0))..' Gold','ui10',true)
+    local n=#(state.cardRewards or {});local sel=state.rewardIdx or 1
+    local x,y,cw,ch=14,248,(w-44)//3,220
+    if m.landscape then x,y,cw,ch=326,114,(w-356)//3,242 end
+    if n>0 then render_card_inspector(14,114,m.landscape and 300 or w-28,m.landscape and 220 or 122,kCards[state.cardRewards[sel]+1],false)end
+    screen.cards={}
+    for i=1,n do local r={x=x+(i-1)*(cw+8),y=y,w=cw,h=ch};screen.cards[i]=r;draw_card_item(r.x,r.y,r.w,r.h,kCards[state.cardRewards[i]+1],sel==i)end
+    draw_actions('Skip','Take','<','>')
 end
 
 function screen.on_button(btn, pressed)
@@ -65,18 +46,14 @@ function screen.on_button(btn, pressed)
 end
 
 function screen.on_tap(x, y)
-    local m = smudge.get_metrics()
-    local n = #(state.cardRewards or {})
-    local cw = math.floor((w - 48) / 3)
-    local sx = math.floor((w - (cw * n)) / 2)
-    local hy = m.top_padding + m.header_height + 176
-    for i = 1, n do
-        if x >= sx + (i - 1) * cw and x <= sx + i * cw and y >= hy and y <= hy + 220 then
-            if (state.rewardIdx or 1) == i then
-                table.insert(state.deck, state.cardRewards[i])
+    for i,r in ipairs(screen.cards or {}) do
+        if x>=r.x and x<r.x+r.w and y>=r.y and y<r.y+r.h then
+            screen.cards=nil
+            if (state.rewardIdx or 1)==i then
+                table.insert(state.deck,state.cardRewards[i])
                 advance_floor()
             else
-                state.rewardIdx = i
+                state.rewardIdx=i
                 smudge.request_update()
             end
             return

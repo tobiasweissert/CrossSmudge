@@ -1,6 +1,6 @@
 # Architecture Overview
 
-CrossSmudge is firmware for the Xteink X4 and X3, built with PlatformIO targeting the ESP32-C3 microcontroller.
+Crosscub is Sticky-only firmware, built with PlatformIO targeting the ESP32-S3R8 microcontroller.
 
 At a high level, it is firmware that uses an activity-driven application architecture loop with persistent settings/state, SD-card-first caching, and a rendering pipeline optimized for e-ink constraints.
 

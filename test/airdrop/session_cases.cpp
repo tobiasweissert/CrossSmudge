@@ -28,7 +28,7 @@ struct Harness {
   unsigned reads=0,waits=0,pendingCount=0,decisionCalls=0,fileBegins=0,finishes=0,cancels=0,appendCalls=0,handovers=0;
   int answer=1;
   unsigned answerAfter=3,blockCount=0,wouldBlockEvery=0;
-  uint64_t waitMs=1;
+  uint64_t waitMs=1,stageCost=0,appendCost=0;
   bool slowAcceptedUrl=false,peerAlive=true,stop=false,eofDisconnect=false,appendFail=false,finishFail=false,stageFail=false,staleQueue=false,disconnectOnFinish=false,deadlineOnFinish=false,disconnectOnDecision=false,deadlineOnDecision=false,cancelBeforeDecision=false,writeFail=false;
   Harness(){workspace->ask=ask.get();}
   static Harness& self(void* p){return *static_cast<Harness*>(p);}
@@ -60,8 +60,8 @@ struct Harness {
     if(h.deadlineOnDecision)h.clock=h.deadline;if(h.slowAcceptedUrl)h.clock=h.deadline-1;
     if(h.answer)h.events.push_back(h.answer>0?"accept":"decline");return h.answer;
   }
-  static bool beginFile(void* p,const Offer& offer){auto& h=self(p);++h.fileBegins;h.events.push_back("begin-file");assert(offer.kind==OfferKind::File);return !h.stageFail;}
-  static stream::WriteResult append(void* p,const uint8_t* data,size_t n){auto& h=self(p);assert(n<=1024);++h.appendCalls;
+  static bool beginFile(void* p,const Offer& offer){auto& h=self(p);++h.fileBegins;h.clock+=h.stageCost;h.events.push_back("begin-file");assert(offer.kind==OfferKind::File);return !h.stageFail;}
+  static stream::WriteResult append(void* p,const uint8_t* data,size_t n){auto& h=self(p);assert(n<=1024);h.clock+=h.appendCost;++h.appendCalls;
     if(h.appendFail)return stream::WriteResult::Error;if(h.blockCount){--h.blockCount;return stream::WriteResult::WouldBlock;}
     h.output.insert(h.output.end(),data,data+n);h.events.push_back("append");return stream::WriteResult::Consumed;
   }
@@ -94,6 +94,22 @@ int failures=0;
 int main(int argc,char** argv){
   assert(argc==2);std::string root=argv[1];auto url=load(root,"url.plist"),file=load(root,"file.plist"),legacy=load(root,"file-noid.plist"),stored=load(root,"stored.dvzip"),compressed=load(root,"zlib.dvzip");
   framingCases(root,file);
+  {Harness h;h.answerAfter=1;h.stageCost=16000;h.appendCost=1;
+    h.input=request("/Ask",load(root,"large.plist"));add(h.input,request("/Upload",load(root,"large.dvzip"),uploadHeaders));h.serve();
+    CHECK("above 2MB with productive local pause",h.finishes==1&&h.count(200)==2&&h.output.size()==2000001&&std::all_of(h.output.begin(),h.output.end(),[](uint8_t c){return c=='x';}));
+  }
+  for(bool staging:{false,true}){
+    Harness h;h.answerAfter=1;h.split=13;h.stageCost=staging?16000:0;h.appendCost=staging?0:16000;
+    h.input=request("/Ask",file);add(h.input,request("/Upload",stored,uploadHeaders));h.serve();
+    CHECK("local staging/SD time is not peer idle time",h.finishes==1&&h.count(200)==2&&h.output.size()==3);
+  }
+  {Harness h;h.input=request("/Ask",file);auto upload=request("/Upload",stored,uploadHeaders);upload.resize(upload.size()-10);add(h.input,upload);h.waitMs=1000;h.serve();
+    bool idle=false;for(auto& s:h.failuresReported)idle|=s.find("15-second input stall")!=std::string::npos;
+    CHECK("genuinely idle upload still expires",idle&&h.finishes==0&&h.cancels==1);
+  }
+  {Harness h;h.answerAfter=1;h.stageCost=1800000;h.input=request("/Ask",file);add(h.input,request("/Upload",stored,uploadHeaders));h.serve();
+    CHECK("local work still counts toward absolute upload deadline",h.finishes==0&&h.count(200)==1&&h.cancels==1);
+  }
   {Harness h;h.input=request("/Discover",{});h.serve();
     CHECK("discovery closes promptly for separate Ask",h.responseCloses&&h.count(200)==1&&h.waits==0&&h.pendingCount==0);
     h.reconnect(request("/Ask",file));add(h.input,request("/Upload",stored,uploadHeaders));h.serve(2);

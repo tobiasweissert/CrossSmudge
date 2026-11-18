@@ -19,116 +19,141 @@ local function button(label,b,action,value,ending,disabled)
 end
 local function pair(M,id)local top,bottom=M.word(id):match('^(.-) / (.*)$');return top or '',bottom or ''end
 local function pairSize(top,bottom,width)return F.inkWidth(top,30)<=width and F.inkWidth(bottom,30)<=width and 30 or 14 end
-local function tag(g,w)local label=g.round==0 and 'PRACTICE'or'ROUND '..(g.phase==5 and g.round or g.round+1);caps(label,w//2,14,w//2-16,29,14,'right')end
-local function geometry(w,h,top)
- local lock=box(16,h-78,w-32,62);local word=box(16,16,w-32,63);local bottom=box(16,lock.y-73,w-32,63);local y=top or 97;local slot=(bottom.y-10-y)//20;local bw=w*5//16;local rx=64+bw+26
- return{top=word,bottom=bottom,board=box(64,y,bw,slot*20),right=box(rx,y,w-16-rx,slot*20),slot=slot,lock=box(rx,h-78,w-16-rx-64,62)}
+local U=dofile('unified_ui.lua')
+local function text(t,x,y,width,font,bold,align)
+ U.text(x,y,U.fit(t,width,font or'ui10',bold),font or'ui10',bold,align or'left')
 end
-local function sy(l,n)return l.board.y+(20-n)*l.slot end
-local function scale(l)
- for n=1,20 do local major=n%5==0;local inset=major and 0 or l.board.w//3;local y=sy(l,n)+l.slot//2-1;fill(l.board.x+inset,y,l.board.w-inset,3)
- if major then caps(string.format('%2d',n),l.board.x-60,sy(l,n),40,l.slot,14,'right')end end
+local function center(t,y,w,font,bold)text(t,w//2,y,w-28,font,bold,'center')end
+local function foot(labels,actions,primary,values,enabled)
+ for i,b in ipairs(U.footer(labels,primary,enabled))do if b.enabled and actions[i]then hit(b,actions[i],values and values[i])end end
 end
-local function band(l,target)local lo,hi=math.max(1,target-2),math.min(20,target+2);F.corners(box(l.board.x-18,sy(l,hi)-5,l.board.w+36,(hi-lo+1)*l.slot+10),14,4);fill(l.board.x+6,sy(l,target)+2,l.board.w-12,l.slot-4)end
-local function marker(l,guess,reveal)
- if reveal then local b=box(l.board.x-10,sy(l,guess)-3,l.board.w+20,l.slot+6);fill(b.x,b.y-3,b.w,b.h+6,true);outline(b,4)else fill(l.board.x-14,sy(l,guess)+l.slot//2-5,l.board.w+28,10)end
-end
-local function poles(top,bottom,l,size,peek)
- size=size or pairSize(top,bottom,l.top.w);caps(top,l.top.x,l.top.y,l.top.w,l.top.h,size,'left');fill(l.top.x,l.top.y+l.top.h+(peek and 5 or 4),l.top.w,3);caps(bottom,l.bottom.x,l.bottom.y,l.bottom.w,l.bottom.h,size,'left')
-end
-local scores={{'EXACT','5'},{'ONE OFF','3'},{'TWO OFF','1'},{'FURTHER OFF','0'}}
-local function scoring(x,y,w) caps('POINTS FOR THE ROUND',x,y,w,29,14,'left');for n,row in ipairs(scores)do caps(row[1],x,y+n*29,w,29,14,'left');caps(row[2],x,y+n*29,w,29,14,'right')end end
-local function ornament(x,y,w,h)
- local r=V.record;F.corners(box(x,y,w,h),14,4);local row=(h-20)//5;local peak=math.max(table.unpack(r.buckets));local max=(w-136)//19
- for i,label in ipairs({'0','1','2','3-5','6+'})do local yy=y+10+(i-1)*row;caps(label,x+12,yy,52,row,14,'left');local n=peak<=max and r.buckets[i]or(r.buckets[i]*max+peak-1)//math.max(1,peak);for k=0,n-1 do fill(x+70+k*19,yy+row//2-6,13,13)end;caps(tostring(r.buckets[i]),x+w-60,yy,46,row,14,'right')end
-end
+local function status(g)return g.round==0 and'PRACTICE'or'ROUND '..(g.phase==5 and g.round or g.round+1)end
 local function menu(g,w,h)
- caps('WAVELENGTH',16,14,w-32,63,30,'left');hit(box(16,14,w-32,103),'start')
- local progress=V.sessionStarted or g.phase>0 or g.round>0;local scored=math.max(0,g.round-1)
- if progress then caps('THIS SESSION',16,150,w-32,29,14,'left');caps(g.total..(g.total==1 and' POINT'or' POINTS')..' IN '..scored..(scored==1 and' ROUND'or' ROUNDS'),16,150,w-32,29,14,'right')else caps('NO SESSION RUNNING. TAP START.',16,150,w-32,29,14,'left')end
- fill(16,190,w-32,3);caps('ROUNDS ALL TIME',16,200,w-32,29,14,'left');caps(tostring(V.record.rounds),16,200,w-32,29,14,'right');caps('POINTS PER ROUND',16,229,w-32,29,14,'left');local avg=V.record.rounds>0 and (V.record.points*10+V.record.rounds//2)//V.record.rounds or 0;caps(V.record.rounds>0 and string.format('%d.%d',avg//10,avg%10)or'--',16,229,w-32,29,14,'right');caps('HOW FAR OFF, ALL TIME',16,262,w-32,29,14,'left');caps('ROUNDS',16,262,w-32,29,14,'right');ornament(16,296,w-32,210)
- caps('RECORD SINCE UI UPDATE',16,508,w-32,18,14);button(progress and'PLAY ROUND '..(g.phase==5 and g.round+1 or g.round+1)or'START',box(16,530,w-32,66),'start');button('HOW TO PLAY',box(16,612,w-32,54),'help');button(progress and'SEE THE SCORE SO FAR'or'NO SCORE YET',box(16,674,w-32,54),progress and'summary'or nil,nil,false,not progress)
- -- Existing Co-op saves remain playable; original Activity hardcoded Teams.
- button(g.mode==1 and'CO-OP'or'TEAMS',box(16,h-56,w-32,40),'mode',nil,true)
+ U.header('WAVELENGTH',status(g));local y=90
+ center(g.total..' POINTS THIS SESSION',y,w,'lexend16',true);y=y+56
+ center(V.record.rounds..' ROUNDS ALL TIME',y,w);y=y+38
+ center(V.record.points..' POINTS ALL TIME',y,w);y=y+38
+ center(V.abandoned..' ABANDONED THIS SESSION',y,w);y=y+48
+ local b={x=14,y=y,w=w-28,h=48};U.button(g.mode==1 and'CO-OP'or'TEAMS',b);hit(b,'mode')
+ foot({'How to play','Score',g.phase>=2 and g.phase<=4 and'Resume'or'Start'},{'help','summary',g.phase>=2 and g.phase<=4 and'resume'or'start'},3)
 end
-local helpLines={'THE CLUE-GIVER SEES A HIDDEN','NUMBER FROM 1 TO 20, AND SAYS','ONE CLUE THAT SITS THERE.','','THE GUESSERS MOVE THE GUESS,','AND LOCK IT IN.','','3 OR MORE PLAYERS. ONE SCORE','FOR THE WHOLE TABLE. THE DEVICE','PASSES LEFT EACH ROUND.','ROUND ONE IS PRACTICE.','','GUESS WHERE THEIR WORDS SIT, NOT','WHAT THEY REALLY THINK.'}
 local function help(w,h)
- caps('HOW TO PLAY',16,14,w-32,63,30,'left');fill(16,88,w-32,3);for n,line in ipairs(helpLines)do if line~=''then caps(line,16,104+(n-1)*29,w-32,29,14,'left')end end;fill(16,515,w-32,3);scoring(16,529,w-32);button('BACK',geometry(w,h).lock,'menu')
+ U.header('WAVELENGTH','HOW TO PLAY');local lines={
+ 'The clue-giver privately sees a number 1–20.', 'Say one clue between the two ends.', 'Guessers move the dial, then lock it.', 'Exact: 5 / one off: 3 / two off: 1.', 'Teams: correct side call adds one point.', 'Only round zero is practice: zero points.', 'Pass left each round. Back pauses.'}
+ local y=84;for _,t in ipairs(lines)do text(t,14,y,w-28);y=y+math.min(42,(h-174)//#lines)end
+ foot({'Back'},{'menu'})
 end
 local function pass(g,w,h)
- caps('PASS THE DEVICE',16,170,w-32,63,30);caps('LEFT',16,245,w-32,133,64);smudge.bitmap(36,265,92,92,art.pass92);fill(90,400,w-180,3);caps('WHOEVER TAKES IT GIVES THE CLUE.',16,416,w-32,29,14);caps('EVERYONE ELSE,',16,470,w-32,63,30);caps('LOOK AWAY.',16,533,w-32,63,30)
- if V.justAbandoned then caps(V.abandoned..(V.abandoned==1 and' ROUND'or' ROUNDS')..' ABANDONED SO FAR',16,120,w-32,29,14)end
- caps(g.round==0 and'PRACTICE ROUND'or'ROUND '..(g.round+1)..'   '..g.total..(g.total==1 and' POINT'or' POINTS'),16,625,w-32,63,g.round==0 and 30 or 14)
- if g.round==0 then caps('THIS ONE DOES NOT COUNT',16,690,w-32,29,14)end;button('I HAVE THE DEVICE',box(16,h-78,w-32,62),'ready')
+ U.header('WAVELENGTH',status(g));local room=h-78-68;local y=h>600 and 78+room//5 or 86
+ center('PASS THE DEVICE',y,w,'lexend16',true)
+ F.inkText('< LEFT',box(14,y+56,w-28,h>600 and 120 or 80),h>600 and 64 or 44)
+ local line=y+(h>600 and 174 or 128);smudge.rect(14,line,w-28,3,true,true)
+ center('Whoever takes it gives the clue.',line+20,w)
+ if h>600 then F.block('EVERYONE ELSE, LOOK AWAY.',box(14,line+52,w-28,70),30,2)else center('EVERYONE ELSE, LOOK AWAY.',line+58,w,'ui10',true)end
+ if h>600 then y=line+128 else y=line+104 end
+ center(g.round==0 and'PRACTICE ROUND'or'ROUND '..(g.round+1)..' / '..g.total..' POINTS',y,w,'ui10',true)
+ if g.round==0 then center('THIS ONE DOES NOT COUNT',y+34,w)end
+ if V.justAbandoned then center(V.abandoned..' ROUNDS ABANDONED',80,w)end
+ foot({'I have the device'},{'ready'},1)
 end
 local function pick(g,M,w,h)
- tag(g,w);caps('PICK ONE',16,14,w-32,63,30,'left');caps('THE NUMBER IS NOT DRAWN YET.',16,84,w-32,29,14,'left');local a,b=pair(M,g.a);local c,d=pair(M,g.b>0 and g.b or g.a);local size=30;for _,word in ipairs({a,b,c,d})do if F.inkWidth(word,30)>w-48 then size=14 end end
- for n=1,g.b>0 and 2 or 1 do local top,bottom=pair(M,n==1 and g.a or g.b);local y=120+(n-1)*274;outline(box(16,y,w-32,250),4);caps(top,24,y+22,w-48,63,size,'left');caps(bottom,24,y+165,w-48,63,size,'left');for k=0,6 do fill(38+k*26,y+123,15,4)end;hit(box(16,y,w-32,250),n)end;caps(g.b>0 and'TAP ONE TO CHOOSE IT'or'ONE LEFT IN THE DECK',16,h-100,w-32,29,14)
+ U.header('WAVELENGTH',status(g));text('PICK ONE / NUMBER STILL HIDDEN',14,80,w-28,'ui10',true)
+ local count=g.b>0 and 2 or 1;local ch=(h-178)//count
+ for n=1,count do local a,b=pair(M,n==1 and g.a or g.b);local r={x=14,y=116+(n-1)*ch,w=w-28,h=ch-10};U.panel(r);F.block(a..' / '..b,r,30,3);hit(r,n)end
+ foot({'Back'},{'menu'})
+end
+local function ladder(g,M,w,h,revealed)
+ local a,b=pair(M,g.pair);text('20 / '..a,14,80,w-28,'ui10',true);text('1 / '..b,14,h-106,w-28,'ui10',true)
+ local slot=math.max(5,(h-240)//20);local board={x=62,y=116,w=w*5//16,h=slot*20};local right={x=board.x+board.w+32,y=116,w=w-14-board.x-board.w-32,h=board.h}
+ local l={board=board,right=right,slot=slot};V.ladder=l
+ for n=1,20 do local yy=board.y+(20-n)*slot
+  smudge.rect(board.x,yy+slot//2,board.w,1,true,true)
+  if n%5==0 then text(tostring(n),14,yy-10,40)end
+ end
+ local yy=board.y+(20-g.guess)*slot;smudge.rect(board.x-6,yy,board.w+12,math.max(2,slot),false,2,true)
+ if revealed then local ty=board.y+(20-g.target)*slot;smudge.rect(board.x+4,ty+1,board.w-8,math.max(2,slot-2),true,true)end
+ return l
 end
 local function peek(g,M,w,h)
- local top,bottom=pair(M,g.pair);local l=geometry(w,h,96);l.top.y=14;l.bottom.y=h-213;l.slot=(l.bottom.y-10-96)//20;l.board.h=l.slot*20;l.right.h=l.board.h;poles(top,bottom,l,nil,true);scale(l)
- if V.peek then band(l,g.target);caps(string.format('%2d',g.target),l.right.x,96,l.right.w,133,64);caps('THE NUMBER',l.right.x,229,l.right.w,29,14)else smudge.bitmap(l.right.x+(l.right.w-120)//2,158,120,120,art.look)end
- for n,line in ipairs({'SAY ONE THING','THAT SITS','EXACTLY THERE','','TWO EITHER SIDE','STILL SCORES','','ONLY ONE.','DO NOT ADD TO IT.'})do if line~=''then caps(line,l.right.x,286+(n-1)*29,l.right.w,29,14)end end
- button(V.peek and'KEEP HOLDING'or V.nudge and'HOLD IT DOWN TO SEE'or'HOLD TO SEE THE NUMBER',box(16,h-142,w-32,58),'peek')
- if V.everRevealed then button('I HAVE MY CLUE',box(16,h-74,w-32,58),'clue')else caps('HOLD THE BAR ABOVE TO SEE IT',16,h-74+(58-29)//2,w-32,29,14)end
+ U.header('WAVELENGTH',status(g));local a,b=pair(M,g.pair)
+ text(a..' / '..b,14,80,w-28,'ui10',true)
+ local r=box(14,126,w-28,h-292)
+ F.inkText(V.peek and tostring(g.target)or'?',r,h>600 and 64 or 44)
+ text('Say one thing that sits exactly there.',14,h-164,w-28)
+ local b1={x=14,y=h-116,w=w-28,h=48};U.button(V.peek and'Keep holding'or'Hold to see the number',b1,true);hit(b1,'peek')
+ foot({V.everRevealed and'I have my clue'or'Hold above to see it'},{V.everRevealed and'clue'or nil},1)
 end
 local function clue(g,M,w,h)
- tag(g,w);local top,bottom=pair(M,g.pair);caps('SAY IT OUT LOUD',16,14,w-32,63,30);caps('THE NUMBER IS HIDDEN NOW.',16,78,w-32,29,14);caps('EVERYONE CAN LOOK.',16,107,w-32,29,14);fill(60,140,w-120,3);local size=pairSize(top,bottom,w-32);caps(top,16,160,w-32,63,size);caps(bottom,16,470,w-32,63,size);for y=239,443,22 do fill(w//2-4,y,8,10)end;fill(60,580,w-120,3);caps('ONE CLUE. TAKE YOUR TIME.',16,598,w-32,29,14);caps('REPEAT IT. DO NOT ADD TO IT.',16,630,w-32,29,14);caps('THEN HANDS OFF THE DEVICE.',16,664,w-32,29,14);button('PUT IT ON THE TABLE',box(16,h-78,w-32,62),'dial')
-end
-local function endWord(word,b,action,size)
- button('',b,action);local inner=b.w-24
- if F.inkWidth(word,14)<=inner then caps(word,b.x+12,b.y+(b.h-63)//2,inner,63,size,nil,true);return end
- local best;for i=1,#word do if word:sub(i,i)==' 'and(not best or math.abs(i-1-#word//2)<math.abs(best-1-#word//2))then best=i end end
- if not best then caps(word,b.x+12,b.y+(b.h-63)//2,inner,63,14,nil,true);return end
- local y=b.y+(b.h-58)//2;caps(word:sub(1,best-1),b.x+12,y,inner,29,14,nil,true);caps(word:sub(best+1),b.x+12,y+29,inner,29,14,nil,true)
-end
-local function call(g,M,w,h)
- local top,bottom=pair(M,g.pair);caps('YOU LOCKED '..g.guess,16,14,w-32,63,30);caps('SIDE CALL: IS THE NUMBER NEARER',16,84,w-32,29,14)
- if g.guess==1 or g.guess==20 then caps('NOTHING IS '..(g.guess==20 and'ABOVE 'or'BELOW ')..g.guess..'.',16,140,w-32,29,14);endWord(g.guess==20 and bottom or top,box(16,200,w-32,260),g.guess==20 and 2 or 1,30);caps('THE ONLY WAY LEFT.',16,500,w-32,29,14)
- else local size=pairSize(top,bottom,w-56);endWord(top,box(16,140,w-32,200),1,size);caps(tostring(g.guess),16,360,w-32,63,30);endWord(bottom,box(16,450,w-32,200),2,size);caps('THE CLUE-GIVER STAYS OUT OF THIS.',16,668,w-32,29,14)end
- -- Narrow truthfulness correction to the original scored-call footnote.
- caps(g.round==0 and'PRACTICE ROUND. NOTHING SCORES.'or'SIDE CALL. THIS ROUND SCORES.',16,h-96,w-32,29,14)
+ U.header('WAVELENGTH',status(g));center('SAY IT OUT LOUD',90,w,'lexend16',true)
+ center('The number is hidden. Everyone can look.',144,w)
+ local a,b=pair(M,g.pair);F.block(a..' / '..b,box(14,190,w-28,h-340),30,3)
+ center('One clue. Repeat it; do not add to it.',h-126,w)
+ foot({'Put it on the table'},{'dial'},1)
 end
 local function dial(g,M,w,h)
- tag(g,w);local top,bottom=pair(M,g.pair);local l=geometry(w,h);V.ladder=l;poles(top,bottom,l);scale(l);marker(l,g.guess);caps(string.format('%2d',g.guess),l.right.x,l.right.y,l.right.w,133,64)
- local x,rw,y=l.right.x,l.right.w,l.right.y+139;caps('ONE GUESS',x,y,rw,29,14);caps('FOR THE TABLE',x,y+29,rw,29,14);fill(x+20,y+72,rw-40,3);local hint=y+88
- for _,row in ipairs({{0,'TAP THE SCALE'},{29,'TO MOVE THE BAR'},{72,'SIDE BUTTONS'},{101,'MOVE IT ONE'},{169,'GUESSERS'},{198,'ONLY'},{256,'BACK PAUSES'}})do caps(row[2],x,hint+row[1],rw,29,14)end
- button('LOCK IT IN',l.lock,3);hit(box(l.board.x-24,l.board.y-l.slot,l.board.w+37,l.board.h+l.slot*2),'step-at')
+ U.header('WAVELENGTH',status(g));local l=ladder(g,M,w,h)
+ F.inkText(tostring(g.guess),box(l.right.x,116,l.right.w,110),64)
+ text('Tap scale to move',l.right.x,238,l.right.w)
+ if h>600 then text('Back pauses',l.right.x,280,l.right.w)end
+ local b={x=l.board.x-24,y=l.board.y,w=l.board.w+37,h=l.board.h};hit(b,'step-at')
+ foot({'-','Lock it in','+'},{2,3,1},2)
 end
-local distances={'EXACT','ONE OFF','TWO OFF','THREE OFF','FOUR OFF','FIVE OFF','SIX OFF','SEVEN OFF','EIGHT OFF','NINE OFF','TEN OFF','ELEVEN OFF','TWELVE OFF','THIRTEEN OFF','FOURTEEN OFF','FIFTEEN OFF','SIXTEEN OFF','SEVENTEEN OFF','EIGHTEEN OFF','NINETEEN OFF'}
+local function call(g,M,w,h)
+ U.header('WAVELENGTH',status(g));center('YOU LOCKED '..g.guess,80,w,'lexend16',true)
+ center('Is the target nearer which end?',134,w)
+ local a,b=pair(M,g.pair);local top=182;local ch=(h-286)//2
+ for i,t in ipairs({a,b})do if (g.guess~=20 or i==2)and(g.guess~=1 or i==1)then
+  local r={x=14,y=top+(i-1)*ch,w=w-28,h=ch-8};U.button(t,r,true);hit(r,i)
+ end end
+ text(g.round==0 and'Practice: nothing scores.'or'Side call: this round scores.',14,h-92,w-28)
+ foot({'Pause'},{'pause'})
+end
 local function reveal(g,M,w,h)
- local top,bottom=pair(M,g.pair);local l=geometry(w,h,150);local miss=math.abs(g.guess-g.target);local practice=g.round==1
- fill(16,16,w-32,76);caps(practice and'NO SCORE'or distances[miss+1],16,16,w-32,76,30,nil,true);caps(top,16,102,w-32,29,14,'left');scale(l);band(l,g.target);marker(l,g.guess,true);caps(bottom,l.bottom.x,l.bottom.y,l.bottom.w,l.bottom.h,14,'left')
- local x,rw=l.right.x,l.right.w;caps('+'..g.points,x,150,rw,133,64);caps(practice and'PRACTICE ROUND'or'THIS ROUND',x,283,rw,29,14)
- local sx=x+6;outline(box(sx,326,26,12),3);caps('GUESS  '..g.guess,sx+34,318,rw-40,29,14,'left');fill(sx,361,26,12);caps('NUMBER '..g.target,sx+34,353,rw-40,29,14,'left')
- if g.mode==2 then local right=g.target>g.guess and g.call==1 or g.target<g.guess and g.call==2;caps('SIDE CALL',x,388,rw,29,14);caps(miss==0 and'NOT NEEDED'or practice and(right and'RIGHT'or'WRONG')or(right and'RIGHT  +1'or'WRONG  +0'),x,417,rw,29,14)end
- if practice then caps('POINTS FOR',x,456,rw,29,14,'left');caps('THE ROUND',x,485,rw,29,14,'left');for n,row in ipairs(scores)do caps(row[1],x,485+n*29,rw,29,14,'left');caps(row[2],x,485+n*29,rw,29,14,'right')end
- else caps('ROUND '..g.round,x,456,rw,29,14);caps(g.total..(g.total==1 and' POINT'or' POINTS'),x,485,rw,29,14)end
- button('NEXT ROUND',box(16,h-160,w-32,62),'next')
+ U.header('WAVELENGTH',g.round==1 and'PRACTICE'or'ROUND '..g.round)
+ local l=ladder(g,M,w,h,true)
+ F.inkText('+'..g.points,box(l.right.x,116,l.right.w,100),64)
+ text('TARGET '..g.target,l.right.x,232,l.right.w);text('GUESS '..g.guess,l.right.x,266,l.right.w)
+ text('TOTAL '..g.total,l.right.x,300,l.right.w)
+ if h>600 then text(g.round==1 and'Practice: no score'or'This round scores',l.right.x,350,l.right.w)end
+ foot({'Score','Next round'},{'summary','next'},2)
 end
 local function pause(g,w,h)
- caps('PAUSED',16,14,w-32,63,30,'left');caps(g.round==0 and'PRACTICE ROUND'or'ROUND '..(g.round+1)..'   '..g.total..(g.total==1 and' POINT'or' POINTS'),16,88,w-32,29,14,'left');fill(16,126,w-32,3);scoring(16,150,w-32);button('RESUME THE ROUND',box(16,340,w-32,72),'resume');fill(16,440,w-32,3);for n,line in ipairs({'THIS ROUND IS SCRAPPED. THE NEXT','PLAYER GETS A NEW NUMBER, AND','THE PASS SCREEN SAYS SO.'})do caps(line,16,458+(n-1)*29,w-32,29,14,'left')end
- if V.abandoned>0 then caps(V.abandoned..(V.abandoned==1 and' ROUND'or' ROUNDS')..' ABANDONED SO FAR',16,556,w-32,29,14,'left')end;button('ABANDON THIS ROUND',box(16,h-78,w-32,62),'abandon',nil,true)
+ U.header('WAVELENGTH','PAUSED');center(status(g)..' / '..g.total..' POINTS',90,w,'lexend16',true)
+ center('Abandon scraps this round, not your score.',158,w)
+ center('The next player gets a new number.',200,w)
+ center(V.abandoned..' ROUNDS ABANDONED',254,w)
+ foot({'Menu','Abandon','Resume'},{'menu','abandon','resume'},3)
 end
 local function summary(g,w,h)
- local scored=math.max(0,g.round-1);caps(tostring(g.total),16,14,w-32,133,64,'left');caps(g.total==1 and'POINT'or'POINTS',16,150,w-32,63,30,'left');caps(scored>0 and'IN '..scored..' SCORED ROUND'..(scored==1 and''or'S')or'NO SCORED ROUNDS YET',16,214,w-32,29,14,'left');if V.abandoned>0 then caps(V.abandoned..' ABANDONED',16,214,w-32,29,14,'right')end;fill(16,252,w-32,3)
- if scored>0 then local avg=(g.total*10+scored//2)//scored;caps('POINTS PER ROUND',16,262,w-32,29,14,'left');caps('THIS SESSION',16,296,w-32,63,14,'left');caps(string.format('%d.%d',avg//10,avg%10),16,296,w-32,63,30,'right');caps('A GOOD TABLE',16,364,w-32,29,14,'left');caps('2.5',16,364,w-32,29,14,'right')
- else for _,row in ipairs({{262,'ONLY THE PRACTICE ROUND SO FAR,'},{296,'AND IT DOES NOT SCORE.'},{340,'PLAY ONE THAT DOES AND THE'},{369,'AVERAGE APPEARS HERE.'}})do caps(row[2],16,row[1],w-32,29,14,'left')end end
- caps('HOW FAR OFF, ALL TIME',16,404,w-32,29,14,'left');caps('ROUNDS',16,404,w-32,29,14,'right');ornament(16,434,w-32,168);button('PLAY ROUND '..(g.round+1),box(16,612,w-32,58),'start');caps('ENDING CLEARS THIS SCORE.',16,676,w-32,29,14,'left');caps('RECORD SINCE UPDATE IS KEPT.',16,705,w-32,29,14,'left');button('END THE SESSION',box(16,736,w-32,54),'fresh',nil,true)
+ U.header('WAVELENGTH','SCORE');center(g.total..' POINTS',90,w,'lexend16',true)
+ center(math.max(0,g.round-1)..' SCORED ROUNDS',150,w)
+ center(V.record.rounds..' ROUNDS ALL TIME',194,w)
+ center('Ending clears this session, not records.',V.notice~=''and 232 or 250,w)
+ local r=V.record;local avg=r.rounds>0 and(r.points*10+r.rounds//2)//r.rounds or 0
+ center('AVERAGE ALL TIME '..(r.rounds>0 and string.format('%d.%d',avg//10,avg%10)or'--'),V.notice~=''and 270 or 290,w)
+ local scored=math.max(0,g.round-1);local sa=scored>0 and(g.total*10+scored//2)//scored or 0
+ center('SESSION AVERAGE '..(scored>0 and string.format('%d.%d',sa//10,sa%10)or'--'),V.notice~=''and 306 or 326,w)
+ local labels={'0','1','2','3-5','6+'};local summary={}
+ for i,label in ipairs(labels)do summary[#summary+1]=label..':'..r.buckets[i]end
+ center(table.concat(summary,'  '),V.notice~=''and 342 or 362,w)
+ if h>600 then
+  for i,label in ipairs(labels)do local y=416+(i-1)*48;local b={x=14,y=y,w=w-28,h=40};U.panel(b);text(label..' POINTS',24,y+7,w//2);text(tostring(r.buckets[i]),w-24,y+7,w//3,'ui10',true,'right')end
+ end
+ foot({'Back','End session','Play round'},{'menu','fresh','start'},3)
 end
 function V.init(g)
- V.sessionStarted=g.phase>0 or g.round>0;F.init();art.look=assert(smudge.read_file('art/look.raw',1800));art.pass92=assert(smudge.read_file('art/pass92.raw',1104));local ok,orientation=pcall(smudge.get_orientation);V.originalOrientation=ok and orientation or nil;pcall(smudge.set_orientation,'portrait');previous=nil
+ V.sessionStarted=g.phase>0 or g.round>0;F.init();art.look=assert(smudge.read_file('art/look.raw',1800));art.pass92=assert(smudge.read_file('art/pass92.raw',1104));local ok,orientation=pcall(smudge.get_orientation);V.originalOrientation=ok and orientation or nil;previous=nil
 end
 function V.exit()if V.peek then smudge.full_refresh()end;V.peek=false;V.touchPeek=false;V.buttonHeld=false;if V.originalOrientation then pcall(smudge.set_orientation,V.originalOrientation)end end
 function V.draw(g,M,notice)
  if previous~=g.phase then V.focus=1;V.peek=false;V.touchPeek=false;V.buttonHeld=false;V.everRevealed=false;V.nudge=false;if g.phase~=3 then V.clue=false end;previous=g.phase end
- local w,h=smudge.get_bounds();V.hit={};smudge.clear();local view
+ local w,physicalH=smudge.get_bounds();V.notice=notice;local h=notice~=''and physicalH-40 or physicalH;V.hit={};smudge.clear();local view
  if V.screen=='front'or g.phase==0 and V.screen=='menu'and not V.pendingPass then view='menu';menu(g,w,h)
  elseif V.screen=='help'then view='help';help(w,h)elseif V.screen=='pause'then view='pause';pause(g,w,h)elseif V.screen=='summary'then view='summary';summary(g,w,h)
  elseif V.pendingPass or g.phase==6 then view='pass';pass(g,w,h)elseif g.phase==1 then view='pick';pick(g,M,w,h)elseif g.phase==2 then view='peek';peek(g,M,w,h)elseif g.phase==3 and V.clue then view='clue';clue(g,M,w,h)elseif g.phase==3 then view='dial';dial(g,M,w,h)elseif g.phase==4 then view='call';call(g,M,w,h)else view='reveal';reveal(g,M,w,h)end
  V.currentView=view;V.g=g;V.paintedPhase=g.phase;V.paintedScreen=V.screen;V.paintedPass=V.pendingPass;V.paintedClue=V.clue
  if V.keyboard and V.hit[V.focus]then outline(V.hit[V.focus].box,3)end
- if notice~=''then F.block(notice,box(16,h-34,w-32,30),14,1)end
+ if notice~=''then U.text(14,physicalH-98,U.fit(notice,w-28,'ui10'),'ui10',true)end
 end
 function V.act(g,M,action,value)
  if not V.valid(g)then return end
@@ -139,6 +164,7 @@ function V.act(g,M,action,value)
  elseif action=='menu'then V.screen=g.phase==0 and'menu'or'front'
  elseif action=='mode'and(g.phase==0 or g.phase==5)then g.mode=3-g.mode
  elseif action=='summary'then V.screen='summary'
+ elseif action=='pause'then V.screen='pause'
  elseif action=='resume'then V.screen='menu'
  elseif action=='fresh'then g.phase=0;g.round=0;g.total=0;g.points=0;g.call=0;V.screen='menu';V.pendingPass=false;V.abandoned=0;V.sessionStarted=false
  elseif action=='abandon'then V.abandoned=math.min(65535,V.abandoned+1);V.justAbandoned=true;V.screen='menu';M.deal(g);V.pendingPass=true
