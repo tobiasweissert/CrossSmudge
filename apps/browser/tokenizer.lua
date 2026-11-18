@@ -47,7 +47,13 @@ function T.scan(s,emit)
       end
      end
     end
-    emit(closing and 'close'or 'open',name,attrs,s:sub(math.max(lt+1,p-32),p-1):match('/%s*$')~=nil)
+    -- Most tags fit entirely in the bounded raw prefix. Its last bytes are
+    -- already resident in Lua; rereading a suffix can otherwise bounce back
+    -- across the SD block edge. Oversized tags still inspect the real ending.
+    local suffix
+    if p-lt-1<=4096 then suffix=raw:sub(-32)
+    else suffix=s:sub(math.max(lt+1,p-32),p-1)end
+    emit(closing and 'close'or 'open',name,attrs,suffix:match('/%s*$')~=nil)
     if not closing and (name=='script'or name=='style')then
      -- Raw text tags: '<' inside JavaScript/CSS never creates HTML nodes.
      local a,b

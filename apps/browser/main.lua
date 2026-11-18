@@ -47,13 +47,9 @@ local function restoreView()
  if S.prepared then local w,h=smudge.get_bounds();if S.prepared.sw~=w or S.prepared.sh~=h then S.layoutKey=nil end end
 end
 local function firstPage(doc,anchor,page,font)
- local w,h=smudge.get_bounds();local m=smudge.get_metrics();local pad=math.max(12,m.content_side_padding or 20)
- local width=w-2*pad
- local top=m.top_padding+m.header_height+12+56;local bottom=h-m.button_hints_height-12-66
- local height=bottom-top
- local key=width..':'..height..':'..font
- local rows,next,done=L.page(doc,anchor,width,height,font)
- return {doc=doc,page=page,key=key,rows=rows,sw=w,sh=h},next,done
+ local r=U.content(font)
+ local rows,next,done=L.page(doc,anchor,r.width,r.height,font)
+ return {doc=doc,page=page,key=r.key,rows=rows,sw=r.sw,sh=r.sh},next,done
 end
 local function installPage(prepared,next,done)
  S.prepared,S.next,S.done,S.layoutKey,S.reflowTarget=prepared,next,done,prepared.key,nil
@@ -211,6 +207,22 @@ local function finish(body,job,css,candidate,event,discovery)
  local current=job.mode=='history'and S.history[job.index]or nil
  local anchors=current and (current.anchors or {current.anchor or {b=1,s=1,p=1}})or {{b=1,s=1,p=1}}
  local page=current and current.page or 1;local url=job.url
+ if current then
+  -- Refetched HTML is a replacement model, not the cached model that produced
+  -- these anchors. Validate without mutating history before cache publication.
+  local valid=type(page)=='number'and page%1==0 and page>=1 and page<=8192
+  local checked={}
+  if valid then for i,a in ipairs(anchors)do
+   local b=type(a)=='table'and type(a.b)=='number'and a.b%1==0 and doc.blocks[a.b]
+   local r=b and b.spans and type(a.s)=='number'and a.s%1==0 and b.spans[a.s]
+   local p=type(a)=='table'and a.p
+   local ok=b and type(p)=='number'and p%1==0 and p>=1 and
+    ((b.image or b.form)and a.s==1 and p==1 or r and p<=#r.text and utf8.offset(r.text,0,p)==p)
+   if not ok then valid=false;break end
+   checked[i]={b=a.b,s=a.s,p=p}
+  end end
+  if not valid or not checked[page]then page=1;anchors={{b=1,s=1,p=1}}else anchors=checked end
+ end
  if job.target and job.target:find('#',1,true)then
   local raw=job.target:match('#(.*)$');local id=raw:gsub('%%(%x%x)',function(c)return string.char(tonumber(c,16))end)
   local anchor=doc.anchors and doc.anchors[id]
@@ -621,30 +633,45 @@ local function preparedImage(image,x,y,width,height)
  if image.file and not image.error and not active and not pending and not W.busy()then imageRequest={image=image,key=key,width=width,height=height}end
  return false
 end
+local focusScreen
 function on_draw()
  if U.editor then U.editDraw();return end
+ if focusScreen~=screen then U.focus=1;focusScreen=screen end
  local width=smudge.get_bounds();local metrics=smudge.get_metrics();local pad=math.max(12,metrics.content_side_padding or 20)
  local subtitle=(S.transport or 'Direct')..' • '..(W.job and (W.job.stage..' • Back cancels')or S.status)
- U.begin('Browser',U.fit(subtitle,math.max(80,width-smudge.text_width('Browser','ui12','bold')-3*pad),'small'))
+ U.begin('Browser',S.transport or 'Direct')
  local p,w,t,b=U.pad,U.w,U.top,U.bottom
+ local notice=W.job and (W.job.stage..' - Back cancels')or S.status or ''
+ local content=U.content(S.font)
+ local noticeY=t+52
+ U.text(p,noticeY,U.fit(notice,w-2*p,'small'),'small')
  U.button('<',p,t,44,44,function()history(-1)end)
  U.button(S.url and U.fit(S.url:gsub('^https://',''),w-2*p-120)or 'Address / search',p+50,t,w-2*p-106,44,address)
  U.button('...',w-p-50,t,50,44,function()screen=screen and nil or 'menu';menuPage=1 end)
- local y=t+56;local bottom=b-66
+ local y=content.y;local bottom=b
  if closed then U.wrap(S.status,p,y,w-2*p,4);return end
- if zoom then
+ if (active or pending or W.busy())and not screen then
+  U.text(p,y,'Loading - previous page retained','ui10',true)
+  U.button('Cancel',p,y+40,w-2*p,44,function()cancel();S.status='Cancelled • page kept';screen=nil end);U.buttons[#U.buttons].immediate=true
+ elseif zoom then
   U.button('Close image',p,y,w-2*p,44,function()zoom=nil end)
   if not preparedImage(zoom,p,y+52,w-2*p,math.max(1,bottom-y-52))then U.wrap('Image decoder rejected this image',p,y+60,w-2*p,3)end
  elseif screen=='details'then
   local title=S.doc and S.doc.title or 'No document loaded';local yy=U.wrap(title,p,y,w-2*p,math.max(1,(bottom-y-60)//smudge.line_height('lexend14')),'lexend14',true)
   if S.doc and S.doc.srp then local n,total=b7:coverage(S.entry);U.wrap(n..'/'..total..' chunks stored • '..S.doc.srp.mode..' • '..S.doc.srp.lang..(S.doc.srp.truncated and ' • truncated: '..(S.doc.srp.reason or 'limit')or ''),p,yy+8,w-2*p,2)end
  elseif screen then
-  local actions=listActions();local n=math.max(1,(bottom-y-52)//50);local pages=math.max(1,math.ceil(#actions/n));menuPage=math.min(menuPage or 1,pages)
-  for i=(menuPage-1)*n+1,math.min(menuPage*n,#actions)do local a=actions[i];U.button(U.fit(a[1],w-2*p-16),p,y+(i-(menuPage-1)*n-1)*50,w-2*p,44,a[2])end
-  if pages>1 then U.button('More '..menuPage..'/'..pages,p,bottom-46,w-2*p,44,function()menuPage=menuPage%pages+1 end)end
+  local actions=listActions();local columns=w>U.h and screen=='menu'and 2 or 1
+  local perColumn=math.max(1,(bottom-y-52)//50);local n=perColumn*columns
+  local pages=math.max(1,math.ceil(#actions/n));menuPage=math.min(menuPage or 1,pages)
+  local cellWidth=(w-2*p-(columns-1)*8)//columns
+  for i=(menuPage-1)*n+1,math.min(menuPage*n,#actions)do
+   local a=actions[i];local slot=i-(menuPage-1)*n-1
+   U.button(a[1],p+(slot%columns)*(cellWidth+8),y+(slot//columns)*50,cellWidth,44,a[2])
+  end
+  if pages>1 then U.button('More '..menuPage..'/'..pages,p,bottom-46,w-2*p,44,function()menuPage=menuPage%pages+1;U.focus=1 end)end
   if #actions==0 then U.text(p,y,'Nothing saved yet')end
  elseif S.doc then
-  local key=(w-2*p)..':'..(bottom-y)..':'..S.font
+  local key=content.key
   local prepared=S.prepared
   if not prepared or prepared.doc~=S.doc or prepared.page~=S.page or prepared.key~=key then
    retainView();layoutRequest={sw=w,sh=U.h,doc=S.doc,page=S.page,key=key,width=w-2*p,height=bottom-y,font=S.font,target=S.reflowTarget or S.layoutKey and S.layoutKey~=key and S.anchors[S.page]or nil,anchor=S.anchors[S.page]}
@@ -671,15 +698,16 @@ function on_draw()
    end
   end
  else
-  U.wrap(S.transport=='Assisted'and 'Public Assisted reader. Shared capacity and short-lived extraction cache, not private storage. The backend and hosting operator see addresses/content; opaque handles are not login protection. No scripts, logins or paywall bypass.'or S.transport=='Offline'and 'Offline reader. Choose saved pages; missing chunks and images need an explicit switch to Assisted.'or 'Direct public HTTPS browser. Reader mode, RSS/Atom news, bookmarks and checked offline pages. JavaScript, logins, paywalls and bot challenges are unsupported.',p,y,w-2*p,6)
-  U.button('Live news feeds',p,bottom-100,w-2*p,44,function()screen='news';menuPage=1 end)
-  U.button('Offline pages',p,bottom-50,w-2*p,44,function()screen='offline';menuPage=1 end)
+  local homeWidth=w>U.h and (w-3*p)//2 or w-2*p
+  U.wrap(S.transport=='Assisted'and 'Public Assisted reader. Shared capacity and short-lived extraction cache, not private storage. The backend and hosting operator see addresses/content; opaque handles are not login protection. No scripts, logins or paywall bypass.'or S.transport=='Offline'and 'Offline reader. Choose saved pages; missing chunks and images need an explicit switch to Assisted.'or 'Direct public HTTPS browser. Reader mode, RSS/Atom news, bookmarks and checked offline pages. JavaScript, logins, paywalls and bot challenges are unsupported.',p,y,homeWidth,math.max(1,(bottom-y-(w>U.h and 0 or 112))//smudge.line_height('small')),'small')
+  local ax=w>U.h and w//2+p or p;local aw=w-p-ax
+  U.button('Live news feeds',ax,bottom-100,aw,44,function()screen='news';menuPage=1 end)
+  U.button('Offline pages',ax,bottom-50,aw,44,function()screen='offline';menuPage=1 end)
  end
- local bw=(w-2*p-16)//3
- U.button('Previous',p,b-50,bw,44,function()turn(-1)end)
- U.button((S.doc and S.doc.srp and 'P'..S.page..' C'..(S.doc.srp.chunk+1)..'/'..S.doc.srp.chunks or 'Page '..S.page..(S.done and ' • end'or '')),p+bw+8,b-50,bw,44,function()screen='menu';menuPage=1 end)
- U.button('Next',p+2*(bw+8),b-50,bw,44,function()turn(1)end)
- if active or pending or W.busy()then U.button('Cancel',w-p-100,U.top+56,100,44,function()cancel();S.status='Cancelled • page kept';screen=nil end);U.buttons[#U.buttons].immediate=true end
+ local counter=S.doc and S.doc.srp and 'P'..S.page..' C'..(S.doc.srp.chunk+1)..'/'..S.doc.srp.chunks or 'Page '..S.page..(S.done and ' • end'or '')
+ if S.doc and not screen and not zoom and not(active or pending or W.busy())then
+  U.actions({{'Previous',function()turn(-1)end},{counter,function()screen='menu';menuPage=1 end},{'Next',function()turn(1)end}},2)
+ end
  U.footer()
 end
 function on_button(key,pressed)

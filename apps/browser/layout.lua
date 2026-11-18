@@ -11,8 +11,8 @@ function L.page(doc,anchor,width,height,delta)
  local a=copy(anchor or {});local rows={};local y=0;local line={runs={},height=0,width=0,y=0};local budget=0
  local function flush()
   if #line.runs==0 then return true end
-  if y+math.max(44,line.height)>height then return false end
-  line.y=y;rows[#rows+1]=line;y=y+math.max(44,line.height)
+  if y+line.height>height then return false end
+  line.y=y;rows[#rows+1]=line;y=y+line.height
   line={runs={},height=0,width=0,y=y};return true
  end
  while a.b<=#doc.blocks do
@@ -53,10 +53,11 @@ function L.page(doc,anchor,width,height,delta)
        text=r.text:sub(p,e-1);last=e;w=measure(text,font,style)
        while w>available and last>nextchar(r.text,p)do last=utf8.offset(r.text,-1,last);text=r.text:sub(p,last-1);w=measure(text,font,style)end
       end
-      local h=smudge.line_height(font)
+      -- Prose follows native leading; only actionable rows reserve touch height.
+      local h=math.max(smudge.line_height(font)+4,r.href and 44 or 0)
       if line.width+w>width and #line.runs>0 then
        if not flush()then a=start;break end
-      elseif y+math.max(44,line.height,h)>height then a=start;break
+      elseif y+math.max(line.height,h)>height then a=start;break
       else
        local previous=line.runs[#line.runs]
        if previous and previous.font==font and previous.bold==r.bold and previous.href==r.href and previous.block==b then previous.text=previous.text..text
@@ -74,8 +75,18 @@ function L.page(doc,anchor,width,height,delta)
 end
 function L.find(doc,query,start)
  query=query:lower();if query==''then return end
- for i=start or 1,#doc.blocks do for j,r in ipairs(doc.blocks[i].spans or {})do
-  local p=r.text:lower():find(query,1,true);if p then return{b=i,s=j,p=utf8.offset(r.text,0,p)}end
- end end
+ for i=start or 1,#doc.blocks do
+  -- The model bounds all text to 64KiB. Join only one semantic block;
+  -- folding ASCII preserves the byte coordinates of the original spans.
+  local spans=doc.blocks[i].spans or {};local parts={}
+  for j,r in ipairs(spans)do parts[j]=r.text end
+  local p=table.concat(parts):lower():find(query,1,true)
+  if p then
+   for j,r in ipairs(spans)do
+    if p<=#r.text then return{b=i,s=j,p=utf8.offset(r.text,0,p)}end
+    p=p-#r.text
+   end
+  end
+ end
 end
 return L

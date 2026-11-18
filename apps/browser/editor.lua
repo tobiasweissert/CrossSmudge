@@ -4,12 +4,32 @@ return function(U)
  local kw=(U.w-16)//10;local kh=math.min(60,(U.bottom-U.top-90)//5)
  local y=U.bottom-5*(kh+4)
  local visible=math.max(1,(y-U.top-8)//smudge.line_height('ui12'))
+ -- Native word wrapping ellipsizes an unbroken URL. Split only at UTF-8
+ -- boundaries, retaining every accepted byte and an explicit caret byte index.
  local draft=e.value:sub(1,e.cursor-1)..'|'..e.value:sub(e.cursor)
- local lines=smudge.wrapped_text(draft,U.w-2*U.pad,'ui12','regular',100).lines
- local caret=1;for i,line in ipairs(lines)do if line:find('|',1,true)then caret=i;break end end
+ local lines={};local start=1;local caret=1;local width=U.w-2*U.pad
+ local advance=smudge.browser_advance or smudge.text_width
+ while start<=#draft do
+  local newline=draft:find('\n',start,true);local stop=newline and newline-1 or #draft
+  local lo,hi=start-1,stop
+  local function boundary(n)
+   while n>=start and draft:byte(n+1)and draft:byte(n+1)>=128 and draft:byte(n+1)<192 do n=n-1 end
+   return n
+  end
+  while lo<hi do
+   local mid=(lo+hi+1)//2
+   if advance(draft:sub(start,boundary(mid)),'ui12','regular')<=width then lo=mid else hi=mid-1 end
+  end
+  local last=boundary(lo)
+  if last<start and start<=stop then last=(utf8.offset(draft,2,start)or #draft+1)-1 end
+  lines[#lines+1]=draft:sub(start,last)
+  if e.cursor>=start and e.cursor<=last then caret=#lines end
+  start=last+1
+  if newline and start==newline then start=start+1 end
+ end
  e.view=math.max(1,math.min(e.view or 1,caret))
  if caret>=e.view+visible then e.view=caret-visible+1 end
- for i=e.view,math.min(#lines,e.view+visible-1)do U.text(U.pad,U.top+(i-e.view)*smudge.line_height('ui12'),lines[i])end
+ for i=e.view,math.min(#lines,e.view+visible-1)do U.text(U.pad,U.top+(i-e.view)*smudge.line_height('ui12'),lines[i],'ui12')end
  local function insert(c) if #e.value+#c<=e.limit then e.value=e.value:sub(1,e.cursor-1)..c..e.value:sub(e.cursor);e.cursor=e.cursor+#c end end
  local rows=e.numeric and {'1234567890','-/:.,?!@&','_+=()%#;'} or {'qwertyuiop','asdfghjkl','zxcvbnm'}
  for row,letters in ipairs(rows) do

@@ -18,6 +18,12 @@ local function trim(s)
  while last>=first and space(s:byte(last))do last=last-1 end
  return s:sub(first,last)
 end
+-- Inputs are validated UTF-8. Locate the character containing the first
+-- excluded byte, backing up at most three bytes rather than rescanning text.
+local function prefix(s,limit)
+ if #s<=limit then return s end
+ return s:sub(1,utf8.offset(s,0,limit+1)-1)
+end
 local blockTags={p=true,div=true,article=true,main=true,section=true,header=true,footer=true,nav=true,aside=true,blockquote=true,pre=true,li=true,ul=true,ol=true,h1=true,h2=true,h3=true,h4=true,h5=true,h6=true,tr=true,table=true,form=true,figure=true,figcaption=true}
 local void={img=true,br=true,hr=true,meta=true,link=true,input=true,base=true,wbr=true,source=true,area=true,embed=true}
 local suppress={script=true,style=true,noscript=true,svg=true,canvas=true,template=true,iframe=true,object=true}
@@ -42,7 +48,7 @@ local function feed(raw,url)
    elseif name=='title'then field='feedtitle'end
   elseif kind=='text'then
    if item and field then item[field]=append(item[field],name,field=='title'and 1024 or field=='url'and 512 or 128)
-   elseif field=='feedtitle'then d.title=M.decode(name):sub(1,200)end
+   elseif field=='feedtitle'then d.title=prefix(M.decode(name),200)end
   elseif kind=='close'then
    if (name=='item'or name=='entry')and item then
     local target=U.resolve(url,item.url:match('^%s*(.-)%s*$'))
@@ -122,7 +128,7 @@ function M.parse(raw,url,options)
  end
  local function process(kind,name,a,selfClose)
   local parent=stack[#stack]
-  if kind=='text'then if title then d.title=(d.title..M.decode(name)):sub(1,200)else add(name,parent)end;return end
+  if kind=='text'then if title then d.title=prefix(d.title..M.decode(name),200)else add(name,parent)end;return end
   if kind=='style'then return end
   if kind=='close'then
    if name=='title'then title=false end
@@ -150,7 +156,7 @@ function M.parse(raw,url,options)
   end
   if name=='meta'and a.content then
    local key=(a.name or a.property or ''):lower()
-   if key=='author'or key=='article:published_time'or key=='date'then d[key]=M.decode(a.content):sub(1,200)end
+   if key=='author'or key=='article:published_time'or key=='date'then d[key]=prefix(M.decode(a.content),200)end
   end
   if name=='br'then add('\n',node)end
   if name=='li'then add('• ',node)elseif name=='blockquote'then add('> ',node)
@@ -158,7 +164,7 @@ function M.parse(raw,url,options)
   if name=='img'and not node.hidden and not node.style.hidden then
    boundary();local src=U.resolve(base,M.decode(a.src or a['data-src']or ''))
    if src and #d.images<32 and (tonumber(a.width)or 100)>24 and (tonumber(a.height)or 100)>24 then
-    local img={url=src,alt=M.decode(a.alt or 'Image'):sub(1,200),width=tonumber(a.width),height=tonumber(a.height)}
+    local img={url=src,alt=prefix(M.decode(a.alt or 'Image'),200),width=tonumber(a.width),height=tonumber(a.height)}
     d.images[#d.images+1]=img;local b=block(node,'image');b.image=img;boundary()
    end
   end

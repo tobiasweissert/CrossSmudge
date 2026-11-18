@@ -23,6 +23,26 @@ function Source:sub(first,last)
 end
 function Source:find(pattern,first,plain)
  local pos=math.max(1,first or 1);local tail=''
+ -- Plain bounded delimiters can search the resident bytes in place. Only
+ -- materialize the tiny boundary overlap after an unsuccessful block scan.
+ -- Keep the general-pattern/long-literal path's existing overlap semantics.
+ if plain and #pattern>0 and #pattern<=128 then
+  local overlap=#pattern-1
+  while pos<=self.size do
+   local chunk,base=self:chunk(pos);local offset=pos-base
+   if #tail>0 then
+    local boundary=tail..chunk:sub(offset,offset+overlap-1)
+    local a,b=boundary:find(pattern,1,true)
+    if a then return pos-#tail+a-1,pos-#tail+b-1 end
+   end
+   local a,b=chunk:find(pattern,offset,true)
+   if a then return base+a,base+b end
+   if base+#chunk==self.size then break end
+   tail=overlap>0 and chunk:sub(math.max(offset,#chunk-overlap+1),#chunk)or ''
+   pos=base+#chunk+1
+  end
+  return
+ end
  while pos<=self.size do
   -- Search the resident block before requesting its successor. A token near
   -- the start must not evict this block merely to look 8 KiB ahead.
