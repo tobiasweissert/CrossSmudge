@@ -4,7 +4,7 @@ Foundation: `2a477dea03a6db5ed4b5ccd33772c04cf19f8767` (the existing reader and 
 
 ## Source catalog is not the live store
 
-The foundation has **37 source applications**. The separate owner-controlled live store has **41**; `flashcards`, `habits`, `pomodoro` and `weather` are live-only. The standard firmware uses `https://raw.githubusercontent.com/tobiasweissert/CrossSmudge/integration/sticky-test-all/apps/` for the catalog, icons and package files. The local 37-entry `apps/catalog.json` describes this candidate's source packages; **do not overwrite the live 41-entry catalog with it**. No live catalog or release is published by host tests.
+The foundation has **37 source applications**. The separate owner-controlled live store has **41**; `flashcards`, `habits`, `pomodoro` and `weather` are live-only. The standard firmware uses `https://raw.githubusercontent.com/tobiasweissert/Crosscub/integration/sticky-test-all/apps/` for the catalog, icons and package files. The local 37-entry `apps/catalog.json` describes this candidate's source packages; **do not overwrite the live 41-entry catalog with it**. No live catalog or release is published by host tests.
 
 All source IDs and save formats stay unchanged. Stopwatch alone changes from 1.0.0 to 1.0.1 in manifest and local catalog for its reproduced landscape clipping repair. Other versions and metadata are preserved. Daily Office's existing lesson file is added to package closure; it is not a new feature or version change. Third-party installed apps remain dynamically discovered; the firmware does not restrict launch to the source inventory.
 

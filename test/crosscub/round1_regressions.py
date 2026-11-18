@@ -121,7 +121,7 @@ int main(int argc,char**argv){
                     project=overrides.get('project','Crosscub').encode();data[80:80+len(project)]=project
                     digest=hashlib.sha256(data).hexdigest();tag='crosscub-v'+tag_version
                     asset={'name':overrides.get('name','crosscub-sticky-v'+tag_version+'.bin'),
-                           'browser_download_url':'https://github.com/'+overrides.get('owner','tobiasweissert')+'/CrossSmudge/releases/download/'+tag+'/crosscub-sticky-v'+tag_version+'.bin',
+                           'browser_download_url':'https://github.com/'+overrides.get('owner','tobiasweissert')+'/Crosscub/releases/download/'+tag+'/crosscub-sticky-v'+tag_version+'.bin',
                            'size':overrides.get('size',len(data)), 'digest':'sha256:'+overrides.get('digest',digest)}
                     (tmp/'image').write_bytes(data);(tmp/'wire').write_text(json.dumps({'tag_name':tag,'assets':[asset]}))
                     result=subprocess.run([str(tmp/'probe'),str(tmp/'image'),str(tmp/'wire'),digest,str(int(expected))])
@@ -196,15 +196,15 @@ assert(client_config.user_data==&releaseParser && client_config.crt_bundle_attac
         self.assertNotIn('Instant Distribution',text)
         self.assertIn('integration/sticky-test-all',text)
         self.assertIn('41',text)
-        self.assertIn('explicitly authorized',text)
+        self.assertIn('separately authorized',text)
 
     def test_readme_matches_production_heap_and_license(self):
         text=(ROOT/'README.md').read_text()
         self.assertNotIn('Mandatory Hardware Constraint Testing',text)
         self.assertNotIn('exact hardware limits',text)
-        self.assertIn('2 MB',text)
-        self.assertIn('4 MB',text)
-        self.assertIn('optional stress',text)
+        self.assertIn('2 MiB',text)
+        self.assertIn('4 MiB',text)
+        self.assertIn('optional legacy 75 KiB simulator stress',text)
         self.assertIn('test/crosscub/test_product.py',text)
         self.assertIn('MIT',text)
         self.assertNotIn('licensed under the **GNU General Public License',text)

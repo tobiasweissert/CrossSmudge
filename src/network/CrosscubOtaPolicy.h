@@ -5,10 +5,10 @@
 #include <cstring>
 
 // OTA is an owner-controlled Crosscub channel, not the legacy repository's
-// latest arbitrary firmware. The repository path intentionally remains stable.
+// latest arbitrary firmware. Use the owner's renamed canonical repository.
 namespace crosscub_ota {
-constexpr char releaseUrl[] = "https://api.github.com/repos/tobiasweissert/CrossSmudge/releases/latest";
-constexpr char downloadRoot[] = "https://github.com/tobiasweissert/CrossSmudge/releases/download/";
+constexpr char releaseUrl[] = "https://api.github.com/repos/tobiasweissert/Crosscub/releases/latest";
+constexpr char downloadRoot[] = "https://github.com/tobiasweissert/Crosscub/releases/download/";
 constexpr char tagPrefix[] = "crosscub-v";
 
 inline const char* version(const char* tag) {

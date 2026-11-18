@@ -3,7 +3,7 @@
 import pathlib,json,hashlib,re,subprocess,tempfile,shutil
 ROOT=pathlib.Path(__file__).resolve().parents[2]
 OUT=pathlib.Path('/root/github/.host-data/crosssmudge/crossplay-ports')
-PREFIX='https://raw.githubusercontent.com/tobiasweissert/CrossSmudge/feat/crossplay-lua-apps/apps/'
+PREFIX='https://raw.githubusercontent.com/tobiasweissert/Crosscub/feat/crossplay-lua-apps/apps/'
 cat=json.loads((ROOT/'apps/catalog.json').read_text());ids=[];files=[];launches=[]
 original=json.loads(subprocess.check_output(['git','show','HEAD:apps/catalog.json'],cwd=ROOT,text=True))
 assert cat['apps'][:len(original['apps'])]==original['apps']

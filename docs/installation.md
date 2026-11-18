@@ -6,7 +6,7 @@ nav_order: 2
 # Installing and updating Crosscub
 
 Crosscub is for **Seeed reTerminal Sticky only**. Source is on
-[`feat/crosscub-sticky-only`](https://github.com/tobiasweissert/CrossSmudge/tree/feat/crosscub-sticky-only).
+[`feat/crosscub-sticky-only`](https://github.com/tobiasweissert/Crosscub/tree/feat/crosscub-sticky-only).
 There is **no published Crosscub firmware feed yet**. Do not install a different
 product's release just because it lives in the same historical repository.
 

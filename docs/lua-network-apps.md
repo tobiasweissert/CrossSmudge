@@ -2,7 +2,7 @@
 
 Worktree base: `da264a5844e87abb4c694e4143b2972f435f99c8`, branch
 `feat/lua-network-apps`. Intended stacked PR: `feat/lua-network-apps` →
-`feat/lua-http-api` in `tobiasweissert/CrossSmudge`. Parent owns commit/push/draft
+`feat/lua-http-api` in `tobiasweissert/Crosscub`. Parent owns commit/push/draft
 PR creation. No host/API/firmware edits, firmware builds, flash, publishing,
 catalog edits, or changes to the other writers' worktrees are part of this work.
 

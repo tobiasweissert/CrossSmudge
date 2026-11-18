@@ -592,7 +592,7 @@ end
 
 ## Submitting to the App Store
 
-Crosscub features an on-device **App Store** accessible directly over Wi-Fi. It queries the community catalog hosted at `https://raw.githubusercontent.com/tobiasweissert/CrossSmudge/integration/sticky-test-all/apps/catalog.json`. Users can browse descriptions, see icons, install, update, and uninstall apps with a single click.
+Crosscub features an on-device **App Store** accessible directly over Wi-Fi. It queries the community catalog hosted at `https://raw.githubusercontent.com/tobiasweissert/Crosscub/integration/sticky-test-all/apps/catalog.json`. Users can browse descriptions, see icons, install, update, and uninstall apps with a single click.
 
 To publish your application to the official Crosscub App Store so any user can discover and install it:
 
@@ -633,7 +633,7 @@ Open [`apps/catalog.json`](./catalog.json) and add an entry under the `"apps"` a
 *Note: Make sure all files required by your app are listed in `files`. The on-device App Store downloads each file in this list.*
 
 ### Step 4: Open a GitHub Pull Request
-1. Fork [https://github.com/tobiasweissert/CrossSmudge](https://github.com/tobiasweissert/CrossSmudge).
+1. Fork [https://github.com/tobiasweissert/Crosscub](https://github.com/tobiasweissert/Crosscub).
 2. Commit your new application folder (`apps/<app_id>/...`) and your edit to `apps/catalog.json`.
 3. Submit a Pull Request with title `feat(apps): add <app_name>`.
 4. Once reviewed and merged into `main`, your application is immediately available in the on-device App Store across all Crosscub devices worldwide!

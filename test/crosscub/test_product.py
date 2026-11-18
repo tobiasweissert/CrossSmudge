@@ -32,7 +32,7 @@ class Product(round1_regressions.Round1):
 #include <cassert>
 #include <cstring>
 int main() {
-  assert(!strcmp(AppStoreSource::baseUrl, "https://raw.githubusercontent.com/tobiasweissert/CrossSmudge/integration/sticky-test-all/apps/"));
+  assert(!strcmp(AppStoreSource::baseUrl, "https://raw.githubusercontent.com/tobiasweissert/Crosscub/integration/sticky-test-all/apps/"));
   assert(AppStoreSource::safePackagePath("browser/main.lua"));
   for (auto s : {"../escape", "/absolute", "https://evil", "a//b", "a/%2e", "a/.."})
     assert(!AppStoreSource::safePackagePath(s));

@@ -6,7 +6,7 @@
 int main() {
   using namespace crosscub_ota;
   const char* tag = "crosscub-v1.6.5.4";
-  const char* good = "https://github.com/tobiasweissert/CrossSmudge/releases/download/crosscub-v1.6.5.4/crosscub-sticky-v1.6.5.4.bin";
+  const char* good = "https://github.com/tobiasweissert/Crosscub/releases/download/crosscub-v1.6.5.4/crosscub-sticky-v1.6.5.4.bin";
   const char* digest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
   assert(version("crosscub-v99999999999") == nullptr);
   assert(version("crosscub-v1.2.3.4444444444") == nullptr);
@@ -15,10 +15,10 @@ int main() {
     assert(!acceptsDownload(bad, good, digest, 65536));
   for (const char* bad : {
       "https://github.com/Mumfee/CrossSmudge/releases/download/crosscub-v1.6.5.4/crosscub-sticky-v1.6.5.4.bin",
-      "https://github.com/tobiasweissert/CrossSmudge/releases/download/crosscub-v1.6.5.4/firmware-sticky-v1.6.5.4.bin",
-      "https://github.com/tobiasweissert/CrossSmudge/releases/download/crosscub-v1.6.5.4/crosscub-sticky-v1.6.5.3.bin",
-      "https://github.com/tobiasweissert/CrossSmudge/releases/download/crosscub-v1.6.5.4/crosscub-sticky-v1.6.5.4.bin?x",
-      "http://github.com/tobiasweissert/CrossSmudge/releases/download/crosscub-v1.6.5.4/crosscub-sticky-v1.6.5.4.bin"})
+      "https://github.com/tobiasweissert/Crosscub/releases/download/crosscub-v1.6.5.4/firmware-sticky-v1.6.5.4.bin",
+      "https://github.com/tobiasweissert/Crosscub/releases/download/crosscub-v1.6.5.4/crosscub-sticky-v1.6.5.3.bin",
+      "https://github.com/tobiasweissert/Crosscub/releases/download/crosscub-v1.6.5.4/crosscub-sticky-v1.6.5.4.bin?x",
+      "http://github.com/tobiasweissert/Crosscub/releases/download/crosscub-v1.6.5.4/crosscub-sticky-v1.6.5.4.bin"})
     assert(!acceptsDownload(tag, bad, digest, 65536));
   assert(!acceptsDownload(tag, good, "", 65536));
   assert(!acceptsDownload(tag, good, digest, 65535));

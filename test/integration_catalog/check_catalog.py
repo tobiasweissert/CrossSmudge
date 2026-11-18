@@ -4,9 +4,11 @@ import argparse,hashlib,json,pathlib,re,zipfile
 p=argparse.ArgumentParser();p.add_argument('--owner-overlay',type=pathlib.Path);a=p.parse_args()
 R=pathlib.Path(__file__).resolve().parents[2]
 catalog=json.loads((R/'apps/catalog.json').read_text())
-carry=json.loads((R/'test/crosscub/catalog-preservation.json').read_text())
-assert catalog['repo']=='tobiasweissert/CrossSmudge'
-assert catalog['branch']==carry['allowed_delta']['branch']
+predecessor=json.loads((R/'test/crosscub/catalog-preservation.json').read_text())
+carry=json.loads((R/'test/crosscub/accepted-catalog-preservation.json').read_text())
+assert set(carry['apps'])==set(predecessor['apps']), 'Accepted redesign must preserve predecessor IDs'
+assert catalog['repo']=='tobiasweissert/Crosscub'
+assert catalog['branch']==carry['branch']
 assert len(catalog['apps'])==carry['catalog_count']
 assert len({v['id'] for v in catalog['apps']})==len(catalog['apps'])
 assert {v['id'] for v in catalog['apps']}==set(carry['apps'])
@@ -15,19 +17,15 @@ overlay=zipfile.ZipFile(a.owner_overlay) if a.owner_overlay else None
 for app in catalog['apps']:
  app_id=app['id'];baseline=carry['apps'][app_id]
  assert re.fullmatch(r'[A-Za-z0-9_-]{1,64}',app_id)
- assert app['version']==(carry['allowed_delta']['stopwatch_version'] if app_id=='stopwatch' else baseline['version']),app_id
- # All original metadata is immutable except the explicitly listed package
- # closure correction and Stopwatch patch bump. All other versions stay pinned.
+ assert app['version']==baseline['version'],app_id
+ # Bind to the immutable owner-accepted redesign, not the superseded pre-redesign fixture.
  record=json.loads(json.dumps(app))
- if app_id=='stopwatch':record['version']=baseline['version']
- if app_id=='dailyoffice':record['files'].remove(carry['allowed_delta']['dailyoffice_add_file'])
  digest=hashlib.sha256(json.dumps(record,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest()
  assert digest==baseline['record_sha256'],(app_id,'baseline record changed')
  folder=R/'apps'/app_id;manifest=json.loads((folder/'manifest.json').read_text())
  assert manifest['id']==app_id and manifest['version']==app['version'],app_id
  manifest_bytes=(folder/'manifest.json').read_bytes()
- if app_id=='stopwatch':manifest_bytes=manifest_bytes.replace(b'"version": "1.0.1"',b'"version": "1.0.0"')
- assert hashlib.sha256(manifest_bytes).hexdigest()==baseline['manifest_sha256'],(app_id,'baseline manifest changed beyond allowed patch version')
+ assert hashlib.sha256(manifest_bytes).hexdigest()==baseline['manifest_sha256'],(app_id,'accepted manifest changed')
  files=app['files'];assert len(files)==len(set(files)),app_id
  assert 'manifest.json' in files and manifest.get('entry','main.lua') in files
  for rel in files:
@@ -50,5 +48,5 @@ for app in catalog['apps']:
  if app_id in {'cp-hackernews','cp-trivia'}:
   assert app['requires_psram'] is True and app['min_api']==manifest['min_api']==3
 assert next(v for v in catalog['apps']if v['id']=='browser')['min_api']==6
-print(f"PASS {len(catalog['apps'])} apps: baseline IDs/versions/metadata, runtime/license closure, safe paths and no save payloads")
+print(f"PASS {len(catalog['apps'])} apps: accepted IDs/versions/metadata, runtime/license closure, safe paths and no save payloads")
 print('The selected currentmain baseline contains 37 apps, not 41; none were removed.')

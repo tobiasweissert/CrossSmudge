@@ -83,7 +83,7 @@ def sort_key_for_device_type(device_type):
 def main():
     args = parse_args()
     version = normalize_version(args.version)
-    if args.repo != 'tobiasweissert/CrossSmudge':
+    if args.repo != 'tobiasweissert/Crosscub':
         raise SystemExit('Crosscub release repository must be owner controlled')
     if args.supported_devices and args.supported_devices != ['sticky']:
         raise SystemExit('Crosscub supports only Sticky')

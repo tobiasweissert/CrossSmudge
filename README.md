@@ -19,7 +19,7 @@ A compatible host firmware is required once. After that, ordinary Lua app update
 
 The web application manager is available at `http://<device-ip>/applications` while the device's web server is running. It supports app-folder/ZIP installation and management. These are local-device URLs, not a hosted Crosscub service.
 
-The source branch contains **37 source-catalog apps**, not the complete 41-app owner store. The live store is `tobiasweissert/CrossSmudge`, branch `integration/sticky-test-all`; do not replace its catalog with the smaller source inventory. App API requirements vary. Browser declares API 6 and its Assisted mode requires compatible public-mode firmware; availability in a store is not proof that an older host supports it.
+The source branch contains **37 source-catalog apps**, not the complete 41-app owner store. The live store is `tobiasweissert/Crosscub`, branch `integration/sticky-test-all`; do not replace its catalog with the smaller source inventory. App API requirements vary. Browser declares API 6 and its Assisted mode requires compatible public-mode firmware; availability in a store is not proof that an older host supports it.
 
 ## Unified 23-app redesign candidate
 
@@ -123,7 +123,7 @@ Legacy `.crosspoint`, `.crosssmudge` and `.smudge` paths remain intentional comp
 
 ## Firmware installation and updates
 
-Source development is on `feat/crosscub-sticky-only` in [tobiasweissert/CrossSmudge](https://github.com/tobiasweissert/CrossSmudge). The repository name is retained; **Crosscub** is the product name. No Crosscub firmware release is published yet.
+The accepted Crosscub firmware is integrated on `main` in [tobiasweissert/Crosscub](https://github.com/tobiasweissert/Crosscub). The previous repository name redirects here. Development continues on separate feature branches. No Crosscub firmware release is published yet.
 
 For a verified application image, back up the SD card, open **Settings → System → SD Card Firmware Update**, select the supplied `.bin` and confirm. An application update is not a factory image. Do not format SD or NVS: preserve books, settings, progress, apps and saves. Consult the [installation guide](docs/installation.md) before changing firmware; USB/factory procedures depend on the exact artifact and installed version.
 
@@ -168,15 +168,15 @@ Host tests and simulator captures complement, but do not replace, target compila
 
 ### Submit and publish separately
 
-Prepare source changes against `feat/crosscub-sticky-only`, preserving IDs, saves and license notices. Include the complete file list in the source catalog and bump both manifest and catalog versions when publishing an update. A merged source change does not automatically publish an app. Updating the configured owner store requires a separately authorized per-app composition into `integration/sticky-test-all`, preserving all 41 entries and unrelated metadata.
+Prepare source changes against `main`, preserving IDs, saves and license notices. Include the complete file list in the source catalog and bump both manifest and catalog versions when publishing an update. A merged source change does not automatically publish an app. Updating the configured owner store requires a separately authorized per-app composition into `integration/sticky-test-all`, preserving all 41 entries and unrelated metadata.
 
 ## Build from source
 
 Use Git with recursive submodules and the PlatformIO toolchain pinned by the selected revision's CI (Core 6.1.19 in this snapshot), not an arbitrary latest replacement.
 
 ```sh
-git clone --branch feat/crosscub-sticky-only https://github.com/tobiasweissert/CrossSmudge.git
-cd CrossSmudge
+git clone https://github.com/tobiasweissert/Crosscub.git
+cd Crosscub
 git submodule update --init --recursive
 pio run -e sticky
 ```

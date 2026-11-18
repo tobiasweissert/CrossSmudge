@@ -15,6 +15,6 @@ class Release(unittest.TestCase):
  def test_catalog_rejects_unowned_variant(self):
   with tempfile.TemporaryDirectory(prefix='crosscub-release-') as tmp:
    p=Path(tmp);bad=p/'firmware-foreign-v1.bin';bad.write_bytes(b'synthetic')
-   r=subprocess.run(['python3',str(R/'scripts/generate_release_catalog.py'),'--firmware',str(bad),'--output',str(p/'catalog'),'--repo','tobiasweissert/CrossSmudge','--version','1'],capture_output=True)
+   r=subprocess.run(['python3',str(R/'scripts/generate_release_catalog.py'),'--firmware',str(bad),'--output',str(p/'catalog'),'--repo','tobiasweissert/Crosscub','--version','1'],capture_output=True)
    self.assertNotEqual(r.returncode,0,'other-board release accepted')
 if __name__=='__main__':unittest.main()
