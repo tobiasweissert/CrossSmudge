@@ -1,7 +1,7 @@
 {
   "source_commit": "a50e5366fea65753bc85f1d32997bb24d09cc3c4",
   "scope": "Owner-accepted redesigned source catalog plus verified Browser 0.3.5 from a50e5366; original predecessor test/crosscub/catalog-preservation.json is retained unchanged",
-  "catalog_count": 37,
+  "catalog_count": 41,
   "branch": "feat/crosscub-sticky-only",
   "apps": {
     "dice": {
@@ -188,6 +188,28 @@
       "version": "0.3.5",
       "record_sha256": "3014dac9a2545d2ae31e3475c3f4cd6f4e70142d25dd2b1ecd3f94f35ba496fe",
       "manifest_sha256": "093488ab1d4c0146dd9ff3cdce2f028a83608124d62c50838aa61e6f6b74a863"
+    },
+    "flashcards": {
+      "version": "0.1.2",
+      "record_sha256": "2d5edf017e069d695e534a5c07c5ef7f921655fee4c325064166a8873fe8d35d",
+      "manifest_sha256": "62f4b1871ea3874480817c287184aa8fa7ab13f00e14210bc0f9a436e3a4689b"
+    },
+    "habits": {
+      "version": "0.1.2",
+      "record_sha256": "d59f1073c8b0357633be244f00c3a1b03e57c10c55617b4d7c7a33d63e4821ca",
+      "manifest_sha256": "95c0bc5c6e92fe1fc4ab0c1947b21bf164ea2f2bd2ce42b102d73ff58bfde1e6"
+    },
+    "pomodoro": {
+      "version": "0.1.1",
+      "record_sha256": "090341fb40b04522b23ca3d28f657b8c180476fa8d0ff152fb8f1a06679f3b9e",
+      "manifest_sha256": "b1aa8ba4e23c6ed57c63bbc7dc67f34b3e946bb23114b86cbd2af981ded21af8"
+    },
+    "weather": {
+      "version": "0.1.1",
+      "record_sha256": "a62316f8084be5eacb54fbef71f28ec9342b70be3560e6dba20be3005aa60879",
+      "manifest_sha256": "52dfe139e1d220313bafd939099da82748dcbacd86edc76990599e7bed476507"
     }
-  }
+  },
+  "source_sync_commit": "f66d29557ccf42b81ab5bcc53ae2a9927dbcad82",
+  "source_sync_scope": "Four owner-reviewed checkpoint productivity apps restored from f66d29557ccf; versions exceed older live Store 0.1.0 and require separate Store publication; other 37 accepted records unchanged"
 }

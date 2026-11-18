@@ -6,7 +6,8 @@ R=pathlib.Path(__file__).resolve().parents[2]
 catalog=json.loads((R/'apps/catalog.json').read_text())
 predecessor=json.loads((R/'test/crosscub/catalog-preservation.json').read_text())
 carry=json.loads((R/'test/crosscub/accepted-catalog-preservation.json').read_text())
-assert set(carry['apps'])==set(predecessor['apps']), 'Accepted redesign must preserve predecessor IDs'
+source_synced={'flashcards','habits','pomodoro','weather'}
+assert set(carry['apps'])==set(predecessor['apps'])|source_synced, 'Preserve predecessor IDs plus the four source-synced productivity apps'
 assert catalog['repo']=='tobiasweissert/Crosscub'
 assert catalog['branch']==carry['branch']
 assert len(catalog['apps'])==carry['catalog_count']
@@ -49,4 +50,4 @@ for app in catalog['apps']:
   assert app['requires_psram'] is True and app['min_api']==manifest['min_api']==3
 assert next(v for v in catalog['apps']if v['id']=='browser')['min_api']==6
 print(f"PASS {len(catalog['apps'])} apps: accepted IDs/versions/metadata, runtime/license closure, safe paths and no save payloads")
-print('The selected currentmain baseline contains 37 apps, not 41; none were removed.')
+print('Preserved all 37 main apps and source-synced four existing Store apps; 41 total.')

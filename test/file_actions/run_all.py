@@ -19,7 +19,8 @@ def main():
         checks = []
         commands = []
         groups = [('files', 'run.py', []), ('nested', 'nested_run.py', []),
-                  ('state', 'state_run.py', []), ('state-ui', 'state_run.py', ['--ui'])]
+                  ('state', 'state_run.py', []), ('state-ui', 'state_run.py', ['--ui']),
+                  ('recents', 'recents_run.py', [])]
         for group, script, extra in groups:
             command = [sys.executable, str(HERE/script), *extra, *flags]
             env = dict(os.environ, NESTED_LOG=str((args.output/(mode+'-nested-probe.log')).resolve()))

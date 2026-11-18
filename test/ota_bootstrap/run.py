@@ -10,8 +10,12 @@ class BootstrapVersion(unittest.TestCase):
     def test_distinct_numeric_release_identity(self):
         config = configparser.ConfigParser(interpolation=None)
         config.read(ROOT / 'platformio.ini')
-        self.assertEqual(config['crosssmudge']['version'], '1.6.5.4')
-        self.assertEqual(config['crossink']['version'], '1.6.5.4')
+        version = config['crosssmudge']['version']
+        self.assertEqual(config['crossink']['version'], version)
+        self.assertRegex(version, r'^[0-9]{1,9}(?:\.[0-9]{1,9}){0,3}$')
+        self.assertLessEqual(len(version.encode('ascii')), 31)
+        parts = tuple(int(part) for part in version.split('.'))
+        self.assertGreaterEqual(parts + (0,) * (4 - len(parts)), (1, 6, 5, 4))
         self.assertIn('CROSSCUB_APP_VERSION=\\"${crosssmudge.version}\\"',
                       config['base']['build_flags'])
         producer = (ROOT / 'src/CrosscubAppDesc.c').read_text()

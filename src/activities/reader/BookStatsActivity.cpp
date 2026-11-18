@@ -5,6 +5,7 @@
 #include "BookStatsView.h"
 #include "MappedInputManager.h"
 #include "components/TouchHeaderBackButton.h"
+#include "components/TouchRegistry.h"
 #include "components/UITheme.h"
 #include "util/InputReleaseGuard.h"
 
@@ -16,13 +17,15 @@ void drawPageIndicators(const GfxRenderer& renderer, const int currentPage, cons
   }
 
   constexpr int kDotSize = 8;
-  constexpr int kDotSpacing = 6;
+  constexpr int kDotSpacing = 36;
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int totalDotWidth = totalPages * kDotSize + (totalPages - 1) * kDotSpacing;
   const int dotsStartX = (renderer.getScreenWidth() - totalDotWidth) / 2;
   const int dotY = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing - 4;
   for (int pageIndex = 0; pageIndex < totalPages; ++pageIndex) {
     const int dotX = dotsStartX + pageIndex * (kDotSize + kDotSpacing);
+    TouchRegistry::getInstance().add(Rect(dotX - 18, dotY - 32, 44, 44),
+                                     BookStatsTouchTarget::PageIndicatorBase + pageIndex, TouchRegistry::Item);
     if (pageIndex == currentPage) {
       renderer.fillRect(dotX, dotY, kDotSize, kDotSize, true);
     } else {
@@ -272,7 +275,6 @@ void BookStatsActivity::onEnter() {
   ignoreInitialBackRelease = mappedInput.isPressed(MappedInputManager::Button::Back);
   ignoreInitialConfirmRelease = mappedInput.isPressed(MappedInputManager::Button::Confirm);
   ignoreInitialPowerRelease = mappedInput.isPressed(MappedInputManager::Button::Power);
-  if (bookCachePath.empty()) page = Page::ThisDevice;
   previousOrientation = renderer.getOrientation();
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
   requestUpdate();
@@ -294,6 +296,12 @@ void BookStatsActivity::exitStatsActivity() {
 }
 
 bool BookStatsActivity::showNextStatsPage() {
+  if (page == Page::Heatmap) {
+    page = Page::PerBook;
+    requestUpdate();
+    return true;
+  }
+
   if (page == Page::PerBook) {
     page = Page::ThisDevice;
     requestUpdate();
@@ -312,6 +320,12 @@ bool BookStatsActivity::showNextStatsPage() {
 bool BookStatsActivity::showPreviousStatsPage() {
   if (page == Page::AllDevices) {
     page = Page::ThisDevice;
+    requestUpdate();
+    return true;
+  }
+
+  if (page == Page::PerBook) {
+    page = Page::Heatmap;
     requestUpdate();
     return true;
   }
@@ -441,6 +455,14 @@ void BookStatsActivity::loop() {
     return;
   }
 
+  int pageTarget = -1;
+  if (mappedInput.wasItemTapped(pageTarget) && pageTarget >= BookStatsTouchTarget::PageIndicatorBase &&
+      pageTarget < BookStatsTouchTarget::PageIndicatorBase + (showAllDevicesStats ? 4 : 3)) {
+    page = static_cast<Page>(pageTarget - BookStatsTouchTarget::PageIndicatorBase);
+    requestUpdate();
+    return;
+  }
+
   const auto swipe = mappedInput.wasSwipe();
   if (swipe == MappedInputManager::SwipeDir::Left && showNextStatsPage()) {
     return;
@@ -459,8 +481,8 @@ void BookStatsActivity::loop() {
       beginDateEditing();
       return;
     }
-    if (hasEditableBook() && upOrLeftPressed) {
-      beginDateEditing();
+    if (upOrLeftPressed) {
+      showPreviousStatsPage();
       return;
     }
     if (downOrRightPressed) {
@@ -475,7 +497,7 @@ void BookStatsActivity::loop() {
     return;
   }
 
-  if (page == Page::ThisDevice && showAllDevicesStats && downOrRightPressed) {
+  if (downOrRightPressed) {
     showNextStatsPage();
   }
 }
@@ -498,6 +520,9 @@ void BookStatsActivity::render(RenderLock&&) {
       renderGlobalStatsPage(renderer, &mappedInput, tr(STR_STATS_THIS_DEVICE_SCREEN), globalStats, true,
                             showAllDevicesStats);
       break;
+    case Page::Heatmap:
+      renderReadingHeatmapPage(renderer, &mappedInput, globalStats, true);
+      break;
     case Page::AllDevices:
       renderGlobalStatsPage(renderer, &mappedInput, tr(STR_STATS_ALL_DEVICES_SCREEN), allDevicesStats, true, false);
       break;
@@ -506,7 +531,7 @@ void BookStatsActivity::render(RenderLock&&) {
       break;
   }
   if (page != Page::EditDates) {
-    drawPageIndicators(renderer, static_cast<int>(page), showAllDevicesStats ? 3 : 2);
+    drawPageIndicators(renderer, static_cast<int>(page), showAllDevicesStats ? 4 : 3);
   }
   renderer.displayBuffer();
 }

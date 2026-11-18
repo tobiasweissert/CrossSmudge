@@ -10,6 +10,7 @@
 #include <cstdio>
 
 #include "MappedInputManager.h"
+#include "ReadingHeatmap.h"
 #include "components/CompactHeader.h"
 #include "components/TouchActionButtons.h"
 #include "components/TouchHeaderBackButton.h"
@@ -532,6 +533,79 @@ void renderPerBookStatsPage(GfxRenderer& renderer, const MappedInputManager* map
     const auto labels =
         mappedInput->mapLabels(mappedInput->withBackArrow(tr(STR_BACK)), showEditButton ? tr(STR_EDIT) : "", "",
                                showMoreButton ? tr(STR_MORE) : "");
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4, true);
+  }
+}
+
+void renderReadingHeatmapPage(GfxRenderer& renderer, const MappedInputManager* mappedInput,
+                              const GlobalReadingStats& stats, const bool showMoreButton) {
+  renderer.clearScreen();
+  if (mappedInput && mappedInput->hasTouchHardware()) {
+    TouchHeaderBackButton::drawCompact(renderer, "Reading activity", false);
+  } else {
+    CompactHeader::drawTitle(renderer, "Reading activity");
+  }
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const auto& layout = getStatsLayout(renderer, mappedInput, true, true, true);
+  const int x = metrics.contentSidePadding;
+  const int w = renderer.getScreenWidth() - 2 * x;
+  const int line = renderer.getLineHeight(UI_10_FONT_ID);
+  int y = metrics.topPadding + statsHeaderHeight(metrics, layout, mappedInput) + layout.topGap;
+  ReadingStatsDateTime now;
+  getCurrentLocalReadingStatsDateTime(now);
+  const auto model = ReadingHeatmap::build(now.date, stats.readingHistoryAnchorDay, stats.readingHistoryBits);
+  if (!model.valid) {
+    renderer.drawText(UI_10_FONT_ID, x, y, "Set clock");
+  } else {
+    char count[32];
+    snprintf(count, sizeof(count), "%u active days", model.activeDays);
+    renderer.drawText(UI_10_FONT_ID, x, y, model.knownDays == 0 ? "No history" : count);
+    y += line + 18;
+
+    // One continuous Monday-first calendar, never split into portrait bands.
+    // Single-letter weekdays leave room for all 53 weeks even at 480px.
+    const int labelW = renderer.getTextWidth(UI_10_FONT_ID, "W") + 8;
+    const int step = std::min(14, (w - labelW - 2) / model.columns);
+    const int size = step - 3;
+    const int gx = x + labelW;
+    int lastLabelRight = -100;
+    for (int col = 0; col < model.columns; ++col) {
+      for (int row = 0; row < 7; ++row) {
+        const auto state = model.cell(col, row);
+        if (state == ReadingHeatmap::Cell::Outside) continue;
+        const int px = gx + col * step, py = y + line + row * step;
+        const uint32_t day = model.gridStart + col * 7 + row;
+        ReadingStatsDate date;
+        readingStatsDateFromDayIndex(day, date);
+        if (date.day == 1 && px >= lastLabelRight) {
+          char month[8];
+          formatReadingStatsMonthToken(date, month, sizeof(month));
+          const int textW = renderer.getTextWidth(UI_10_FONT_ID, month);
+          if (px + textW <= x + w) {
+            renderer.drawText(UI_10_FONT_ID, px, y, month);
+            lastLabelRight = px + textW + 4;
+          }
+        }
+        // Solid = recorded reading; hollow = inactive; dotted = unavailable.
+        if (state == ReadingHeatmap::Cell::Active) {
+          renderer.fillRect(px, py, size, size, true);
+        } else if (state == ReadingHeatmap::Cell::Inactive) {
+          renderer.drawRect(px, py, size, size, true);
+        } else {
+          renderer.drawPixel(px + size / 2, py + size / 2, true);
+        }
+        // The extra outline marks today without touching adjacent day cells.
+        if (day == model.lastDay) renderer.drawRect(px - 1, py - 1, size + 2, size + 2, true);
+      }
+    }
+    const char* weekdays[] = {"M", "S"};
+    for (int row = 0; row < 2; ++row) {
+      renderer.drawText(UI_10_FONT_ID, x, y + line + row * 6 * step - 4, weekdays[row]);
+    }
+  }
+  if (mappedInput) {
+    const auto labels =
+        mappedInput->mapLabels(mappedInput->withBackArrow(tr(STR_EXIT)), "", "", showMoreButton ? tr(STR_MORE) : "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4, true);
   }
 }

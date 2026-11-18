@@ -10,6 +10,7 @@ class MappedInputManager;
 
 namespace BookStatsTouchTarget {
 constexpr int StartedDaysStat = 1;
+constexpr int PageIndicatorBase = 100;
 constexpr int DateFieldBase = 10;
 constexpr int DateFieldCount = 6;
 constexpr int DateAdjustUp = 20;
@@ -24,6 +25,9 @@ void renderPerBookStatsPage(GfxRenderer& renderer, const MappedInputManager* map
                             const BookReadingStats& stats, float progressPercent, bool hasEstimatedTimeLeft,
                             uint32_t estimatedTimeLeftSeconds, bool showButtonHints, bool showEditButton,
                             bool showMoreButton);
+
+void renderReadingHeatmapPage(GfxRenderer& renderer, const MappedInputManager* mappedInput,
+                              const GlobalReadingStats& stats, bool showMoreButton);
 
 void renderGlobalStatsPage(GfxRenderer& renderer, const MappedInputManager* mappedInput, const char* screenTitle,
                            const GlobalReadingStats& stats, bool showButtonHints, bool showMoreButton);

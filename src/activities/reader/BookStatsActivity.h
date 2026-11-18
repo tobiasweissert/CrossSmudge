@@ -9,7 +9,7 @@
 #include "GlobalReadingStats.h"
 
 class BookStatsActivity final : public Activity {
-  enum class Page : uint8_t { PerBook, ThisDevice, AllDevices, EditDates };
+  enum class Page : uint8_t { Heatmap, PerBook, ThisDevice, AllDevices, EditDates };
 
   std::string bookTitle;
   std::string bookCachePath;
@@ -22,7 +22,7 @@ class BookStatsActivity final : public Activity {
   bool hasEstimatedTimeLeft = false;
   uint32_t estimatedTimeLeftSeconds = 0;
   GfxRenderer::Orientation previousOrientation = GfxRenderer::Orientation::Portrait;
-  Page page = Page::PerBook;
+  Page page = Page::Heatmap;
   int selectedEditField = 0;
   bool didChangeStats = false;
   BookReadingStats dateEditStatsSnapshot;

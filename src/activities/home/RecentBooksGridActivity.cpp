@@ -485,12 +485,12 @@ void RecentBooksGridActivity::promptDeleteBook(const RecentBook& book) {
       return;
     }
 
-    BookActions::clearFileMetadata(path);
     if (!Storage.remove(path.c_str())) {
       LOG_ERR("RBGA", "Failed to delete file: %s", path.c_str());
       return;
     }
 
+    BookActions::clearFileMetadata(path);
     RECENT_BOOKS.removeByPath(path);
     reloadAfterBookAction();
   };
