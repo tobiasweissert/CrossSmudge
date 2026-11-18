@@ -31,40 +31,25 @@ function screen.exit()
 end
 
 function screen.draw()
-    local m = smudge.get_metrics()
-    smudge.header("Scriptorium", "Ch.1 Pg " .. state.floor .. "/15")
-    local ty = m.top_padding + m.header_height + 2
-    draw_page_frame(ty, h - m.button_hints_height - 2)
-
-    ty = draw_codex_stats(ty + 6)
-    draw_miniature_frame(330, ty + 10, 136, 136)
-    smudge.draw_sprite(334, ty + 14, 128, 128, "sprites/merchant.raw")
-    smudge.text(24, ty + 14, "Merchant's Wares:", "ui12", "bold", "left")
-
-    local iy = ty + 44
-    for i = 1, 7 do
-        local sel = (i == idx)
-        local it = ""
-        if i <= 3 then
-            local cId = shop_state.cards[i]
-            local cName = cId < 0 and "SOLD" or kCards[cId + 1].name
-            it = i .. ". [Verse] " .. cName .. " (" .. (35 + i * 10) .. " G)"
-        elseif i <= 5 then
-            if not kRelics then dofile("relics.lua") end
-            local rId = shop_state.relics[i - 3]
-            local rName = rId < 0 and "SOLD" or kRelics[rId + 1].name
-            it = i .. ". [Relic] " .. rName .. " (" .. (95 + (i - 3) * 15) .. " G)"
-        elseif i == 6 then
-            it = "6. " .. (shop_state.heal and "Scribe's Draught [SOLD]" or "Scribe's Draught (+12 HP) [35 G]")
-        else
-            it = "7. Turn the Page -> (Depart)"
-        end
-
-        if sel then smudge.rect(20, iy - 2, 300, 26, true) end
-        smudge.text(26, iy + 2, it, "small", sel and "bold" or "regular", "left", not sel)
-        iy = iy + 30
+    local m=U.metrics()
+    U.header('Scriptorium','PG '..state.floor..'/15')
+    U.text(14,80,'HP '..state.playerHp..'/'..state.playerMaxHp..'  GOLD '..state.gold,'ui10',true)
+    local x=m.landscape and 180 or 14
+    local y= m.landscape and 114 or 258
+    draw_miniature_frame(14,114,136,136)
+    smudge.draw_sprite(18,118,128,128,'sprites/merchant.raw')
+    local cap=math.max(1,(m.body_bottom-y-12)//44)
+    local first=((idx-1)//cap)*cap+1
+    screen.items={}
+    for i=first,math.min(7,first+cap-1)do
+        local label
+        if i<=3 then local id=shop_state.cards[i];label=(id<0 and 'SOLD' or kCards[id+1].name)..' ('..(35+i*10)..' G)'
+        elseif i<=5 then if not kRelics then dofile('relics.lua')end;local id=shop_state.relics[i-3];label=(id<0 and 'SOLD' or kRelics[id+1].name)..' ('..(95+(i-3)*15)..' G)'
+        elseif i==6 then label=shop_state.heal and 'Draught SOLD' or 'Draught +12 HP (35 G)'
+        else label='Turn the Page (Depart)'end
+        screen.items[i]=U.button(label,{x=x,y=y+(i-first)*44,w=w-x-14,h=36},i==idx)
     end
-    smudge.button_hints("Leave", "Buy", "Prev", "Next")
+    draw_actions('Leave','Buy','Prev','Next')
 end
 
 function screen.on_button(btn, pressed)
@@ -110,17 +95,8 @@ function screen.on_button(btn, pressed)
     smudge.request_update()
 end
 
-function screen.on_tap(x, y)
-    local m = smudge.get_metrics()
-    local iy = m.top_padding + m.header_height + 72
-    for i = 1, 7 do
-        if x >= 20 and x <= 320 and y >= iy - 4 and y <= iy + 26 then
-            idx = i
-            screen.on_button("confirm", true)
-            return
-        end
-        iy = iy + 30
-    end
+function screen.on_tap(x,y)
+    for i,r in pairs(screen.items or {})do if U.hit(r,x,y)then idx=i;screen.on_button('confirm',true);return end end
 end
 
 return screen

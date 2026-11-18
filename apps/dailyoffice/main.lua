@@ -16,6 +16,9 @@ local hymnPaths = {"hours/hymns.txt", "hymns.txt", "/.crosssmudge/applications/d
 local psalterPaths = {"psalter.txt", "hours/psalter.txt", "/.crosssmudge/applications/dailyoffice/psalter.txt"}
 local propersPaths = {"propers.txt", "/.crosssmudge/applications/dailyoffice/propers.txt"}
 
+local U = dofile('unified_ui.lua')
+local rows, footer = {}, {}
+local painted_state = nil
 local state, sel, cur_name = "menu", 1, ""
 local total_pages, cur_page = 0, 1
 local w, h = 480, 800
@@ -65,12 +68,15 @@ local function load_propers()
     if smudge.find_section then
         for _, p in ipairs(propersPaths) do
             local found = false
+            local continued = {}
             smudge.find_section(p, "[" .. date_key .. "]", "[", function(rawL)
                 found = true
-                local k, v = rawL:gsub("^%s+", ""):gsub("%s+$", ""):match("^([%w_]+)=(.*)$")
+                local k, plus, v = rawL:gsub("^%s+", ""):gsub("%s+$", ""):match("^([%w_]+)(%+?)=(.*)$")
                 if k and v then
                     k = k:upper()
                     v = v:gsub("^%s+", ""):gsub("%s+$", "")
+                    if plus == "+" then v = (continued[k] or "") .. " " .. v end
+                    continued[k] = v
                     if k == "TITLE" then feast_title = v
                     elseif k == "COLOR" then feast_color = v
                     elseif k == "MP_PSS" then mp_pss = v
@@ -96,35 +102,42 @@ function on_init()
 end
 
 local function draw_menu()
-    smudge.header("Divine Worship", "Daily Office")
-    local m = smudge.get_metrics()
-    local y = m.top_padding + m.header_height + 6
-    smudge.centered_text(y, banner_str, "ui12", "bold", true)
-    y = y + smudge.line_height("ui12") + 4
-    smudge.centered_text(y, "¶ " .. feast_title .. " (" .. feast_color .. ")", "small", "regular", true)
-    y = y + smudge.line_height("small") + 8
-    smudge.line(m.content_side_padding, y, w - m.content_side_padding, y)
-    y = y + 8
-
-    local my, mh = y, h - y - m.button_hints_height - 6
-    local ih, bw, bx = math.floor(mh / #H), w - m.content_side_padding * 2, m.content_side_padding
-    for i, it in ipairs(H) do
-        local by = my + (i - 1) * ih + 4
-        local bh = ih - 8
-        local s = (i == sel)
-        smudge.rect(bx, by, bw, bh, s)
-        local ty = by + math.floor((bh - smudge.line_height("ui12") - smudge.line_height("small")) / 2)
-        smudge.text(bx + 16, ty, it[1], "ui12", "bold", "left", not s)
-        smudge.text(bx + 16, ty + smudge.line_height("ui12"), it[2], "small", "regular", "left", not s)
+    local m=U.metrics()
+    U.header('Daily Office','DIVINE WORSHIP')
+    U.text(14,m.body_top,U.fit(banner_str:upper(),w-28,'ui10',true),'ui10',true)
+    local proper=(feast_title..' ('..feast_color..')'):upper()
+    local wrapped=smudge.wrapped_text(proper,w-28,'small','regular',100)
+    local lines=(wrapped and wrapped.lines) or wrapped or {proper}
+    local count=math.max(1,math.min(3,#lines))
+    for i=1,count do
+        local text=lines[i] or ''
+        if i==3 and #lines>3 then text='Open an hour for the full proper' end
+        U.text(14,m.body_top+30+(i-1)*smudge.line_height('small'),text,'small')
     end
-    smudge.button_hints("Back", "Select", "Up", "Down")
+    local top=m.body_top+30+count*smudge.line_height('small')+8
+    local height=math.min(58,(m.body_bottom-top-6*8)//7)
+    rows={}
+    for i,it in ipairs(H)do
+        local r={x=14,y=top+(i-1)*(height+8),w=w-28,h=height}
+        rows[i]=r
+        local selected=i==sel
+        U.panel(r,selected)
+        if height<48 then
+            U.text(28,r.y+(height-25)//2,it[1]:upper(),'ui10',true,'left',not selected)
+            U.text(w-28,r.y+(height-20)//2,it[2]:upper(),'small',false,'right',not selected)
+        else
+            U.text(28,r.y+4,it[1]:upper(),'ui10',true,'left',not selected)
+            U.text(28,r.y+30,it[2]:upper(),'small',false,'left',not selected)
+        end
+    end
+    footer=U.footer({'Back','Open'},2)
 end
 
 local function draw_reader()
-    local m = smudge.get_metrics()
-    smudge.header(cur_name, string.format("%d / %d", cur_page, total_pages))
-    local cx, cw = m.content_side_padding, w - m.content_side_padding * 2
-    local y = m.top_padding + m.header_height + 12
+    local m = U.metrics()
+    U.header(cur_name, string.format("%d / %d", cur_page, total_pages))
+    local cx, cw = 14, w - 28
+    local y = m.body_top
     local lh = smudge.line_height("ui12") + 4
     local rh = smudge.line_height("small") + 2
     local hh = smudge.line_height("ui12") + 8
@@ -165,24 +178,34 @@ local function draw_reader()
             end
         end)
     end
-    smudge.button_hints("Back", "", (cur_page > 1) and "Prev" or "", (cur_page < total_pages) and "Next" or "Done")
+    footer=U.footer({'Back','Prev',(cur_page<total_pages) and 'Next' or 'Done'},3,{[2]=cur_page>1})
 end
 
+local build_hour
 function on_draw()
     smudge.clear()
+    local nw,nh=smudge.get_bounds()
+    if nw~=w or nh~=h then
+        w,h=nw,nh
+        if state=='reader' then
+            build_hour(sel,H[sel][3])
+            cur_page=math.max(1,math.min(cur_page,total_pages))
+        end
+    end
     if state == "menu" then draw_menu() else draw_reader() end
+    painted_state=state
 end
 
-local function build_hour(hIdx, hFile)
+build_hour = function(hIdx, hFile)
     total_pages = 0
     collectgarbage("collect")
     local curY = 0
-    local m = smudge.get_metrics()
-    local cw = w - m.content_side_padding * 2
+    local m = U.metrics()
+    local cw = w - 28
     local lh = smudge.line_height("ui12") + 4
     local rh = smudge.line_height("small") + 2
     local hh = smudge.line_height("ui12") + 8
-    local availH = h - m.top_padding - m.header_height - m.button_hints_height - 24
+    local availH = m.body_bottom - m.body_top
 
     local function emit(str)
         local cost = lh
@@ -207,7 +230,7 @@ local function build_hour(hIdx, hFile)
     local function divider() emit("d:") end
     local function wrap(p1, p2, text, maxW, font, style)
         if not text or #text == 0 then return end
-        if #text <= 34 and not text:find("\n") then emit(p1 .. text); return end
+        if not text:find("\n") and smudge.text_width(text,font or 'ui12',style or 'regular') <= (maxW or cw) then emit(p1 .. text); return end
         local res = smudge.wrapped_text(text, maxW or cw, font or "ui12", style or "regular", 100)
         local lns = (res and res.lines) or res or {}
         for i, l in ipairs(lns) do emit(((i == 1) and p1 or p2) .. l) end
@@ -312,10 +335,10 @@ local function build_hour(hIdx, hFile)
                         else blank() end
                     end)
                     blank()
-                    emit("b:Glory be to the Father, and to the Son :")
-                    emit("b:and to the Holy Ghost;")
-                    emit("b:As it was in the beginning, is now, and ever shall be :")
-                    emit("b:world without end. Amen.")
+                    wrap('b:','b:',"Glory be to the Father, and to the Son :",cw)
+                    wrap('b:','b:',"and to the Holy Ghost;",cw)
+                    wrap('b:','b:',"As it was in the beginning, is now, and ever shall be :",cw)
+                    wrap('b:','b:',"world without end. Amen.",cw)
                     blank()
                     divider()
                 end
@@ -328,14 +351,18 @@ local function build_hour(hIdx, hFile)
 
                 if cit and #cit > 0 then wrap("r:", "r:", "¶ Appointed " .. lNm .. ": " .. cit, cw - 24, "small"); blank() end
 
+                local has_text = false
                 local loaded = stream_sec({"lessons/" .. date_key .. ".txt", "/.crosssmudge/applications/dailyoffice/lessons/" .. date_key .. ".txt"}, "[" .. tag .. "]", "[", function(rawPara)
                     local para = rawPara:gsub("^%s+", ""):gsub("%s+$", "")
-                    if #para > 0 then wrap("b:", "b:", para, cw) else blank() end
+                    if #para > 0 then has_text = true;wrap("b:", "b:", para, cw) else blank() end
                 end)
-                if not loaded then wrap("b:", "b:", "Here beginneth the " .. lNm:lower() .. " appointed for the day.", cw) end
                 blank()
-                wrap("v:", "i:", "Here endeth the " .. lNm .. ".", cw - 32)
-                wrap("R:", "j:", "Thanks be to God.", cw - 32)
+                if loaded and has_text then
+                    wrap("v:", "i:", "Here endeth the " .. lNm .. ".", cw - 32)
+                    wrap("R:", "j:", "Thanks be to God.", cw - 32)
+                else
+                    wrap("r:", "r:", "Lesson text unavailable: not included for this date. Read the appointed citation separately.", cw - 24, "small")
+                end
                 blank()
                 divider()
                 skipL = true
@@ -389,29 +416,19 @@ function on_button(btn, pressed)
     end
 end
 
-function on_tap(x, y)
-    local m = smudge.get_metrics()
-    if state == "menu" then
-        if y > h - m.button_hints_height then
-            if x < w / 4 then smudge.exit()
-            elseif x < w / 2 then on_button("confirm", true)
-            elseif x < 3 * w / 4 then on_button("up", true)
-            else on_button("down", true) end
+function on_tap(x,y)
+    local cw,ch=smudge.get_bounds();if cw~=w or ch~=h then return end
+    if painted_state~=state then return end
+    for i,r in ipairs(footer)do
+        if U.hit(r,x,y)then
+            if state=='menu' then on_button(i==1 and 'back' or 'confirm',true)
+            else on_button(({'back','up','down'})[i],true)end
             return
         end
-        local my = m.top_padding + m.header_height + 26 + smudge.line_height("ui12") + smudge.line_height("small")
-        local ih = math.floor((h - my - m.button_hints_height - 6) / #H)
-        if y >= my then
-            local idx = math.floor((y - my) / ih) + 1
-            if idx >= 1 and idx <= #H then sel = idx; on_button("confirm", true) end
-        end
-    else
-        if y > h - m.button_hints_height then
-            if x < w / 4 then total_pages = 0; collectgarbage("collect"); state = "menu"; smudge.request_update()
-            elseif x >= w / 2 and x < 3 * w / 4 then on_button("up", true)
-            elseif x >= 3 * w / 4 then on_button("down", true) end
-            return
-        end
-        if x > w / 2 then on_button("down", true) else on_button("up", true) end
     end
+    local m=U.metrics()
+    if x<0 or x>=m.w or y<m.body_top or y>=m.body_bottom then return end
+    if state=='menu' then
+        for i,r in ipairs(rows)do if U.hit(r,x,y)then sel=i;on_button('confirm',true);return end end
+    else on_button(x>w//2 and 'down' or 'up',true)end
 end

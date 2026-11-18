@@ -1,35 +1,30 @@
 -- TriviaScreens.cpp Notice/Choice composition, with explicit paging for the
 -- existing provider's text (the original pack pre-fits its questions/options).
-local F=dofile('graphics.lua')
+local F=dofile('graphics.lua');local B=dofile('unified_ui.lua')
 local U={hit={},page=1,pages=1,detail=nil,focus=1}
 local function box(x,y,w,h)return{x=x,y=y,w=w,h=h}end
 local function hit(b,kind,value)U.hit[#U.hit+1]={box=b,kind=kind,value=value}end
 local function outline(b,weight)smudge.rect(b.x,b.y,b.w,b.h,false,weight or 1,true)end
 local function button(text,b,kind,value,filled)
- if filled then smudge.rect(b.x,b.y,b.w,b.h,true,true)else outline(b,2)end
- F.label(text,b,'small',filled);hit(b,kind,value)
+ B.button(text,b,filled);hit(b,kind,value)
 end
-local function header(w,right)
- smudge.rect(0,0,w,76,true,true);F.label('TRIVIA',box(16,0,w-32,76),'title',true,'left')
- if right then
-  local label=F.visible(right,'small')
-  while F.width(label,'small')>w-208 and #label>0 do local at=utf8.offset(label,-1);label=label:sub(1,at-1)end
-  F.label(label,box(192,0,w-208,76),'small',true,'right')
- end
- smudge.rect(0,80,w,3,true,true)
-end
+local function header(w,right)B.header('TRIVIA',right)end
 local function footer(w,h,primary,action,readQuestion)
- local full=w-32;local aside=box(w-148,h-80,132,64)
- if primary then
-  if readQuestion then
-   -- Original three-action footer geometry, used only when unrestricted
-   -- provider text needs the supported complete-reading surface.
-   local wide=full-288
-   button(primary=='SKIP'and'READ'or primary,box(16,h-80,wide,64),primary=='SKIP'and'question-detail'or action,nil,true)
-   button(primary=='SKIP'and'SKIP'or'READ',box(16+wide+12,h-80,132,64),primary=='SKIP'and action or'question-detail',nil,false)
-  else button(primary,box(16,h-80,full-144,64),action,nil,true)end
+ local labels,actions={primary,'END'},{action,'exit'}
+ if readQuestion then labels={primary=='SKIP'and'READ'or primary,primary=='SKIP'and'SKIP'or'READ','END'};actions={primary=='SKIP'and'question-detail'or action,primary=='SKIP'and action or'question-detail','exit'}end
+ for i,b in ipairs(B.footer(labels,1))do hit(b,actions[i])end
+end
+local function empty(s,w,h)
+ local lines={};local body=s.status..'\nOpen Trivia DB / CC BY-SA 4.0. Fetch one live question; no bundled questions.'
+ for paragraph in(body..'\n'):gmatch('(.-)\n')do
+  local line='';for word in paragraph:gmatch('%S+')do local next=line==''and word or line..' '..word
+   if smudge.text_width(next,'ui10')>w-56 and line~=''then lines[#lines+1]=line;line=word else line=next end
+  end;if line~=''then lines[#lines+1]=line end
  end
- button('END',aside,'exit',nil,false)
+ local total=64+24+#lines*29;local y=78+(h-146-total)//2
+ F.label((s.request or s.queued)and'FETCHING'or'NO QUESTIONS',box(14,y,w-28,64),'title');y=y+88
+ for _,line in ipairs(lines)do B.text(w//2,y,line,'ui10',false,'center');y=y+29 end
+ for _,b in ipairs(B.footer({(s.request or s.queued)and'Fetching'or'Fetch question'},1))do hit(b,'fetch')end
 end
 local function pageText(text,b,key,center)
  local lines=F.wrap(text,b.w,key);local capacity=math.max(1,b.h//F.metrics[key][1])
@@ -41,19 +36,22 @@ local function pageText(text,b,key,center)
  end
  U.visibleLines=visible;U.totalLines=#lines
 end
-function U.init()F.init();U.page=1;U.detail=nil;U.focus=1 end
-function U.reset()U.page=1;U.detail=nil;U.focus=1 end
+function U.retire()U.hit={};U.painted=nil end
+function U.complete(s)U.painted={q=s.q,answered=s.answered,detail=U.detail,page=U.page}end
+function U.valid(s)
+ local p=U.painted
+ return p and p.q==s.q and p.answered==s.answered and p.detail==U.detail and p.page==U.page
+end
+function U.init()F.init();U.reset()end
+function U.reset()U.retire();U.page=1;U.detail=nil;U.focus=1 end
 function U.draw(s)
  local w,h=smudge.get_bounds();smudge.clear();header(w,s.q and w>h and s.status or nil);U.hit={};U.visibleLines={}
  if not s.q then
-  local top=h>=600 and 179 or 103
-  F.label((s.request or s.queued) and 'FETCHING' or 'NO QUESTIONS',box(16,top,w-32,64),'title')
-  local body=s.status..'\n\nOpen Trivia DB / CC BY-SA 4.0. Fetch one live question; no bundled questions.'
-  pageText(body,box(16,top+88,w-32,math.min(260,math.max(40,h-112-top-88-29))),'body',true)
-  button((s.request or s.queued) and 'FETCHING' or 'FETCH QUESTION',box(16,h-80,w-32,64),'fetch',nil,true)
+  empty(s,w,h)
  elseif U.detail then
   pageText(U.detail==0 and s.q.question or s.q.question..'\n\n'..s.q.answers[U.detail],box(16,117,w-32,math.max(40,h-117-112-29)),'body')
-  footer(w,h,(U.detail==0 or s.answered) and 'BACK' or 'CHOOSE',(U.detail==0 or s.answered) and 'close-detail' or 'choose-detail')
+  if U.detail==0 or s.answered then footer(w,h,'BACK','close-detail')
+  else local r=B.footer({'Back','Choose','End'},2);hit(r[1],'close-detail');hit(r[2],'choose-detail');hit(r[3],'exit')end
  else
   -- No fabricated difficulty, pack totals, scores or records: this provider
   -- interface exposes only the current question and its checked answer.
@@ -97,5 +95,5 @@ function U.touch(x,y)
   if x>=b.x and y>=b.y and x<b.x+b.w and y<b.y+b.h then return target.kind,target.value end
  end
 end
-function U.turn(delta)U.page=math.max(1,math.min(U.pages,U.page+delta));smudge.request_update()end
+function U.turn(delta)U.retire();U.page=math.max(1,math.min(U.pages,U.page+delta));smudge.request_update()end
 return U

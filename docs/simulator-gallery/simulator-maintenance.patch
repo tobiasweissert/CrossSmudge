@@ -1,0 +1,42 @@
+--- a/src/MappedInputManager.cpp
++++ b/src/MappedInputManager.cpp
+@@ -475,9 +475,12 @@
+   if (!touchInputEnabled()) return false;
+ #ifdef SIMULATOR
+   if (simulatorTouch.pressed) return true;
+-#endif
++  float nx = 0, ny = 0;
++  return gpio.isTouchHeldAt(nx, ny);
++#else
+   if (!gpio.isTouchPressed()) return false;
+   return !gpio.supportsMultiTouch() || gpio.getTouchSnapshot().reportedCount == 1;
++#endif
+ }
+ 
+ bool MappedInputManager::wasTapInRect(const int x, const int y, const int width, const int height) const {
+--- a/src/activities/apps/lua/LuaRunner.cpp
++++ b/src/activities/apps/lua/LuaRunner.cpp
+@@ -1981,7 +1981,9 @@
+ }
+ 
+ int LuaRunner::l_getDevice(lua_State* L) {
+-#if defined(SIMULATOR)
++#if defined(SIMULATOR_DEVICE_STICKY)
++  lua_pushstring(L, "sticky");
++#elif defined(SIMULATOR)
+   lua_pushstring(L, "simulator");
+ #else
+   lua_pushstring(L, "sticky");
+--- /dev/null
++++ b/src/HalBrowserBackend.h
+@@ -0,0 +1,3 @@
++#pragma once
++// Simulator forwarding header: firmware HAL library is intentionally ignored.
++#include "../lib/hal/HalBrowserBackend.h"
+--- /dev/null
++++ b/src/simulator/BackendSimulator.cpp
+@@ -0,0 +1,4 @@
++#ifdef SIMULATOR
++#include "../../lib/hal/HalBrowserBackend.cpp"
++#include "../../lib/hal/HalLuaResources.cpp"
++#endif

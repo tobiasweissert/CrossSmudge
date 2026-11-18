@@ -74,8 +74,18 @@ function L.page(doc,anchor,width,height,delta)
 end
 function L.find(doc,query,start)
  query=query:lower();if query==''then return end
- for i=start or 1,#doc.blocks do for j,r in ipairs(doc.blocks[i].spans or {})do
-  local p=r.text:lower():find(query,1,true);if p then return{b=i,s=j,p=utf8.offset(r.text,0,p)}end
- end end
+ for i=start or 1,#doc.blocks do
+  -- The model bounds all text to 64KiB. Join only one semantic block;
+  -- folding ASCII preserves the byte coordinates of the original spans.
+  local spans=doc.blocks[i].spans or {};local parts={}
+  for j,r in ipairs(spans)do parts[j]=r.text end
+  local p=table.concat(parts):lower():find(query,1,true)
+  if p then
+   for j,r in ipairs(spans)do
+    if p<=#r.text then return{b=i,s=j,p=utf8.offset(r.text,0,p)}end
+    p=p-#r.text
+   end
+  end
+ end
 end
 return L

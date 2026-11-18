@@ -1,0 +1,7 @@
+# watertracker candidate 1.0.2 — bounded app-local repair
+
+Rollover runs before input mutations and in update; successful old-day totals archive once. Exact integer civil-day arithmetic breaks the completed-day streak after skipped days. Backward clocks retain the saved day/intake rather than duplicating or deleting it. Existing water_state_v1.dat seven fields (including old six-field records) and water_history_v1.dat four-field rows are retained without a destructive schema migration. All fourteen retained rows are paged using measured capacity at both bounds, with visible Prev/Next and physical navigation. Landscape keeps the same cup and dashboard in two columns; settings compact the same five rows and hardware instructions. Visible footer paint/touch share rectangles. No missing days are fabricated in the history.
+
+The global hidden-hardware-hint policy is unchanged. App identity, icon/sprite references and licenses are retained; no binary asset was available in this text fixture or modified.
+
+Qualification: the registered `firmware/test/lua_app_repairs/run.py` routine executes actual Lua modules/callbacks at 480x800 and 800x480 under int32/float32 and the 2 MiB ordinary-app allocator ceiling. Synthetic drawing/text metrics and in-memory save adapters establish behavior and geometric bounds, not production-font legibility, pixel parity, physical touch delivery, SD durability, device PSRAM headroom or Sticky firmware acceptance. Parent independent review, composed routine and target build remain required. No publication approval.

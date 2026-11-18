@@ -39,6 +39,11 @@ class HalFiles final : public Files {
   bool recoveryToken(unsigned index, char token[33], bool& scanOk);
 
  private:
+  // Same 1KiB I/O bound, but scheduling cost is independent of fragment size.
+  // Yield outside HAL locks after 4KiB or 1ms of I/O work, whichever comes first.
+  size_t ioBytesSinceYield_ = 0;
+  int64_t ioLastYieldUs_ = 0;
+  void cooperate(size_t bytes);
   HalFile stage_;
   HalFile reader_;
   HalFile inventory_;

@@ -1,8 +1,20 @@
 {
   "id": "dice",
-  "name": "Dice Roller",
-  "version": "1.0.0",
+  "name": "Dice",
+  "version": "1.0.2",
   "author": "Mumfee",
   "description": "Multi-polyhedral tabletop dice simulator with running history",
-  "entry": "main.lua"
+  "entry": "main.lua",
+  "files": [
+    "FONT-LICENSE.txt",
+    "dice_shapes.lua",
+    "icon.raw",
+    "main.lua",
+    "manifest.json",
+    "numeral_fonts.lua",
+    "numerals.lua",
+    "sprites/coin_heads.raw",
+    "sprites/coin_tails.raw",
+    "unified_ui.lua"
+  ]
 }

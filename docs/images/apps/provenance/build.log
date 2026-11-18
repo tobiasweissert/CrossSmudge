@@ -1,0 +1,1453 @@
+
+COMMAND ['/root/github/.host-data/crosssmudge/browser-platformio/penv/bin/platformio', 'run', '-e', 'sticky-simulator', '-j', '2']
+Processing sticky-simulator (platform: native)
+--------------------------------------------------------------------------------
+Platform Manager: Installing native
+Downloading 0% 10%
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Platform Manager: native@1.2.1 has been installed!
+Library Manager: Installing git+https://github.com/uxjulia/crossink-simulator
+git version 2.53.0
+Cloning into '/root/github/.host-data/crosssmudge/browser-platformio/.cache/tmp/pkg-installing-3os08tec'...
+Library Manager: simulator@1.0.0+sha.20f5266 has been installed!
+Library Manager: Installing symlink://freeink-sdk/libs/ui/FreeInkUI
+Library Manager: FreeInkUI@0.1.0 has been installed!
+Library Manager: Installing symlink://freeink-sdk/libs/assets/Icons
+Library Manager: Icons@1.0.0 has been installed!
+Library Manager: Installing symlink://freeink-sdk/libs/network/NearbyTransfer
+Library Manager: NearbyTransfer@1.0.0 has been installed!
+Library Manager: Installing bblanchon/ArduinoJson @ 7.4.2
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: ArduinoJson@7.4.2 has been installed!
+Library Manager: Installing ricmoo/QRCode @ ^0.0.1
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80%
+Library Manager: QRCode@0.0.1 has been installed!
+Library Manager: Installing bitbank2/PNGdec @ 1.1.6
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: PNGdec@1.1.6 has been installed!
+Library Manager: Installing git+https://github.com/bitbank2/JPEGDEC.git#86282979224c8a32fd51e091ed5a35b0c699a52b
+git version 2.53.0
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+hint:
+hint: Disable this message with "git config set advice.defaultBranchName false"
+Initialized empty Git repository in /root/github/.host-data/crosssmudge/browser-platformio/.cache/tmp/pkg-installing-3w61yro0/.git/
+From https://github.com/bitbank2/JPEGDEC
+ * branch            86282979224c8a32fd51e091ed5a35b0c699a52b -> FETCH_HEAD
+HEAD is now at 8628297 Fixed 2 issues which occur when decoding progressive images
+Library Manager: JPEGDEC@1.2.7+sha.8628297 has been installed!
+Library Manager: Installing links2004/WebSockets @ 2.7.3
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Library Manager: WebSockets@2.7.3 has been installed!
+Verbose mode can be enabled via `-v, --verbose` option
+Language              Code  Own  Fallback  Unused  Data (B)
+--------------------  ----  ---  --------  ------  --------
+English               EN    882  0         65      16064   
+العربية               AR    709  173       58      23650   
+Беларуская            BE    529  353       23      18140   
+Català                CA    584  298       23      13276   
+Valencià              CAV   565  317       18      12561   
+Čeština               CS    716  166       58      16370   
+Dansk                 DA    528  354       23      9423    
+Deutsch               DE    705  177       54      15046   
+Español               ES    706  176       58      16218   
+Suomi                 FI    517  365       23      10296   
+Français              FR    528  354       23      10338   
+עברית                 HE    521  361       17      13911   
+Magyar                HU    528  354       23      11326   
+Italiano              IT    595  287       30      12234   
+Қазақша               KK    527  355       23      17781   
+Lietuvių              LT    528  354       23      9914    
+Nederlands            NL    527  355       22      9720    
+Polski                PL    547  335       30      11045   
+Português (Brasil)    PT    705  177       58      15889   
+Português (Portugal)  PT2   799  83        63      19014   
+Română                RO    527  355       22      10803   
+Русский               RU    592  290       22      21050   
+Slovenščina           SI    528  354       23      10188   
+Slovenčina            SK    616  266       34      13825   
+Svenska               SV    581  301       22      11466   
+Türkçe                TR    527  355       22      10342   
+Українська            UK    581  301       29      21188   
+Tiếng Việt            VI    582  300       33      13629   
+
+  Total: 882  |  Used in code: 817  |  Never used: 65
+  Flash: 394,707 B strings (deduped)  +  49,392 B offset tables  =  444,099 B
+
+  Stripping 65 unused string(s) from output.
+
+Code generation complete!
+  Languages: 28
+  String keys: 817
+WARNING [git_branch.py]: git command failed (exit 128): fatal: not a git repository (or any of the parent directories): .git; short SHA suffix will be "unknown"
+WARNING [git_branch.py]: Could not read git working-tree state: Command '['git', 'status', '--porcelain', '--untracked-files=no']' returned non-zero exit status 128.; state will be "unknown"
+HomePageHtml          2863B ->   1121B gz
+FilesPageHtml       259809B ->  60635B gz
+ApplicationsPageHtml   24081B ->   6611B gz
+SettingsPageHtml     25596B ->   5741B gz
+FontsPageHtml        10723B ->   3266B gz
+StyleCss              3059B ->   1153B gz
+LogoPng                688B raw
+jszip_minJs          97630B ->  28379B gz
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ off
+Found 40 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- Crosspoint Simulator @ 1.0.0+sha.20f5266
+|-- ArduinoJson @ 7.4.2
+|-- QRCode @ 0.0.1
+|-- PNGdec @ 1.1.6
+|-- JPEGDEC @ 1.2.7+sha.8628297
+|-- Logging
+|-- Serialization
+|-- uzlib @ 2.9.8
+|-- I18n
+|-- GfxRenderer
+|-- Epub
+|-- FsHelpers
+|-- Xtc
+|-- MemoryBudget
+|-- Memory
+|-- LuaBrowser
+|-- EpdFont
+|-- LuaHttp
+|-- AppVersion
+|-- Txt
+|-- FreeInkUI @ 0.1.0
+|-- OpdsParser
+|-- Utf8
+|-- KOReaderSync
+|-- MiniBidi
+|-- DictHtmlRenderer
+|-- FileIndex
+|-- AirDrop @ 0.0.0
+|-- NearbyTransfer @ 1.0.0
+|-- Lua @ 5.4.7
+Building in release mode
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/BookmarkStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/ClippingStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/CrossPointSettings.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/CrossPointState.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/CrosscubAppDesc.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/FontInstaller.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/MappedInputManager.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/OpdsServerStore.o
+src/MappedInputManager.cpp: In member function ‘bool MappedInputManager::isScreenContactActive() const’:
+src/MappedInputManager.cpp:479:13: error: ‘class HalGPIO’ has no member named ‘isTouchPressed’; did you mean ‘isPressed’?
+  479 |   if (!gpio.isTouchPressed()) return false;
+      |             ^~~~~~~~~~~~~~
+      |             isPressed
+*** [/root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/MappedInputManager.o] Error 1
+========================= [FAILED] Took 25.95 seconds =========================
+
+Environment       Status    Duration
+----------------  --------  ------------
+sticky-simulator  FAILED    00:00:25.951
+==================== 1 failed, 0 succeeded in 00:00:25.951 ====================
+
+COMMAND ['/root/github/.host-data/crosssmudge/browser-platformio/penv/bin/platformio', 'run', '-e', 'sticky-simulator', '-j', '2']
+Processing sticky-simulator (platform: native)
+--------------------------------------------------------------------------------
+Verbose mode can be enabled via `-v, --verbose` option
+Language              Code  Own  Fallback  Unused  Data (B)
+--------------------  ----  ---  --------  ------  --------
+English               EN    882  0         65      16064   
+العربية               AR    709  173       58      23650   
+Беларуская            BE    529  353       23      18140   
+Català                CA    584  298       23      13276   
+Valencià              CAV   565  317       18      12561   
+Čeština               CS    716  166       58      16370   
+Dansk                 DA    528  354       23      9423    
+Deutsch               DE    705  177       54      15046   
+Español               ES    706  176       58      16218   
+Suomi                 FI    517  365       23      10296   
+Français              FR    528  354       23      10338   
+עברית                 HE    521  361       17      13911   
+Magyar                HU    528  354       23      11326   
+Italiano              IT    595  287       30      12234   
+Қазақша               KK    527  355       23      17781   
+Lietuvių              LT    528  354       23      9914    
+Nederlands            NL    527  355       22      9720    
+Polski                PL    547  335       30      11045   
+Português (Brasil)    PT    705  177       58      15889   
+Português (Portugal)  PT2   799  83        63      19014   
+Română                RO    527  355       22      10803   
+Русский               RU    592  290       22      21050   
+Slovenščina           SI    528  354       23      10188   
+Slovenčina            SK    616  266       34      13825   
+Svenska               SV    581  301       22      11466   
+Türkçe                TR    527  355       22      10342   
+Українська            UK    581  301       29      21188   
+Tiếng Việt            VI    582  300       33      13629   
+
+  Total: 882  |  Used in code: 817  |  Never used: 65
+  Flash: 394,707 B strings (deduped)  +  49,392 B offset tables  =  444,099 B
+
+  Stripping 65 unused string(s) from output.
+
+Code generation complete!
+  Languages: 28
+  String keys: 817
+WARNING [git_branch.py]: git command failed (exit 128): fatal: not a git repository (or any of the parent directories): .git; short SHA suffix will be "unknown"
+WARNING [git_branch.py]: Could not read git working-tree state: Command '['git', 'status', '--porcelain', '--untracked-files=no']' returned non-zero exit status 128.; state will be "unknown"
+HomePageHtml          2863B ->   1121B gz
+FilesPageHtml       259809B ->  60635B gz
+ApplicationsPageHtml   24081B ->   6611B gz
+SettingsPageHtml     25596B ->   5741B gz
+FontsPageHtml        10723B ->   3266B gz
+StyleCss              3059B ->   1153B gz
+LogoPng                688B raw
+jszip_minJs          97630B ->  28379B gz
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ off
+Found 40 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- Crosspoint Simulator @ 1.0.0+sha.20f5266
+|-- ArduinoJson @ 7.4.2
+|-- QRCode @ 0.0.1
+|-- PNGdec @ 1.1.6
+|-- JPEGDEC @ 1.2.7+sha.8628297
+|-- Logging
+|-- Serialization
+|-- uzlib @ 2.9.8
+|-- I18n
+|-- GfxRenderer
+|-- Epub
+|-- FsHelpers
+|-- Xtc
+|-- MemoryBudget
+|-- Memory
+|-- LuaBrowser
+|-- EpdFont
+|-- LuaHttp
+|-- AppVersion
+|-- Txt
+|-- FreeInkUI @ 0.1.0
+|-- OpdsParser
+|-- Utf8
+|-- KOReaderSync
+|-- MiniBidi
+|-- DictHtmlRenderer
+|-- FileIndex
+|-- AirDrop @ 0.0.0
+|-- NearbyTransfer @ 1.0.0
+|-- Lua @ 5.4.7
+Building in release mode
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/BookmarkStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/ClippingStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/CrossPointSettings.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/CrossPointState.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/CrosscubAppDesc.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/FontInstaller.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/MappedInputManager.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/OpdsServerStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/QuickActions.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/RecentBooksStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/SdCardFontSystem.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/WifiCredentialStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/Activity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/ActivityManager.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/apps/lua/BrowserImage.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/apps/lua/LuaRunner.o
+src/activities/apps/lua/LuaRunner.cpp:7:10: fatal error: HalBrowserBackend.h: No such file or directory
+
+***************************************************************************
+* Looking for HalBrowserBackend.h dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:HalBrowserBackend.h"
+* Web  > https://registry.platformio.org/search?q=header:HalBrowserBackend.h
+*
+***************************************************************************
+
+    7 | #include <HalBrowserBackend.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+*** [/root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/apps/lua/LuaRunner.o] Error 1
+========================= [FAILED] Took 38.84 seconds =========================
+
+Environment       Status    Duration
+----------------  --------  ------------
+sticky-simulator  FAILED    00:00:38.838
+==================== 1 failed, 0 succeeded in 00:00:38.838 ====================
+
+COMMAND ['/root/github/.host-data/crosssmudge/browser-platformio/penv/bin/platformio', 'run', '-e', 'sticky-simulator', '-j', '2']
+Processing sticky-simulator (platform: native)
+--------------------------------------------------------------------------------
+Verbose mode can be enabled via `-v, --verbose` option
+Language              Code  Own  Fallback  Unused  Data (B)
+--------------------  ----  ---  --------  ------  --------
+English               EN    882  0         65      16064   
+العربية               AR    709  173       58      23650   
+Беларуская            BE    529  353       23      18140   
+Català                CA    584  298       23      13276   
+Valencià              CAV   565  317       18      12561   
+Čeština               CS    716  166       58      16370   
+Dansk                 DA    528  354       23      9423    
+Deutsch               DE    705  177       54      15046   
+Español               ES    706  176       58      16218   
+Suomi                 FI    517  365       23      10296   
+Français              FR    528  354       23      10338   
+עברית                 HE    521  361       17      13911   
+Magyar                HU    528  354       23      11326   
+Italiano              IT    595  287       30      12234   
+Қазақша               KK    527  355       23      17781   
+Lietuvių              LT    528  354       23      9914    
+Nederlands            NL    527  355       22      9720    
+Polski                PL    547  335       30      11045   
+Português (Brasil)    PT    705  177       58      15889   
+Português (Portugal)  PT2   799  83        63      19014   
+Română                RO    527  355       22      10803   
+Русский               RU    592  290       22      21050   
+Slovenščina           SI    528  354       23      10188   
+Slovenčina            SK    616  266       34      13825   
+Svenska               SV    581  301       22      11466   
+Türkçe                TR    527  355       22      10342   
+Українська            UK    581  301       29      21188   
+Tiếng Việt            VI    582  300       33      13629   
+
+  Total: 882  |  Used in code: 817  |  Never used: 65
+  Flash: 394,707 B strings (deduped)  +  49,392 B offset tables  =  444,099 B
+
+  Stripping 65 unused string(s) from output.
+
+Code generation complete!
+  Languages: 28
+  String keys: 817
+WARNING [git_branch.py]: git command failed (exit 128): fatal: not a git repository (or any of the parent directories): .git; short SHA suffix will be "unknown"
+WARNING [git_branch.py]: Could not read git working-tree state: Command '['git', 'status', '--porcelain', '--untracked-files=no']' returned non-zero exit status 128.; state will be "unknown"
+HomePageHtml          2863B ->   1121B gz
+FilesPageHtml       259809B ->  60635B gz
+ApplicationsPageHtml   24081B ->   6611B gz
+SettingsPageHtml     25596B ->   5741B gz
+FontsPageHtml        10723B ->   3266B gz
+StyleCss              3059B ->   1153B gz
+LogoPng                688B raw
+jszip_minJs          97630B ->  28379B gz
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ off
+Found 40 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- Crosspoint Simulator @ 1.0.0+sha.20f5266
+|-- ArduinoJson @ 7.4.2
+|-- QRCode @ 0.0.1
+|-- PNGdec @ 1.1.6
+|-- JPEGDEC @ 1.2.7+sha.8628297
+|-- Logging
+|-- Serialization
+|-- uzlib @ 2.9.8
+|-- I18n
+|-- GfxRenderer
+|-- Epub
+|-- FsHelpers
+|-- Xtc
+|-- MemoryBudget
+|-- Memory
+|-- LuaBrowser
+|-- EpdFont
+|-- LuaHttp
+|-- AppVersion
+|-- Txt
+|-- FreeInkUI @ 0.1.0
+|-- OpdsParser
+|-- Utf8
+|-- KOReaderSync
+|-- MiniBidi
+|-- DictHtmlRenderer
+|-- FileIndex
+|-- AirDrop @ 0.0.0
+|-- NearbyTransfer @ 1.0.0
+|-- Lua @ 5.4.7
+Building in release mode
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/BookmarkStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/ClippingStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/CrossPointSettings.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/CrossPointState.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/CrosscubAppDesc.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/FontInstaller.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/MappedInputManager.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/OpdsServerStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/QuickActions.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/RecentBooksStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/SdCardFontSystem.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/WifiCredentialStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/Activity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/ActivityManager.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/apps/lua/BrowserImage.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/apps/lua/LuaRunner.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/boot_sleep/BootActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/boot_sleep/ImageFolderIndex.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/boot_sleep/SleepActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/boot_sleep/SleepCoverAssets.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/browser/OpdsBookBrowserActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/AlertActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/BookActions.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/CrashActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/FileBrowserActionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/FileBrowserActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/HomeActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/RecentBookProgress.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/RecentBooksActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/RecentBooksGridActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/SavedItemsHomeActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/network/AirDropReceiveActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/network/CalibreConnectActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/network/CrossPointWebServerActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/network/NearbyBookTransferActivity.o
+src/activities/network/CrossPointWebServerActivity.cpp: In member function ‘void CrossPointWebServerActivity::startAccessPoint()’:
+src/activities/network/CrossPointWebServerActivity.cpp:315:29: warning: argument 1 null where non-null expected [-Wnonnull]
+  315 |   if (AP_PASSWORD && strlen(AP_PASSWORD) >= 8) {
+      |                             ^~~~~~~~~~~
+In file included from /usr/include/c++/15/cstring:48,
+                 from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/Print.h:4,
+                 from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/HardwareSerial.h:6,
+                 from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/Arduino.h:35,
+                 from lib/Logging/Logging.h:3,
+                 from src/activities/Activity.h:2,
+                 from src/activities/network/NetworkModeSelectionActivity.h:5,
+                 from src/activities/network/CrossPointWebServerActivity.h:8,
+                 from src/activities/network/CrossPointWebServerActivity.cpp:1:
+/usr/include/string.h:439:15: note: in a call to function ‘size_t strlen(const char*)’ declared ‘nonnull’
+  439 | extern size_t strlen (const char *__s)
+      |               ^~~~~~
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/network/NearbyStatsSyncActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/network/NetworkModeSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/network/UsbDriveActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/network/WifiSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/BookReadingStats.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/BookStatsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/BookStatsView.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/ClipSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/ControlsOptionsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/DictionaryDefinitionActivity.o
+src/activities/reader/DictionaryDefinitionActivity.cpp: In member function ‘virtual void DictionaryDefinitionActivity::render(RenderLock&&)’:
+src/activities/reader/DictionaryDefinitionActivity.cpp:1503:46: warning: ‘%d’ directive output may be truncated writing between 1 and 10 bytes into a region of size between 4 and 14 [-Wformat-truncation=]
+ 1503 |     snprintf(pageInfo, sizeof(pageInfo), "%d/%d", currentPage + 1, totalPages);
+      |                                              ^~
+src/activities/reader/DictionaryDefinitionActivity.cpp:1503:42: note: directive argument in the range [2, 2147483647]
+ 1503 |     snprintf(pageInfo, sizeof(pageInfo), "%d/%d", currentPage + 1, totalPages);
+      |                                          ^~~~~~~
+In file included from /usr/include/stdio.h:974,
+                 from /usr/include/c++/15/cstdio:47,
+                 from /usr/include/c++/15/ext/string_conversions.h:47,
+                 from /usr/include/c++/15/bits/basic_string.h:4442,
+                 from /usr/include/c++/15/string:56,
+                 from /usr/include/c++/15/bits/locale_classes.h:42,
+                 from /usr/include/c++/15/bits/ios_base.h:43,
+                 from /usr/include/c++/15/ios:46,
+                 from /usr/include/c++/15/bits/ostream.h:43,
+                 from /usr/include/c++/15/bits/unique_ptr.h:42,
+                 from /usr/include/c++/15/bits/shared_ptr_base.h:59,
+                 from /usr/include/c++/15/bits/shared_ptr.h:53,
+                 from /usr/include/c++/15/condition_variable:47,
+                 from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/freertos/FreeRTOS.h:3,
+                 from src/activities/reader/DictionaryDefinitionActivity.h:3,
+                 from src/activities/reader/DictionaryDefinitionActivity.cpp:1:
+In function ‘int snprintf(char*, size_t, const char*, ...)’,
+    inlined from ‘virtual void DictionaryDefinitionActivity::render(RenderLock&&)’ at src/activities/reader/DictionaryDefinitionActivity.cpp:1503:13:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:68:35: note: ‘__builtin___snprintf_chk’ output between 4 and 23 bytes into a destination of size 16
+   68 |   return __builtin___snprintf_chk (__s, __n, __USE_FORTIFY_LEVEL - 1,
+      |          ~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   69 |                                    __glibc_objsize (__s), __fmt,
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   70 |                                    __va_arg_pack ());
+      |                                    ~~~~~~~~~~~~~~~~~
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/DictionarySuggestionsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/DictionaryWordSelectActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EndOfBookOptions.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubGrayscale.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubReaderActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubReaderBookmarkListActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubReaderChapterSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubReaderClippingListActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubReaderFootnotesActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubReaderMenuActivity.o
+src/activities/reader/EpubReaderClippingListActivity.cpp: In member function ‘void EpubReaderClippingListActivity::renderDetail()’:
+src/activities/reader/EpubReaderClippingListActivity.cpp:585:44: warning: ‘%d’ directive output may be truncated writing between 1 and 10 bytes into a region of size between 4 and 14 [-Wformat-truncation=]
+  585 |     snprintf(pageBuf, sizeof(pageBuf), "%d/%d", detailPage + 1, detailPageCount);
+      |                                            ^~
+src/activities/reader/EpubReaderClippingListActivity.cpp:585:40: note: directive argument in the range [2, 2147483647]
+  585 |     snprintf(pageBuf, sizeof(pageBuf), "%d/%d", detailPage + 1, detailPageCount);
+      |                                        ^~~~~~~
+In file included from /usr/include/stdio.h:974,
+                 from /usr/include/c++/15/cstdio:47,
+                 from /usr/include/c++/15/ext/string_conversions.h:47,
+                 from /usr/include/c++/15/bits/basic_string.h:4442,
+                 from /usr/include/c++/15/string:56,
+                 from /usr/include/c++/15/bits/locale_classes.h:42,
+                 from /usr/include/c++/15/bits/ios_base.h:43,
+                 from /usr/include/c++/15/ios:46,
+                 from /usr/include/c++/15/bits/ostream.h:43,
+                 from /usr/include/c++/15/bits/unique_ptr.h:42,
+                 from /usr/include/c++/15/memory:80,
+                 from freeink-sdk/libs/ui/FreeInkUI/include/FreeInkApp.h:14,
+                 from src/activities/reader/EpubReaderClippingListActivity.h:3,
+                 from src/activities/reader/EpubReaderClippingListActivity.cpp:1:
+In function ‘int snprintf(char*, size_t, const char*, ...)’,
+    inlined from ‘void EpubReaderClippingListActivity::renderDetail()’ at src/activities/reader/EpubReaderClippingListActivity.cpp:585:13:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:68:35: note: ‘__builtin___snprintf_chk’ output between 4 and 23 bytes into a destination of size 16
+   68 |   return __builtin___snprintf_chk (__s, __n, __USE_FORTIFY_LEVEL - 1,
+      |          ~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   69 |                                    __glibc_objsize (__s), __fmt,
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   70 |                                    __va_arg_pack ());
+      |                                    ~~~~~~~~~~~~~~~~~
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubReaderPercentSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubReaderTouchMenuActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/GlobalReadingStats.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/KOReaderSyncActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/LookedUpWordsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/NearbyBookPositionSyncActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/QrDisplayActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/ReaderActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/ReaderOptionsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/ReadingStatsUtils.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/StatsBackup.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/TxtReaderActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/XtcReaderActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/XtcReaderChapterSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/XtcReaderMenuActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/BackupStatsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/ButtonRemapActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/ClearCacheActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/ClockOffsetActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/ClockSyncActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/DictionarySelectActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/FontDownloadActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/FontSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/FrontlightTimePickerActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/KOReaderAuthActivity.o
+src/activities/settings/FrontlightTimePickerActivity.cpp: In member function ‘virtual void FrontlightTimePickerActivity::render(RenderLock&&)’:
+src/activities/settings/FrontlightTimePickerActivity.cpp:288:50: warning: ‘__builtin___snprintf_chk’ output may be truncated before the last format character [-Wformat-truncation=]
+  288 |     snprintf(minuteText, sizeof(minuteText), "%u_", static_cast<unsigned>(numericEntry));
+      |                                                  ^
+In file included from /usr/include/stdio.h:974,
+                 from /usr/include/c++/15/cstdio:47,
+                 from /usr/include/c++/15/ext/string_conversions.h:47,
+                 from /usr/include/c++/15/bits/basic_string.h:4442,
+                 from /usr/include/c++/15/string:56,
+                 from /usr/include/c++/15/bits/locale_classes.h:42,
+                 from /usr/include/c++/15/bits/ios_base.h:43,
+                 from /usr/include/c++/15/ios:46,
+                 from /usr/include/c++/15/istream:42,
+                 from /usr/include/c++/15/sstream:42,
+                 from /usr/include/c++/15/chrono:51,
+                 from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/Arduino.h:3,
+                 from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/HalDisplay.h:2,
+                 from lib/GfxRenderer/GfxRenderer.h:4,
+                 from freeink-sdk/libs/ui/FreeInkUI/include/FreeInkUIGfxRenderer.h:22,
+                 from src/activities/settings/FrontlightTimePickerActivity.h:3,
+                 from src/activities/settings/FrontlightTimePickerActivity.cpp:1:
+In function ‘int snprintf(char*, size_t, const char*, ...)’,
+    inlined from ‘virtual void FrontlightTimePickerActivity::render(RenderLock&&)’ at src/activities/settings/FrontlightTimePickerActivity.cpp:288:13:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:68:35: note: ‘__builtin___snprintf_chk’ output between 3 and 5 bytes into a destination of size 4
+   68 |   return __builtin___snprintf_chk (__s, __n, __USE_FORTIFY_LEVEL - 1,
+      |          ~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   69 |                                    __glibc_objsize (__s), __fmt,
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   70 |                                    __va_arg_pack ());
+      |                                    ~~~~~~~~~~~~~~~~~
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/KOReaderSettingsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/KeyboardLayoutsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/OpdsServerListActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/OpdsSettingsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/OtaUpdateActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/QuickActionsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/SdFirmwareUpdateActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/SettingsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/StatusBarSettingsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/util/BmpViewerActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/util/ConfirmationActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/util/FrontlightPanelActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/util/FullScreenMessageActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/util/IntervalSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/util/KeyboardEntryActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/util/KeyboardLayoutSet.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/util/OptionSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/clippings/ClipTextBuilder.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/clippings/ClippingsManager.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/CompactHeader.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/HeaderDate.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/TouchActionButtons.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/TouchHeaderBackButton.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/TouchRegistry.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/UITheme.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/themes/BaseTheme.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/themes/dashboard/DashboardTheme.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/themes/lyra/Lyra3CoversTheme.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/themes/lyra/LyraCarouselTheme.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/themes/lyra/LyraTheme.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/themes/minimal/MinimalTheme.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/themes/roundedraff/RoundedRaffTheme.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/main.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/network/CrossPointWebServer.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/network/HttpDownloader.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/network/UsbSerialFileTransfer.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/network/WebDAVHandler.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/network/lua_http/HttpSimulator.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/platform/UsbSerialJtagHandoff.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/simulator/BackendSimulator.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/simulator/GalleryCapture.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/simulator/SimulatorHomeKeyInput.o
+In file included from /root/.hermes/cache/scratch/crosscub-gallery-sdl/extracted/usr/include/SDL2/SDL_stdinc.h:33,
+                 from /root/.hermes/cache/scratch/crosscub-gallery-sdl/extracted/usr/include/SDL2/SDL_main.h:25,
+                 from /root/.hermes/cache/scratch/crosscub-gallery-sdl/extracted/usr/include/SDL2/SDL.h:31,
+                 from src/simulator/SimulatorHomeKeyInput.cpp:5:
+/root/.hermes/cache/scratch/crosscub-gallery-sdl/extracted/usr/include/SDL2/SDL_config.h:4:10: fatal error: SDL2/_real_SDL_config.h: No such file or directory
+    4 | #include <SDL2/_real_SDL_config.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+*** [/root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/simulator/SimulatorHomeKeyInput.o] Error 1
+In file included from src/simulator/GalleryCapture.cpp:9:
+src/activities/apps/lua/LuaAppActivity.h: In member function ‘void LuaAppActivityAdapter<Runner>::renderError(const char*)’:
+src/activities/apps/lua/LuaAppActivity.h:307:50: error: ‘STR_BACK’ was not declared in this scope [-Wtemplate-body]
+  307 |     const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "", "");
+      |                                                  ^~~~~~~~
+src/activities/apps/lua/LuaAppActivity.h:307:47: error: there are no arguments to ‘tr’ that depend on a template parameter, so a declaration of ‘tr’ must be available [-Wtemplate-body]
+  307 |     const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "", "");
+      |                                               ^~
+src/activities/apps/lua/LuaAppActivity.h:307:47: note: (if you use ‘-fpermissive’, G++ will accept your code, but allowing the use of an undeclared name is deprecated)
+src/activities/apps/lua/LuaAppActivity.h:307:64: error: ‘STR_SELECT’ was not declared in this scope [-Wtemplate-body]
+  307 |     const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "", "");
+      |                                                                ^~~~~~~~~~
+src/activities/apps/lua/LuaAppActivity.h:307:61: error: there are no arguments to ‘tr’ that depend on a template parameter, so a declaration of ‘tr’ must be available [-Wtemplate-body]
+  307 |     const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "", "");
+      |                                                             ^~
+src/activities/apps/lua/LuaAppActivity.h: In instantiation of ‘void LuaAppActivityAdapter<Runner>::renderError(const char*) [with Runner = ink::LuaRunner]’:
+src/activities/apps/lua/LuaAppActivity.h:58:7:   required from ‘void LuaAppActivityAdapter<Runner>::onEnter() [with Runner = ink::LuaRunner]’
+   58 |       renderError(err.empty() ? "Failed to initialize Lua VM" : err.c_str());
+      |       ^~~~~~~~~~~
+src/activities/apps/lua/LuaAppActivity.h:40:8:   required from here
+   40 |   void onEnter() override {
+      |        ^~~~~~~
+src/activities/apps/lua/LuaAppActivity.h:307:58: error: ‘tr’ was not declared in this scope; did you mean ‘tm’?
+  307 |     const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "", "");
+      |                                                          ^
+      |                                                          tm
+src/activities/apps/lua/LuaAppActivity.h:307:74: error: ‘tr’ was not declared in this scope, and no declarations were found by argument-dependent lookup at the point of instantiation
+  307 |     const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "", "");
+      |                                                                          ^
+src/activities/apps/lua/LuaAppActivity.h:307:58: note: ‘tr’ declared here, later in the translation unit
+  307 |     const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), "", "");
+      |                                                          ^
+*** [/root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/simulator/GalleryCapture.o] Error 1
+========================= [FAILED] Took 292.95 seconds =========================
+
+Environment       Status    Duration
+----------------  --------  ------------
+sticky-simulator  FAILED    00:04:52.951
+==================== 1 failed, 0 succeeded in 00:04:52.951 ====================
+
+COMMAND ['/root/github/.host-data/crosssmudge/browser-platformio/penv/bin/platformio', 'run', '-e', 'sticky-simulator', '-j', '2']
+Processing sticky-simulator (platform: native)
+--------------------------------------------------------------------------------
+Verbose mode can be enabled via `-v, --verbose` option
+Language              Code  Own  Fallback  Unused  Data (B)
+--------------------  ----  ---  --------  ------  --------
+English               EN    882  0         65      16064   
+العربية               AR    709  173       58      23650   
+Беларуская            BE    529  353       23      18140   
+Català                CA    584  298       23      13276   
+Valencià              CAV   565  317       18      12561   
+Čeština               CS    716  166       58      16370   
+Dansk                 DA    528  354       23      9423    
+Deutsch               DE    705  177       54      15046   
+Español               ES    706  176       58      16218   
+Suomi                 FI    517  365       23      10296   
+Français              FR    528  354       23      10338   
+עברית                 HE    521  361       17      13911   
+Magyar                HU    528  354       23      11326   
+Italiano              IT    595  287       30      12234   
+Қазақша               KK    527  355       23      17781   
+Lietuvių              LT    528  354       23      9914    
+Nederlands            NL    527  355       22      9720    
+Polski                PL    547  335       30      11045   
+Português (Brasil)    PT    705  177       58      15889   
+Português (Portugal)  PT2   799  83        63      19014   
+Română                RO    527  355       22      10803   
+Русский               RU    592  290       22      21050   
+Slovenščina           SI    528  354       23      10188   
+Slovenčina            SK    616  266       34      13825   
+Svenska               SV    581  301       22      11466   
+Türkçe                TR    527  355       22      10342   
+Українська            UK    581  301       29      21188   
+Tiếng Việt            VI    582  300       33      13629   
+
+  Total: 882  |  Used in code: 817  |  Never used: 65
+  Flash: 394,707 B strings (deduped)  +  49,392 B offset tables  =  444,099 B
+
+  Stripping 65 unused string(s) from output.
+
+Code generation complete!
+  Languages: 28
+  String keys: 817
+WARNING [git_branch.py]: git command failed (exit 128): fatal: not a git repository (or any of the parent directories): .git; short SHA suffix will be "unknown"
+WARNING [git_branch.py]: Could not read git working-tree state: Command '['git', 'status', '--porcelain', '--untracked-files=no']' returned non-zero exit status 128.; state will be "unknown"
+HomePageHtml          2863B ->   1121B gz
+FilesPageHtml       259809B ->  60635B gz
+ApplicationsPageHtml   24081B ->   6611B gz
+SettingsPageHtml     25596B ->   5741B gz
+FontsPageHtml        10723B ->   3266B gz
+StyleCss              3059B ->   1153B gz
+LogoPng                688B raw
+jszip_minJs          97630B ->  28379B gz
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ off
+Found 40 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- Crosspoint Simulator @ 1.0.0+sha.20f5266
+|-- ArduinoJson @ 7.4.2
+|-- QRCode @ 0.0.1
+|-- PNGdec @ 1.1.6
+|-- JPEGDEC @ 1.2.7+sha.8628297
+|-- Logging
+|-- Serialization
+|-- uzlib @ 2.9.8
+|-- I18n
+|-- GfxRenderer
+|-- Epub
+|-- FsHelpers
+|-- Xtc
+|-- MemoryBudget
+|-- Memory
+|-- LuaBrowser
+|-- EpdFont
+|-- LuaHttp
+|-- AppVersion
+|-- Txt
+|-- FreeInkUI @ 0.1.0
+|-- OpdsParser
+|-- Utf8
+|-- KOReaderSync
+|-- MiniBidi
+|-- DictHtmlRenderer
+|-- FileIndex
+|-- AirDrop @ 0.0.0
+|-- NearbyTransfer @ 1.0.0
+|-- Lua @ 5.4.7
+Building in release mode
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/BookmarkStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/ClippingStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/CrossPointSettings.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/CrossPointState.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/CrosscubAppDesc.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/FontInstaller.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/MappedInputManager.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/OpdsServerStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/QuickActions.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/RecentBooksStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/SdCardFontSystem.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/WifiCredentialStore.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/Activity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/ActivityManager.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/apps/lua/BrowserImage.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/apps/lua/LuaRunner.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/boot_sleep/BootActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/boot_sleep/ImageFolderIndex.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/boot_sleep/SleepActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/boot_sleep/SleepCoverAssets.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/browser/OpdsBookBrowserActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/AlertActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/BookActions.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/CrashActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/FileBrowserActionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/FileBrowserActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/HomeActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/RecentBookProgress.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/RecentBooksActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/RecentBooksGridActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/home/SavedItemsHomeActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/network/AirDropReceiveActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/network/CalibreConnectActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/network/CrossPointWebServerActivity.o
+src/activities/network/CrossPointWebServerActivity.cpp: In member function ‘void CrossPointWebServerActivity::startAccessPoint()’:
+src/activities/network/CrossPointWebServerActivity.cpp:315:29: warning: argument 1 null where non-null expected [-Wnonnull]
+  315 |   if (AP_PASSWORD && strlen(AP_PASSWORD) >= 8) {
+      |                             ^~~~~~~~~~~
+In file included from /usr/include/c++/15/cstring:48,
+                 from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/Print.h:4,
+                 from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/HardwareSerial.h:6,
+                 from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/Arduino.h:35,
+                 from lib/Logging/Logging.h:3,
+                 from src/activities/Activity.h:2,
+                 from src/activities/network/NetworkModeSelectionActivity.h:5,
+                 from src/activities/network/CrossPointWebServerActivity.h:8,
+                 from src/activities/network/CrossPointWebServerActivity.cpp:1:
+/usr/include/string.h:439:15: note: in a call to function ‘size_t strlen(const char*)’ declared ‘nonnull’
+  439 | extern size_t strlen (const char *__s)
+      |               ^~~~~~
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/network/NearbyBookTransferActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/network/NearbyStatsSyncActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/network/NetworkModeSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/network/UsbDriveActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/network/WifiSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/BookReadingStats.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/BookStatsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/BookStatsView.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/ClipSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/ControlsOptionsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/DictionaryDefinitionActivity.o
+src/activities/reader/DictionaryDefinitionActivity.cpp: In member function ‘virtual void DictionaryDefinitionActivity::render(RenderLock&&)’:
+src/activities/reader/DictionaryDefinitionActivity.cpp:1503:46: warning: ‘%d’ directive output may be truncated writing between 1 and 10 bytes into a region of size between 4 and 14 [-Wformat-truncation=]
+ 1503 |     snprintf(pageInfo, sizeof(pageInfo), "%d/%d", currentPage + 1, totalPages);
+      |                                              ^~
+src/activities/reader/DictionaryDefinitionActivity.cpp:1503:42: note: directive argument in the range [2, 2147483647]
+ 1503 |     snprintf(pageInfo, sizeof(pageInfo), "%d/%d", currentPage + 1, totalPages);
+      |                                          ^~~~~~~
+In file included from /usr/include/stdio.h:974,
+                 from /usr/include/c++/15/cstdio:47,
+                 from /usr/include/c++/15/ext/string_conversions.h:47,
+                 from /usr/include/c++/15/bits/basic_string.h:4442,
+                 from /usr/include/c++/15/string:56,
+                 from /usr/include/c++/15/bits/locale_classes.h:42,
+                 from /usr/include/c++/15/bits/ios_base.h:43,
+                 from /usr/include/c++/15/ios:46,
+                 from /usr/include/c++/15/bits/ostream.h:43,
+                 from /usr/include/c++/15/bits/unique_ptr.h:42,
+                 from /usr/include/c++/15/bits/shared_ptr_base.h:59,
+                 from /usr/include/c++/15/bits/shared_ptr.h:53,
+                 from /usr/include/c++/15/condition_variable:47,
+                 from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/freertos/FreeRTOS.h:3,
+                 from src/activities/reader/DictionaryDefinitionActivity.h:3,
+                 from src/activities/reader/DictionaryDefinitionActivity.cpp:1:
+In function ‘int snprintf(char*, size_t, const char*, ...)’,
+    inlined from ‘virtual void DictionaryDefinitionActivity::render(RenderLock&&)’ at src/activities/reader/DictionaryDefinitionActivity.cpp:1503:13:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:68:35: note: ‘__builtin___snprintf_chk’ output between 4 and 23 bytes into a destination of size 16
+   68 |   return __builtin___snprintf_chk (__s, __n, __USE_FORTIFY_LEVEL - 1,
+      |          ~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   69 |                                    __glibc_objsize (__s), __fmt,
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   70 |                                    __va_arg_pack ());
+      |                                    ~~~~~~~~~~~~~~~~~
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/DictionarySuggestionsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/DictionaryWordSelectActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EndOfBookOptions.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubGrayscale.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubReaderActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubReaderBookmarkListActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubReaderChapterSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubReaderClippingListActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubReaderFootnotesActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubReaderMenuActivity.o
+src/activities/reader/EpubReaderClippingListActivity.cpp: In member function ‘void EpubReaderClippingListActivity::renderDetail()’:
+src/activities/reader/EpubReaderClippingListActivity.cpp:585:44: warning: ‘%d’ directive output may be truncated writing between 1 and 10 bytes into a region of size between 4 and 14 [-Wformat-truncation=]
+  585 |     snprintf(pageBuf, sizeof(pageBuf), "%d/%d", detailPage + 1, detailPageCount);
+      |                                            ^~
+src/activities/reader/EpubReaderClippingListActivity.cpp:585:40: note: directive argument in the range [2, 2147483647]
+  585 |     snprintf(pageBuf, sizeof(pageBuf), "%d/%d", detailPage + 1, detailPageCount);
+      |                                        ^~~~~~~
+In file included from /usr/include/stdio.h:974,
+                 from /usr/include/c++/15/cstdio:47,
+                 from /usr/include/c++/15/ext/string_conversions.h:47,
+                 from /usr/include/c++/15/bits/basic_string.h:4442,
+                 from /usr/include/c++/15/string:56,
+                 from /usr/include/c++/15/bits/locale_classes.h:42,
+                 from /usr/include/c++/15/bits/ios_base.h:43,
+                 from /usr/include/c++/15/ios:46,
+                 from /usr/include/c++/15/bits/ostream.h:43,
+                 from /usr/include/c++/15/bits/unique_ptr.h:42,
+                 from /usr/include/c++/15/memory:80,
+                 from freeink-sdk/libs/ui/FreeInkUI/include/FreeInkApp.h:14,
+                 from src/activities/reader/EpubReaderClippingListActivity.h:3,
+                 from src/activities/reader/EpubReaderClippingListActivity.cpp:1:
+In function ‘int snprintf(char*, size_t, const char*, ...)’,
+    inlined from ‘void EpubReaderClippingListActivity::renderDetail()’ at src/activities/reader/EpubReaderClippingListActivity.cpp:585:13:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:68:35: note: ‘__builtin___snprintf_chk’ output between 4 and 23 bytes into a destination of size 16
+   68 |   return __builtin___snprintf_chk (__s, __n, __USE_FORTIFY_LEVEL - 1,
+      |          ~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   69 |                                    __glibc_objsize (__s), __fmt,
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   70 |                                    __va_arg_pack ());
+      |                                    ~~~~~~~~~~~~~~~~~
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubReaderPercentSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/EpubReaderTouchMenuActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/GlobalReadingStats.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/KOReaderSyncActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/LookedUpWordsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/NearbyBookPositionSyncActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/QrDisplayActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/ReaderActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/ReaderOptionsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/ReadingStatsUtils.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/StatsBackup.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/TxtReaderActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/XtcReaderActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/XtcReaderChapterSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/reader/XtcReaderMenuActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/BackupStatsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/ButtonRemapActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/ClearCacheActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/ClockOffsetActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/ClockSyncActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/DictionarySelectActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/FontDownloadActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/FontSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/FrontlightTimePickerActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/KOReaderAuthActivity.o
+src/activities/settings/FrontlightTimePickerActivity.cpp: In member function ‘virtual void FrontlightTimePickerActivity::render(RenderLock&&)’:
+src/activities/settings/FrontlightTimePickerActivity.cpp:288:50: warning: ‘__builtin___snprintf_chk’ output may be truncated before the last format character [-Wformat-truncation=]
+  288 |     snprintf(minuteText, sizeof(minuteText), "%u_", static_cast<unsigned>(numericEntry));
+      |                                                  ^
+In file included from /usr/include/stdio.h:974,
+                 from /usr/include/c++/15/cstdio:47,
+                 from /usr/include/c++/15/ext/string_conversions.h:47,
+                 from /usr/include/c++/15/bits/basic_string.h:4442,
+                 from /usr/include/c++/15/string:56,
+                 from /usr/include/c++/15/bits/locale_classes.h:42,
+                 from /usr/include/c++/15/bits/ios_base.h:43,
+                 from /usr/include/c++/15/ios:46,
+                 from /usr/include/c++/15/istream:42,
+                 from /usr/include/c++/15/sstream:42,
+                 from /usr/include/c++/15/chrono:51,
+                 from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/Arduino.h:3,
+                 from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/HalDisplay.h:2,
+                 from lib/GfxRenderer/GfxRenderer.h:4,
+                 from freeink-sdk/libs/ui/FreeInkUI/include/FreeInkUIGfxRenderer.h:22,
+                 from src/activities/settings/FrontlightTimePickerActivity.h:3,
+                 from src/activities/settings/FrontlightTimePickerActivity.cpp:1:
+In function ‘int snprintf(char*, size_t, const char*, ...)’,
+    inlined from ‘virtual void FrontlightTimePickerActivity::render(RenderLock&&)’ at src/activities/settings/FrontlightTimePickerActivity.cpp:288:13:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:68:35: note: ‘__builtin___snprintf_chk’ output between 3 and 5 bytes into a destination of size 4
+   68 |   return __builtin___snprintf_chk (__s, __n, __USE_FORTIFY_LEVEL - 1,
+      |          ~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   69 |                                    __glibc_objsize (__s), __fmt,
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   70 |                                    __va_arg_pack ());
+      |                                    ~~~~~~~~~~~~~~~~~
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/KOReaderSettingsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/KeyboardLayoutsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/OpdsServerListActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/OpdsSettingsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/OtaUpdateActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/QuickActionsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/SdFirmwareUpdateActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/SettingsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/settings/StatusBarSettingsActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/util/BmpViewerActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/util/ConfirmationActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/util/FrontlightPanelActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/util/FullScreenMessageActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/util/IntervalSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/util/KeyboardEntryActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/util/KeyboardLayoutSet.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/util/OptionSelectionActivity.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/clippings/ClipTextBuilder.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/clippings/ClippingsManager.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/CompactHeader.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/HeaderDate.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/TouchActionButtons.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/TouchHeaderBackButton.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/TouchRegistry.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/UITheme.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/themes/BaseTheme.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/themes/dashboard/DashboardTheme.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/themes/lyra/Lyra3CoversTheme.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/themes/lyra/LyraCarouselTheme.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/themes/lyra/LyraTheme.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/themes/minimal/MinimalTheme.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/components/themes/roundedraff/RoundedRaffTheme.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/main.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/network/CrossPointWebServer.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/network/HttpDownloader.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/network/UsbSerialFileTransfer.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/network/WebDAVHandler.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/network/lua_http/HttpSimulator.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/platform/UsbSerialJtagHandoff.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/simulator/BackendSimulator.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/simulator/GalleryCapture.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/simulator/SimulatorHomeKeyInput.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/simulator/SimulatorSmokeTest.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/util/BatteryDiagnosticLog.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/util/BookCacheUtils.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/util/BookMoveUtils.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/util/ButtonNavigator.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/util/DictLayout.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/util/Dictionary.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/util/DictionaryLookupController.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/util/DictionaryLookupWorker.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/util/DictionaryRegistry.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/util/LookupHistory.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/util/NextBookFinder.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/util/QrUtils.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/util/ScreenshotUtil.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/util/StringUtils.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/util/UrlUtils.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/util/WordSelectNavigator.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib39b/Utf8/Utf8.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib39b/libUtf8.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib39b/libUtf8.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libc3f/uzlib/tinflate.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libc3f/uzlib/uzlib_checksums.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libc3f/libuzlib.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libc3f/libuzlib.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib60a/InflateReader/InflateReader.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib60a/libInflateReader.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib60a/libInflateReader.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libdeb/Logging/Logging.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libcd7/Memory/BuildScratch.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libcd7/libMemory.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libcd7/libMemory.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libd1f/EpdFont/EpdFont.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libdeb/libLogging.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libdeb/libLogging.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libd1f/EpdFont/EpdFontFamily.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libd1f/EpdFont/FontDecompressor.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libd1f/EpdFont/SdCardFont.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libd1f/EpdFont/SdCardFontManager.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libd1f/EpdFont/SdCardFontRegistry.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib72b/MiniBidi/BidiUtils.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib72b/MiniBidi/minibidi.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libd1f/libEpdFont.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libd1f/libEpdFont.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib172/GfxRenderer/Bitmap.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib72b/libMiniBidi.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib72b/libMiniBidi.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib172/GfxRenderer/BitmapHelpers.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib172/GfxRenderer/FontCacheManager.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib172/GfxRenderer/GfxRenderer.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/CrossPointWebServer.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/ESP.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/HalClock.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib172/libGfxRenderer.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib172/libGfxRenderer.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/HalDisplay.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/HalFrontlight.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/HalGPIO.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/HalPowerManager.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/HalStorage.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/HalSystem.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/HalTiltSensor.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/NetworkClient.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/SecureClient.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/SimulatorImageDecode.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/SimulatorLifecycle.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/SimulatorStackCheck.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/WebServer.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/WebSocketsServer.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/WiFiClient.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/firmware_link_stubs.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/qrcode.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/simulator_firmware.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/simulator_main.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/simulator/simulator_ota.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libd5e/QRCode/qrcode.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libd5e/libQRCode.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libd5e/libQRCode.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib337/PNGdec/PNGdec.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/libsimulator.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfe7/libsimulator.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib337/PNGdec/adler32.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib337/PNGdec/crc32.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib337/PNGdec/infback.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib337/PNGdec/inffast.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib337/PNGdec/inflate.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib337/PNGdec/inftrees.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib337/PNGdec/s3_simd_rgb565.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib337/PNGdec/zutil.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/liba55/JPEGDEC/JPEGDEC.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib337/libPNGdec.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib337/libPNGdec.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/liba55/JPEGDEC/s3_simd_420.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/liba55/JPEGDEC/s3_simd_444.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/liba55/JPEGDEC/s3_simd_dequant.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib29a/Serialization/ObfuscationUtils.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib29a/Serialization/PersistableStore.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/liba55/libJPEGDEC.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/liba55/libJPEGDEC.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libcd0/I18n/I18n.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libcd0/I18n/I18nStrings.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libcd0/libI18n.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libcd0/libI18n.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libb9a/FsHelpers/FsHelpers.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libb9a/FsHelpers/NaturalSort.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib29a/libSerialization.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib29a/libSerialization.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libb06/miniz/InflateStream.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libb9a/libFsHelpers.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libb9a/libFsHelpers.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libb06/miniz/miniz_impl.o
+In file included from lib/miniz/src/miniz_impl.c:4:
+lib/miniz/src/MinizConfig.h:13:9: warning: ‘MINIZ_NO_ZLIB_COMPATIBLE_NAMES’ redefined
+   13 | #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+<command-line>: note: this is the location of the previous definition
+In file included from lib/miniz/src/InflateStream.cpp:10:
+lib/miniz/src/MinizConfig.h:13:9: warning: ‘MINIZ_NO_ZLIB_COMPATIBLE_NAMES’ redefined
+   13 | #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+<command-line>: note: this is the location of the previous definition
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libb33/ZipFile/ZipFile.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libb06/libminiz.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libb06/libminiz.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libef6/expat/xmlparse.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libb33/libZipFile.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libb33/libZipFile.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libef6/expat/xmlrole.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libef6/expat/xmltok.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib900/JpegToBmpConverter/JpegToBmpConverter.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libef6/libexpat.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libef6/libexpat.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib316/PngToBmpConverter/PngToBmpConverter.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib900/libJpegToBmpConverter.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib900/libJpegToBmpConverter.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib316/libPngToBmpConverter.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib316/libPngToBmpConverter.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/BookMetadataCache.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/Page.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/ParsedText.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/Section.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/blocks/ImageBlock.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/blocks/TextBlock.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/converters/ImageDecoderFactory.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/converters/ImageDimsProbe.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/converters/ImageToFramebufferDecoder.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/converters/JpegToFramebufferConverter.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/converters/PngToFramebufferConverter.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/css/CssParser.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/htmlEntities.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/hyphenation/HyphenationCommon.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/hyphenation/Hyphenator.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/hyphenation/LanguageRegistry.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/hyphenation/LiangHyphenation.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/image/PxcV2.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/parsers/ChapterHtmlSlimParser.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/parsers/ContainerParser.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/parsers/ContentOpfParser.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/parsers/PreviewBlockLocator.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/parsers/TocNavParser.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/parsers/TocNcxParser.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/Epub/Epub/tables/CompactTableLayout.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73d/Xtc/Xtc.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/libEpub.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib790/libEpub.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73d/Xtc/Xtc/XtcParser.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lapi.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lauxlib.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lbaselib.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lcode.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lcorolib.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lctype.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/ldblib.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73d/libXtc.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73d/libXtc.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/ldebug.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/ldo.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/ldump.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lfunc.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lgc.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/linit.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/liolib.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/llex.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lmathlib.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lmem.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/loadlib.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lobject.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lopcodes.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/loslib.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lparser.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lstate.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lstring.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lstrlib.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/ltable.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/ltablib.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/ltm.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lundump.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lutf8lib.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lvm.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/Lua/lzio.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/LuaHttp/BackendConfig.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/LuaHttp/HttpCore.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/libLua.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/libLua.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/LuaHttp/HttpGzip.o
+In file included from lib/LuaHttp/HttpGzip.cpp:2:
+lib/miniz/src/MinizConfig.h:13:9: warning: ‘MINIZ_NO_ZLIB_COMPATIBLE_NAMES’ redefined
+   13 | #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+<command-line>: note: this is the location of the previous definition
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/LuaHttp/LuaHttp.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib183/Txt/Txt.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/libLuaHttp.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/libLuaHttp.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib83d/FreeInkUI/FreeInkUI.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib83d/libFreeInkUI.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib83d/libFreeInkUI.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib54e/OpdsParser/OpdsParser.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib183/libTxt.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib183/libTxt.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib54e/OpdsParser/OpdsStream.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libca6/KOReaderSync/ChapterXPathResolver.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib54e/libOpdsParser.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib54e/libOpdsParser.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libca6/KOReaderSync/KOReaderCredentialStore.o
+In file included from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/MD5Builder.h:6,
+                 from lib/KOReaderSync/KOReaderCredentialStore.cpp:4:
+/root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/MD5Builder_linux.h: In member function ‘void MD5Builder::begin()’:
+/root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/MD5Builder_linux.h:25:13: warning: ‘int MD5_Init(MD5_CTX*)’ is deprecated: Since OpenSSL 3.0 [-Wdeprecated-declarations]
+   25 |     MD5_Init(&ctx_);
+      |     ~~~~~~~~^~~~~~~
+In file included from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/MD5Builder_linux.h:12:
+/usr/include/openssl/md5.h:49:27: note: declared here
+   49 | OSSL_DEPRECATEDIN_3_0 int MD5_Init(MD5_CTX *c);
+      |                           ^~~~~~~~
+/root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/MD5Builder_linux.h: In member function ‘void MD5Builder::add(const uint8_t*, size_t)’:
+/root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/MD5Builder_linux.h:33:15: warning: ‘int MD5_Update(MD5_CTX*, const void*, size_t)’ is deprecated: Since OpenSSL 3.0 [-Wdeprecated-declarations]
+   33 |     MD5_Update(&ctx_, data, len);
+      |     ~~~~~~~~~~^~~~~~~~~~~~~~~~~~
+/usr/include/openssl/md5.h:50:27: note: declared here
+   50 | OSSL_DEPRECATEDIN_3_0 int MD5_Update(MD5_CTX *c, const void *data, size_t len);
+      |                           ^~~~~~~~~~
+/root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/MD5Builder_linux.h: In member function ‘void MD5Builder::calculate()’:
+/root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/MD5Builder_linux.h:46:14: warning: ‘int MD5_Final(unsigned char*, MD5_CTX*)’ is deprecated: Since OpenSSL 3.0 [-Wdeprecated-declarations]
+   46 |     MD5_Final(digest_, &ctx_);
+      |     ~~~~~~~~~^~~~~~~~~~~~~~~~
+/usr/include/openssl/md5.h:51:27: note: declared here
+   51 | OSSL_DEPRECATEDIN_3_0 int MD5_Final(unsigned char *md, MD5_CTX *c);
+      |                           ^~~~~~~~~
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libca6/KOReaderSync/KOReaderDocumentId.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libca6/KOReaderSync/KOReaderSyncClient.o
+In file included from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/MD5Builder.h:6,
+                 from lib/KOReaderSync/KOReaderDocumentId.cpp:5:
+/root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/MD5Builder_linux.h: In member function ‘void MD5Builder::begin()’:
+/root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/MD5Builder_linux.h:25:13: warning: ‘int MD5_Init(MD5_CTX*)’ is deprecated: Since OpenSSL 3.0 [-Wdeprecated-declarations]
+   25 |     MD5_Init(&ctx_);
+      |     ~~~~~~~~^~~~~~~
+In file included from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/MD5Builder_linux.h:12:
+/usr/include/openssl/md5.h:49:27: note: declared here
+   49 | OSSL_DEPRECATEDIN_3_0 int MD5_Init(MD5_CTX *c);
+      |                           ^~~~~~~~
+/root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/MD5Builder_linux.h: In member function ‘void MD5Builder::add(const uint8_t*, size_t)’:
+/root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/MD5Builder_linux.h:33:15: warning: ‘int MD5_Update(MD5_CTX*, const void*, size_t)’ is deprecated: Since OpenSSL 3.0 [-Wdeprecated-declarations]
+   33 |     MD5_Update(&ctx_, data, len);
+      |     ~~~~~~~~~~^~~~~~~~~~~~~~~~~~
+/usr/include/openssl/md5.h:50:27: note: declared here
+   50 | OSSL_DEPRECATEDIN_3_0 int MD5_Update(MD5_CTX *c, const void *data, size_t len);
+      |                           ^~~~~~~~~~
+/root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/MD5Builder_linux.h: In member function ‘void MD5Builder::calculate()’:
+/root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/MD5Builder_linux.h:46:14: warning: ‘int MD5_Final(unsigned char*, MD5_CTX*)’ is deprecated: Since OpenSSL 3.0 [-Wdeprecated-declarations]
+   46 |     MD5_Final(digest_, &ctx_);
+      |     ~~~~~~~~~^~~~~~~~~~~~~~~~
+/usr/include/openssl/md5.h:51:27: note: declared here
+   51 | OSSL_DEPRECATEDIN_3_0 int MD5_Final(unsigned char *md, MD5_CTX *c);
+      |                           ^~~~~~~~~
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libca6/KOReaderSync/ProgressMapper.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libd4e/DictHtmlRenderer/DictHtmlRenderer.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libca6/libKOReaderSync.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libca6/libKOReaderSync.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib553/FileIndex/FileIndex.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libd4e/libDictHtmlRenderer.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libd4e/libDictHtmlRenderer.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib04e/AirDrop/browser/BrowserLaunch.o
+lib/FileIndex/FileIndex.cpp: In member function ‘bool FileIndex::build(const char*, AcceptFn, uint32_t, uint32_t, uint32_t)’:
+lib/FileIndex/FileIndex.cpp:219:47: warning: ‘.tmp’ directive output may be truncated writing 4 bytes into a region of size between 1 and 64 [-Wformat-truncation=]
+  219 |   snprintf(bs.tmpPath, sizeof(bs.tmpPath), "%s.tmp", idxPath);
+      |                                               ^~~~
+In file included from /usr/include/stdio.h:974,
+                 from /usr/include/c++/15/cstdio:47,
+                 from /usr/include/c++/15/ext/string_conversions.h:47,
+                 from /usr/include/c++/15/bits/basic_string.h:4442,
+                 from /usr/include/c++/15/string:56,
+                 from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/WString.h:13,
+                 from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/Stream.h:3,
+                 from /root/github/.host-data/crosssmudge/gallery-native-deps/sticky-simulator/simulator/src/HalStorage.h:4,
+                 from lib/FileIndex/FileIndex.h:3,
+                 from lib/FileIndex/FileIndex.cpp:1:
+In function ‘int snprintf(char*, size_t, const char*, ...)’,
+    inlined from ‘bool FileIndex::build(const char*, AcceptFn, uint32_t, uint32_t, uint32_t)’ at lib/FileIndex/FileIndex.cpp:219:11:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:68:35: note: ‘__builtin___snprintf_chk’ output between 5 and 68 bytes into a destination of size 64
+   68 |   return __builtin___snprintf_chk (__s, __n, __USE_FORTIFY_LEVEL - 1,
+      |          ~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   69 |                                    __glibc_objsize (__s), __fmt,
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   70 |                                    __va_arg_pack ());
+      |                                    ~~~~~~~~~~~~~~~~~
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib553/libFileIndex.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib553/libFileIndex.a
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib04e/AirDrop/browser/LuaLaunch.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib04e/AirDrop/core/Consent.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib04e/AirDrop/core/HttpRequest.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib04e/AirDrop/core/Offer.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib04e/AirDrop/port/Discovery.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib04e/AirDrop/port/ReceiverEsp32.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib04e/AirDrop/session/Session.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib04e/AirDrop/storage/HalStorageSink.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib04e/AirDrop/storage/StorageSink.o
+In file included from lib/AirDrop/session/../stream/StreamDecoder.h:6,
+                 from lib/AirDrop/session/Session.h:4,
+                 from lib/AirDrop/session/Session.cpp:1:
+lib/miniz/src/MinizConfig.h:13:9: warning: ‘MINIZ_NO_ZLIB_COMPATIBLE_NAMES’ redefined
+   13 | #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+<command-line>: note: this is the location of the previous definition
+In file included from lib/AirDrop/storage/../stream/StreamDecoder.h:6,
+                 from lib/AirDrop/storage/StorageSink.cpp:7:
+lib/miniz/src/MinizConfig.h:13:9: warning: ‘MINIZ_NO_ZLIB_COMPATIBLE_NAMES’ redefined
+   13 | #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+<command-line>: note: this is the location of the previous definition
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib04e/AirDrop/stream/StreamDecoder.o
+In file included from lib/AirDrop/stream/StreamDecoder.h:6,
+                 from lib/AirDrop/stream/StreamDecoder.cpp:1:
+lib/miniz/src/MinizConfig.h:13:9: warning: ‘MINIZ_NO_ZLIB_COMPATIBLE_NAMES’ redefined
+   13 | #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+<command-line>: note: this is the location of the previous definition
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib04e/AirDrop/vendor/ESP32Drop/src/awdl/port/awdl_port_esp32.o
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libea6/NearbyTransfer/NearbyTransfer.o
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib04e/libAirDrop.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib04e/libAirDrop.a
+Archiving /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libea6/libNearbyTransfer.a
+Indexing /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libea6/libNearbyTransfer.a
+Linking /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/program
+/usr/bin/x86_64-linux-gnu-ld.bfd: /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/libLua.a(loslib.o): in function `os_tmpname':
+loslib.c:(.text+0x20): warning: the use of `tmpnam' is dangerous, better use `mkstemp'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/apps/lua/LuaRunner.o: in function `ink::LuaRunner::LuaRunner(GfxRenderer&, MappedInputManager&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)':
+LuaRunner.cpp:(.text+0x7c9d): undefined reference to `ink::http::Resource::reset()'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/activities/apps/lua/LuaRunner.o: in function `ink::LuaRunner::~LuaRunner()':
+LuaRunner.cpp:(.text+0x7dd8): undefined reference to `ink::http::Resource::reset()'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/libLuaHttp.a(LuaHttp.o): in function `ink::http::(anonymous namespace)::requestInner(lua_State*)::{lambda(void*, char const*, unsigned long)#1}::_FUN(void*, char const*, unsigned long)':
+LuaHttp.cpp:(.text+0x18b): undefined reference to `ink::http::Resource::append(char const*, unsigned long)'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/libLuaHttp.a(LuaHttp.o): in function `ink::http::(anonymous namespace)::backendRequestInner(lua_State*)::{lambda(void*, char const*, unsigned long)#1}::_FUN(void*, char const*, unsigned long)':
+LuaHttp.cpp:(.text+0x19d): undefined reference to `ink::http::Resource::append(char const*, unsigned long)'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/libLuaHttp.a(LuaHttp.o): in function `ink::http::Job::release()':
+LuaHttp.cpp:(.text+0x57f): undefined reference to `ink::http::Resource::reset()'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/libLuaHttp.a(LuaHttp.o): in function `ink::http::(anonymous namespace)::worker(void*)':
+LuaHttp.cpp:(.text+0x625): undefined reference to `ink::http::Resource::finish()'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/libLuaHttp.a(LuaHttp.o): in function `ink::http::Session::close()':
+LuaHttp.cpp:(.text+0x942): undefined reference to `ink::http::Resource::reset()'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/libLuaHttp.a(LuaHttp.o): in function `ink::http::Session::retain()':
+LuaHttp.cpp:(.text+0x9d0): undefined reference to `ink::http::Resource::take(ink::http::Resource&)'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/libLuaHttp.a(LuaHttp.o): in function `ink::http::(anonymous namespace)::resourceRead(lua_State*)':
+LuaHttp.cpp:(.text+0xb54): undefined reference to `ink::http::Resource::read(unsigned long, char*, unsigned long) const'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/libLuaHttp.a(LuaHttp.o): in function `ink::http::(anonymous namespace)::resourceStoreImpl(lua_State*, bool)':
+LuaHttp.cpp:(.text+0xcf3): undefined reference to `ink::http::Resource::copyStep(char const*) const'
+/usr/bin/x86_64-linux-gnu-ld.bfd: LuaHttp.cpp:(.text+0xd49): undefined reference to `ink::http::Resource::copy(char const*) const'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/libLuaHttp.a(LuaHttp.o): in function `ink::http::Session::reserve()':
+LuaHttp.cpp:(.text+0xeff): undefined reference to `ink::http::cleanupResources(char const*)'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/libLuaHttp.a(LuaHttp.o): in function `ink::http::(anonymous namespace)::requestInner(lua_State*)':
+LuaHttp.cpp:(.text+0x1714): undefined reference to `ink::http::Resource::begin(char const*, int)'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/libLuaHttp.a(LuaHttp.o): in function `ink::http::(anonymous namespace)::backendRequestInner(lua_State*)':
+LuaHttp.cpp:(.text+0x1b59): undefined reference to `ink::http::Resource::begin(char const*, int)'
+/usr/bin/x86_64-linux-gnu-ld.bfd: /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/lib73c/libLuaHttp.a(LuaHttp.o): in function `ink::http::Session::releaseResource(int)':
+LuaHttp.cpp:(.text+0x1c03): undefined reference to `ink::http::Resource::reset()'
+collect2: error: ld returned 1 exit status
+*** [/root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/program] Error 1
+========================= [FAILED] Took 313.11 seconds =========================
+
+Environment       Status    Duration
+----------------  --------  ------------
+sticky-simulator  FAILED    00:05:13.113
+==================== 1 failed, 0 succeeded in 00:05:13.113 ====================
+
+COMMAND ['/root/github/.host-data/crosssmudge/browser-platformio/penv/bin/platformio', 'run', '-e', 'sticky-simulator', '-j', '2']
+Processing sticky-simulator (platform: native)
+--------------------------------------------------------------------------------
+Verbose mode can be enabled via `-v, --verbose` option
+Language              Code  Own  Fallback  Unused  Data (B)
+--------------------  ----  ---  --------  ------  --------
+English               EN    882  0         65      16064   
+العربية               AR    709  173       58      23650   
+Беларуская            BE    529  353       23      18140   
+Català                CA    584  298       23      13276   
+Valencià              CAV   565  317       18      12561   
+Čeština               CS    716  166       58      16370   
+Dansk                 DA    528  354       23      9423    
+Deutsch               DE    705  177       54      15046   
+Español               ES    706  176       58      16218   
+Suomi                 FI    517  365       23      10296   
+Français              FR    528  354       23      10338   
+עברית                 HE    521  361       17      13911   
+Magyar                HU    528  354       23      11326   
+Italiano              IT    595  287       30      12234   
+Қазақша               KK    527  355       23      17781   
+Lietuvių              LT    528  354       23      9914    
+Nederlands            NL    527  355       22      9720    
+Polski                PL    547  335       30      11045   
+Português (Brasil)    PT    705  177       58      15889   
+Português (Portugal)  PT2   799  83        63      19014   
+Română                RO    527  355       22      10803   
+Русский               RU    592  290       22      21050   
+Slovenščina           SI    528  354       23      10188   
+Slovenčina            SK    616  266       34      13825   
+Svenska               SV    581  301       22      11466   
+Türkçe                TR    527  355       22      10342   
+Українська            UK    581  301       29      21188   
+Tiếng Việt            VI    582  300       33      13629   
+
+  Total: 882  |  Used in code: 817  |  Never used: 65
+  Flash: 394,707 B strings (deduped)  +  49,392 B offset tables  =  444,099 B
+
+  Stripping 65 unused string(s) from output.
+
+Code generation complete!
+  Languages: 28
+  String keys: 817
+WARNING [git_branch.py]: git command failed (exit 128): fatal: not a git repository (or any of the parent directories): .git; short SHA suffix will be "unknown"
+WARNING [git_branch.py]: Could not read git working-tree state: Command '['git', 'status', '--porcelain', '--untracked-files=no']' returned non-zero exit status 128.; state will be "unknown"
+HomePageHtml          2863B ->   1121B gz
+FilesPageHtml       259809B ->  60635B gz
+ApplicationsPageHtml   24081B ->   6611B gz
+SettingsPageHtml     25596B ->   5741B gz
+FontsPageHtml        10723B ->   3266B gz
+StyleCss              3059B ->   1153B gz
+LogoPng                688B raw
+jszip_minJs          97630B ->  28379B gz
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ off
+Found 40 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- Crosspoint Simulator @ 1.0.0+sha.20f5266
+|-- ArduinoJson @ 7.4.2
+|-- QRCode @ 0.0.1
+|-- PNGdec @ 1.1.6
+|-- JPEGDEC @ 1.2.7+sha.8628297
+|-- Logging
+|-- Serialization
+|-- uzlib @ 2.9.8
+|-- I18n
+|-- GfxRenderer
+|-- Epub
+|-- FsHelpers
+|-- Xtc
+|-- MemoryBudget
+|-- Memory
+|-- LuaBrowser
+|-- EpdFont
+|-- LuaHttp
+|-- AppVersion
+|-- Txt
+|-- FreeInkUI @ 0.1.0
+|-- OpdsParser
+|-- Utf8
+|-- KOReaderSync
+|-- MiniBidi
+|-- DictHtmlRenderer
+|-- FileIndex
+|-- AirDrop @ 0.0.0
+|-- NearbyTransfer @ 1.0.0
+|-- Lua @ 5.4.7
+Building in release mode
+Compiling /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/src/simulator/BackendSimulator.o
+Linking /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/program
+/usr/bin/x86_64-linux-gnu-ld.bfd: /root/.hermes/cache/scratch/crosscub-app-gallery/build/sticky-simulator/libfa0/libLua.a(loslib.o): in function `os_tmpname':
+loslib.c:(.text+0x20): warning: the use of `tmpnam' is dangerous, better use `mkstemp'
+========================= [SUCCESS] Took 6.59 seconds =========================
+
+Environment       Status    Duration
+----------------  --------  ------------
+sticky-simulator  SUCCESS   00:00:06.588
+========================= 1 succeeded in 00:00:06.588 =========================

@@ -211,6 +211,22 @@ local function finish(body,job,css,candidate,event,discovery)
  local current=job.mode=='history'and S.history[job.index]or nil
  local anchors=current and (current.anchors or {current.anchor or {b=1,s=1,p=1}})or {{b=1,s=1,p=1}}
  local page=current and current.page or 1;local url=job.url
+ if current then
+  -- Refetched HTML is a replacement model, not the cached model that produced
+  -- these anchors. Validate without mutating history before cache publication.
+  local valid=type(page)=='number'and page%1==0 and page>=1 and page<=8192
+  local checked={}
+  if valid then for i,a in ipairs(anchors)do
+   local b=type(a)=='table'and type(a.b)=='number'and a.b%1==0 and doc.blocks[a.b]
+   local r=b and b.spans and type(a.s)=='number'and a.s%1==0 and b.spans[a.s]
+   local p=type(a)=='table'and a.p
+   local ok=b and type(p)=='number'and p%1==0 and p>=1 and
+    ((b.image or b.form)and a.s==1 and p==1 or r and p<=#r.text and utf8.offset(r.text,0,p)==p)
+   if not ok then valid=false;break end
+   checked[i]={b=a.b,s=a.s,p=p}
+  end end
+  if not valid or not checked[page]then page=1;anchors={{b=1,s=1,p=1}}else anchors=checked end
+ end
  if job.target and job.target:find('#',1,true)then
   local raw=job.target:match('#(.*)$');local id=raw:gsub('%%(%x%x)',function(c)return string.char(tonumber(c,16))end)
   local anchor=doc.anchors and doc.anchors[id]
@@ -625,14 +641,21 @@ function on_draw()
  if U.editor then U.editDraw();return end
  local width=smudge.get_bounds();local metrics=smudge.get_metrics();local pad=math.max(12,metrics.content_side_padding or 20)
  local subtitle=(S.transport or 'Direct')..' • '..(W.job and (W.job.stage..' • Back cancels')or S.status)
- U.begin('Browser',U.fit(subtitle,math.max(80,width-smudge.text_width('Browser','ui12','bold')-3*pad),'small'))
+ U.begin('Browser',S.transport or 'Direct')
  local p,w,t,b=U.pad,U.w,U.top,U.bottom
+ local notice=W.job and (W.job.stage..' - Back cancels')or S.status or ''
+ local wrapped=smudge.wrapped_text(notice,w-2*p,'small','regular',4)
+ local noticeY=t+52
+ for i,line in ipairs(wrapped.lines)do U.text(p,noticeY+(i-1)*smudge.line_height('small'),line,'small')end
  U.button('<',p,t,44,44,function()history(-1)end)
  U.button(S.url and U.fit(S.url:gsub('^https://',''),w-2*p-120)or 'Address / search',p+50,t,w-2*p-106,44,address)
  U.button('...',w-p-50,t,50,44,function()screen=screen and nil or 'menu';menuPage=1 end)
- local y=t+56;local bottom=b-66
+ local y=t+60+#wrapped.lines*smudge.line_height('small');local bottom=b
  if closed then U.wrap(S.status,p,y,w-2*p,4);return end
- if zoom then
+ if active or pending or W.busy()then
+  U.text(p,y,'Loading - previous page retained','ui10',true)
+  U.button('Cancel',p,y+40,w-2*p,44,function()cancel();S.status='Cancelled • page kept';screen=nil end);U.buttons[#U.buttons].immediate=true
+ elseif zoom then
   U.button('Close image',p,y,w-2*p,44,function()zoom=nil end)
   if not preparedImage(zoom,p,y+52,w-2*p,math.max(1,bottom-y-52))then U.wrap('Image decoder rejected this image',p,y+60,w-2*p,3)end
  elseif screen=='details'then
@@ -671,15 +694,14 @@ function on_draw()
    end
   end
  else
-  U.wrap(S.transport=='Assisted'and 'Public Assisted reader. Shared capacity and short-lived extraction cache, not private storage. The backend and hosting operator see addresses/content; opaque handles are not login protection. No scripts, logins or paywall bypass.'or S.transport=='Offline'and 'Offline reader. Choose saved pages; missing chunks and images need an explicit switch to Assisted.'or 'Direct public HTTPS browser. Reader mode, RSS/Atom news, bookmarks and checked offline pages. JavaScript, logins, paywalls and bot challenges are unsupported.',p,y,w-2*p,6)
-  U.button('Live news feeds',p,bottom-100,w-2*p,44,function()screen='news';menuPage=1 end)
-  U.button('Offline pages',p,bottom-50,w-2*p,44,function()screen='offline';menuPage=1 end)
+  local homeWidth=w>U.h and (w-3*p)//2 or w-2*p
+  U.wrap(S.transport=='Assisted'and 'Public Assisted reader. Shared capacity and short-lived extraction cache, not private storage. The backend and hosting operator see addresses/content; opaque handles are not login protection. No scripts, logins or paywall bypass.'or S.transport=='Offline'and 'Offline reader. Choose saved pages; missing chunks and images need an explicit switch to Assisted.'or 'Direct public HTTPS browser. Reader mode, RSS/Atom news, bookmarks and checked offline pages. JavaScript, logins, paywalls and bot challenges are unsupported.',p,y,homeWidth,math.max(1,(bottom-y-(w>U.h and 0 or 112))//smudge.line_height('small')),'small')
+  local ax=w>U.h and w//2+p or p;local aw=w-p-ax
+  U.button('Live news feeds',ax,bottom-100,aw,44,function()screen='news';menuPage=1 end)
+  U.button('Offline pages',ax,bottom-50,aw,44,function()screen='offline';menuPage=1 end)
  end
- local bw=(w-2*p-16)//3
- U.button('Previous',p,b-50,bw,44,function()turn(-1)end)
- U.button((S.doc and S.doc.srp and 'P'..S.page..' C'..(S.doc.srp.chunk+1)..'/'..S.doc.srp.chunks or 'Page '..S.page..(S.done and ' • end'or '')),p+bw+8,b-50,bw,44,function()screen='menu';menuPage=1 end)
- U.button('Next',p+2*(bw+8),b-50,bw,44,function()turn(1)end)
- if active or pending or W.busy()then U.button('Cancel',w-p-100,U.top+56,100,44,function()cancel();S.status='Cancelled • page kept';screen=nil end);U.buttons[#U.buttons].immediate=true end
+ local counter=S.doc and S.doc.srp and 'P'..S.page..' C'..(S.doc.srp.chunk+1)..'/'..S.doc.srp.chunks or 'Page '..S.page..(S.done and ' • end'or '')
+ U.actions({{'Previous',function()turn(-1)end},{counter,function()screen='menu';menuPage=1 end},{'Next',function()turn(1)end}},2)
  U.footer()
 end
 function on_button(key,pressed)

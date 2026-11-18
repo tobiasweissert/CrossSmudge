@@ -33,6 +33,13 @@ for compressed,name in [(False,'stored'),(True,'zlib')]:
     body=zlib.compress(archive)if compressed else archive
     word=len(body)|(0 if compressed else 0x80000000)
     (OUT/(name+'.dvzip')).write_bytes(struct.pack('>I',word)+body+b'\0\0\0\0')
+# Large integration control: separate 128KiB DVZip records from HTTP chunking.
+large_size=2000001
+large_file={**file,'Files':[{**file['Files'][0],'FileSize':large_size}]}
+(OUT/'large.plist').write_bytes(plistlib.dumps(large_file,fmt=plistlib.FMT_BINARY))
+large_archive=member('./book.txt',b'x'*large_size)+member('TRAILER!!!',b'',0)
+large_records=b''.join(struct.pack('>I',len(part)|0x80000000)+part for part in (large_archive[i:i+131072] for i in range(0,len(large_archive),131072)))
+(OUT/'large.dvzip').write_bytes(large_records+b'\0'*4)
 # Split DVZip records across the file, trailer and padding independently of HTTP.
 for compressed,name in [(False,'stored'),(True,'zlib')]:
     for cut in [1,89,len(archive)-1]:

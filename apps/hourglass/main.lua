@@ -1,3 +1,6 @@
+local U = dofile('unified_ui.lua')
+local P = dofile('primary_numerals.lua')
+local footer = {}
 local w, h = 480, 800
 if smudge.get_bounds then
     w, h = smudge.get_bounds()
@@ -255,244 +258,27 @@ end
 -- Drawing Routines
 -- ----------------------------------------------------------------------------
 
-local function draw_hourglass(cx, cy, pct)
-    -- Hourglass geometry (lowered to cy = 155, height = 250px)
-    local top_y = cy
-    local hg_h = 250
-    local bot_y = cy + hg_h
-    local mid_y = cy + math.floor(hg_h / 2)
-    local max_w = 176
-    local half_w = math.floor(max_w / 2)
-    local neck_w = 22
-    local half_n = math.floor(neck_w / 2)
-
-    -- 1. Wooden Top Pedestal
-    smudge.rounded_rect(cx - half_w - 18, top_y - 14, max_w + 36, 14, 6, true)
-    smudge.rounded_rect(cx - half_w - 10, top_y - 24, max_w + 20, 10, 4, false)
-    smudge.circle(cx - half_w - 6, top_y - 7, 2, true, false)
-    smudge.circle(cx + half_w + 6, top_y - 7, 2, true, false)
-
-    -- 2. Wooden Bottom Pedestal
-    smudge.rounded_rect(cx - half_w - 18, bot_y, max_w + 36, 14, 6, true)
-    smudge.rounded_rect(cx - half_w - 10, bot_y + 14, max_w + 20, 10, 4, false)
-    smudge.circle(cx - half_w - 6, bot_y + 7, 2, true, false)
-    smudge.circle(cx + half_w + 6, bot_y + 7, 2, true, false)
-
-    -- 3. Side Support Pillars
-    local pl_x = cx - half_w - 10
-    local pr_x = cx + half_w + 10
-    smudge.thick_line(pl_x, top_y, pl_x, bot_y, 4)
-    smudge.thick_line(pr_x, top_y, pr_x, bot_y, 4)
-    smudge.thick_line(pl_x - 3, mid_y - 20, pl_x + 3, mid_y - 20, 2)
-    smudge.thick_line(pl_x - 3, mid_y + 20, pl_x + 3, mid_y + 20, 2)
-    smudge.thick_line(pr_x - 3, mid_y - 20, pr_x + 3, mid_y - 20, 2)
-    smudge.thick_line(pr_x - 3, mid_y + 20, pr_x + 3, mid_y + 20, 2)
-
-    -- Glass Contours (organic cosine curve with slender waist)
-    local neck_h = 10
-    local neck_top = mid_y - math.floor(neck_h / 2)
-    local neck_bot = mid_y + math.floor(neck_h / 2)
-    local bulb_top_h = neck_top - top_y
-    local bulb_bot_h = bot_y - neck_bot
-
-    -- Draw glass walls
-    local prev_ly, prev_lx, prev_rx = top_y, cx - half_w, cx + half_w
-    for y = top_y + 2, neck_top, 2 do
-        local t = (y - top_y) / bulb_top_h
-        local w_y = math.floor(half_n + (half_w - half_n) * (0.5 * (1.0 + math.cos(t * math.pi))))
-        local lx = cx - w_y
-        local rx = cx + w_y
-        smudge.thick_line(prev_lx, prev_ly, lx, y, 2)
-        smudge.thick_line(prev_rx, prev_ly, rx, y, 2)
-        prev_ly, prev_lx, prev_rx = y, lx, rx
+local function draw_hourglass(cx,cy,pct)
+    local ah=w>h and 200 or 250
+    local aw=180;local half=ah//2
+    smudge.rect(cx-aw//2,cy,aw,12,true,true)
+    smudge.rect(cx-aw//2,cy+ah,aw,12,true,true)
+    for _,side in ipairs({-1,1}) do
+        smudge.thick_line(cx+side*(aw//2-16),cy+12,cx+side*7,cy+half,5,true)
+        smudge.thick_line(cx+side*7,cy+half,cx+side*(aw//2-16),cy+ah,5,true)
     end
-    -- Neck straight section
-    smudge.thick_line(cx - half_n, neck_top, cx - half_n, neck_bot, 2)
-    smudge.thick_line(cx + half_n, neck_top, cx + half_n, neck_bot, 2)
-    prev_ly, prev_lx, prev_rx = neck_bot, cx - half_n, cx + half_n
-    for y = neck_bot + 2, bot_y, 2 do
-        local t = (y - neck_bot) / bulb_bot_h
-        local w_y = math.floor(half_n + (half_w - half_n) * (0.5 * (1.0 - math.cos(t * math.pi))))
-        local lx = cx - w_y
-        local rx = cx + w_y
-        smudge.thick_line(prev_lx, prev_ly, lx, y, 2)
-        smudge.thick_line(prev_rx, prev_ly, rx, y, 2)
-        prev_ly, prev_lx, prev_rx = y, lx, rx
+    -- State-driven monochrome sand; no cartoon face or decorative casing.
+    local top=math.floor((half-18)*(1-pct))
+    for dy=18+top,half-8,3 do
+        local radius=math.max(1,math.floor((half-dy)*0.5))
+        smudge.line(cx-radius,cy+dy,cx+radius,cy+dy,true)
     end
-
-    -- 4. Sand Rendering
-    -- Top bulb sand: funnels inward, flows through neck channel, and tapers to nozzle tip.
-    -- pct = remaining fraction (1.0 = full top, 0.0 = full bottom)
-    local nozzle_h = 6
-    local sand_max_y = neck_bot + nozzle_h
-    if pct > 0.005 and smudge.rect_dither then
-        local max_dip = is_running and 22 or 14
-        local dip_h = math.floor(max_dip * math.sin(pct * math.pi))
-        if pct > 0.05 and dip_h < 6 then
-            dip_h = 6
-        end
-        local sand_edge_y = math.floor(top_y + 4 + (1.0 - pct) * (bulb_top_h - 8))
-        local sand_center_y = math.min(sand_max_y - 2, sand_edge_y + dip_h)
-
-        for y = sand_edge_y, sand_max_y, 2 do
-            local w_y = 0
-            if y < neck_top then
-                local t = (y - top_y) / bulb_top_h
-                w_y = math.floor(half_n + (half_w - half_n) * (0.5 * (1.0 + math.cos(t * math.pi)))) - 4
-            elseif y <= neck_bot then
-                w_y = half_n - 3
-            else
-                local prog = (y - neck_bot) / nozzle_h
-                w_y = math.max(1, math.floor((half_n - 3) * (1.0 - prog)))
-            end
-
-            if w_y > 0 then
-                if y < sand_center_y and dip_h > 0 then
-                    -- Funnel region: parabolic crater sloping down toward neck center
-                    local prog = (y - sand_edge_y) / math.max(1, (sand_center_y - sand_edge_y))
-                    local crater_w = math.floor(w_y * (1.0 - (prog ^ 0.75)))
-                    local wing_w = w_y - crater_w
-                    if wing_w > 1 then
-                        smudge.rect_dither(cx - w_y, y, wing_w, 2)
-                        smudge.rect_dither(cx + crater_w, y, wing_w, 2)
-                    end
-                else
-                    -- Full width sand below crater vertex
-                    smudge.rect_dither(cx - w_y, y, w_y * 2, 2)
-                end
-            end
-        end
-
-        -- Animated falling sand particles along the crater slopes when running
-        if is_running and dip_h > 4 and pct > 0.05 then
-            for i = 0, 2 do
-                local p_prog = ((anim_tick * 0.2 + i * 0.33) % 1.0)
-                local py = math.floor(sand_edge_y + p_prog * (sand_center_y - sand_edge_y))
-                if py >= sand_edge_y and py < sand_max_y - 2 then
-                    local pw = half_n - 3
-                    if py < neck_top then
-                        local pt = (py - top_y) / bulb_top_h
-                        pw = math.floor(half_n + (half_w - half_n) * (0.5 * (1.0 + math.cos(pt * math.pi)))) - 4
-                    end
-                    local p_prog2 = (py - sand_edge_y) / math.max(1, (sand_center_y - sand_edge_y))
-                    local cw = math.floor(pw * (1.0 - (p_prog2 ^ 0.75)))
-                    if i % 2 == 0 then
-                        smudge.rect(cx - cw - 1, py, 2, 2, true)
-                    else
-                        smudge.rect(cx + cw - 1, py, 2, 2, true)
-                    end
-                end
-            end
-        end
+    local bottom=math.floor((half-18)*(1-pct))
+    for dy=ah-bottom,ah-8,3 do
+        local radius=math.max(1,math.floor((dy-half)*0.5))
+        smudge.line(cx-radius,cy+dy,cx+radius,cy+dy,true)
     end
-
-    -- Bottom bulb sand: fills from bot_y - 4 upwards
-    local bot_fill_h = math.floor((1.0 - pct) * (bulb_bot_h - 6))
-    local bot_sand_y = bot_y - 4 - bot_fill_h
-    local mound_h = 0
-    if bot_fill_h > 2 and smudge.rect_dither then
-        for y = bot_sand_y, bot_y - 4, 2 do
-            local t = (y - neck_bot) / bulb_bot_h
-            local w_y = math.floor(half_n + (half_w - half_n) * (0.5 * (1.0 - math.cos(t * math.pi)))) - 4
-            if w_y > 2 then
-                smudge.rect_dither(cx - w_y, y, w_y * 2, 2)
-            end
-        end
-        -- Dynamic conical sand mound where falling stream lands
-        if pct > 0.01 and pct < 0.99 then
-            mound_h = math.min(12, math.floor(6 + bot_fill_h * 0.15))
-            for my = bot_sand_y - mound_h, bot_sand_y - 1, 2 do
-                local prog = (bot_sand_y - my) / mound_h
-                local mw = math.floor(math.min(26, half_n + bot_fill_h * 0.4) * (1.0 - prog))
-                local max_mw = half_n - 3
-                if my >= neck_bot then
-                    local t_m = (my - neck_bot) / bulb_bot_h
-                    max_mw = math.floor(half_n + (half_w - half_n) * (0.5 * (1.0 - math.cos(t_m * math.pi)))) - 4
-                end
-                if mw > max_mw then mw = max_mw end
-                if mw > 1 then
-                    smudge.rect_dither(cx - mw, my, mw * 2, 2)
-                end
-            end
-
-            -- Animated splash / bouncing sand grains at mound apex when running
-            if is_running and pct > 0.02 then
-                local apex_y = bot_sand_y - mound_h
-                local splash_phase = anim_tick % 3
-                if splash_phase == 0 then
-                    smudge.rect(cx - 3, apex_y - 2, 2, 2, true)
-                elseif splash_phase == 1 then
-                    smudge.rect(cx + 2, apex_y - 1, 2, 2, true)
-                else
-                    smudge.rect(cx - 2, apex_y - 3, 2, 2, true)
-                    smudge.rect(cx + 3, apex_y - 2, 1, 1, true)
-                end
-            end
-        end
-    end
-
-    -- Falling sand stream through neck (active when running, frozen when paused)
-    if has_started and pct > 0.005 then
-        local stream_start_y = sand_max_y
-        local stream_end_y = math.max(neck_bot, bot_sand_y - mound_h)
-        if stream_end_y >= stream_start_y then
-            for y = stream_start_y, stream_end_y, 4 do
-                local stream_w = 1
-                if is_running then
-                    stream_w = ((y + anim_tick * 2) % 6 < 3) and 2 or 1
-                else
-                    stream_w = (y % 6 < 3) and 2 or 1
-                end
-                smudge.rect(cx - math.floor(stream_w / 2), y, stream_w, 3, true)
-            end
-        end
-    end
-
-    -- 5. Cute Face & Eyes in Top Bulb (Water cup style)
-    local eye_y = top_y + 46
-
-    if is_alarm then
-        -- Celebratory / happy expression (> <)
-        for _, ex in ipairs({cx - 24, cx + 24}) do
-            smudge.thick_line(ex - 7, eye_y - 4, ex, eye_y, 2)
-            smudge.thick_line(ex - 7, eye_y + 4, ex, eye_y, 2)
-        end
-        -- Wide happy open mouth
-        smudge.circle(cx, eye_y + 14, 5, true, true)
-        smudge.circle(cx, eye_y + 14, 5, false, false)
-    else
-        -- Water Cup style adorable face:
-        -- White backing so eyes pop cleanly over sand
-        smudge.circle(cx - 24, eye_y, 7, true, false)
-        smudge.circle(cx + 24, eye_y, 7, true, false)
-
-        -- Solid black circles radius 5
-        smudge.circle(cx - 24, eye_y, 5, true, true)
-        smudge.circle(cx + 24, eye_y, 5, true, true)
-
-        -- Tiny white sparkle radius 2 in upper-right
-        smudge.circle(cx - 22, eye_y - 2, 2, true, false)
-        smudge.circle(cx + 26, eye_y - 2, 2, true, false)
-
-        -- Water Cup cheerful wide smile
-        smudge.thick_line(cx - 12, eye_y + 12, cx - 4, eye_y + 18, 2)
-        smudge.thick_line(cx - 4, eye_y + 18, cx + 4, eye_y + 18, 2)
-        smudge.thick_line(cx + 4, eye_y + 18, cx + 12, eye_y + 12, 2)
-    end
-
-    -- Glass reflection highlights
-    smudge.thick_line(cx - half_w + 10, top_y + 12, cx - half_w + 18, top_y + 36, 2)
-    smudge.thick_line(cx + half_w - 10, bot_y - 12, cx + half_w - 18, bot_y - 36, 2)
-end
-
-local function sticky_touch()
-    return smudge.get_device and smudge.get_device() == "sticky"
-end
-
-local function touch_controls()
-    local width, height = smudge.get_bounds()
-    local gap, margin = 8, 24
-    return margin, height - 76, math.floor((width - margin * 2 - gap * 3) / 4), 52, gap
+    if is_running then smudge.line(cx,cy+half,cx,cy+ah-12,true) end
 end
 
 local function settings_geometry()
@@ -501,179 +287,60 @@ local function settings_geometry()
     return math.floor((width - mw) / 2), math.max(60, math.floor((height - mh) / 2)), mw, mh
 end
 
-local function draw_settings_dialog(cx, w, h)
-    local mw = 430
-    local mh = 300
-    local mx = math.floor((w - mw) / 2)
-    local my = 195
-    if sticky_touch() then mx, my, mw, mh = settings_geometry() end
+-- Shared half-open rectangles for both paint and Sticky dispatch.
+local function settings_rect(row)
+    local mx, my, mw = settings_geometry()
+    if row == 3 then return mx + 20, my + 244, mw - 40, 40 end
+    return w // 2 - 130, my + (row == 1 and 80 or 164), 260, 36
+end
+local function contains(x, y, rx, ry, rw, rh)
+    return x >= rx and x < rx + rw and y >= ry and y < ry + rh
+end
 
-    -- Background shadow and modal frame
-    smudge.rounded_rect(mx - 2, my - 2, mw + 4, mh + 4, 12, true, true)
-    smudge.rounded_rect(mx, my, mw, mh, 10, true, false)
-    smudge.rounded_rect(mx, my, mw, mh, 10, false, true)
+local function screen_layout()
+    local land=w>h
+    return {ax=land and w//4 or w//2,ay=land and 128 or 186,ah=land and 200 or 250,
+        x=land and w//2+14 or 14,cw=land and w//2-28 or w-28,
+        cx=land and 3*w//4 or w//2,time_y=land and 150 or 488,
+        card_y=land and 224 or 574,prompt_y=land and 350 or 670}
+end
 
-    -- Title
-    smudge.text(cx, my + 12, "Adjust Increments", 12, true, "center", true)
-    smudge.line(mx + 16, my + 42, mx + mw - 16, my + 42)
-
-    local box_w = 260
-    local box_h = 36
-    local box_x = cx - math.floor(box_w / 2)
-
-    -- Row 1: Top / Bottom Hardware Buttons
-    local r1_y = my + 52
-    smudge.text(mx + 24, r1_y, "Top / Bottom Buttons (hardware):", 10, true, "left", true)
-
-    local box1_y = r1_y + 28
-    if setting_row == 1 then
-        smudge.rounded_rect(box_x - 2, box1_y - 2, box_w + 4, box_h + 4, 6, true, true)
-        smudge.rounded_rect(box_x, box1_y, box_w, box_h, 5, true, false)
-        smudge.rounded_rect(box_x, box1_y, box_w, box_h, 5, false, true)
-        smudge.text(cx, box1_y + 8, "<   " .. format_step(step_top_sec) .. "   >", 12, true, "center", true)
-    else
-        smudge.rounded_rect(box_x, box1_y, box_w, box_h, 5, false, true)
-        smudge.text(cx, box1_y + 8, format_step(step_top_sec), 11, false, "center", true)
+local function draw_settings_dialog(cx,w,h)
+    local mx,my,mw,mh=settings_geometry()
+    U.panel({x=mx,y=my,w=mw,h=mh})
+    U.text(cx,my+12,'Adjust Increments','ui12',true,'center')
+    U.text(cx,my+48,'Top / Bottom: coarse step','ui10',false,'center')
+    U.text(cx,my+132,'Screen - / +: fine step','ui10',false,'center')
+    for row=1,3 do
+        local x,y,rw,rh=settings_rect(row)
+        local label=row==3 and 'Done' or '<  '..format_step(row==1 and step_top_sec or step_bot_sec)..'  >'
+        U.button(label,{x=x,y=y,w=rw,h=rh},row==setting_row)
     end
-
-    -- Divider
-    smudge.line(mx + 20, my + 126, mx + mw - 20, my + 126)
-
-    -- Row 2: Bottom Soft Buttons (- / +)
-    local r2_y = my + 136
-    smudge.text(mx + 24, r2_y, "Bottom - / + Buttons (screen):", 10, true, "left", true)
-
-    local box2_y = r2_y + 28
-    if setting_row == 2 then
-        smudge.rounded_rect(box_x - 2, box2_y - 2, box_w + 4, box_h + 4, 6, true, true)
-        smudge.rounded_rect(box_x, box2_y, box_w, box_h, 5, true, false)
-        smudge.rounded_rect(box_x, box2_y, box_w, box_h, 5, false, true)
-        smudge.text(cx, box2_y + 8, "<   " .. format_step(step_bot_sec) .. "   >", 12, true, "center", true)
-    else
-        smudge.rounded_rect(box_x, box2_y, box_w, box_h, 5, false, true)
-        smudge.text(cx, box2_y + 8, format_step(step_bot_sec), 11, false, "center", true)
-    end
-
-    -- Divider 2
-    smudge.line(mx + 20, my + 210, mx + mw - 20, my + 210)
-
-    -- Instructions
-    smudge.text(cx, my + 224, "[Select] Switch Row   •   [-] / [+] Change", 10, false, "center", true)
-    if sticky_touch() then
-        smudge.rounded_rect(mx + 20, my + 244, mw - 40, 40, 8, false, true)
-        smudge.text(cx, my + 254, "Done", "ui12", true, "center", true)
-    else
-        smudge.text(cx, my + 252, "Press [Done] to save & return", 10, true, "center", true)
-    end
-
-    -- Button hints for modal
-    smudge.button_hints("Done", "Select", "-", "+")
+    U.text(cx,my+212,'Tap left / right to adjust','ui10',false,'center')
 end
 
 function on_draw()
-    if smudge.get_bounds then
-        w, h = smudge.get_bounds()
-    end
-    smudge.clear()
-
-    local cx = math.floor(w / 2)
-    local margin = 24
-    local card_w = w - (margin * 2)
-    local card_x = margin
-
-    -- 1. Header
-    smudge.header("Hourglass", "")
-
-    -- 2. Top Banner / Status Pill (y = 98..132, safely below 84px header line)
-    local by = 98
-    local bh = 34
-    if banner_msg ~= "" then
-        smudge.rounded_rect(card_x, by, card_w, bh, 6, true)
-        smudge.text(cx, by + 7, banner_msg, 11, true, "center", false)
-    else
-        smudge.rounded_rect(card_x, by, card_w, bh, 6, false)
-        local status_str = is_alarm and "TIME'S UP! (PRESS ANY KEY)" or (is_running and "RUNNING" or (has_started and "PAUSED" or "READY"))
-        smudge.text(cx, by + 7, status_str, 10, true, "center", true)
-    end
-
-    -- 3. Centered Hourglass Animation (y = 170..410)
-    local pct = (total_sec > 0) and math.max(0, math.min(1.0, remaining_sec / total_sec)) or 0
-    draw_hourglass(cx, 170, pct)
-
-    -- 4. Large Digital Time Readout (y = 464)
-    local time_str = format_time(remaining_sec)
-    smudge.text(cx, 464, time_str, 28, true, "center", true)
-
-    -- 5. Sub-Card Area (y = 520..616)
-    if has_started then
-        -- Elapsed progress bar & info
-        local elapsed_pct = math.floor((1.0 - pct) * 100)
-        local bar_x = card_x + 16
-        local bar_w = card_w - 32
-        local bar_y = 528
-        local bar_h = 18
-
-        smudge.rounded_rect(bar_x, bar_y, bar_w, bar_h, 5, false)
-        local bar_fill = math.max(0, math.min(bar_w - 4, math.floor((1.0 - pct) * (bar_w - 4))))
-        if bar_fill > 0 then
-            smudge.rounded_rect(bar_x + 2, bar_y + 2, bar_fill, bar_h - 4, 3, true)
-        end
-
-        smudge.text(cx, 560, string.format("Progress: %d%%  •  Total: %s", elapsed_pct, format_time(total_sec)), 10, true, "center", true)
-        local prompt = is_alarm and "TIME'S UP! Press any key to dismiss" or (is_running and "Timer running smoothly" or "Paused • Press [Start] to resume")
-        smudge.text(cx, 592, prompt, 10, true, "center", true)
-    else
-        -- Clean increments information card
-        local cy_card = 520
-        local ch_card = 96
-        smudge.rounded_rect(card_x, cy_card, card_w, ch_card, 8, false)
-
-        local pad = 18
-        local lx = card_x + pad
-        local rx = card_x + card_w - pad
-
-        -- Row 1: Top/Bottom buttons step
-        smudge.text(lx, cy_card + 14, "Top / Bottom buttons", 10, false, "left", true)
-        smudge.text(rx, cy_card + 14, "± " .. format_step(step_top_sec), 11, true, "right", true)
-
-        -- Divider
-        smudge.line(card_x + 14, cy_card + 46, card_x + card_w - 14, cy_card + 46)
-
-        -- Row 2: Bottom - / + buttons step
-        smudge.text(lx, cy_card + 60, "Bottom - / + buttons", 10, false, "left", true)
-        smudge.text(rx, cy_card + 60, "± " .. format_step(step_bot_sec), 11, true, "right", true)
-
-        -- Subtitle prompt
-        smudge.text(cx, 638, "Hold [Start] to customize step sizes", 9, false, "center", true)
-    end
-
-    -- 6. Bottom Button Hints
-    if not has_started then
-        smudge.button_hints("Exit", "Start", "-", "+")
-    else
-        local b2_label = is_running and "Pause" or "Start"
-        smudge.button_hints("Exit", b2_label, "Reset", "")
-    end
-
-    if sticky_touch() then
-        local x, y, bw, bh, gap = touch_controls()
-        local labels = {"Exit", is_running and "Pause" or "Start", has_started and "Reset" or "-", has_started and "Set" or "+"}
-        for i, label in ipairs(labels) do
-            local bx = x + (i - 1) * (bw + gap)
-            smudge.rounded_rect(bx, y, bw, bh, 8, i == 2, true)
-            smudge.text(bx + bw // 2, y + 15, label, "ui12", true, "center", i ~= 2)
-        end
-    end
-
-    -- 7. Settings Modal Overlay
+    w,h=smudge.get_bounds();smudge.clear()
+    U.header('Hourglass',is_alarm and "TIME'S UP!" or (is_running and 'RUNNING' or (has_started and 'PAUSED' or 'READY')))
     if in_settings then
-        draw_settings_dialog(cx, w, h)
+        draw_settings_dialog(w//2,w,h)
+        footer=U.footer({'Done','Select','-','+'},1)
+        if is_alarm and flash_state and smudge.invert_screen then smudge.invert_screen() end
+        return
     end
-
-    -- 8. Alarm Screen Flashing
-    if is_alarm and flash_state and smudge.invert_screen then
-        smudge.invert_screen()
-    end
+    if banner_msg~='' then U.text(w//2,78,U.fit(banner_msg,w-28,'ui10',true),'ui10',true,'center') end
+    local pct=total_sec>0 and math.max(0,math.min(1,remaining_sec/total_sec)) or 0
+    local l=screen_layout();draw_hourglass(l.ax,l.ay,pct)
+    P.draw(format_time(remaining_sec),l.x,l.time_y-8,l.cw,w>h and 76 or 96)
+    U.panel({x=l.x,y=l.card_y,w=l.cw,h=14})
+    local fill=math.floor((l.cw-8)*(1-pct))
+    if fill>0 then smudge.rect(l.x+4,l.card_y+4,fill,6,true,true) end
+    U.text(l.cx,l.card_y+30,'PROGRESS: '..math.floor((1-pct)*100)..'% - TOTAL: '..format_time(total_sec),'ui10',true,'center')
+    if not has_started then
+        U.button('Set increments: coarse / fine',{x=l.x,y=l.card_y+66,w=l.cw,h=48})
+    elseif is_alarm then U.text(l.cx,l.card_y+66,'Tap anywhere to dismiss','ui10',true,'center') end
+    footer=U.footer({'Exit',is_running and 'Pause' or 'Start',has_started and 'Reset' or '-',has_started and 'Set' or '+'},2)
+    if is_alarm and flash_state and smudge.invert_screen then smudge.invert_screen() end
 end
 
 function on_button(btn, pressed)
@@ -750,73 +417,74 @@ function on_touch(action, tx, ty)
     end
 
     if in_settings then
-        local mw = 390
-        local mh = 330
-        local mx = math.floor((w - mw) / 2)
-        local my = 230
-
-        if sticky_touch() then mx, my, mw, mh = settings_geometry() end
-
-        -- Match the actual settings rows and visible Done button.
-        local done_y = my + (sticky_touch() and 244 or 260)
-        if tx >= mx and tx < mx + mw and ty >= done_y and ty <= done_y + (sticky_touch() and 40 or 50) then
-            in_settings = false
-            save_data()
-            show_banner("Settings Saved", 1200)
-            if smudge.request_update then smudge.request_update() end
-            return
+        for i,r in ipairs(footer) do
+            if U.hit(r,tx,ty) then on_button(({'back','confirm','left','right'})[i],true);return end
         end
-
-        -- Row 1 tap (Top/Bottom buttons step)
-        if ty >= my + (sticky_touch() and 80 or 60) and ty <= my + (sticky_touch() and 116 or 120) then
-            setting_row = 1
-            if tx < cx then
-                adjust_step(1, -1)
-            else
-                adjust_step(1, 1)
-            end
-            return
-        end
-
-        -- Row 2 tap (Bottom -/+ buttons step)
-        if ty >= my + (sticky_touch() and 164 or 145) and ty <= my + (sticky_touch() and 200 or 215) then
-            setting_row = 2
-            if tx < cx then
-                adjust_step(2, -1)
-            else
-                adjust_step(2, 1)
-            end
-            return
-        end
-        return
-    end
-
-    if sticky_touch() then
-        local x, y, bw, bh, gap = touch_controls()
-        if ty >= y and ty < y + bh and tx >= x then
-            local i = math.floor((tx - x) / (bw + gap)) + 1
-            if i >= 1 and i <= 4 and (tx - x) % (bw + gap) < bw then
-                if i == 4 and has_started then
-                    in_settings = true
-                    if smudge.request_update then smudge.request_update() end
+        for row=1,3 do
+            if contains(tx,ty,settings_rect(row)) then
+                if row==3 then
+                    in_settings=false;save_data();show_banner('Settings Saved',1200)
                 else
-                    on_button(({"back", "confirm", "left", "right"})[i], true)
+                    setting_row=row;adjust_step(row,tx<cx and -1 or 1)
                 end
+                if smudge.request_update then smudge.request_update() end
                 return
             end
         end
+        return
     end
 
-    -- Tap Hourglass or Big Time: Start/Pause
-    if ty >= 150 and ty <= 480 and math.abs(tx - cx) <= 120 then
+    for i,r in ipairs(footer) do
+        if U.hit(r,tx,ty) then
+            if i==4 and has_started then
+                in_settings=true
+                if smudge.request_update then smudge.request_update() end
+            else on_button(({'back','confirm','left','right'})[i],true) end
+            return
+        end
+    end
+    if ty>=h-60 then return end
+    local layout=screen_layout()
+    if contains(tx,ty,layout.ax-90,layout.ay,180,layout.ah+12)
+        or contains(tx,ty,layout.x,layout.time_y,layout.cw,48) then
         toggle_start_pause()
-        return
-    end
-
-    -- Tap Increments card: open settings
-    if ty >= 508 and ty <= 630 and not has_started then
-        in_settings = true
+    elseif not has_started and contains(tx,ty,layout.x,layout.card_y+66,layout.cw,48) then
+        in_settings=true
         if smudge.request_update then smudge.request_update() end
-        return
     end
+end
+
+-- A changed view is not an input target until its complete draw returns.
+-- This also catches hold-to-settings and countdown-to-alarm transitions.
+local painted_view
+local function input_view()
+    return tostring(in_settings)..':'..tostring(is_alarm)..':'..tostring(has_started)
+        ..':'..tostring(is_running)..':'..setting_row
+end
+local function sticky_input_ready()
+    return not (smudge.get_device and smudge.get_device() == 'sticky')
+        or painted_view == input_view()
+end
+local function retire_changed_view()
+    if not sticky_input_ready() then footer = {} end
+end
+local draw_view, button_view, touch_view, update_view = on_draw, on_button, on_touch, on_update
+function on_draw()
+    painted_view = nil
+    draw_view()
+    painted_view = input_view()
+end
+function on_button(btn, pressed)
+    if not sticky_input_ready() then return end
+    button_view(btn, pressed)
+    retire_changed_view()
+end
+function on_touch(action, tx, ty)
+    if not sticky_input_ready() then return end
+    touch_view(action, tx, ty)
+    retire_changed_view()
+end
+function on_update()
+    update_view()
+    retire_changed_view()
 end

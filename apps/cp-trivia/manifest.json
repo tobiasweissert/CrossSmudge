@@ -1,7 +1,7 @@
 {
   "id": "cp-trivia",
   "name": "Trivia",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "author": "CrossSmudge contributors",
   "description": "Live Open Trivia DB questions; APIv3 preview",
   "entry": "main.lua",

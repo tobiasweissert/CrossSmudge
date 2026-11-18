@@ -22,7 +22,7 @@ class LiveFlow(unittest.TestCase):
   selftest=self
   with patch.object(sys,'argv',['live_flow.py','--url','https://example.org/']),patch('urllib.request.build_opener',return_value=Opener()),contextlib.redirect_stdout(io.StringIO()):runpy.run_path(str(ROOT/'scripts/live_flow.py'),run_name='__main__')
   self.assertEqual(len(seen),5)
- def run_fixture(self,overrides=None,image=False):
+ def run_fixture(self,overrides=None,image=False,chunks=1):
   seen=[];overrides=overrides or {}
   class Reply:
    def __init__(self,status,body):self.status=status;self.body=body
@@ -36,9 +36,10 @@ class LiveFlow(unittest.TestCase):
     if endpoint in overrides:return Reply(*overrides[endpoint])
     if endpoint=='open' and len(seen)==1:
      blocks=[{'kind':'image','image':{'asset':'b'*32}}] if image else []
-     return Reply(200,{'v':1,'state':'ready','doc':'a'*32,'chunks':1,'blocks':blocks,'truncated':False})
+     return Reply(200,{'v':1,'state':'ready','doc':'a'*32,'chunks':chunks,'blocks':blocks,'truncated':False})
     if endpoint=='open':return Reply(410,{'v':1,'error':'cancelled'})
     if endpoint=='cancel':return Reply(200,{'v':1,'state':'cancelled'})
+    if endpoint=='chunk':return Reply(200,{'v':1,'blocks':[]})
     return Reply(200,{'v':1,'found':False})
   output=io.StringIO()
   with patch.object(sys,'argv',['live_flow.py','--url','https://example.org/']),patch('urllib.request.build_opener',return_value=Opener()),contextlib.redirect_stdout(output):
@@ -62,12 +63,34 @@ class LiveFlow(unittest.TestCase):
     with self.subTest(endpoint=endpoint,fields=fields):
      with self.assertRaisesRegex(RuntimeError,endpoint+' result'):
       self.run_fixture({endpoint:(200,{'v':1,**fields})})
- def test_found_false_and_go_omitted_zero_positions_are_valid(self):
-  for result in ({'found':False},{'found':True,'chunk':0},{'found':True,'chunk':0,'block':1,'run':1,'byte':1}):
+ def test_found_false_and_complete_positions_are_valid(self):
+  for result in ({'found':False},{'found':True,'chunk':0,'block':1,'run':1,'byte':1}):
    with self.subTest(result=result):
     report,_,seen=self.run_fixture({p:(200,{'v':1,**result}) for p in ('locate','find')})
     self.assertEqual(seen,['open','locate','find','cancel','open'])
     self.assertFalse(report['content_output'])
+ def test_found_positions_require_each_explicit_typed_bounded_field(self):
+  valid={'v':1,'found':True,'chunk':0,'block':1,'run':1,'byte':1}
+  for endpoint in ('locate','find'):
+   for field,upper in (('chunk',0),('block',1024),('run',512),('byte',2049)):
+    missing={k:v for k,v in valid.items() if k!=field}
+    with self.subTest(endpoint=endpoint,field=field,value='missing'):
+     with self.assertRaisesRegex(RuntimeError,endpoint+' result position'):
+      self.run_fixture({endpoint:(200,missing)})
+    invalid=[None,True,False,'1',1.0,[],{},-1,upper+1]
+    if field!='chunk':invalid.append(0)
+    for value in invalid:
+     with self.subTest(endpoint=endpoint,field=field,value=value):
+      with self.assertRaisesRegex(RuntimeError,endpoint+' result position'):
+       self.run_fixture({endpoint:(200,{**valid,field:value})})
+ def test_found_positions_allow_protocol_extremes_and_last_chunk(self):
+  # P.position envelope bounds; this does not prove membership in unrequested chunks.
+  for chunk in (0,63):
+   result={'v':1,'found':True,'chunk':chunk,'block':1024,'run':512,'byte':2049}
+   self.run_fixture({p:(200,result) for p in ('locate','find')},chunks=64)
+  result={'v':1,'found':True,'chunk':64,'block':1,'run':1,'byte':1}
+  with self.assertRaisesRegex(RuntimeError,'locate result position'):
+   self.run_fixture({'locate':(200,result)},chunks=65)
  def test_image200_json_error_is_not_success(self):
   with self.assertRaisesRegex(RuntimeError,'image format'):
    self.run_fixture({'image':(200,{'v':1,'error':'busy'})},image=True)

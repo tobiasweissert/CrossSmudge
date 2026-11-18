@@ -9,6 +9,10 @@ namespace {
 uint64_t now(Workspace& w){return w.io->now(w.io->context);}
 bool stopping(Workspace& w){return w.backend->cancelled(w.backend->context);}
 bool more(Workspace& w){
+  // Measure only a refill's wait for the peer, not staging, decode, SD or
+  // display-lock work performed since the previous successful read. The
+  // absolute request deadline still includes all of that local work.
+  if(w.begin==w.end)w.lastProgress=now(w);
   while(w.begin==w.end){
     if(stopping(w)){w.readError="cancelled";return false;}
     if(now(w)>=w.deadline){w.readError="absolute deadline";return false;}

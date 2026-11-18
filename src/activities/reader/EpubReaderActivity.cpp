@@ -2165,6 +2165,7 @@ void EpubReaderActivity::onEnter() {
   const bool resumePageBuildAfterRestart = consumeSilentRestartReaderPageBuild(
       epub->getPath(), restartPageBuildSpine, restartPageBuildTarget, resumeAutoPageTurnAfterRestart);
 
+  bool loadedProgress = false;
   if (APP_STATE.pendingBookmarkSpine != UINT16_MAX && APP_STATE.pendingBookmarkProgress >= 0.0f) {
     // Resume from a bookmark selected on the Home screen
     currentSpineIndex = APP_STATE.pendingBookmarkSpine;
@@ -2183,6 +2184,7 @@ void EpubReaderActivity::onEnter() {
   } else {
     EpubReaderUtils::Progress progress;
     if (EpubReaderUtils::loadProgress(*epub, progress)) {
+      loadedProgress = true;
       currentSpineIndex = progress.spineIndex;
       nextPageNumber = progress.pageNumber;
       cachedSpineIndex = currentSpineIndex;
@@ -2198,9 +2200,8 @@ void EpubReaderActivity::onEnter() {
       }
     }
   }
-  // We may want a better condition to detect if we are opening for the first time.
-  // This will trigger if the book is re-opened at Chapter 0.
-  if (currentSpineIndex == 0 && !pendingPercentJump) {
+  // The guide's start reference is a first-open default, not a resume target.
+  if (!loadedProgress && currentSpineIndex == 0 && !pendingPercentJump) {
     int textSpineIndex = epub->getSpineIndexForTextReference();
     if (textSpineIndex != 0) {
       currentSpineIndex = textSpineIndex;
@@ -2446,7 +2447,7 @@ void EpubReaderActivity::openReaderMenu() {
       }
       {
         RenderLock lock(*this);
-        clearFootnotePreviewState();
+        abandonFootnoteNavigation();
         currentSpineIndex = chapter->spineIndex;
         pendingAnchor = chapter->anchor;
         nextPageNumber = 0;
@@ -3303,7 +3304,7 @@ void EpubReaderActivity::jumpToPercent(float percent) {
   int locationSpineIndex = 0;
   float locationSpineProgress = 0.0f;
   if (epub->resolveLocationPercentToSpineProgress(percent, locationSpineIndex, locationSpineProgress)) {
-    clearFootnotePreviewState();
+    abandonFootnoteNavigation();
     currentSpineIndex = locationSpineIndex;
     pendingSpineProgress = locationSpineProgress;
     nextPageNumber = 0;
@@ -3352,7 +3353,7 @@ void EpubReaderActivity::jumpToPercent(float percent) {
   }
 
   // Reset state so render() reloads and repositions on the target spine.
-  clearFootnotePreviewState();
+  abandonFootnoteNavigation();
   currentSpineIndex = targetSpineIndex;
   nextPageNumber = 0;
   pendingPercentJump = true;
@@ -3378,7 +3379,7 @@ void EpubReaderActivity::jumpToStablePage(const uint32_t page) {
     return;
   }
 
-  clearFootnotePreviewState();
+  abandonFootnoteNavigation();
   currentSpineIndex = targetSpineIndex;
   pendingSpineProgress = targetSpineProgress;
   pendingReferenceUnitOffset = targetSpineUnitOffset;
@@ -3394,7 +3395,7 @@ void EpubReaderActivity::jumpToStablePage(const uint32_t page) {
 void EpubReaderActivity::handleClippingJump(const ClippingJumpResult& clipping) {
   clearPendingManualPageTurns();
   RenderLock lock(*this);
-  clearFootnotePreviewState();
+  abandonFootnoteNavigation();
   currentSpineIndex = clipping.spineIndex;
   pendingPageJump = clipping.page;
   pendingParagraphIndex = clipping.paragraphIndex;
@@ -3592,7 +3593,7 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
               const auto& chapterResult = std::get<ChapterResult>(result.data);
               RenderLock lock(*this);
 
-              clearFootnotePreviewState();
+              abandonFootnoteNavigation();
               currentSpineIndex = chapterResult.spineIndex;
 
               // If anchor is not empty, it will be used later to calculate the page number.
@@ -4007,7 +4008,7 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
             if (!result.isCancelled) {
               const auto& bm = std::get<BookmarkResult>(result.data);
               RenderLock lock(*this);
-              clearFootnotePreviewState();
+              abandonFootnoteNavigation();
               if (section && currentSpineIndex == bm.spineIndex) {
                 bool resolved = false;
                 const uint16_t fallbackPage =
@@ -4140,10 +4141,7 @@ void EpubReaderActivity::onFrontlightPanelOpened() {
 }
 
 void EpubReaderActivity::onFrontlightPanelClosed() {
-  globalStats = GlobalReadingStats::load();
-  stats = epub ? BookReadingStats::load(epub->getCachePath()) : stats;
-  resumeReadingPaceTimer("frontlight_panel_return");
-  requestUpdate();
+  handleBookStatsReturn(false);
 }
 
 bool EpubReaderActivity::handleFrontlightPanelResult(const FrontlightPanelResult& result) {
@@ -5408,6 +5406,20 @@ void EpubReaderActivity::requestManualPageTurn(const bool isForwardTurn, const c
     return;
   }
 
+  // Shortcuts bypass loop()'s ordinary end-screen input handling.
+  if (epub && currentSpineIndex > 0 && currentSpineIndex >= epub->getSpineItemsCount()) {
+    if (endOfBookOptions && endOfBookOptions->menuActive()) return;
+    if (isForwardTurn) {
+      onGoHome();
+    } else {
+      currentSpineIndex = epub->getSpineItemsCount() - 1;
+      nextPageNumber = 0;
+      pendingPageJump = std::numeric_limits<uint16_t>::max();
+      requestUpdate();
+    }
+    return;
+  }
+  if (!section) return;
   pageTurn(isForwardTurn, source);
 }
 
@@ -5460,6 +5472,7 @@ void EpubReaderActivity::cancelSilentNextChapterPrefetchForForwardTurn() {
 }
 
 void EpubReaderActivity::pageTurn(bool isForwardTurn, const char* source) {
+  if (!section) return;
   pageLoadRetryCount = 0;
   if (activeFootnotePreview) {
     if (isForwardTurn) {
@@ -6251,6 +6264,9 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       pageLoadRetryCount++;
       if (pageLoadRetryCount <= MAX_PAGE_LOAD_RETRIES) {
         LOG_ERR("ERS", "Failed to load page from SD (retry %d) - clearing section cache", pageLoadRetryCount);
+        // Retry the page that failed, not the stale chapter-entry/resume page.
+        // A later explicit pending jump still takes precedence during reload.
+        nextPageNumber = section->currentPage;
         section->abandonBuild();
         section->clearCache();
         section.reset();
@@ -7598,6 +7614,12 @@ std::string EpubReaderActivity::footnotePreviewCacheSuffix(const EpubRenderMode 
 void EpubReaderActivity::clearFootnotePreviewState() {
   pendingFootnotePreviewAnchor.clear();
   activeFootnotePreview = false;
+}
+
+void EpubReaderActivity::abandonFootnoteNavigation() {
+  clearFootnotePreviewState();
+  // Deliberate navigation replaces the origin, unlike ordinary footnote Back.
+  footnoteDepth = 0;
 }
 
 void EpubReaderActivity::navigateToHref(const std::string& hrefStr, const bool savePosition,

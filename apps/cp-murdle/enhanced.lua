@@ -97,96 +97,100 @@ local beats={
 function on_init()
  closed=false;g=S.load(M.decode) or M.new(smudge.millis());M.pause(g);screen='menu';face=1;struck=0;made={};nextTier=(g.id-1)//16+1
  F.init();for _,name in ipairs({'suspects','weapons','places','motives','face_clues','face_grid','face_info'}) do art[name]=assert(smudge.read_file('art/'..name..'.raw',72)) end
- local ok,o=pcall(smudge.get_orientation);if ok then original=o end;pcall(smudge.set_orientation,'portrait');redraw()
+ local ok,o=pcall(smudge.get_orientation);if ok then original=o end;redraw()
+end
+local U=dofile('unified_ui.lua');local accusePage=1;local helpPage=1
+local function text(t,x,y,width,bold,align)U.text(x,y,U.fit(t,width,'ui10',bold),'ui10',bold,align or'left')end
+local function wrap(t,width)
+ local out,line={},'';for word in t:gmatch('%S+')do
+  local next=line==''and word or line..' '..word
+  if smudge.text_width(next,'ui10')>width and line~=''then out[#out+1]=line;line=word else line=next end
+ end;if line~=''then out[#out+1]=line end;return out
+end
+local function footer(labels,actions,values,primary,enabled)
+ for i,b in ipairs(U.footer(labels,primary,enabled))do if actions[i]and b.enabled then hit(b,actions[i],values and values[i])end end
+end
+local function pager(action,current,count)
+ local y=h-116;local width=(w-44)//3
+ for i,label in ipairs({'<',current..' / '..count,'>'})do
+  local b={x=14+(i-1)*(width+8),y=y,w=width,h=40};U.button(label,b)
+  if i~=2 then hit(b,action,action=='page'and(i==1 and -1 or 1)or math.max(1,math.min(count,current+(i==1 and -1 or 1))))end
+ end
+end
+local function sheets(p,info)
+ local pages={{}};local top=78;local bottom=notice~=''and h-164 or h-128;local y=top
+ local function add(lines,index,bold)
+  for n,line in ipairs(lines)do
+   if y+29>bottom then pages[#pages+1]={};y=top end
+   pages[#pages][#pages[#pages]+1]={text=line,y=y,index=index,first=n==1,bold=bold};y=y+29
+  end;y=y+10
+ end
+ if info then
+  for cat=1,p.cats do
+   add({names[cat]},nil,true)
+   for i=1,p.n do add(wrap(p.dossier[(cat-1)*p.n+i]or p.labels[cat][i],w-28),nil)end
+  end
+ else for i,t in ipairs(p.text)do add(wrap(t,w-76),i)end end
+ return pages
 end
 function on_draw()
- w,h=smudge.get_bounds();hits={};smudge.clear();local p=M.case(g);local footer=F.box(16,h-78,w-32,62)
- local title=screen=='settings' and 'DIFFICULTY' or screen=='accuse' and 'ACCUSE' or screen=='help' and 'HOW TO SOLVE' or 'MURDLE'
- F.header(title,w,screen=='menu' and tiers[(g.id-1)//16+1] or nil)
- if screen=='menu' then
-  F.nativeText(g.phase==1 and 'CASE CLOSED' or 'THE CASE',F.box(16,119,w-32,63),30,false,true)
-  F.nativeText('CASE '..g.id..', '..tiers[(g.id-1)//16+1]..(g.phase==1 and', CLOSED'or''),F.box(16,184,w-32,21),10,false,true)
-  local board=F.box(16,217,w-32,h-217-266);drawBoard(p,board,true);hit(F.box(16,119,w-32,h-119-250),'play')
-  local count,used=0,0;for b=1,#M.blocks(p) do for r=1,p.n do for c=1,p.n do if M.shown(g,b,r,c)~=0 then count=count+1 end end end end
+ w,h=smudge.get_bounds();hits={};smudge.clear();local p=M.case(g);local m=U.metrics()
+ U.header(screen=='settings'and'DIFFICULTY'or screen=='accuse'and'ACCUSE'or screen=='help'and'HOW TO SOLVE'or'MURDLE',screen=='case'and #p.text..' CLUES'or screen=='menu'and tiers[(g.id-1)//16+1]or'')
+ if screen=='menu'then
+  text(g.phase==1 and'CASE CLOSED'or'THE CASE',14,86,w-28,true)
+  text('CASE '..g.id..' / '..tiers[(g.id-1)//16+1],14,128,w-28)
+  local count,used=0,0;for b=1,#M.blocks(p)do for r=1,p.n do for c=1,p.n do if M.shown(g,b,r,c)~=0 then count=count+1 end end end end
   for i=1,#p.text do if struck&(1<<(i-1))~=0 then used=used+1 end end
-  F.nativeText(used..' OF '..#p.text..' CLUES USED',F.box(16,h-260,w-32,21),10)
-  F.nativeText(count..' OF '..#g.marks..' SQUARES SETTLED',F.box(16,h-239,w-32,21),10)
-  button('NEW CASE',F.box(16,h-210,w-32,62),'new')
-  button('DIFFICULTY',F.box(16,h-144,w-32,62),'settings',nil,true)
-  button('HOW TO SOLVE',footer,'help',nil,true)
- elseif screen=='case' then
-  local door=0;for f=1,3 do if f~=face then local x=w-112+door*56;smudge.bitmap(x+16,26,24,24,art[faceIcons[f]],true);hit(F.box(x,0,56,76),'face',f);door=door+1 end end
+  text(used..' OF '..#p.text..' CLUES USED',14,174,w-28)
+  text(count..' OF '..#g.marks..' SQUARES SETTLED',14,214,w-28)
+  if h>600 then drawBoard(p,F.box(14,270,w-28,h-370-(notice~=''and 40 or 0)),true)end
+  footer({'New case','Level','Help','Play'},{'new','settings','help','play'},nil,4)
+ elseif screen=='case'then
   if face==2 then
-   local bottom=drawBoard(p,F.box(16,119,w-32,h-119-140),false)
-   if notice~=''then F.nativeText(notice,F.box(16,bottom+8,w-32,21),10)end
-   drawLegend(p,bottom+37,h-82)
+   drawBoard(p,F.box(14,78,w-28,h-206-(notice~=''and 40 or 0)),false)
+   text('Full category names and details: File',14,h-116,w-28)
   else
-   local sheets=textPages(p,face==3);pageCount=#sheets;page=math.max(1,math.min(page,pageCount))
-   for _,item in ipairs(sheets[page]) do
-    if item.category then
-     if item.divider then smudge.rect(16,item.y-10,w-32,1,true,true)end
-     F.nativeText(names[item.category],F.box(16,item.y,w-32,23),10,false,true);local y=item.y+27
-     for _,line in ipairs(item.lines)do F.nativeText(line,F.box(28,y,w-44,23),10,false,true);y=y+23 end
-    else
-     local done=(struck&(1<<(item.index-1)))~=0;local tick=F.box(16,item.y,24,23)
-     F.round(tick,5,done,false,1);F.nativeText(item.index,F.box(tick.x,tick.y+1,tick.w,21),10,done)
-     local y=item.y;for _,line in ipairs(item.lines) do F.nativeText(line,F.box(48,y,w-64,21),10,false,true);y=y+21 end
-     hit(F.box(16,item.y,w-32,item.h+10),'clue',item.index)
-    end
+   local pages=sheets(p,face==3);pageCount=#pages;page=math.max(1,math.min(page,pageCount))
+   for _,row in ipairs(pages[page])do
+    if row.index then
+     local done=struck&(1<<(row.index-1))~=0
+     if row.first then local b={x=14,y=row.y,w=30,h=29};U.panel(b,done);U.text(29,row.y+2,tostring(row.index),'ui10',true,'center',not done)end
+     text(row.text,58,row.y,w-72);hit({x=14,y=row.y,w=w-28,h=29},'clue',row.index)
+    else text(row.text,14,row.y,w-28,row.bold)end
    end
-   if pageCount>1 then
-    for i,label in ipairs({'<','>'})do local live=i==1 and page>1 or i==2 and page<pageCount;local b=F.box(i==1 and 16 or w-64,h-128,48,40)
-     if live then F.round(b,8,false,false,1);F.nativeText(label,F.box(b.x+4,b.y+2,b.w-8,b.h-4),20);hit(b,'page',i==1 and -1 or 1)else F.disabled(b,label,20,8)end end
-    local used=0;for i=1,#p.text do if struck&(1<<(i-1))~=0 then used=used+1 end end;F.nativeText(page..' / '..pageCount..'      '..used..' OF '..#p.text..' DONE',F.box(16,h-118,w-32,22),10)
-   end
+   if pageCount>1 then pager('page',page,pageCount)end
   end
-  button(g.phase==1 and 'SOLVED' or 'ACCUSE',footer,g.phase==0 and 'accuse' or nil)
- elseif screen=='settings' then
-  for i=1,4 do local b=F.box(16,119+(i-1)*86,w-32,76);local selected=i==nextTier
-   F.round(b,10,selected,false,1);F.nativeText(tiers[i],F.box(28,b.y+6,w-56,42),20,selected,true);F.nativeText(shapes[i],F.box(28,b.y+48,w-56,21),10,selected,true);hit(b,'tier',i)
-  end
-  paragraph('The case you have open keeps the size it was made at. This applies to the next one.',16,479,w-32,10)
- elseif screen=='confirm' then
-  F.nativeText('DROP THIS CASE?',F.box(16,119,w-32,56),30,false,true,true)
-  paragraph('The marks you have made will go with it. There is only ever one case open at a time.',16,189,w-32,10)
-  button('START A NEW ONE',F.box(16,h-144,w-32,62),'fresh')
-  button('KEEP IT',footer,'menu',nil,true)
- elseif screen=='accuse' then
-  local y=119;local rowH=40;local gap=8;local cw=(w-40)//2
-  for cat=1,p.cats do
-   F.nativeText(cat==1 and'SUSPECTS'or names[cat],F.box(16,y,w-32,25),10,false,true);y=y+25
-   for i=1,p.n do local b=F.box(16+(i-1)%2*(cw+8),y+(i-1)//2*(rowH+gap),cw,rowH);local selected=made[cat] and g.picks[cat]==i
-    F.round(b,8,selected,false,1);F.nativeText(p.labels[cat][i],F.box(b.x+4,b.y+2,b.w-8,b.h-4),10,selected);hit(b,'pick',{cat,i})
-   end
-   y=y+((p.n+1)//2)*(rowH+gap)+10
-  end
-  local complete=true;for cat=1,p.cats do if not made[cat] then complete=false end end
-  if complete then button('THAT IS MY ACCUSATION',footer,'submit')else F.disabled(footer,'THAT IS MY ACCUSATION',20)end
- elseif screen=='verdict' then
-  F.nativeText(g.phase==1 and 'CASE CLOSED' or 'THEY WALK FREE',F.box(16,119,w-32,60),30)
-  local text='It was '..p.labels[1][g.picks[1]]..' with '..phrases[1][p.labels[2][g.picks[2]]]..' '..phrases[2][p.labels[3][g.picks[3]]]
-  if p.cats==4 then text=text..', driven by '..phrases[3][p.labels[4][g.picks[4]]]end
-  local y=paragraph(text..'.',16,199,w-32,20)
-  paragraph(g.phase==1 and (g.attempts==1 and 'SOLVED, FIRST TIME OF ASKING.' or 'SOLVED, AFTER '..(g.attempts-1)..' WRONG ACCUSATIONS.') or 'THE EVIDENCE DOES NOT SUPPORT IT.',16,y+14,w-32,10)
-  local b=F.box(16,h-144,w-32,62);F.button(g.phase==1 and 'ANOTHER CASE'or'KEEP LOOKING',b,true,30);hit(b,g.phase==1 and'new'or'play')
-  button('DONE',footer,'menu',nil,true)
- elseif screen=='help' then
-  local y=119
-  for i,beat in ipairs(beats) do
-   F.nativeText(beat[1],F.box(16,y,w-32,42),20,false,true);y=paragraph(beat[2],16,y+44,w-32,10)
-   if i==2 then
-    y=y+10;local labels={'NOT SURE','IT WAS THEM','YOU RULED OUT','GRID RULED OUT'}
-    for n,label in ipairs(labels) do local x=16+(n-1)%2*((w-32)//2);local top=y+(n-1)//2*50
-     F.rect(F.box(x,top,40,40),false)
-     if n==2 then F.round(F.box(x+10,top+10,20,20),3,true) elseif n>=3 then smudge.rect(x+9,top+20-(n==3 and 2 or 1),22,n==3 and 4 or 2,true,true) end
-     F.nativeText(label,F.box(x+48,top+9,(w-32)//2-52,21),10,false,true)
-    end;y=y+106
-   end;y=y+16
-  end
-  hit(F.box(16,119,w-32,h-135),'menu')
+  footer({face==2 and'Clues'or'Grid',face==3 and'Clues'or'File',g.phase==1 and'Solved'or'Accuse'},{'face','face',g.phase==0 and'accuse'or nil},{face==2 and 1 or 2,face==3 and 1 or 3},3)
+ elseif screen=='settings'then
+  for i=1,4 do local b={x=14,y=78+(i-1)*64,w=w-28,h=56};U.button(tiers[i],b,i==nextTier);hit(b,'tier',i)end
+  text('Applies to the next case; current case is kept.',14,notice~=''and 286 or 344,w-28)
+  footer({'Back'},{'menu'})
+ elseif screen=='confirm'then
+  text('DROP THIS CASE?',14,90,w-28,true)
+  local y=148;for _,t in ipairs(wrap('All its marks go with it. There is only ever one open case.',w-28))do text(t,14,y,w-28);y=y+29 end
+  footer({'Keep it','Start a new one'},{'menu','fresh'},nil,2)
+ elseif screen=='accuse'then
+  accusePage=math.max(1,math.min(p.cats,accusePage));local cat=accusePage
+  text(names[cat],14,80,w-28,true)
+  local cw=(w-36)//2
+  for i=1,p.n do local b={x=14+(i-1)%2*(cw+8),y=128+(i-1)//2*72,w=cw,h=64};U.button(p.labels[cat][i],b,made[cat]and g.picks[cat]==i);hit(b,'pick',{cat,i})end
+  pager('accuse-page',cat,p.cats)
+  local complete=true;for c=1,p.cats do if not made[c]then complete=false end end
+  footer({'Clues','Submit'},{'clues','submit'},nil,2,{true,complete})
+ elseif screen=='verdict'then
+  text(g.phase==1 and'CASE CLOSED'or'THEY WALK FREE',14,80,w-28,true)
+  local t='It was '..p.labels[1][g.picks[1]]..' with '..phrases[1][p.labels[2][g.picks[2]]]..' '..phrases[2][p.labels[3][g.picks[3]]]
+  if p.cats==4 then t=t..', driven by '..phrases[3][p.labels[4][g.picks[4]]]end
+  F.block(t,F.box(14,128,w-28,h-264-(notice~=''and 40 or 0)),20,12)
+  text(g.phase==1 and'SOLVED / ATTEMPTS '..g.attempts or'THE EVIDENCE DOES NOT SUPPORT IT',14,h-106,w-28)
+  footer({'Done',g.phase==1 and'New case'or'Keep looking'},{'menu',g.phase==1 and'new'or'play'},nil,2)
+ elseif screen=='help'then
+  local beat=beats[helpPage];text(beat[1],14,78,w-28,true)
+  F.block(beat[2],F.box(14,128,w-28,h-274-(notice~=''and 40 or 0)),20,18)
+  pager('help-page',helpPage,#beats);footer({'Back'},{'menu'})
  end
- if keyboard then focus=math.max(1,math.min(focus,#hits));if hits[focus] then local b=hits[focus].box;F.corners(b,math.min(8,b.w),2) end end
- if notice=='SAVE FAILED - RETRY' then F.center(notice,F.box(16,h-105,w-32,21),10) end
+ if notice~=''then text(notice,14,h-154,w-28,true)end
+ if keyboard then focus=math.max(1,math.min(focus,#hits));if hits[focus]then local b=hits[focus].box;smudge.rect(b.x,b.y,b.w,b.h,false,3,true)end end
 end
 local function dispatch(action,value)
  if action=='play' then screen='case'
@@ -201,9 +205,12 @@ local function dispatch(action,value)
  elseif action=='page' then page=math.max(1,math.min(pageCount,page+value))
  elseif action=='clue' then struck=struck~(1<<(value-1))
  elseif action=='cell' then notice=M.tap(g,value[1],value[2],value[3]) and '' or 'ALREADY TICKED ELSEWHERE'
- elseif action=='accuse' then screen='accuse'
+ elseif action=='accuse' then screen='accuse';accusePage=1
+ elseif action=='accuse-page'then accusePage=value
+ elseif action=='help-page'then helpPage=value
+ elseif action=='clues'then screen='case';face=1;page=1
  elseif action=='pick' then g.picks[value[1]]=value[2];made[value[1]]=true
- elseif action=='submit' then M.accuse(g);screen='verdict' end
+ elseif action=='submit' then local complete=true;for cat=1,M.case(g).cats do if not made[cat]then complete=false end end;if complete then M.accuse(g);screen='verdict'end end
  focus=1;hits={} -- Retire the old screen targets until its replacement is drawn.
  if smudge.millis()-savedAt>=5000 then save();savedAt=smudge.millis() end
  redraw()

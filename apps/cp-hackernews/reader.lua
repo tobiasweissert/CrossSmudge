@@ -4,7 +4,7 @@ local root='https://hacker-news.firebaseio.com/v0/';local feeds={'topstories','n
 local S={screen='list',tab=1,listPage=1,ids={},items={},failed={},comments={},error='',loading=false,more=false}
 local pending,active,closed,lastTry,feedCache,articleCache,deferred
 local slots,frames,seen={},{},{};local target,bytes,visited=0,0,0
-local function redraw()smudge.request_update()end
+local function redraw()if V.retire then V.retire()end;smudge.request_update()end
 local function cancel()
  if active and active.kind=='comment' then deferred=active end;if pending and pending.kind=='comment' then deferred=pending end
  if active then smudge.http_cancel(active.request) end;active=nil;pending=nil;S.loading=false;lastTry=nil

@@ -8,59 +8,20 @@ function screen.enter()
 end
 
 function screen.draw()
-    smudge.header("Codex", "Ink & Iron")
-    local m = smudge.get_metrics()
-    local topY = m.top_padding + m.header_height + 2
-    local bottomY = h - m.button_hints_height - 2
-    draw_page_frame(topY, bottomY)
-
-    local y = topY + 12
-    smudge.centered_text(y, "CODEX: INK & IRON", "ui12", "bold", true)
-    y = y + smudge.line_height("ui12") + 4
-    smudge.centered_text(y, "A Roguelike Deckbuilder for E-Paper", "small", "regular", true)
-    y = y + smudge.line_height("small") + 12
-
-    local plateSize = 136
-    local plateX = math.floor((w - plateSize) / 2)
-    draw_monster(plateX, y, 6)
-    y = y + plateSize + 16
-
-    draw_codex_divider(y, w, 28)
-    y = y + 16
-
-    local btnW = 340
-    local btnH = 38
-    local btnX = math.floor((w - btnW) / 2)
-
-    local options = {}
-    if state.inRun then
-        options = {
-            string.format("Continue Delve (Page %d/15)", state.floor),
-            "New Delve",
-            "Inspect Grimoire",
-            "Abandon Delve"
-        }
-    else
-        options = {
-            "New Delve",
-            "Inspect Grimoire",
-            "Exit to Applications"
-        }
+    local m=U.metrics()
+    U.header('Codex Delve','Ink & Iron')
+    local x=m.landscape and 220 or 14
+    local width=w-x-14
+    local y=m.landscape and 88 or 260
+    draw_monster(m.landscape and 36 or (w-136)//2,100,6)
+    local options=state.inRun and {string.format('Continue Delve (Page %d/15)',state.floor),'New Delve','Inspect Grimoire','Abandon Delve'} or {'New Delve','Inspect Grimoire','Exit to Applications'}
+    screen.options={}
+    for i,label in ipairs(options)do screen.options[i]=U.button(label,{x=x,y=y+(i-1)*52,w=width,h=44},i==title_idx)end
+    if state.saveNotice then
+        local ny=m.body_bottom-60
+        for _,line in ipairs(smudge.wrapped_text(state.saveNotice,w-28,'small',true,3).lines or {})do U.text(14,ny,line,'small',true);ny=ny+smudge.line_height('small')end
     end
-
-    for i, opt in ipairs(options) do
-        local optY = y + (i - 1) * (btnH + 10)
-        local isSel = (i == title_idx)
-        if isSel then
-            smudge.rect(btnX, optY, btnW, btnH, true)
-            smudge.text(btnX + math.floor(btnW / 2), optY + math.floor((btnH - smudge.line_height("ui12")) / 2), opt, "ui12", "bold", "center", false)
-        else
-            smudge.rect(btnX, optY, btnW, btnH, false)
-            smudge.text(btnX + math.floor(btnW / 2), optY + math.floor((btnH - smudge.line_height("ui12")) / 2), opt, "ui12", "regular", "center", true)
-        end
-    end
-
-    smudge.button_hints("Back", "Select", "Up", "Down")
+    draw_actions('Back','Select','Up','Down')
 end
 
 function screen.on_button(btn, pressed)
@@ -104,23 +65,8 @@ function screen.on_button(btn, pressed)
     end
 end
 
-function screen.on_tap(x, y)
-    local m = smudge.get_metrics()
-    local topY = m.top_padding + m.header_height + 2
-    local menuStartY = topY + 12 + smudge.line_height("ui12") + 4 + smudge.line_height("small") + 12 + 136 + 16 + 16
-    local btnW = 340
-    local btnH = 38
-    local btnX = math.floor((w - btnW) / 2)
-    local totalOptions = state.inRun and 4 or 3
-
-    for i = 1, totalOptions do
-        local optY = menuStartY + (i - 1) * (btnH + 10)
-        if x >= btnX and x <= btnX + btnW and y >= optY and y <= optY + btnH then
-            title_idx = i
-            screen.on_button("confirm", true)
-            return
-        end
-    end
+function screen.on_tap(x,y)
+    for i,r in ipairs(screen.options or {})do if U.hit(r,x,y)then title_idx=i;screen.on_button('confirm',true);return end end
 end
 
 return screen

@@ -2,6 +2,13 @@
 -- Modular roguelike deckbuilder with dynamic screen loading and low heap footprint
 
 w, h = 480, 800
+U = dofile('unified_ui.lua')
+local footer, painted = {}, false
+function draw_actions(a,b,c,d)
+    local labels={a,b,c,d};local enabled={}
+    for i=1,4 do enabled[i]=labels[i]~=nil and labels[i]~='' end
+    footer=U.footer(labels,2,enabled)
+end
 
 dofile("state.lua")
 dofile("ui_base.lua")
@@ -13,6 +20,7 @@ pending_screen = nil
 pending_screen_arg = nil
 
 function set_screen(name, arg)
+    painted=false;footer={}
     pending_screen = name
     pending_screen_arg = arg
 end
@@ -83,13 +91,16 @@ function on_draw()
         apply_screen_transition()
     end
     smudge.clear()
+    w,h=smudge.get_bounds();footer={}
     if active_screen and active_screen.draw then
         active_screen.draw()
     end
+    painted=true
     collectgarbage("step", 50)
 end
 
 function on_button(btn, pressed)
+    if pressed then painted=false;footer={} end
     if active_screen and active_screen.on_button then
         active_screen.on_button(btn, pressed)
     end
@@ -100,19 +111,16 @@ function on_button(btn, pressed)
 end
 
 function on_tap(x, y)
-    local m = smudge.get_metrics()
-    if y > h - m.button_hints_height then
-        if x < w / 4 then
-            on_button("back", true)
-        elseif x < w / 2 then
-            on_button("confirm", true)
-        elseif x < 3 * w / 4 then
-            on_button("left", true)
-        else
-            on_button("right", true)
-        end
+    if not painted then return end
+    painted=false
+    for i,r in ipairs(footer)do
+        if U.hit(r,x,y)then on_button(({'back','confirm','left','right'})[i],true);return end
+    end
+    if y>=h-68 then
+        if active_screen_name=='combat' and active_screen and active_screen.on_tap then active_screen.on_tap(x,y)end
         return
     end
+    if y<64 then return end
 
     if active_screen and active_screen.on_tap then
         active_screen.on_tap(x, y)

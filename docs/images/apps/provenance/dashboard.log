@@ -1,0 +1,31 @@
+[0] [INF] [BOOT] Reset diagnostic: reset=0(UNKNOWN) sleepWake=0(UNDEFINED)
+[0] [INF] [MAIN] Device: Simulator
+[0] [INF] [BOOT] Wake route: Other
+[0] [INF] [BOOT] Other wake route: continuing boot
+SIMRESOURCE mode=off calibrated=0 internal=1048576/1048576 largest=1048576 psram=0/0 largest=0
+[0] [DBG] [BOOTMEM] storage ready: free=1048576 maxAlloc=1048576
+[SIM] open failed: ./fs_/.crosspoint/dictionary.bin (flags=0x0 errno=2 No such file or directory)
+[0] [DBG] [UI] Using Lyra theme
+[0] [DBG] [BOOTMEM] boot state ready: free=1048576 maxAlloc=1048576
+[0] [DBG] [MAIN] Starting Crosscub version 1.6.5.3
+[0] [INF] [MEM] Boot: heap free=1048576 total=1048576 min=1048576 maxAlloc=1048576
+[80] [DBG] [ACT] Render task started with 16384-byte stack
+[80] [DBG] [SDFS] SD font resolver ready; discovery deferred until requested
+[80] [DBG] [BOOTMEM] display and selected fonts ready: free=1048576 maxAlloc=1048576
+[80] [DBG] [ACT] Entering activity: Boot
+[SIM] open failed: ./fs_/.bootscreen (flags=0x0 errno=2 No such file or directory)
+[SIM] open failed: ./fs_/bootscreen (flags=0x0 errno=2 No such file or directory)
+[82] [DBG] [ACT] Exiting activity: Boot
+[82] [DBG] [ACT] Entering activity: Home
+[SIM] open failed: ./fs_/.crosspoint/global_stats.bin (flags=0x0 errno=2 No such file or directory)
+[SIM] open failed: ./fs_/.crosspoint/global_stats.bin.bak (flags=0x0 errno=2 No such file or directory)
+[82] [DBG] [GSTATS] Global stats missing or corrupt, starting fresh
+[SIM] open failed: ./fs_/.crosspoint/synced_stats (flags=0x0 errno=2 No such file or directory)
+[82] [INF] [GALLERY] Launching published app dashboard; networking disabled
+[104] [DBG] [ACT] Exiting activity: Home
+[104] [DBG] [ACT] Entering activity: dashboard
+[105] [INF] [LUA] [dashboard] Init with heap limit: 2097152 bytes, pool=default
+[SIM] open failed: ./fs_/.crosssmudge/applications/dashboard/dashboard.dat (flags=0x0 errno=2 No such file or directory)
+[SIM] open failed: ./fs_/.crosssmudge/applications/dashboard/dashboard_v1.dat (flags=0x0 errno=2 No such file or directory)
+[SIM] Saved screenshot: /root/.hermes/cache/scratch/crosscub-app-gallery/dashboard.bmp
+SIMRESOURCE final internal_current=1048576 internal_minimum=1048576 internal_largest=1048576 internal_live=0 psram_current=0 psram_minimum=0 psram_largest=0 psram_live=0
