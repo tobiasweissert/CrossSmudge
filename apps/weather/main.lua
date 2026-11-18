@@ -2,6 +2,7 @@ local U=dofile('ui.lua');collectgarbage('collect')
 local M=dofile('model.lua');collectgarbage('collect')
 local S=dofile('storage.lua');collectgarbage('collect')
 local location,forecast,pending,active,cities,detail,closed
+local cancel
 local status='Refresh to fetch weather'
 local function queue(kind,url)
  if active or pending then status='Request in progress';return end
@@ -50,8 +51,12 @@ end
 local function temp(n)return string.format('%.0f',n)..'o'end
 function on_draw()
  if U.editor then U.editDraw();return end
- U.begin(location.name,status)
+ U.begin('Weather',location.name)
  local p,w,t,b=U.pad,U.w,U.top,U.bottom
+ local sh=smudge.wrapped_text(status,w-2*p,'ui10','regular',3)
+ for i,line in ipairs(sh.lines)do U.text(p,t+(i-1)*smudge.line_height('ui10'),line,'ui10')end
+ t=t+#sh.lines*smudge.line_height('ui10')+12
+ if active or pending then U.button('Cancel',w-p-100,t,100,44,function()cancel();status='Cancelled'end);t=t+52 end
  if cities and #cities>0 then
   for i,city in ipairs(cities)do U.button(city.name,p,t+(i-1)*48,w-2*p,42,function()
    location=city;forecast=nil;cities=nil;U.save(S,M.encodeLocation(location)..'\n');refresh()
@@ -59,14 +64,44 @@ function on_draw()
  else
   if forecast then
    local c=forecast.current;local y
-   if detail and w>U.h then
-    U.text(p,t+10,temp(c.temperature_2m)..'  '..M.condition(c.weather_code),'ui12',true)
-    y=t+40
+   if w>U.h then
+    -- Landscape keeps the complete forecast beside current conditions rather
+    -- than spending the short body height on a portrait temperature stack.
+    local left=240;local x0=p+left+16;local right=w-p-x0
+    local lh=smudge.line_height('ui10');local limit=b-32
+    U.text(p,t,temp(c.temperature_2m),'ui12',true)
+    local cy=U.wrap(M.condition(c.weather_code),p,t+lh+8,left,3,'ui10',true)
+    U.text(p,cy+4,'Feels '..temp(c.apparent_temperature),'ui10')
+    U.text(p,cy+lh+8,'Wind '..string.format('%.0f',c.wind_speed_10m)..' km/h','ui10')
+    if detail then
+     local cw=(right-12)//2;local rh=(limit-t)//2
+     for i=2,5 do
+      local x=x0+((i-2)%2)*(cw+12);local yy=t+((i-2)//2)*rh
+      U.text(x,yy,forecast.daily.time[i]:sub(6),'ui10',true)
+      U.text(x+cw,yy,temp(forecast.daily.temperature_2m_max[i])..' / '..temp(forecast.daily.temperature_2m_min[i]),'ui10',true,'right')
+      U.wrap(M.condition(forecast.daily.weather_code[i]),x,yy+lh,cw,2,'ui10')
+     end
+    else
+     local cw=(right-4*8)//5
+     for i=1,5 do
+      local hour=1+(i-1)*3;local x=x0+(i-1)*(cw+8)
+      smudge.rect(x,t,cw,limit-t,false,1,true)
+      U.text(x+cw//2,t+6,forecast.hourly.time[hour]:sub(12,16),'ui10',false,'center')
+      U.text(x+cw//2,t+lh+6,temp(forecast.hourly.temperature_2m[hour]),'ui10',true,'center')
+      -- Native wrapped_text ellipsizes a single over-wide word. Split these
+      -- bounded ASCII condition labels explicitly so no condition is omitted.
+      local label=M.condition(forecast.hourly.weather_code[hour]);local yy=t+2*lh+6
+      while #label>0 do
+       local n=#label
+       while n>1 and smudge.text_width(label:sub(1,n),'ui10')>cw-8 do n=n-1 end
+       U.text(x+4,yy,label:sub(1,n),'ui10');label=label:sub(n+1);yy=yy+lh
+      end
+     end
+    end
    else
     local nh=math.min(145,(b-t)*0.24)
     U.number(t+10,temp(c.temperature_2m),nh)
     y=t+nh+25;U.text(p,y,M.condition(c.weather_code),'ui12',true);y=y+30
-   end
    U.text(p,y,'Feels '..temp(c.apparent_temperature)..'  Wind '..string.format('%.0f',c.wind_speed_10m)..' km/h','small')
    y=y+36
    if detail then
@@ -90,16 +125,20 @@ function on_draw()
      end
     end
    end
-  else U.wrap('No forecast yet. Select Refresh. Wi-Fi and trusted UTC are required.',p,t+35,w-2*p,4)end
-  local bw=(w-2*p-16)//3
-  U.button('Refresh',p,b-67,bw,42,refresh,true)
-  U.button('Location',p+bw+8,b-67,bw,42,search)
-  U.button(detail and 'Overview'or 'Details',p+2*(bw+8),b-67,bw,42,function()detail=not detail end)
-  U.text(p,b-17,'Weather: Open-Meteo (CC BY 4.0)','small')
+   end
+  else
+   local y=math.max(t,(t+b)//2-65)
+   U.text(w//2,y,'NO FORECAST','lexend16',true,'center')
+   local lines=smudge.wrapped_text('Select Refresh. Wi-Fi and trusted UTC are required.',w-2*p,'ui10','regular',3)
+   for i,line in ipairs(lines.lines)do U.text(w//2,y+52+(i-1)*smudge.line_height('ui10'),line,'ui10',false,'center')end
+   U.text(w//2,math.min(b-26,y+64+#lines.lines*smudge.line_height('ui10')),'Weather: Open-Meteo (CC BY 4.0)','small',false,'center')
+  end
+  U.actions({{'Refresh',refresh},{'Location',search},{detail and 'Overview'or 'Details',function()detail=not detail end}},1)
+  if forecast then U.text(p,b-24,'Weather: Open-Meteo (CC BY 4.0)','small')end
  end
  U.footer()
 end
-local function cancel()
+cancel=function()
  pending=nil;if active then smudge.http_cancel(active.id);active=nil end
 end
 function on_button(key,pressed)

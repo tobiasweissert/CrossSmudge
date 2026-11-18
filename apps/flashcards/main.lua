@@ -21,7 +21,7 @@ function on_init()
 end
 function on_draw()
  if U.editor then U.editDraw();return end
- U.begin(menu and 'Deck options' or 'Flashcards',deck.title)
+ U.begin(menu and 'Deck options' or 'Flashcards',#deck.cards>0 and ('Card '..index..' of '..#deck.cards)or 'Empty deck')
  local p,w,t,b=U.pad,U.w,U.top,U.bottom
  if confirmDelete then
   U.button('Cancel',p,t,w-2*p,44,function()confirmDelete=false end)
@@ -32,24 +32,28 @@ function on_draw()
    {'Retry save',save},{'Return to cards',function()menu=false end}}
   for i,a in ipairs(actions) do U.button(a[1],p,t+(i-1)*52,w-2*p,44,a[2]) end
  else
-  U.button('+',w-p-48,t,48,36,add)
-  U.text(p,t+6,#deck.cards==0 and 'Empty deck' or ('Card '..index..' of '..#deck.cards),'small')
-  local bars=math.min(24,#deck.cards);local bw=(w-2*p)/math.max(1,bars)
-  for i=1,bars do smudge.rounded_rect(math.floor(p+(i-1)*bw),t+46,math.max(2,math.floor(bw)-3),12,3,i<index,1);if i==index then smudge.rect_dither(math.floor(p+(i-1)*bw)+2,t+48,math.max(1,math.floor(bw)-7),8) end end
-  local cy,ch=t+76,b-t-174
-  smudge.rounded_rect(p+4,cy+5,w-2*p,ch,18,true,1);smudge.rounded_rect(p,cy,w-2*p,ch,18,true,1,false);smudge.rounded_rect(p,cy,w-2*p,ch,18,false,3)
+  U.text(p,t,U.style.fit(deck.title:upper(),w-2*p,'ui10',true),'ui10',true)
+  local bars=math.min(24,#deck.cards);local gap=6;local bw=(w-2*p-gap*math.max(0,bars-1))//math.max(1,bars)
+  for i=1,bars do U.style.panel({x=p+(i-1)*(bw+gap),y=t+32,w=bw,h=12},i==index)end
+  local cy,ch=t+56,b-t-56
+  U.style.panel({x=p,y=cy,w=w-2*p,h=ch})
   if #deck.cards>0 then
-   U.text(w/2,cy+20,answer and 'Answer' or 'Question','small',false,'center')
-   local lines=smudge.wrapped_text(deck.cards[index][answer and 2 or 1],w-2*p-32,'bitter14','bold',math.max(1,(ch-80)//smudge.line_height('bitter14')))
-   for i,s in ipairs(lines.lines) do U.text(w/2,cy+(ch-lines.total_height)/2+(i-1)*smudge.line_height('bitter14'),s,'bitter14',true,'center') end
-  else U.text(w/2,cy+ch/2,'Add your first card','ui12',true,'center') end
-  U.button(answer and 'Next card' or 'Show answer',p,b-76,w-2*p,54,function()if answer then nextCard(1)else answer=true end end,true)
+   U.text(w//2,cy+10,answer and 'Answer' or 'Question','ui10',false,'center')
+   local font='lexend16';local lineH=smudge.line_height(font)
+   local content=deck.cards[index][answer and 2 or 1]
+   local all=smudge.wrapped_text(content,w-2*p-32,font,'bold',160)
+   if all.total_height>ch-64 then font='ui10';lineH=smudge.line_height(font);all=smudge.wrapped_text(content,w-2*p-32,font,'bold',160)end
+   for i,s in ipairs(all.lines)do U.text(w//2,cy+(ch-all.total_height)//2+(i-1)*lineH,s,font,true,'center')end
+  else U.text(w//2,cy+ch//2,'Add your first card','ui10',true,'center')end
+  U.actions({{'Option',function()menu=true;U.focus=1 end},{'+ Add',add},{answer and 'Next' or 'Answer',function()if answer then nextCard(1)else answer=true end end}},3)
+
  end
  U.footer()
 end
 function on_button(key,pressed)
  if not pressed then return end
- if U.editor then if confirmDelete then if key=='back'then confirmDelete=false else U.key(key)end;U.redraw();return end
+ if confirmDelete then if key=='back'then confirmDelete=false else U.key(key)end;U.redraw();return end
+ if U.editor then
  if key=='back' then U.closeEditor();U.redraw()else U.key(key)end;return end
  if key=='back' then if menu then menu=false else smudge.exit()end
  elseif key=='up' then menu=not menu;U.focus=1
@@ -61,7 +65,7 @@ function on_button(key,pressed)
 end
 function on_tap(x,y)
  if U.tap(x,y) or U.editor or menu then return end
- if y>U.top+76 and y<U.bottom-98 then answer=not answer;U.redraw()end
+ if #U.buttons>0 and U.style.hit({x=U.pad,y=U.top+56,w=U.w-2*U.pad,h=U.bottom-U.top-56},x,y)then answer=not answer;U.redraw()end
 end
 function on_swipe(dir) if not U.editor and not menu then nextCard(dir=='left' and 1 or -1)end end
 function on_update()end

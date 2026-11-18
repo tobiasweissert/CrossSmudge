@@ -5,7 +5,7 @@
     {
       "id": "flashcards",
       "name": "Flashcards",
-      "version": "0.1.0",
+      "version": "0.1.2",
       "author": "CrossSmudge",
       "description": "Create and study question and answer cards.",
       "min_api": 2,
@@ -16,13 +16,14 @@
         "main.lua",
         "manifest.json",
         "storage.lua",
-        "ui.lua"
+        "ui.lua",
+        "unified_ui.lua"
       ]
     },
     {
       "id": "habits",
       "name": "Habits",
-      "version": "0.1.0",
+      "version": "0.1.2",
       "author": "CrossSmudge",
       "description": "Daily habit checklists, streaks and sixteen weeks of history.",
       "min_api": 2,
@@ -33,13 +34,14 @@
         "main.lua",
         "manifest.json",
         "storage.lua",
-        "ui.lua"
+        "ui.lua",
+        "unified_ui.lua"
       ]
     },
     {
       "id": "pomodoro",
       "name": "Pomodoro",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "author": "CrossSmudge",
       "description": "Focus sessions with short and long breaks.",
       "min_api": 2,
@@ -50,14 +52,27 @@
         "icon.raw",
         "main.lua",
         "manifest.json",
+        "numeric_sans.lua",
+        "numeric_sans_128.bin",
+        "numeric_sans_150.bin",
+        "numeric_sans_180.bin",
+        "numeric_sans_24.bin",
+        "numeric_sans_32.bin",
+        "numeric_sans_48.bin",
+        "numeric_sans_64.bin",
+        "numeric_sans_96.bin",
+        "numeric_sans_OFL.txt",
+        "numeric_sans_SOURCE.txt",
+        "numeric_sans_metrics.lua",
         "storage.lua",
-        "ui.lua"
+        "ui.lua",
+        "unified_ui.lua"
       ]
     },
     {
       "id": "weather",
       "name": "Weather",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "author": "CrossSmudge",
       "description": "Current conditions and forecasts from Open-Meteo.",
       "min_api": 3,
@@ -72,7 +87,8 @@
         "manifest.json",
         "model.lua",
         "storage.lua",
-        "ui.lua"
+        "ui.lua",
+        "unified_ui.lua"
       ]
     },
     {
