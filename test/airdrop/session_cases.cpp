@@ -20,6 +20,7 @@ struct Harness {
   std::vector<uint8_t> output;
   std::string failure;
   std::vector<std::string> failuresReported;
+  std::string offeredFilename, offeredArchivePath;
   bool responseCloses=false;
   Offer offered{};OfferIdentity identity{},queued{};
   uint64_t clock=1000,sequence=0,requestOffset=0,deadline=0;
@@ -60,7 +61,7 @@ struct Harness {
     if(h.deadlineOnDecision)h.clock=h.deadline;if(h.slowAcceptedUrl)h.clock=h.deadline-1;
     if(h.answer)h.events.push_back(h.answer>0?"accept":"decline");return h.answer;
   }
-  static bool beginFile(void* p,const Offer& offer){auto& h=self(p);++h.fileBegins;h.clock+=h.stageCost;h.events.push_back("begin-file");assert(offer.kind==OfferKind::File);return !h.stageFail;}
+  static bool beginFile(void* p,const Offer& offer){auto& h=self(p);++h.fileBegins;h.clock+=h.stageCost;h.events.push_back("begin-file");assert(offer.kind==OfferKind::File);h.offeredFilename=offer.filename;h.offeredArchivePath=offer.archivePath;return !h.stageFail;}
   static stream::WriteResult append(void* p,const uint8_t* data,size_t n){auto& h=self(p);assert(n<=1024);h.clock+=h.appendCost;++h.appendCalls;
     if(h.appendFail)return stream::WriteResult::Error;if(h.blockCount){--h.blockCount;return stream::WriteResult::WouldBlock;}
     h.output.insert(h.output.end(),data,data+n);h.events.push_back("append");return stream::WriteResult::Consumed;
@@ -164,5 +165,9 @@ int main(int argc,char** argv){
   }
   {Harness h;h.input=request("/Ask",url,"Content-Length: 1\r\n");h.serve();CHECK("duplicate framing",h.count(200)==0&&h.pendingCount==0&&h.fileBegins==0);}
   {Harness h;h.input=request("/Ask",url);h.writeFail=true;h.serve();CHECK("failed ack write",h.handovers==0&&h.fileBegins==0);}
+  {Harness h;h.stageFail=true;h.input=request("/Ask",file);add(h.input,request("/Upload",stored,uploadHeaders));h.serve();
+    CHECK("AD-NAME-004 collision-safe staging failure explains no overwrite",h.failure.find("destination exists or SD unavailable")!=std::string::npos&&h.failure.find("no overwrite")!=std::string::npos&&h.count(507)==1&&h.count(200)==1&&h.count(100)==0&&h.finishes==0);}
+  {Harness h;const std::string name="Résumé e\xcc\x81 你好.EPUB";h.input=request("/Ask",load(root,"utf8.plist"));add(h.input,request("/Upload",load(root,"utf8.dvzip"),uploadHeaders));h.serve();
+    CHECK("AD-NAME-008 real plist/consent/session/decoder forwards original UTF8 name",h.count(200)==2&&h.finishes==1&&h.offeredFilename==name&&h.offeredArchivePath=="./"+name&&std::string(h.output.begin(),h.output.end())=="abc");}
   std::printf("production Session tests: failures=%d workspace=%zu; no device proof\n",failures,sizeof(Workspace));return failures?1:0;
 }

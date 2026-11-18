@@ -1,6 +1,6 @@
 {
-  "source_commit": "e647c44634970b30bac13ff08f21eab6bdcd0538",
-  "scope": "Owner-accepted redesigned source catalog; original predecessor test/crosscub/catalog-preservation.json is retained unchanged",
+  "source_commit": "a50e5366fea65753bc85f1d32997bb24d09cc3c4",
+  "scope": "Owner-accepted redesigned source catalog plus verified Browser 0.3.5 from a50e5366; original predecessor test/crosscub/catalog-preservation.json is retained unchanged",
   "catalog_count": 37,
   "branch": "feat/crosscub-sticky-only",
   "apps": {
@@ -185,9 +185,9 @@
       "manifest_sha256": "5f87772d553a6b5a097def5cbc2f48f0039a0474171f2f3384a7e89599e722d3"
     },
     "browser": {
-      "version": "0.3.3",
-      "record_sha256": "32694fdc36a6282372c668cc53dd9ea6b27a0be1a23a20941e01f2e48421f920",
-      "manifest_sha256": "46a79bef46f3aa07e4ff0f57e3c4bdeb185f44480d1c8be616d945638f83bf75"
+      "version": "0.3.5",
+      "record_sha256": "3014dac9a2545d2ae31e3475c3f4cd6f4e70142d25dd2b1ecd3f94f35ba496fe",
+      "manifest_sha256": "093488ab1d4c0146dd9ff3cdce2f028a83608124d62c50838aa61e6f6b74a863"
     }
   }
 }

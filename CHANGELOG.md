@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- File deletion preserves reading metadata when removal fails; moving a file preserves its reading state and refuses existing destinations.
+
 - Assisted Browser rejects forbidden response fields and oversized JSON, validates exact protocol values, and finds saved phrases across styled text with accurate Find-next positions.
 
 - Assisted Browser accepts the service’s UTF-8 JSON responses and fragment targets on image and GET form blocks while rejecting invalid offsets.
@@ -60,6 +62,8 @@
 - Fixed Solitaire v1.0.1 touch input on reTerminal Sticky: tapping cards now deals, selects, and moves cards; reset confirmation buttons match their drawn bounds, and taps in tableau gaps or below cards are ignored. Other devices retain their existing input behavior and saved games remain compatible.
 
 ### Added
+
+- Files offers touch-accessible actions and a destination folder picker. AirDrop saves the original filename without overwriting an existing file.
 
 - Browser 0.3.1 makes Assisted public and keyless at sticky.tobiasweissert.ch, removes private configuration import, and requires the explicit public-mode firmware flag. Shared quotas and opaque IDs are not private storage. Direct/Offline and existing saves remain available on API6.
 

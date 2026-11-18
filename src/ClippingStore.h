@@ -68,6 +68,7 @@ class ClippingStore {
     std::string destinationBackupPath;
     bool destinationBackedUp = false;
     bool active = false;
+    bool uncertain = false;
   };
 
   static ClippingStore& getInstance() { return instance; }
@@ -99,9 +100,11 @@ class ClippingStore {
   static void deleteForFilePath(const std::string& filePath, const std::string& bookType);
   static bool migrateForFilePath(const std::string& oldFilePath, const std::string& newFilePath,
                                  const std::string& title, const std::string& author, const std::string& bookType);
+  // Conservative Manual Move refuses retained destination records (no merge),
+  // and never rolls back an unacknowledged publication. Legacy default stays false.
   static bool beginRenameMigration(const std::string& oldFilePath, const std::string& newFilePath,
                                    const std::string& title, const std::string& author, const std::string& bookType,
-                                   RenameMigration& migration);
+                                   RenameMigration& migration, bool preserveOnRenameFailure = false);
   static bool commitRenameMigration(RenameMigration& migration);
   static bool rollbackRenameMigration(RenameMigration& migration);
 
@@ -118,7 +121,7 @@ class ClippingStore {
   bool readFromFile();
   bool readFromFile(const std::string& path, std::vector<Clipping>& out) const;
   bool writeToFile(const std::string* replacementText = nullptr, size_t replacementIndex = SIZE_MAX,
-                   const std::string* sourcePathOverride = nullptr);
+                   const std::string* sourcePathOverride = nullptr, bool preserveOnRenameFailure = false);
 };
 
 inline bool clippingStoredRangeMatchesLayout(const Clipping& clipping, const uint16_t currentPageCount,

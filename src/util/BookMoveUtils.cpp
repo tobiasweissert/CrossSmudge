@@ -56,7 +56,8 @@ std::string buildReadFolderDestination(const std::string& srcPath) {
 
 RenameMigrationResult migrateRenamedBookState(const std::string& oldPath, const std::string& newPath,
                                               const std::string& oldCachePath, const std::string& title,
-                                              const std::string& author, const char* bookType) {
+                                              const std::string& author, const char* bookType,
+                                              const bool preserveOnRenameFailure) {
   if (!bookType) {
     LOG_ERR("BookMove", "Missing book type for state migration");
     return RenameMigrationResult::RolledBack;
@@ -64,20 +65,26 @@ RenameMigrationResult migrateRenamedBookState(const std::string& oldPath, const 
 
   std::string newCachePath;
   if (!getCachePath(newPath, bookType, newCachePath)) return RenameMigrationResult::RolledBack;
+  if (preserveOnRenameFailure && Storage.exists(newCachePath.c_str())) {
+    return RenameMigrationResult::RolledBack;
+  }
 
   bool cacheMoved = false;
   bool bookRenamed = false;
   bool recentMoved = false;
   bool openPathMoved = false;
   const bool shouldMoveOpenPath = APP_STATE.openEpubPath == oldPath;
+  bool metadataCommitted = true;
   BookmarkStore::RenameMigration bookmarkMigration;
   ClippingStore::RenameMigration clippingMigration;
 
   const auto commitMetadata = [&]() {
     if (!BookmarkStore::commitRenameMigration(bookmarkMigration)) {
+      metadataCommitted = false;
       LOG_ERR("BookMove", "Renamed book kept stale bookmark rollback files: %s", newPath.c_str());
     }
     if (!ClippingStore::commitRenameMigration(clippingMigration)) {
+      metadataCommitted = false;
       LOG_ERR("BookMove", "Renamed book kept stale clipping rollback files: %s", newPath.c_str());
     }
   };
@@ -141,6 +148,7 @@ RenameMigrationResult migrateRenamedBookState(const std::string& oldPath, const 
   const auto recover = [&]() {
     if (bookRenamed) {
       if (!Storage.rename(newPath.c_str(), oldPath.c_str())) {
+        if (preserveOnRenameFailure) return RenameMigrationResult::Uncertain;
         return keepRenamed();
       }
       bookRenamed = false;
@@ -157,6 +165,7 @@ RenameMigrationResult migrateRenamedBookState(const std::string& oldPath, const 
 
     if (!rollbackPreparedStorage()) {
       LOG_ERR("BookMove", "Storage rollback was incomplete; the original book path remains available");
+      if (preserveOnRenameFailure) return RenameMigrationResult::Uncertain;
     }
     return RenameMigrationResult::RolledBack;
   };
@@ -164,20 +173,28 @@ RenameMigrationResult migrateRenamedBookState(const std::string& oldPath, const 
   // Publish the new-path metadata before the book itself is renamed. Until
   // the physical rename succeeds, the old book and its source metadata remain
   // intact; after it succeeds, the new-path metadata is already discoverable.
-  if (!BookmarkStore::beginRenameMigration(oldPath, newPath, title, author, bookType, bookmarkMigration)) {
+  if (!BookmarkStore::beginRenameMigration(oldPath, newPath, title, author, bookType, bookmarkMigration,
+                                           preserveOnRenameFailure)) {
     LOG_ERR("BookMove", "Failed to migrate bookmarks for renamed book %s -> %s", oldPath.c_str(), newPath.c_str());
+    if (preserveOnRenameFailure && bookmarkMigration.uncertain) return RenameMigrationResult::Uncertain;
     return recover();
   }
 
   if (strcmp(bookType, "epub") == 0) {
-    if (!ClippingStore::beginRenameMigration(oldPath, newPath, title, author, bookType, clippingMigration)) {
+    if (!ClippingStore::beginRenameMigration(oldPath, newPath, title, author, bookType, clippingMigration,
+                                             preserveOnRenameFailure)) {
       LOG_ERR("BookMove", "Failed to migrate clippings for renamed book %s -> %s", oldPath.c_str(), newPath.c_str());
+      if (preserveOnRenameFailure && clippingMigration.uncertain) return RenameMigrationResult::Uncertain;
       return recover();
     }
   }
 
   if (!oldCachePath.empty() && Storage.exists(oldCachePath.c_str())) {
     if (!Storage.rename(oldCachePath.c_str(), newCachePath.c_str())) {
+      // A negative FAT acknowledgement does not prove no mutation: the two
+      // entries may alias one cluster chain. Manual Move must retain every
+      // candidate and stop, not rename/delete candidates in speculative recovery.
+      if (preserveOnRenameFailure) return RenameMigrationResult::Uncertain;
       LOG_ERR("BookMove", "Failed to rename cache dir %s -> %s", oldCachePath.c_str(), newCachePath.c_str());
       return recover();
     }
@@ -185,12 +202,14 @@ RenameMigrationResult migrateRenamedBookState(const std::string& oldPath, const 
   }
 
   if (!Storage.rename(oldPath.c_str(), newPath.c_str())) {
+    if (preserveOnRenameFailure) return RenameMigrationResult::Uncertain;
     LOG_ERR("BookMove", "Failed to rename file: %s -> %s", oldPath.c_str(), newPath.c_str());
     return recover();
   }
   bookRenamed = true;
 
   if (!RECENT_BOOKS.updatePath(oldPath, newPath, oldCachePath, newCachePath)) {
+    if (preserveOnRenameFailure) return RenameMigrationResult::Uncertain;
     return recover();
   }
   recentMoved = true;
@@ -199,6 +218,7 @@ RenameMigrationResult migrateRenamedBookState(const std::string& oldPath, const 
     APP_STATE.openEpubPath = newPath;
     openPathMoved = true;
     if (!APP_STATE.saveToFile()) {
+      if (preserveOnRenameFailure) return RenameMigrationResult::Uncertain;
       LOG_ERR("BookMove", "Failed to save renamed open book path: %s", newPath.c_str());
       return recover();
     }
@@ -206,6 +226,7 @@ RenameMigrationResult migrateRenamedBookState(const std::string& oldPath, const 
 
   commitMetadata();
 
+  if (preserveOnRenameFailure && !metadataCommitted) return RenameMigrationResult::Uncertain;
   return RenameMigrationResult::Success;
 }
 

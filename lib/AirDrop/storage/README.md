@@ -30,8 +30,10 @@ fonts, archives, scripts and arbitrary binary files are saved unchanged, without
 execution, extraction or installation. Content interpretation belongs to the app
 that later opens the file. Empty files are supported.
 
-Final names are `/Inbox/<stem> (AirDrop <nonce>)<extension>`. Existing files are
-never overwritten or removed. A healthy checked parent-directory scan must
+New receives save exactly `/Inbox/<validated original basename>`, preserving UTF-8
+bytes, case and extension without a postfix. Nonces remain private staging identities.
+Known destination collisions refuse before staging; the prepublication check also
+refuses late collisions. Existing files are never overwritten or removed. A healthy checked parent-directory scan must
 report the target missing, then publication intent is durably recorded before
 one no-overwrite rename. Both pinned FAT and exFAT rename use `O_EXCL`; the
 actual FAT fault suite qualifies the FAT implementation only. A failed rename
@@ -45,12 +47,14 @@ must wait for this success before its final sender acknowledgment.
 Four immutable 512-byte records under each session are named `phase.1` through
 `phase.4`: Receiving, CompleteStaged, PublishAttempted, PublishedVerified. Every
 creation is exclusive, every write/sync/close is checked, and every record is
-read back byte-for-byte. Layout version 1 has magic `ADSTG001` at 0, version at
+read back byte-for-byte. New layout version 2 and legacy layout version 1 share magic `ADSTG001` at 0, version at
 8, phase at 9, little-endian payload size at 12, SHA256 at 16 (zero in phase 1),
 121-byte safe name at 64, 192-byte final path at 185, 32-byte nonce token at 400,
 and CRC32 of bytes 0..507 at 508. Remaining bytes are zero on creation. The
 final path is reconstructed and compared during recovery, never blindly trusted.
-No existing firmware/cache format changes.
+Version 2 reconstructs the exact original name; version 1 retains the historical
+`<stem> (AirDrop <nonce>)<extension>` path. Mixed/unknown versions reject. Legacy
+records remain read-only and are never implicitly republished.
 
 Missing, short, torn, CRC-invalid, gapped, mismatched or unreadable records fail
 closed. A persisted phase 3 without a checked phase 4 is publication uncertainty;
@@ -87,4 +91,5 @@ A healthy historical phase-1 journal is `RetainedPartial`, not a live
 `Receiving` writer. Inspection leaves every candidate byte unchanged; a fresh
 consent may reserve a different nonce. Active stages and real publication
 uncertainty still refuse reuse, and uncertainty cannot be cleared by inspecting
-another historical candidate. The journal format/phases are unchanged.
+another historical candidate. Journal phases stay unchanged; new sessions write version 2, including after
+read-only inspection of a retained version-1 partial.

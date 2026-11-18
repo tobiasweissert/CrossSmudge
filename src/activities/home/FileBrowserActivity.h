@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "RecentBooksStore.h"
+#include "FileMutationInputGate.h"
 #include "activities/Activity.h"
 #include "util/ButtonNavigator.h"
 
@@ -41,6 +42,9 @@ class FileBrowserActivity final : public Activity {
   bool isPinnedBootFavorite(const std::string& fullPath) const;
   void showFileActionMenu(const std::string& entry, bool ignoreInitialConfirmRelease = false);
   void startRenameFile(const std::string& fullPath, const std::string& entry);
+  void startMoveFile(const std::string& fullPath, const std::string& entry);
+  void moveFile(const std::string& fullPath, const std::string& entry, const std::string& directory);
+  void fileOperationError(const char* message);
   void renameFile(const std::string& oldPath, const std::string& oldEntry, const std::string& newStem,
                   const std::string& extension);
 
@@ -60,6 +64,10 @@ class FileBrowserActivity final : public Activity {
   bool lockNextConfirmRelease = false;
 
   Mode mode = Mode::Books;
+  std::string directoryPickerTitle;
+  FileMutationInputGate pickerInputGate;
+  FileMutationInputGate mutationListInputGate;
+  std::atomic<bool> mutationListFence{false};
 
   // Files state
   static constexpr size_t INDEX_ROW_CACHE_SIZE = 32;
@@ -89,6 +97,8 @@ class FileBrowserActivity final : public Activity {
   static void listScreen(UiApp::ScreenType& screen, void* user);
   static void onRowEvent(const freeink::ui::ActionEvent& event, void* user);
   static void onSettingsEvent(const freeink::ui::ActionEvent& event, void* user);
+  static void onFileControlEvent(const freeink::ui::ActionEvent& event, void* user);
+  void selectCurrentFolder();
   void buildListScreen(UiApp::ScreenType& screen);
   void activateSelected();
   void navigateBack();

@@ -99,3 +99,4 @@ add_subdirectory(lua_http)
 add_subdirectory(lua_device_identity)
 
 add_subdirectory(crosscub)
+add_subdirectory(file_actions)

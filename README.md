@@ -129,6 +129,15 @@ For a verified application image, back up the SD card, open **Settings → Syste
 
 OTA remains in Settings, but accepts only the owner's `crosscub-v…` tags, `crosscub-sticky-v….bin` assets, pinned SHA-256 and Crosscub application identity. It does not select upstream product firmware. Until an owner release exists, the update screen reports that no Crosscub update has been published.
 
+## File actions on the development branch
+
+`feat/airdrop-original-names-file-actions` adds native firmware features; an App Store-only update cannot add them to an older host.
+
+- AirDrop saves to `/Inbox/<original filename>` with the original safe UTF-8 spelling, case and extension. No postfix is added. Existing destination files are refused, never silently overwritten.
+- In **Browse Files**, select a regular file and choose **Actions**; the existing long-press/hold route also remains available. **Delete** requires an explicit confirmation, with Cancel initially selected.
+- **Move** opens a destination picker. Navigate to the folder and use **Select folder** (or hardware Right). The original filename and book state are carried; destination collisions are refused. Cancel leaves the file in place. Recursive folder deletion is not offered by this feature.
+- An uncertain SD or metadata operation stops further Files mutations for the session. Checked app-state persistence may remain read-only across reopening until its retained recovery copies are inspected. Stop using the card and preserve it for inspection; restarting is not evidence that an uncertain operation was repaired. Host fault tests are not physical SD power-loss guarantees.
+
 ## Develop an app
 
 An app is a folder with a manifest, Lua entry point and optional assets:

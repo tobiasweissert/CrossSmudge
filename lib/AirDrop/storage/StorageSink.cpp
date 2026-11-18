@@ -68,6 +68,7 @@ bool StorageSink::begin(const char* name, uint32_t size, const uint8_t nonce[16]
   state_ = State::Idle;
   error_ = nullptr;
   publicationAttempted_ = false;
+  journalVersion_ = 2;
   if (files_.cancelled()) return fail("receive owner cancelled");
   written_ = 0;
   expected_ = size;
@@ -83,14 +84,14 @@ bool StorageSink::begin(const char* name, uint32_t size, const uint8_t nonce[16]
   for (unsigned i = 0; i < 16; ++i) { token[2 * i] = Hex[nonce[i] >> 4]; token[2 * i + 1] = Hex[nonce[i] & 15]; }
   token[32] = 0;
   if (!paths(token)) return false;
-  const char* dot = std::strrchr(name_, '.');
-  if (!dot) dot = name_ + std::strlen(name_);
-  const int stem = static_cast<int>(dot - name_);
-  const int count = std::snprintf(finalPath_, sizeof finalPath_, "/Inbox/%.*s (AirDrop %s)%s", stem, name_, token_, dot);
+  const int count = std::snprintf(finalPath_, sizeof finalPath_, "/Inbox/%s", name_);
   if (count < 0 || size_t(count) >= sizeof finalPath_) return fail("destination name exceeds storage bound");
   uint64_t available = 0;
   if (!files_.ready(available) || available < uint64_t(size) + ReserveBytes) return fail("SD unavailable or insufficient reserved free space");
   if (!ensureDirectory("/Inbox")) return fail("SD Inbox is unreadable or cannot be created");
+  uint32_t ignored = 0;
+  if (files_.stat(finalPath_, ignored) != PathState::Missing)
+    return fail("destination collision or unreadable Inbox; no file replaced");
   if (!ensureDirectory("/Inbox/.airdrop")) return fail("SD staging directory is unreadable or cannot be created");
   // mkdirExclusive refuses every prior session, including uncertain candidates.
   if (!files_.mkdirExclusive(sessionPath_)) return fail("cannot exclusively reserve a new receive session");
@@ -120,7 +121,7 @@ bool StorageSink::append(const uint8_t* bytes, size_t length) {
 void StorageSink::serialize(uint8_t phase) {
   std::memset(journal_, 0, sizeof journal_);
   std::memcpy(journal_, Magic, sizeof Magic);
-  journal_[8] = 1;
+  journal_[8] = journalVersion_;
   journal_[9] = phase;
   put32(journal_ + 12, expected_);
   if (phase > 1) std::memcpy(journal_ + 16, digest_, sizeof digest_);
@@ -206,11 +207,13 @@ bool StorageSink::loadRecord(uint8_t phase) {
   if (!files_.openRead(recordPath_, size)) return false;
   const bool read = size == RecordBytes && files_.read(journal_, RecordBytes) == int(RecordBytes);
   const bool closed = files_.closeRead();
-  if (!read || !closed || std::memcmp(journal_, Magic, sizeof Magic) || journal_[8] != 1 || journal_[9] != phase ||
+  if (!read || !closed || std::memcmp(journal_, Magic, sizeof Magic) ||
+      (journal_[8] != 1 && journal_[8] != 2) || (phase > 1 && journal_[8] != journalVersion_) || journal_[9] != phase ||
       le32(journal_ + RecordCrcOffset) != journalCrc32(journal_, RecordCrcOffset) ||
       std::memcmp(journal_ + 400, token_, 32) || !std::memchr(journal_ + NameOffset, 0, sizeof name_) ||
       !std::memchr(journal_ + FinalOffset, 0, sizeof finalPath_)) return false;
   if (phase == 1) {
+    journalVersion_ = journal_[8];
     expected_ = le32(journal_ + 12);
     if (expected_ > MaxPayloadBytes) return false;
     std::memcpy(name_, journal_ + NameOffset, sizeof name_);
@@ -219,8 +222,12 @@ bool StorageSink::loadRecord(uint8_t phase) {
     // Never trust persisted arbitrary paths: reconstruct and compare identity.
     const char* dot = std::strrchr(name_, '.');
     if (!dot) dot = name_ + std::strlen(name_);
-    const int n = std::snprintf(reinterpret_cast<char*>(buffer_), sizeof buffer_, "/Inbox/%.*s (AirDrop %s)%s",
-                               int(dot - name_), name_, token_, dot);
+    // Version 1 receipts retain their original postfix identity, read-only.
+    // Version 2 binds publication to the exact consented basename.
+    const int n = journalVersion_ == 1 ?
+        std::snprintf(reinterpret_cast<char*>(buffer_), sizeof buffer_, "/Inbox/%.*s (AirDrop %s)%s",
+                      int(dot - name_), name_, token_, dot) :
+        std::snprintf(reinterpret_cast<char*>(buffer_), sizeof buffer_, "/Inbox/%s", name_);
     if (n < 0 || size_t(n) >= sizeof finalPath_ || std::strcmp(finalPath_, reinterpret_cast<char*>(buffer_))) return false;
   } else {
     if (le32(journal_ + 12) != expected_ || std::memcmp(journal_ + NameOffset, name_, sizeof name_) ||

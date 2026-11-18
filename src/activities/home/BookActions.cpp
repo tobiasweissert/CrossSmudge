@@ -7,6 +7,7 @@
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Logging.h>
+#include <Txt.h>
 #include <Xtc.h>
 
 #include <cstdio>
@@ -75,16 +76,20 @@ bool canSendNearby(const std::string& path) {
          FsHelpers::hasPngExtension(path) || FsHelpers::hasBmpExtension(path);
 }
 
-void clearFileMetadata(const std::string& fullPath) {
+bool clearFileMetadata(const std::string& fullPath) {
+  bool ok = true;
   if (FsHelpers::hasEpubExtension(fullPath)) {
-    Epub(fullPath, "/.crosspoint").clearCache();
+    ok = Epub(fullPath, "/.crosspoint").clearCache();
     BookmarkStore::deleteForFilePath(fullPath, "epub");
     ClippingStore::deleteForFilePath(fullPath, "epub");
   } else if (FsHelpers::hasXtcExtension(fullPath)) {
+    ok = Xtc(fullPath, "/.crosspoint").clearCache();
     BookmarkStore::deleteForFilePath(fullPath, "xtc");
   } else if (FsHelpers::hasTxtExtension(fullPath) || FsHelpers::hasMarkdownExtension(fullPath)) {
+    ok = Txt(fullPath, "/.crosspoint").clearCache();
     BookmarkStore::deleteForFilePath(fullPath, "txt");
   }
+  return ok;
 }
 
 bool clearBookCache(const std::string& fullPath) {

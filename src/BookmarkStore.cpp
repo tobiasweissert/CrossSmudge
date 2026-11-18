@@ -38,17 +38,26 @@ std::string legacyStoreFilePathForBook(const std::string& filePath, const std::s
          ".bin";
 }
 
+bool readBookmarkString(FsFile& file, std::string& value) {
+  uint32_t length = 0;
+  if (!serialization::tryReadPod(file, length)) return false;
+  const int remaining = file.available();
+  if (remaining < 0 || length > static_cast<uint32_t>(remaining) ||
+      length > value.max_size()) return false;
+  value.resize(length);
+  return length == 0 || file.read(&value[0], length) == static_cast<int>(length);
+}
+
 bool readBookmarkCount(FsFile& file, const uint8_t version, uint16_t& count) {
   if (version == LEGACY_VERSION) {
     uint8_t legacyCount = 0;
-    serialization::readPod(file, legacyCount);
+    if (!serialization::tryReadPod(file, legacyCount)) return false;
     count = legacyCount;
     return true;
   }
 
   if (version == COUNT_U16_VERSION || version == PARAGRAPH_ANCHOR_VERSION || version == VERSION) {
-    serialization::readPod(file, count);
-    return true;
+    return serialization::tryReadPod(file, count);
   }
 
   return false;
@@ -170,7 +179,10 @@ bool readBookmarkFileHeader(const std::string& fullPath, const char* name, Bookm
     return false;
   }
   uint8_t version;
-  serialization::readPod(f, version);
+  if (!serialization::tryReadPod(f, version)) {
+    f.close();
+    return false;
+  }
   if (version != LEGACY_VERSION && version != COUNT_U16_VERSION && version != PARAGRAPH_ANCHOR_VERSION &&
       version != VERSION) {
     f.close();
@@ -186,17 +198,7 @@ bool readBookmarkFileHeader(const std::string& fullPath, const char* name, Bookm
     return false;
   }
 
-  auto readCheckedString = [&f](std::string& s) -> bool {
-    uint32_t len;
-    if (f.available() < static_cast<int>(sizeof(len))) return false;
-    serialization::readPod(f, len);
-    if (f.available() < static_cast<int>(len)) return false;
-    s.resize(len);
-    f.read(reinterpret_cast<uint8_t*>(&s[0]), len);
-    return true;
-  };
-
-  if (!readCheckedString(header.title) || !readCheckedString(header.author) || !readCheckedString(header.path)) {
+  if (!readBookmarkString(f, header.title) || !readBookmarkString(f, header.author) || !readBookmarkString(f, header.path)) {
     f.close();
     return false;
   }
@@ -433,7 +435,10 @@ bool BookmarkStore::readFromFile(const std::string& path, std::vector<Bookmark>&
   }
 
   uint8_t version;
-  serialization::readPod(f, version);
+  if (!serialization::tryReadPod(f, version)) {
+    f.close();
+    return false;
+  }
   if (version != LEGACY_VERSION && version != COUNT_U16_VERSION && version != PARAGRAPH_ANCHOR_VERSION &&
       version != VERSION) {
     LOG_ERR("BKS", "Unknown bookmark file version %u: %s", version, path.c_str());
@@ -454,12 +459,23 @@ bool BookmarkStore::readFromFile(const std::string& path, std::vector<Bookmark>&
   }
 
   std::string tmp;
-  serialization::readString(f, tmp);  // title — not validated
-  serialization::readString(f, tmp);  // author — not validated
   std::string storedPath;
-  serialization::readString(f, storedPath);
+  if (!readBookmarkString(f, tmp) || !readBookmarkString(f, tmp) || !readBookmarkString(f, storedPath)) {
+    f.close();
+    return false;
+  }
   if (storedPath != bookFilePath) {
     LOG_ERR("BKS", "Bookmark file path mismatch, file may belong to a different book: %s", path.c_str());
+    f.close();
+    return false;
+  }
+
+  const size_t recordSize = sizeof(Bookmark::spineIndex) + sizeof(Bookmark::progress) +
+                            sizeof(Bookmark::timestamp) + BOOKMARK_CHAPTER_TITLE_MAX +
+                            (version >= PARAGRAPH_ANCHOR_VERSION ? sizeof(Bookmark::paragraphIndex) : 0) +
+                            (version >= VERSION ? BOOKMARK_SNIPPET_MAX : 0);
+  const int remaining = f.available();
+  if (remaining < 0 || static_cast<size_t>(remaining) / recordSize < count) {
     f.close();
     return false;
   }
@@ -473,19 +489,28 @@ bool BookmarkStore::readFromFile(const std::string& path, std::vector<Bookmark>&
       f.close();
       return false;
     }
-    serialization::readPod(f, bm.spineIndex);
+    if (!serialization::tryReadPod(f, bm.spineIndex)) {
+      f.close();
+      return false;
+    }
     if (f.available() < static_cast<int>(sizeof(bm.progress))) {
       LOG_ERR("BKS", "Bookmark file truncated at progress, record %u: %s", i, path.c_str());
       f.close();
       return false;
     }
-    serialization::readPod(f, bm.progress);
+    if (!serialization::tryReadPod(f, bm.progress)) {
+      f.close();
+      return false;
+    }
     if (f.available() < static_cast<int>(sizeof(bm.timestamp))) {
       LOG_ERR("BKS", "Bookmark file truncated at timestamp, record %u: %s", i, path.c_str());
       f.close();
       return false;
     }
-    serialization::readPod(f, bm.timestamp);
+    if (!serialization::tryReadPod(f, bm.timestamp)) {
+      f.close();
+      return false;
+    }
     const int chRead = f.read(bm.chapterTitle, sizeof(bm.chapterTitle));
     bm.chapterTitle[sizeof(bm.chapterTitle) - 1] = '\0';
     if (chRead != static_cast<int>(sizeof(bm.chapterTitle))) {
@@ -499,7 +524,10 @@ bool BookmarkStore::readFromFile(const std::string& path, std::vector<Bookmark>&
         f.close();
         return false;
       }
-      serialization::readPod(f, bm.paragraphIndex);
+      if (!serialization::tryReadPod(f, bm.paragraphIndex)) {
+        f.close();
+        return false;
+      }
     } else {
       bm.paragraphIndex = UINT16_MAX;
     }
@@ -524,32 +552,52 @@ bool BookmarkStore::readFromFile(const std::string& path, std::vector<Bookmark>&
 }
 
 bool BookmarkStore::writeToFile() const {
+  // Reject unrepresentable records before opening (and truncating) any file.
+  if (bookmarks.size() > MAX_BOOKMARKS || bookTitle.size() > UINT32_MAX ||
+      bookAuthor.size() > UINT32_MAX || bookFilePath.size() > UINT32_MAX) return false;
   Storage.mkdir(BOOKMARKS_DIR);
-
   FsFile f;
-  if (!Storage.openFileForWrite("BKS", storeFilePath, f)) {
-    LOG_ERR("BKS", "Failed to open bookmark file for write");
-    return false;
-  }
+  if (!Storage.openFileForWrite("BKS", storeFilePath, f)) return false;
 
-  const uint16_t count = static_cast<uint16_t>(bookmarks.size());
-  serialization::writePod(f, VERSION);
-  serialization::writePod(f, count);
-  serialization::writeString(f, bookTitle);
-  serialization::writeString(f, bookAuthor);
-  serialization::writeString(f, bookFilePath);
-
-  for (const auto& bm : bookmarks) {
-    serialization::writePod(f, bm.spineIndex);
-    serialization::writePod(f, bm.progress);
-    serialization::writePod(f, bm.timestamp);
-    f.write(reinterpret_cast<const uint8_t*>(bm.chapterTitle), sizeof(bm.chapterTitle));
-    serialization::writePod(f, bm.paragraphIndex);
-    f.write(reinterpret_cast<const uint8_t*>(bm.snippet), sizeof(bm.snippet));
-  }
-
+  // The same bounded byte stream is checked on write and compared after close.
+  // Readback checks exact header/record bytes, not just a decodable prefix.
+  const auto transfer = [&](FsFile& file, const bool verify) {
+    const auto bytes = [&](const void* data, size_t size) {
+      const auto* expected = static_cast<const uint8_t*>(data);
+      if (!verify) return file.write(expected, size) == size;
+      uint8_t buffer[64];
+      while (size) {
+        const size_t chunk = std::min(size, sizeof(buffer));
+        if (file.read(buffer, chunk) != static_cast<int>(chunk) ||
+            !std::equal(buffer, buffer + chunk, expected)) return false;
+        expected += chunk;
+        size -= chunk;
+      }
+      return true;
+    };
+    const auto pod = [&](const auto& value) { return bytes(&value, sizeof(value)); };
+    const auto string = [&](const std::string& value) {
+      const uint32_t length = static_cast<uint32_t>(value.size());
+      return pod(length) && (length == 0 || bytes(value.data(), length));
+    };
+    const uint16_t count = static_cast<uint16_t>(bookmarks.size());
+    if (!pod(VERSION) || !pod(count) || !string(bookTitle) || !string(bookAuthor) || !string(bookFilePath))
+      return false;
+    for (const auto& bm : bookmarks) {
+      if (!pod(bm.spineIndex) || !pod(bm.progress) || !pod(bm.timestamp) ||
+          !bytes(bm.chapterTitle, sizeof(bm.chapterTitle)) || !pod(bm.paragraphIndex) ||
+          !bytes(bm.snippet, sizeof(bm.snippet))) return false;
+    }
+    return true;
+  };
+  const bool written = transfer(f, false) && f.sync();
   f.close();
-  return true;
+  if (!written) return false;
+  FsFile check;
+  if (!Storage.openFileForRead("BKS", storeFilePath, check)) return false;
+  const bool verified = transfer(check, true) && check.available() == 0;
+  check.close();
+  return verified;
 }
 
 void BookmarkStore::deleteForFilePath(const std::string& filePath, const std::string& bookType) {
@@ -685,7 +733,8 @@ bool BookmarkStore::migrateForFilePath(const std::string& oldFilePath, const std
 
 bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const std::string& newFilePath,
                                          const std::string& title, const std::string& author,
-                                         const std::string& bookType, RenameMigration& migration) {
+                                         const std::string& bookType, RenameMigration& migration,
+                                         const bool preserveOnRenameFailure) {
   migration = {};
   if (bookType != "epub" && bookType != "xtc" && bookType != "txt") {
     LOG_ERR("BKS", "Unknown book type for bookmark rename migration: %s", bookType.c_str());
@@ -699,6 +748,15 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
   migration.destinationLegacyPath = legacyStoreFilePathForBook(newFilePath, bookType);
   migration.destinationCurrentBackupPath = migration.destinationCurrentPath + ".rename.bak";
   migration.destinationLegacyBackupPath = migration.destinationLegacyPath + ".rename.bak";
+
+  // Manual Move cannot establish whether retained rename candidates alias.
+  // Leave recovery to an explicit operation, never discard or rename them here.
+  if (preserveOnRenameFailure &&
+      (Storage.exists(migration.destinationCurrentBackupPath.c_str()) ||
+       Storage.exists(migration.destinationLegacyBackupPath.c_str()))) {
+    migration.uncertain = true;
+    return false;
+  }
 
   const auto recoverInterruptedDestination = [](const std::string& path, const std::string& backupPath) {
     if (Storage.exists(path.c_str()) || !Storage.exists(backupPath.c_str())) return true;
@@ -728,6 +786,18 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
     return false;
   }
 
+  const auto mergeForRename = [&](std::vector<Bookmark>& destination, const std::vector<Bookmark>& source) {
+    size_t count = destination.size();
+    for (const auto& bookmark : source) {
+      if (std::none_of(destination.begin(), destination.end(), [&](const Bookmark& existing) {
+            return bookmarksMatchIdentity(existing, bookmark);
+          })) ++count;
+    }
+    if (preserveOnRenameFailure && count > MAX_BOOKMARKS) return false;
+    mergeBookmarks(destination, source);
+    return true;
+  };
+
   BookmarkStore sourceReader;
   sourceReader.bookFilePath = oldFilePath;
   std::vector<Bookmark> migratedBookmarks;
@@ -745,7 +815,7 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
       LOG_ERR("BKS", "Failed to load source legacy bookmarks for rename: %s", migration.sourceLegacyPath.c_str());
       return false;
     }
-    mergeBookmarks(migratedBookmarks, legacyBookmarks);
+    if (!mergeForRename(migratedBookmarks, legacyBookmarks)) return false;
   }
 
   BookmarkStore destinationReader;
@@ -757,7 +827,7 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
       LOG_ERR("BKS", "Failed to load destination bookmarks for rename: %s", migration.destinationCurrentPath.c_str());
       return false;
     }
-    mergeBookmarks(destinationBookmarks, migratedBookmarks);
+    if (!mergeForRename(destinationBookmarks, migratedBookmarks)) return false;
     migratedBookmarks = std::move(destinationBookmarks);
   }
   if (migration.destinationLegacyPath != migration.destinationCurrentPath &&
@@ -769,21 +839,23 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
               migration.destinationLegacyPath.c_str());
       return false;
     }
-    mergeBookmarks(destinationLegacyBookmarks, migratedBookmarks);
+    if (!mergeForRename(destinationLegacyBookmarks, migratedBookmarks)) return false;
     migratedBookmarks = std::move(destinationLegacyBookmarks);
   }
 
-  const auto backupDestination = [](const std::string& path, const std::string& backupPath, bool& backedUp) {
+  const auto backupDestination = [&](const std::string& path, const std::string& backupPath, bool& backedUp) {
     if (!Storage.exists(path.c_str())) return true;
     if (Storage.exists(backupPath.c_str()) && !Storage.remove(backupPath.c_str())) {
       LOG_ERR("BKS", "Failed to remove stale bookmark rename backup: %s", backupPath.c_str());
       return false;
     }
+    if (preserveOnRenameFailure) migration.uncertain = true;
     if (!Storage.rename(path.c_str(), backupPath.c_str())) {
       LOG_ERR("BKS", "Failed to preserve destination bookmarks: %s", path.c_str());
       return false;
     }
     backedUp = true;
+    migration.uncertain = false;
     return true;
   };
 
@@ -793,7 +865,7 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
       (migration.destinationLegacyPath != migration.destinationCurrentPath &&
        !backupDestination(migration.destinationLegacyPath, migration.destinationLegacyBackupPath,
                           migration.destinationLegacyBackedUp))) {
-    rollbackRenameMigration(migration);
+    if (!preserveOnRenameFailure) rollbackRenameMigration(migration);
     return false;
   }
 
@@ -803,15 +875,19 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
   writer.bookAuthor = author;
   writer.storeFilePath = migration.destinationCurrentPath;
   writer.bookmarks = std::move(migratedBookmarks);
+  migration.destinationWritten = !writer.bookmarks.empty();
+  if (preserveOnRenameFailure && migration.destinationWritten) migration.uncertain = true;
   if (!writer.bookmarks.empty() && !writer.writeToFile()) {
     LOG_ERR("BKS", "Failed to write transactional bookmark rename: %s", migration.destinationCurrentPath.c_str());
-    rollbackRenameMigration(migration);
+    if (!preserveOnRenameFailure) rollbackRenameMigration(migration);
     return false;
   }
+  migration.uncertain = false;
   return true;
 }
 
 bool BookmarkStore::commitRenameMigration(RenameMigration& migration) {
+  if (migration.uncertain) return false;
   if (!migration.active) return true;
   bool ok = deleteBookmarkStorePath(migration.sourceCurrentPath, "renamed source");
   if (migration.sourceLegacyPath != migration.sourceCurrentPath) {
@@ -828,8 +904,10 @@ bool BookmarkStore::commitRenameMigration(RenameMigration& migration) {
 }
 
 bool BookmarkStore::rollbackRenameMigration(RenameMigration& migration) {
+  if (migration.uncertain) return false;
   if (!migration.active) return true;
-  bool ok = deleteBookmarkStorePath(migration.destinationCurrentPath, "rolled-back destination");
+  bool ok = !migration.destinationWritten ||
+            deleteBookmarkStorePath(migration.destinationCurrentPath, "rolled-back destination");
   const auto restoreDestination = [](const std::string& backupPath, const std::string& path, const bool backedUp) {
     if (!backedUp) return true;
     if (!Storage.rename(backupPath.c_str(), path.c_str())) {
@@ -868,7 +946,10 @@ bool BookmarkStore::getAllBookmarkedBooks(std::vector<BookmarkedBookEntry>& out)
       continue;
     }
     uint8_t version;
-    serialization::readPod(f, version);
+    if (!serialization::tryReadPod(f, version)) {
+      f.close();
+      continue;
+    }
     if (version != LEGACY_VERSION && version != COUNT_U16_VERSION && version != PARAGRAPH_ANCHOR_VERSION &&
         version != VERSION) {
       LOG_DBG("BKS", "Skipping bookmark file with unknown version: %s", name.c_str());
@@ -886,19 +967,8 @@ bool BookmarkStore::getAllBookmarkedBooks(std::vector<BookmarkedBookEntry>& out)
       continue;
     }
 
-    // Reads a length-prefixed string, returning false if the file is truncated.
-    auto readCheckedString = [&f](std::string& s) -> bool {
-      uint32_t len;
-      if (f.available() < static_cast<int>(sizeof(len))) return false;
-      serialization::readPod(f, len);
-      if (f.available() < static_cast<int>(len)) return false;
-      s.resize(len);
-      f.read(reinterpret_cast<uint8_t*>(&s[0]), len);
-      return true;
-    };
-
     std::string title, author, path;
-    if (!readCheckedString(title) || !readCheckedString(author) || !readCheckedString(path)) {
+    if (!readBookmarkString(f, title) || !readBookmarkString(f, author) || !readBookmarkString(f, path)) {
       f.close();
       continue;
     }

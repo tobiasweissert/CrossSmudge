@@ -13,6 +13,97 @@ constexpr uint8_t STATE_FILE_VERSION = 5;
 constexpr char STATE_FILE_BIN[] = "/.crosspoint/state.bin";
 constexpr char STATE_FILE_JSON[] = "/.crosspoint/state.json";
 constexpr char STATE_FILE_BAK[] = "/.crosspoint/state.bin.bak";
+// Private independent copies, not the legacy rename-based .bak/.tmp roots.
+constexpr char STATE_JSON_TEMP[] = "/.crosspoint/state.json.checked.tmp";
+constexpr char STATE_JSON_BACKUP[] = "/.crosspoint/state.json.checked.bak";
+constexpr char STATE_JSON_PENDING[] = "/.crosspoint/state.json.checked.pending";
+// Preserve the legacy HAL readFile ceiling for every state-document root.
+constexpr size_t STATE_JSON_MAX_BYTES = 50000;
+
+bool readStateJson(const char* path, JsonDocument& doc, std::string* bytes = nullptr) {
+  auto file = Storage.open(path);
+  if (!file || file.isDirectory()) return false;
+  const auto reportedSize = file.size();
+  // Check in the storage size type before narrowing or allocating a body buffer.
+  if (reportedSize == 0 || reportedSize > STATE_JSON_MAX_BYTES) {
+    file.close();
+    return false;
+  }
+  const size_t size = static_cast<size_t>(reportedSize);
+  std::string json(size, '\0');
+  size_t offset = 0;
+  while (offset < size) {
+    const size_t count = std::min(size - offset, static_cast<size_t>(256));
+    const int read = file.read(&json[offset], count);
+    if (read != static_cast<int>(count)) {
+      file.close();
+      return false;
+    }
+    offset += count;
+  }
+  if (!file.close() || json.empty() || deserializeJson(doc, json) || !doc.is<JsonObject>()) return false;
+  if (bytes) *bytes = std::move(json);
+  return true;
+}
+
+bool createStateCopy(const char* path, const std::string& json) {
+  // Never truncate a retained candidate, including one left by an uncertain FAT rename.
+  auto file = Storage.open(path, O_WRONLY | O_CREAT | O_EXCL);
+  if (!file) return false;
+  const bool written = file.write(json.data(), json.size()) == json.size();
+  const bool synced = file.sync();
+  const bool closed = file.close();
+  if (!written || !synced || !closed) return false;
+  JsonDocument check;
+  std::string bytes;
+  return readStateJson(path, check, &bytes) && bytes == json;
+}
+
+bool writeStateJson(const JsonDocument& doc) {
+  // Reject unreadable output before serialization or touching retained candidates.
+  const size_t jsonSize = measureJson(doc);
+  if (jsonSize == 0 || jsonSize > STATE_JSON_MAX_BYTES) return false;
+  // Publication uses independent copies only, never FAT rename (whose false
+  // acknowledgement can leave aliased cluster chains). A pending write is
+  // read-only across reboot; retain all candidates for external inspection.
+  if (Storage.exists(STATE_JSON_PENDING)) return false;
+  const bool hadPrimary = Storage.exists(STATE_FILE_JSON);
+  JsonDocument oldDoc;
+  std::string oldJson;
+  if (hadPrimary) {
+    // A corrupt/unreadable primary must never rotate over a healthy recovery copy.
+    if (!readStateJson(STATE_FILE_JSON, oldDoc, &oldJson)) return false;
+  } else if (Storage.exists(STATE_JSON_BACKUP) || Storage.exists(STATE_JSON_TEMP)) {
+    return false;
+  }
+  if (Storage.exists(STATE_JSON_TEMP)) {
+    JsonDocument previous;
+    std::string bytes;
+    // Without a pending marker, only an exact independent copy of the valid
+    // primary is a completed write. Never erase an unresolved prepared candidate.
+    if (!readStateJson(STATE_JSON_TEMP, previous, &bytes) || bytes != oldJson) return false;
+    if (!Storage.remove(STATE_JSON_TEMP)) return false;
+  }
+  std::string json;
+  if (serializeJson(doc, json) != jsonSize) return false;
+  Storage.mkdir("/.crosspoint");
+  if (!createStateCopy(STATE_JSON_TEMP, json)) return false;
+  // The pending root is itself the current old-state snapshot, not just an
+  // existence marker: a retained older .bak must not revive an acknowledged cleanup.
+  if (!createStateCopy(STATE_JSON_PENDING, hadPrimary ? oldJson : "{}")) return false;
+  // Neither sidecar is ever renamed, so replacing this independent backup
+  // cannot truncate a primary/candidate alias left by our protocol.
+  if (Storage.exists(STATE_JSON_BACKUP) && !Storage.remove(STATE_JSON_BACKUP)) return false;
+  if (hadPrimary && !createStateCopy(STATE_JSON_BACKUP, oldJson)) return false;
+  // Both the old document and the complete replacement now have independent,
+  // checked roots before replacing the primary. An open/write failure cannot
+  // discard the only old document.
+  if (hadPrimary && !Storage.remove(STATE_FILE_JSON)) return false;
+  if (!createStateCopy(STATE_FILE_JSON, json)) return false;
+  // Retain .tmp as the latest complete recovery value, including cleared
+  // references/tombstones. A stale old backup is never the normal fallback.
+  return Storage.remove(STATE_JSON_PENDING);
+}
 }  // namespace
 
 bool CrossPointState::isRecentSleep(uint16_t idx, uint8_t checkCount) const {
@@ -58,18 +149,26 @@ bool CrossPointState::saveToFile() const {
   std::lock_guard<std::mutex> stateLock(_mutex);
   JsonDocument doc;
   toJson(doc);
-  return PersistableStoreBase::writeDocToFile(STATE_FILE_JSON, doc);
+  return writeStateJson(doc);
 }
 
 bool CrossPointState::loadFromFile() {
-  // Try JSON first
-  if (Storage.exists(STATE_FILE_JSON)) {
+  {
     std::lock_guard<std::mutex> storeLock(storeMutex);
     JsonDocument doc;
-    if (PersistableStoreBase::readDocFromFile(STATE_FILE_JSON, doc)) {
+    // Read only: recovery never renames/removes a possibly aliased candidate.
+    // Prefer the primary, then the complete replacement, then the checked
+    // current-old snapshot. The archival .bak can precede an acknowledged
+    // cleanup and is deliberately never an automatic recovery source.
+    if (readStateJson(STATE_FILE_JSON, doc) || readStateJson(STATE_JSON_TEMP, doc) ||
+        readStateJson(STATE_JSON_PENDING, doc)) {
       std::lock_guard<std::mutex> stateLock(_mutex);
       return fromJson(doc.as<JsonVariantConst>());
     }
+    // Existing JSON/recovery data is not a first boot. Never resurrect an old
+    // binary reference after a failed JSON cleanup or unreadable recovery root.
+    if (Storage.exists(STATE_FILE_JSON) || Storage.exists(STATE_JSON_BACKUP) ||
+        Storage.exists(STATE_JSON_TEMP) || Storage.exists(STATE_JSON_PENDING)) return false;
   }
 
   // Fall back to binary migration

@@ -15,10 +15,13 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
 #include <limits>
 
 #include "BookActions.h"
+#include "FileActionPaths.h"
+#include "FileMutationConfirmationActivity.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "FileBrowserActionActivity.h"
@@ -48,6 +51,7 @@ constexpr int ROOT_HINT_GAP = 20;
 constexpr size_t NAME_BUFFER_SIZE = 500;
 constexpr fui::ActionId ACTION_ROW = 1;
 constexpr fui::ActionId ACTION_SETTINGS = 2;
+constexpr fui::ActionId ACTION_FILE_CONTROL = 3;
 constexpr size_t INDEX_THRESHOLD = 200;
 constexpr size_t MAX_VIRTUAL_LIST_ENTRIES = static_cast<size_t>(std::numeric_limits<int16_t>::max());
 constexpr uint32_t FILE_BROWSER_APPEND_MIN_FREE_AFTER_ALLOC = 48U * 1024U;
@@ -424,6 +428,7 @@ void FileBrowserActivity::onEnter() {
   applySharedUiTheme(app, uiTarget);
   app.on(ACTION_ROW, &FileBrowserActivity::onRowEvent, this);
   app.on(ACTION_SETTINGS, &FileBrowserActivity::onSettingsEvent, this);
+  app.on(ACTION_FILE_CONTROL, &FileBrowserActivity::onFileControlEvent, this);
   app.setScreen(&FileBrowserActivity::listScreen, this);
   requestUpdate();
 }
@@ -443,26 +448,53 @@ void FileBrowserActivity::promptDeleteFile(const std::string& fullPath, const st
     if (res.isCancelled) {
       return;
     }
+    if (FileActionPaths::mutationBlocked || !FileActionPaths::isUserPath(fullPath)) {
+      fileOperationError(tr(STR_FILES_UNSAFE));
+      return;
+    }
+    auto source = Storage.open(fullPath.c_str());
+    const bool isRegularFile = source && !source.isDirectory();
+    source.close();
+    if (!isRegularFile) {
+      fileOperationError(tr(STR_FILES_MISSING));
+      return;
+    }
 
-    BookActions::clearFileMetadata(fullPath);
     if (!Storage.remove(fullPath.c_str())) {
       LOG_ERR("FileBrowser", "Failed to delete file: %s", fullPath.c_str());
+      fileOperationError(tr(STR_FILES_DELETE_FAILED));
       return;
+    }
+    if (!BookActions::clearFileMetadata(fullPath)) {
+      fileOperationError(tr(STR_FILES_CACHE_CLEANUP_FAILED));
+    }
+    RECENT_BOOKS.removeByPath(fullPath);
+    bool stateChanged = false;
+    if (APP_STATE.openEpubPath == fullPath) {
+      APP_STATE.openEpubPath.clear();
+      stateChanged = true;
+    }
+    if (isPinnedSleepFavorite(fullPath)) {
+      APP_STATE.favoriteSleepImagePath.clear();
+      stateChanged = true;
+    }
+    if (isPinnedBootFavorite(fullPath)) {
+      APP_STATE.favoriteBootImagePath.clear();
+      stateChanged = true;
+    }
+    if (stateChanged && !APP_STATE.saveToFile()) {
+      fileOperationError(tr(STR_FILES_STATE_CLEANUP_FAILED));
     }
     ImageFolderIndex::invalidateForPath(fullPath.c_str());
     sdFontSystem.markRegistryDirtyForPath(fullPath.c_str());
-
-    if (isPinnedSleepFavorite(fullPath)) {
-      unpinSleepFavorite();
-    }
-    if (isPinnedBootFavorite(fullPath)) {
-      unpinBootFavorite();
-    }
 
     {
       // The render task reads the file list and base path while it builds the
       // FreeInkUI rows. Do not replace their backing strings mid-build.
       RenderLock lock(*this);
+      uiReady = false;
+      mutationListInputGate.beginPaint();
+      mutationListFence = true;
       loadFilesLocked();
       if (entryCount() == 0) {
         selectorIndex = 0;
@@ -474,7 +506,13 @@ void FileBrowserActivity::promptDeleteFile(const std::string& fullPath, const st
   };
 
   const std::string heading = tr(STR_DELETE) + std::string("? ");
-  startActivityForResult(std::make_unique<ConfirmationActivity>(renderer, mappedInput, heading, entry), handler);
+  // ActivityManager owns this screen beyond the callback's stack lifetime.
+  auto confirmation = makeUniqueNoThrow<FileMutationConfirmationActivity>(renderer, mappedInput, heading, entry);
+  if (!confirmation) {
+    fileOperationError(tr(STR_FILES_MEMORY_FAILED));
+    return;
+  }
+  startActivityForResult(std::move(confirmation), handler);
 }
 
 void FileBrowserActivity::promptDeleteDirectory(const std::string& fullPath, const std::string& entry,
@@ -536,7 +574,8 @@ void FileBrowserActivity::showDirectoryActionMenu(const std::string& entry, bool
   std::vector<FileBrowserActionActivity::MenuItem> items;
   items.push_back({useDefaultFolders ? FileBrowserAction::ClearSleepFolder : FileBrowserAction::SetSleepFolder,
                    useDefaultFolders ? StrId::STR_USE_DEFAULT_SLEEP_FOLDERS : StrId::STR_SET_AS_SLEEP_FOLDER});
-  items.push_back({FileBrowserAction::Delete, StrId::STR_DELETE});
+  // Mutations in Files are deliberately file-only: recursive removal can also
+  // erase hidden app data (for example Inbox/.airdrop recovery journals).
 
   startActivityForResult(std::make_unique<FileBrowserActionActivity>(renderer, mappedInput, getFileName(entry),
                                                                      std::move(items), ignoreInitialConfirmRelease),
@@ -574,6 +613,7 @@ void FileBrowserActivity::showDirectoryActionMenu(const std::string& entry, bool
                              case FileBrowserAction::ResetReaderSettings:
                              case FileBrowserAction::SendNearby:
                              case FileBrowserAction::Rename:
+                             case FileBrowserAction::Move:
                                return;
                            }
                          });
@@ -685,9 +725,14 @@ bool FileBrowserActivity::isPinnedBootFavorite(const std::string& fullPath) cons
 }
 
 void FileBrowserActivity::showFileActionMenu(const std::string& entry, bool ignoreInitialConfirmRelease) {
+  if (FileActionPaths::mutationBlocked) {
+    fileOperationError(tr(STR_FILES_MOVE_UNCERTAIN));
+    return;
+  }
   const std::string fullPath = buildFullPath(basepath, entry);
   std::vector<FileBrowserActionActivity::MenuItem> items = BookActions::buildBookActionItems(fullPath, false);
   items.insert(items.begin(), {FileBrowserAction::Rename, StrId::STR_RENAME});
+  items.insert(items.begin() + 1, {FileBrowserAction::Move, StrId::STR_SELECT, tr(STR_FILES_MOVE)});
 
   if (BookActions::canSendNearby(fullPath)) {
     items.push_back({FileBrowserAction::SendNearby, StrId::STR_SEND_NEARBY_BOOK});
@@ -718,6 +763,9 @@ void FileBrowserActivity::showFileActionMenu(const std::string& entry, bool igno
 
         const auto action = static_cast<FileBrowserAction>(std::get<FileBrowserActionResult>(result.data).action);
         switch (action) {
+          case FileBrowserAction::Move:
+            startMoveFile(fullPath, entry);
+            return;
           case FileBrowserAction::Rename:
             startRenameFile(fullPath, entry);
             return;
@@ -841,6 +889,125 @@ void FileBrowserActivity::showFileActionMenu(const std::string& entry, bool igno
             return;
         }
       });
+}
+
+void FileBrowserActivity::startMoveFile(const std::string& fullPath, const std::string& entry) {
+  // ActivityManager owns this screen until folder selection completes.
+  auto picker = makeUniqueNoThrow<FileBrowserActivity>(renderer, mappedInput,
+                                                       FsHelpers::extractFolderPath(fullPath), Mode::PickDirectory);
+  if (!picker) {
+    fileOperationError(tr(STR_FILES_MEMORY_FAILED));
+    return;
+  }
+  picker->directoryPickerTitle = tr(STR_FILES_MOVE_TO_FOLDER);
+  startActivityForResult(std::move(picker), [this, fullPath, entry](const ActivityResult& result) {
+    if (result.isCancelled) return;
+    const auto* folder = std::get_if<FilePathResult>(&result.data);
+    if (!folder) return;
+    moveFile(fullPath, entry, folder->path);
+  });
+}
+
+void FileBrowserActivity::moveFile(const std::string& fullPath, const std::string& entry,
+                                  const std::string& directory) {
+  if (FileActionPaths::mutationBlocked) {
+    fileOperationError(tr(STR_FILES_MOVE_UNCERTAIN));
+    return;
+  }
+  const std::string folder = normalizeDirectoryPath(directory);
+  if (!FileActionPaths::isUserPath(fullPath) || !FileActionPaths::isUserPath(folder) ||
+      entry.empty() || entry.front() == '.' || !FsHelpers::isSafePathComponent(entry) ||
+      fullPath.substr(fullPath.rfind('/') + 1) != entry) return;
+  const std::string destination = buildFullPath(folder, entry);
+  if (destination == fullPath) return;
+  auto source = Storage.open(fullPath.c_str());
+  const bool sourceIsFile = source && !source.isDirectory();
+  source.close();
+  auto targetFolder = Storage.open(folder.c_str());
+  const bool targetIsDirectory = targetFolder && targetFolder.isDirectory();
+  targetFolder.close();
+  if (Storage.exists(destination.c_str())) {
+    fileOperationError(tr(STR_FILES_DESTINATION_EXISTS));
+    return;
+  }
+  if (!sourceIsFile || !targetIsDirectory) return;
+  std::string oldCachePath;
+  const char* bookType = nullptr;
+  if (FsHelpers::hasEpubExtension(fullPath)) {
+    oldCachePath = Epub::cachePathForFilePath(fullPath, "/.crosspoint");
+    bookType = "epub";
+  } else if (FsHelpers::hasXtcExtension(fullPath)) {
+    oldCachePath = Xtc(fullPath, "/.crosspoint").getCachePath();
+    bookType = "xtc";
+  } else if (FsHelpers::hasTxtExtension(fullPath) || FsHelpers::hasMarkdownExtension(fullPath)) {
+    oldCachePath = Txt(fullPath, "/.crosspoint").getCachePath();
+    bookType = "txt";
+  }
+  if (bookType) {
+    std::string title = getFileName(entry);
+    std::string author;
+    const auto& books = RECENT_BOOKS.getBooks();
+    const auto recent = std::find_if(books.begin(), books.end(),
+                                    [&fullPath](const RecentBook& book) { return book.path == fullPath; });
+    if (recent != books.end()) {
+      if (!recent->title.empty()) title = recent->title;
+      author = recent->author;
+    }
+    const auto result = BookMoveUtils::migrateRenamedBookState(fullPath, destination, oldCachePath, title, author,
+                                                              bookType, true);
+    if (result != BookMoveUtils::RenameMigrationResult::Success) {
+      if (result != BookMoveUtils::RenameMigrationResult::RolledBack) {
+        FileActionPaths::mutationBlocked = true;
+        fileOperationError(tr(STR_FILES_MOVE_UNCERTAIN));
+      } else {
+        fileOperationError(tr(STR_FILES_MOVE_FAILED));
+      }
+      return;
+    }
+  } else if (!Storage.rename(fullPath.c_str(), destination.c_str())) {
+    FileActionPaths::mutationBlocked = true;
+    fileOperationError(tr(STR_FILES_MOVE_UNCERTAIN));
+    return;
+  }
+
+  bool favoritesChanged = false;
+  if (APP_STATE.favoriteSleepImagePath == fullPath) {
+    APP_STATE.favoriteSleepImagePath = destination;
+    favoritesChanged = true;
+  }
+  if (APP_STATE.favoriteBootImagePath == fullPath) {
+    APP_STATE.favoriteBootImagePath = destination;
+    favoritesChanged = true;
+  }
+  if (favoritesChanged && !APP_STATE.saveToFile()) {
+    fileOperationError(tr(STR_FILES_FAVORITES_SAVE_FAILED));
+  }
+  ImageFolderIndex::invalidateForPath(fullPath.c_str());
+  ImageFolderIndex::invalidateForPath(destination.c_str());
+  sdFontSystem.markRegistryDirtyForPath(fullPath.c_str());
+  sdFontSystem.markRegistryDirtyForPath(destination.c_str());
+  {
+    RenderLock lock(*this);
+    uiReady = false;
+    mutationListInputGate.beginPaint();
+    mutationListFence = true;
+    loadFilesLocked();
+    selectorIndex = entryCount() == 0 ? 0 : std::min(selectorIndex, entryCount() - 1);
+    topIndex = followListSelection(static_cast<int>(selectorIndex), 0, visibleRows, static_cast<int>(entryCount()));
+    listNav.reset(static_cast<int>(selectorIndex));
+    listNav.top = topIndex;
+    listNav.visibleRows = visibleRows;
+  }
+  requestUpdate(true);
+}
+
+void FileBrowserActivity::fileOperationError(const char* message) {
+  LOG_ERR("FileBrowser", "%s", message);
+  snprintf(APP_STATE.pendingAlertTitle, sizeof(APP_STATE.pendingAlertTitle), "%s", tr(STR_FILES_TITLE));
+  snprintf(APP_STATE.pendingAlertBody, sizeof(APP_STATE.pendingAlertBody), "%s", message);
+  APP_STATE.pendingAlertGoHomeOnBack.store(false, std::memory_order_relaxed);
+  APP_STATE.hasPendingAlert.store(true, std::memory_order_release);
+  requestUpdate();
 }
 
 void FileBrowserActivity::startRenameFile(const std::string& fullPath, const std::string& entry) {
@@ -1004,6 +1171,31 @@ void FileBrowserActivity::onRowEvent(const fui::ActionEvent& event, void* user) 
   self->activateSelected();
 }
 
+void FileBrowserActivity::selectCurrentFolder() {
+  if (mode != Mode::PickDirectory) return;
+  ActivityResult result{FilePathResult{normalizeDirectoryPath(basepath)}};
+  result.isCancelled = false;
+  setResult(std::move(result));
+  finish();
+}
+
+void FileBrowserActivity::onFileControlEvent(const fui::ActionEvent&, void* user) {
+  auto* self = static_cast<FileBrowserActivity*>(user);
+  self->app.clearTapFlash();
+  if (self->mode == Mode::PickDirectory) {
+    self->selectCurrentFolder();
+    return;
+  }
+  if (self->mode != Mode::Books) return;
+  std::string entry;
+  {
+    RenderLock lock(*self);
+    if (self->selectorIndex >= self->entryCount()) return;
+    entry = self->entryNameAt(self->selectorIndex);
+  }
+  if (!entry.empty() && entry.back() != '/') self->showFileActionMenu(entry);
+}
+
 void FileBrowserActivity::onSettingsEvent(const fui::ActionEvent&, void* user) {
   auto* self = static_cast<FileBrowserActivity*>(user);
   if (self->mode != Mode::Books || !self->mappedInput.hasTouchHardware()) return;
@@ -1065,6 +1257,7 @@ void FileBrowserActivity::activateSelected() {
     RenderLock lock(*this);
     if (basepath.back() != '/') basepath += "/";
     if (isDirectory) {
+      if (mode == Mode::PickDirectory) pickerInputGate.beginPaint();
       basepath += entry.substr(0, entry.length() - 1);
       loadFilesLocked();
       selectorIndex = 0;
@@ -1084,6 +1277,11 @@ void FileBrowserActivity::activateSelected() {
 }
 
 void FileBrowserActivity::loop() {
+  if (mutationListFence) {
+    if (!mutationListInputGate.allowInput(mappedInput)) return;
+    mutationListFence = false;
+  }
+  if (mode == Mode::PickDirectory && !pickerInputGate.allowInput(mappedInput)) return;
   if (TouchHeaderBackButton::wasTapped(mappedInput, renderer)) {
     navigateBack();
     return;
@@ -1104,10 +1302,7 @@ void FileBrowserActivity::loop() {
   // In directory-picker mode the fourth front button selects the folder shown
   // in the path band; Confirm continues to descend into the highlighted child.
   if (mode == Mode::PickDirectory && mappedInput.wasReleased(MappedInputManager::Button::Right)) {
-    ActivityResult result{FilePathResult{normalizeDirectoryPath(basepath)}};
-    result.isCancelled = false;
-    setResult(std::move(result));
-    finish();
+    selectCurrentFolder();
     return;
   }
 
@@ -1269,6 +1464,7 @@ void FileBrowserActivity::navigateBack() {
     {
       RenderLock lock(*this);
       const std::string oldPath = basepath;
+      if (mode == Mode::PickDirectory) pickerInputGate.beginPaint();
       basepath.replace(basepath.find_last_of('/'), std::string::npos, "");
       if (basepath.empty()) basepath = "/";
       loadFilesLocked();
@@ -1381,6 +1577,21 @@ void FileBrowserActivity::buildListScreen(UiApp::ScreenType& screen) {
     renderer.drawText(SMALL_FONT_ID, band.x + metrics.contentSidePadding, pathY, pathDisplay);
   }
 
+  const bool selectedFile = mode == Mode::Books && selectorIndex < entryCount() &&
+                            std::string(entryNameAt(selectorIndex)).back() != '/';
+  if (mode == Mode::PickDirectory || selectedFile) {
+    const int16_t height = std::max<int16_t>(48, screen.theme().minTouchSize);
+    const auto rect = screen.takeBottom(height);
+    fui::ButtonProps select;
+    select.label = mode == Mode::PickDirectory ? tr(STR_FILES_SELECT_FOLDER) : tr(STR_FILES_ACTIONS);
+    select.text = screen.theme().bodyText;
+    select.styles = fui::plainStyles();
+    select.minTouchSize = height;
+    select.inputMask = fui::InputTouch;
+    select.action = ACTION_FILE_CONTROL;
+    screen.button(select, rect);
+  }
+
   const size_t totalEntries = entryCount();
   if (totalEntries == 0) {
     const char* emptyMessage =
@@ -1477,6 +1688,9 @@ void FileBrowserActivity::buildListScreen(UiApp::ScreenType& screen) {
 }
 
 void FileBrowserActivity::render(RenderLock&&) {
+  const bool paintMutationFence = mutationListFence;
+  if (paintMutationFence) mutationListInputGate.beginPaint();
+  if (mode == Mode::PickDirectory) pickerInputGate.beginPaint();
   renderer.clearScreen();
 
   const auto pageWidth = renderer.getScreenWidth();
@@ -1486,7 +1700,7 @@ void FileBrowserActivity::render(RenderLock&&) {
       mode == Mode::PickFirmware
           ? std::string(tr(STR_SELECT_FIRMWARE_FILE))
           : (mode == Mode::PickDirectory
-                 ? std::string(tr(STR_SELECT_RECEIVE_FOLDER))
+                 ? (directoryPickerTitle.empty() ? std::string(tr(STR_SELECT_RECEIVE_FOLDER)) : directoryPickerTitle)
                  : ((basepath == "/") ? std::string(tr(STR_SD_CARD)) : basepath.substr(basepath.rfind('/') + 1)));
   // Header via GUI.drawHeader (already FreeInkUI-themed) for the battery
   // indicator; the rest of the screen renders through the app.
@@ -1537,6 +1751,8 @@ void FileBrowserActivity::render(RenderLock&&) {
   }
 
   renderer.displayBuffer();
+  if (mode == Mode::PickDirectory) pickerInputGate.endPaint();
+  if (paintMutationFence) mutationListInputGate.endPaint();
 }
 
 size_t FileBrowserActivity::findEntry(const std::string& name) {

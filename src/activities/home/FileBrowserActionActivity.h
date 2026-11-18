@@ -28,6 +28,7 @@ enum class FileBrowserAction : int {
   PinBootFavorite = 16,
   UnpinBootFavorite = 17,
   Rename = 18,
+  Move = 19,
 };
 
 class FileBrowserActionActivity final : public Activity {
@@ -35,6 +36,7 @@ class FileBrowserActionActivity final : public Activity {
   struct MenuItem {
     FileBrowserAction action;
     StrId labelId;
+    const char* label = nullptr;
   };
 
   FileBrowserActionActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string title,

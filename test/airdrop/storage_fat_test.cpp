@@ -28,6 +28,22 @@ int main() {
     StorageFatFiles files(*owner,blank);StorageSink sink(files);assert(transfer(sink));
     std::puts("PASS first upload creates Inbox and hidden staging on an empty FAT volume");
   }
+  // Actual FAT filename spelling and aliases, not a case-sensitive map model.
+  for (const char* name : {"Résumé 你好.EPUB", "MiXeD.tar.GZ", "README"}) {
+    StorageDisk exact;uint8_t scratch[512];FatFormatter format;assert(format.format(&exact,scratch));
+    auto owner=std::make_unique<FatVolume>();assert(owner->begin(&exact,false));
+    StorageFatFiles files(*owner,exact);StorageSink sink(files);
+    assert(sink.begin(name,0,Token));assert(sink.finish());assert(std::string(sink.savedPath())==std::string("/Inbox/")+name);
+    FatFile final;assert(final.open(owner.get(),sink.savedPath(),O_RDONLY));char spelling[256];assert(final.getName(spelling,sizeof spelling)==std::strlen(name));assert(std::string(spelling)==name);assert(final.close());
+  }
+  for (const char* existing : {"BOOK.TXT", "Book.Txt"}) {
+    StorageDisk collision;uint8_t scratch[512];FatFormatter format;assert(format.format(&collision,scratch));
+    auto owner=std::make_unique<FatVolume>();assert(owner->begin(&collision,false));assert(owner->mkdir("/Inbox"));
+    const std::string path=std::string("/Inbox/")+existing;FatFile old;assert(old.open(owner.get(),path.c_str(),O_CREAT|O_EXCL|O_RDWR));assert(old.write("old",3)==3);assert(old.sync());assert(old.close());
+    StorageFatFiles files(*owner,collision);StorageSink sink(files);assert(!transfer(sink));assert(files.renames<=1);
+    assert(old.open(owner.get(),path.c_str(),O_RDONLY));char bytes[4]{};assert(old.read(bytes,3)==3&&!std::strcmp(bytes,"old"));assert(old.close());
+  }
+  std::puts("PASS AD-NAME-009 actual pinned FAT exact UTF8/case/extension spelling and case-alias no-overwrite");
   StorageDisk disk; uint8_t sector[512]; FatFormatter formatter; assert(formatter.format(&disk, sector));
   {
     auto owner = std::make_unique<FatVolume>(); auto& volume = *owner; assert(volume.begin(&disk, false)); assert(volume.mkdir("/apps")); assert(volume.mkdir("/Inbox"));
@@ -61,7 +77,7 @@ int main() {
   disk.sectors = baseline;
   {
     auto owner = std::make_unique<FatVolume>(); auto& volume = *owner; assert(volume.begin(&disk, false));
-    FatFile existing; const char* path = "/Inbox/book (AirDrop 01020304050000000000000000000000).txt";
+    FatFile existing; const char* path = "/Inbox/book.txt";
     assert(existing.open(&volume, path, O_CREAT | O_EXCL | O_RDWR)); assert(existing.write("old", 3) == 3);
     assert(existing.sync()); assert(existing.close());
     StorageFatFiles files(volume, disk); StorageSink sink(files); assert(!transfer(sink)); assert(files.renames == 0);
@@ -87,7 +103,7 @@ int main() {
       auto owner = std::make_unique<FatVolume>(); auto& volume = *owner; assert(volume.begin(&disk, false));
       FatFile stage, final;
       const bool a = stage.open(&volume, "/Inbox/.airdrop/01020304050000000000000000000000/payload.part", O_RDONLY);
-      const bool b = final.open(&volume, "/Inbox/book (AirDrop 01020304050000000000000000000000).txt", O_RDONLY);
+      const bool b = final.open(&volume, "/Inbox/book.txt", O_RDONLY);
       if (a && b && stage.firstCluster() != 0 && stage.firstCluster() == final.firstCluster()) ++actualAliases;
       assert(stage.close()); assert(final.close());
     }

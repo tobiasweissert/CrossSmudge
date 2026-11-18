@@ -78,4 +78,5 @@ with tempfile.TemporaryDirectory(prefix='airdrop-storage-') as tmp:
         args.receipt.write_text(json.dumps({'commands': commands, 'exit': 0, 'before': before, 'after': after, 'sanitizers': args.sanitize, 'leak_sanitizer': 'disabled under sandbox tracing', 'actual_fat': args.fat, 'sdfat': str(args.sdfat), 'hardware_proof': False}, indent=2) + '\n')
 
 if not args.fat:
+    subprocess.run(['python3',str(root/'test/airdrop/original_names_run.py'),*(['--sanitize'] if args.sanitize else [])],cwd=root,check=True)
     subprocess.run(['python3',str(root/'test/airdrop/recovery_ownership_run.py'),*(['--sanitize'] if args.sanitize else [])],cwd=root,check=True)
