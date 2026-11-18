@@ -1,16 +1,8 @@
 #!/usr/bin/env bash
-# Usage: ./scripts/release.sh 1.2.7
-# Bumps [crosssmudge] version in platformio.ini, commits, and creates a Crosscub product tag.
+# Usage: scripts/release.sh 1.6.5.4 [--write-version] [--publish]
+# Plan only by default. --write-version updates both INI fields portably.
+# --publish prints the explicitly approved stable publication command; it does
+# not run it. No implicit commit, tag, push, build or upstream-origin assumption.
 set -euo pipefail
-
-VERSION="${1:-}"
-if [[ -z "$VERSION" ]]; then
-  echo "Usage: $0 <version>  (e.g. 1.2.7)" >&2
-  exit 1
-fi
-
-sed -i '' "/^\\[crosssmudge\\]/,/^\\[/ s/^version = .*/version = $VERSION/" platformio.ini
-git add platformio.ini
-git commit -m "Update Crosscub version to $VERSION"
-git tag "crosscub-v$VERSION"
-echo "Tagged crosscub-v$VERSION — push with: git push && git push origin crosscub-v$VERSION"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 "$SCRIPT_DIR/prepare_ota_release.py" "$@"

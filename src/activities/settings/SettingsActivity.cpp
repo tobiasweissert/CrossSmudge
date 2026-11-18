@@ -5,6 +5,7 @@
 #include <HalGPIO.h>
 #include <I18n.h>
 #include <Logging.h>
+#include <Memory.h>
 #include <WiFi.h>
 
 #include <algorithm>
@@ -27,6 +28,7 @@
 #include "KeyboardLayoutsActivity.h"
 #include "MappedInputManager.h"
 #include "OpdsServerListActivity.h"
+#include "OtaUpdateActivity.h"
 #include "QuickActions.h"
 #include "QuickActionsActivity.h"
 #include "SdCardFontSystem.h"
@@ -1093,9 +1095,16 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::ClearCache:
         startActivityForResult(std::make_unique<ClearCacheActivity>(renderer, mappedInput), resultHandler);
         break;
-      case SettingAction::CheckForUpdates:
-        silentRestartToNetwork(NetworkBootTarget::OTA);
+      case SettingAction::CheckForUpdates: {
+        auto activity = makeUniqueNoThrow<OtaUpdateActivity>(renderer, mappedInput);
+        if (!activity) {
+          LOG_ERR("OTA", "Not enough memory to open update check");
+          requestUpdate();
+          break;
+        }
+        startActivityForResult(std::move(activity), resultHandler);
         break;
+      }
       case SettingAction::SdFirmwareUpdate:
         startActivityForResult(std::make_unique<SdFirmwareUpdateActivity>(renderer, mappedInput), resultHandler);
         break;

@@ -13,6 +13,8 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from validate_ota_release import REPOSITORY, validate_release, validate_version
+
 
 DEVICE_TYPE_ORDER = ('sticky',)
 DEFAULT_SUPPORTED_DEVICES = {'sticky': ['sticky']}
@@ -32,8 +34,7 @@ def utc_now_iso():
 
 
 def normalize_version(version):
-    version = version.strip()
-    return version[1:] if version.startswith('v') else version
+    return validate_version(version)
 
 
 def parse_args():
@@ -47,7 +48,7 @@ def parse_args():
     )
     parser.add_argument('--output', required=True, type=Path, help='Output catalog path. Use "catalog" for /catalog.')
     parser.add_argument('--repo', required=True, help='GitHub repository in owner/name form.')
-    parser.add_argument('--version', required=True, help='Release version, with or without a leading v.')
+    parser.add_argument('--version', required=True, help='Exact numeric descriptor version (no prefix or suffix).')
     parser.add_argument(
         '--firmware-base-url',
         default=None,
@@ -88,8 +89,9 @@ def main():
     if args.supported_devices and args.supported_devices != ['sticky']:
         raise SystemExit('Crosscub supports only Sticky')
     notes = args.notes or f'Crosscub {version} {args.channel} firmware'
-    firmware_base_url = args.firmware_base_url or f'https://github.com/{args.repo}/releases/download/crosscub-v{version}/'
-    firmware_base_url = firmware_base_url.rstrip('/') + '/'
+    firmware_base_url = f'https://github.com/{REPOSITORY}/releases/download/crosscub-v{version}/'
+    if args.firmware_base_url is not None and args.firmware_base_url != firmware_base_url:
+        raise SystemExit('Crosscub artifact URL must exactly match its owner release')
 
     releases = []
     seen_device_types = set()
@@ -103,8 +105,9 @@ def main():
         device_type = parse_device_type(firmware_path)
         supported_devices = args.supported_devices or DEFAULT_SUPPORTED_DEVICES.get(device_type, [])
         firmware_url = f'{firmware_base_url}{filename}'
-        firmware_sha256 = sha256_file(firmware_path)
-        firmware_size = firmware_path.stat().st_size
+        qualified = validate_release(firmware_path, version, args.repo)
+        firmware_sha256 = qualified['sha256']
+        firmware_size = qualified['size']
         if device_type in seen_device_types:
             raise SystemExit(f'Duplicate firmware device type supplied: {device_type}')
         seen_device_types.add(device_type)
