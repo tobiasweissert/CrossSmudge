@@ -2,12 +2,12 @@
 
 #include <GfxRenderer.h>
 #include <I18n.h>
+#include <Memory.h>
 #include <WiFi.h>
 
 #include "AppVersion.h"
 #include "MappedInputManager.h"
 #include "SdCardFontSystem.h"
-#include "SilentRestart.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/CompactHeader.h"
 #include "components/TouchActionButtons.h"
@@ -87,32 +87,52 @@ void OtaUpdateActivity::onWifiSelectionComplete(const bool success) {
 
 void OtaUpdateActivity::onEnter() {
   Activity::onEnter();
-  sdFontSystem.releaseLoadedFont(renderer);
+  // Release both the active font and its catalog before the radio/TLS allocations.
+  sdFontSystem.releaseForNetwork(renderer);
 
   if (hasActiveWifiConnection()) {
     onWifiSelectionComplete(true);
     return;
   }
 
-  // Turn on WiFi immediately
-  WiFi.mode(WIFI_STA);
+  // Turn on WiFi immediately, but do not continue after driver allocation failure.
+  if (!WiFi.mode(WIFI_STA)) {
+    LOG_ERR("OTA", "Failed to enable WiFi for update check");
+    {
+      RenderLock lock(*this);
+      state = FAILED;
+    }
+    requestUpdate(true);
+    return;
+  }
 
-  // Launch WiFi selection subactivity
-  startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput),
-                         [this](const ActivityResult& result) { onWifiSelectionComplete(!result.isCancelled); });
+  auto selection = makeUniqueNoThrow<WifiSelectionActivity>(renderer, mappedInput);
+  if (!selection) {
+    LOG_ERR("OTA", "Not enough memory to open WiFi selection");
+    {
+      RenderLock lock(*this);
+      state = FAILED;
+    }
+    requestUpdate(true);
+    return;
+  }
+  startActivityForResult(std::move(selection), [this](const ActivityResult& result) {
+    onWifiSelectionComplete(!result.isCancelled && hasActiveWifiConnection());
+  });
 }
 
 void OtaUpdateActivity::onExit() {
   Activity::onExit();
 
-  // Success path reboots via the SHUTTING_DOWN state's plain ESP.restart()
-  // (loop() above) so the new firmware boots normally. Back-out paths land
-  // here with wifi still active; silent-restart to free the LWIP/mbedTLS
-  // fragmentation, same as the other wifi activities.
+  // Leaving the checker is not an installation. Release the radio in place,
+  // matching WifiSelectionActivity's canceled-flow teardown, and return to Settings.
+  // Only a successful install reaches the plain ESP.restart() in loop().
   if (WiFi.getMode() != WIFI_MODE_NULL) {
     WiFi.disconnect(false);
     delay(30);
-    silentRestart();
+    if (!WiFi.mode(WIFI_OFF)) {
+      LOG_ERR("OTA", "Failed to switch WiFi off after update check");
+    }
   }
 }
 
