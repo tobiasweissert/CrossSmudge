@@ -1,49 +1,62 @@
 #pragma once
 
-#include <BoardConfig.h>
+#include <functional>
 
-#include "activities/UiListActivity.h"
+#include "activities/Activity.h"
+#include "activities/ScreenTransitionRefresh.h"
+#include "components/UiAppHost.h"
+#include "util/ButtonNavigator.h"
 
-enum class NetworkMode { JOIN_NETWORK, CONNECT_CALIBRE, CREATE_HOTSPOT, USB_DRIVE, OPDS_BROWSER };
+enum class NetworkMode {
+  JOIN_NETWORK,
+  CONNECT_CALIBRE,
+  CREATE_HOTSPOT,
+  USB_DRIVE,
+  NEARBY_BOOK_RECEIVE,
+  NEARBY_STATS_SYNC,
+  AIRDROP_RECEIVE,  // Append only: existing boot/result enum values remain stable.
+  OPDS_BROWSER
+};
 
 /**
  * NetworkModeSelectionActivity presents the user with a choice:
  * - "Join a Network" - Connect to an existing WiFi network (STA mode)
- * - "Calibre Wireless" - Use Calibre wireless device transfers
+ * - "Connect to Calibre" - Use Calibre wireless device transfers
  * - "Create Hotspot" - Create an Access Point that others can connect to (AP mode)
- * - "OPDS Browser" - Browse OPDS catalogs, or add a server when none is configured.
- *   Hidden while Home shows it (plugins off and a server configured).
- * - "USB Drive" - Expose the SD card over USB (boards with USB mass storage)
+ * - "Sync Stats" - Sync reading stats directly with a nearby reader
+ * - "Receive File" - Receive a file directly from another reader
  *
  * The onModeSelected callback is called with the user's choice.
  * The onCancel callback is called if the user presses back.
- *
- * The header stays on GUI.drawHeader for the battery indicator.
  */
-class NetworkModeSelectionActivity final : public UiListActivity {
+class NetworkModeSelectionActivity final : public Activity {
+  // FreeInkApp hosts the mode list (themed rows, icons, touch routing); the
+  // header stays on GUI.drawHeader for the battery indicator.
+  using UiHost = UiAppHost<12, 4>;
+  using UiApp = UiHost::App;
+
+  ButtonNavigator buttonNavigator;
+
+  int selectedIndex = 0;
+
+  UiHost ui;
+  int visibleRows = 1;  // rows per page at the current scale; set by the screen builder
+  int topIndex = 0;     // viewport scroll position, decoupled from the selection
+  freeink::ui::ListNav listNav;
+  ScreenTransitionRefresh screenTransitionRefresh;
+
+  static void listScreen(UiApp::ScreenType& screen, void* user);
+  static void onRowEvent(const freeink::ui::ActionEvent& event, void* user);
+  void buildListScreen(UiApp::ScreenType& screen);
+  void selectCurrent();
+
  public:
   explicit NetworkModeSelectionActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
-
-#if FREEINK_CAP_USB_MSC
-  static constexpr int MAX_ITEM_COUNT = 5;
-#else
-  static constexpr int MAX_ITEM_COUNT = 4;
-#endif
+  void onEnter() override;
+  void onExit() override;
+  void loop() override;
+  void render(RenderLock&&) override;
 
   void onModeSelected(NetworkMode mode);
   void onCancel();
-
- private:
-  int listCount() const override;
-  void buildScreen(UiScreen& screen) override;
-  void activateIndex(int index) override;
-  void onBackButton() override { onCancel(); }
-  const char* headerTitle() const override;
-
-  // Row storage: built once in the constructor instead of every buildScreen()
-  // call, into fixed-capacity storage that avoids any heap allocation for the
-  // row list. actionValue is the row index; rowModes_ maps it to a mode.
-  freeink::ui::ListItem rowItems_[MAX_ITEM_COUNT]{};
-  NetworkMode rowModes_[MAX_ITEM_COUNT]{};
-  int rowCount_ = 0;
 };

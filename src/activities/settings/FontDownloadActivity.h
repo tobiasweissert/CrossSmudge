@@ -1,12 +1,20 @@
 #pragma once
 
+#include <FreeInkApp.h>
+#include <FreeInkUIGfxRenderer.h>
+
+#include <atomic>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "FontInstaller.h"
 #include "SdCardFont.h"
-#include "activities/UiListActivity.h"
+#include "activities/Activity.h"
+#include "activities/ScreenTransitionRefresh.h"
+#include "util/ButtonNavigator.h"
+
+struct Rect;
 
 // JSON schema version of the fonts.json manifest. The canonical version for
 // the build tooling lives in lib/EpdFont/scripts/cpfont_version.py. This
@@ -15,23 +23,24 @@
 #define FONTS_MANIFEST_VERSION 1
 
 #ifndef FONT_MANIFEST_URL
-// Manifest + .cpfont assets are published by .github/workflows/release-fonts.yml
-// to the crosspoint-fonts repo under the "sd-fonts-m<META>-b<BIN>" tag. The tag
-// pattern must stay in sync with the workflow; it derives its version numbers
-// from lib/EpdFont/scripts/cpfont_version.py.
+// Default hosted SD-font manifest. Use plain HTTP for this public S3 bucket:
+// HTTPS stalls inside esp_http_client on ESP32-C3, and downloaded .cpfont files
+// are still validated by CRC before install. The versioned prefix must stay in
+// sync with .github/workflows/release-fonts.yml and cpfont_version.py.
 #define FONT_MANIFEST_URL_STRINGIFY_INNER(x) #x
 #define FONT_MANIFEST_URL_STRINGIFY(x) FONT_MANIFEST_URL_STRINGIFY_INNER(x)
-#define FONT_MANIFEST_URL                                                                                           \
-  "https://github.com/crosspoint-reader/crosspoint-fonts/releases/download/sd-fonts-m" FONT_MANIFEST_URL_STRINGIFY( \
+#define FONT_MANIFEST_URL                                                                       \
+  "http://crosssmudge-fonts.s3.us-east-1.amazonaws.com/sd-fonts-m" FONT_MANIFEST_URL_STRINGIFY( \
       FONTS_MANIFEST_VERSION) "-b" FONT_MANIFEST_URL_STRINGIFY(CPFONT_VERSION) "/fonts.json"
 #endif
 
-class FontDownloadActivity final : public UiListActivity {
+class FontDownloadActivity : public Activity {
  public:
   explicit FontDownloadActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
   void onEnter() override;
   void onExit() override;
+  void loop() override;
   void render(RenderLock&&) override;
   bool preventAutoSleep() override {
     return state_ == LOADING_MANIFEST || state_ == DOWNLOADING ||
@@ -46,122 +55,115 @@ class FontDownloadActivity final : public UiListActivity {
   enum State {
     WIFI_SELECTION,
     LOADING_MANIFEST,
-    GROUP_LIST,
     FAMILY_LIST,
     DOWNLOADING,
     COMPLETE,
     ERROR,
   };
 
-  // Byte offset into stringArena_; 0 is the empty string.
-  using StrRef = uint32_t;
-
   struct ManifestFile {
-    StrRef name = 0;
-    uint32_t size = 0;
+    // The downloaded manifest can contain hundreds of file names. They all
+    // point into manifestStringArena_ so the catalog does not fragment the
+    // C3 heap with one std::string allocation per entry.
+    const char* name = "";
+    size_t size = 0;
     uint32_t crc32 = 0;
+    uint8_t pointSize = 0;
   };
 
   struct ManifestFamily {
-    StrRef name = 0;
-    StrRef description = 0;
-    // Range into files_, which holds every family's files back to back.
-    uint32_t fileStart = 0;
-    uint32_t fileCount = 0;
-    uint32_t totalSize = 0;
-    uint32_t scriptMask = 0;
+    const char* name = "";
+    std::string installName;
+    const char* description = "";
+    const char* languages = "";
+    size_t fileStart = 0;
+    size_t fileCount = 0;
+    size_t totalSize = 0;
     bool installed = false;
     bool hasUpdate = false;
   };
 
-  static constexpr size_t MAX_SCRIPT_GROUPS = 32;
-
   State state_ = WIFI_SELECTION;
+  ScreenTransitionRefresh screenTransitionRefresh_;
   FontInstaller fontInstaller_;
+  ButtonNavigator buttonNavigator_;
 
   // Manifest data
   std::string baseUrl_;
-  // Reused for every file of every family: downloadToFile takes a std::string,
-  // so a char buffer would just build a temporary per call.
-  std::string downloadUrl_;
-  // Manifest strings, null-terminated and packed back to back.
-  std::unique_ptr<char[]> stringArena_;
-  uint32_t arenaUsed_ = 0;
-  uint32_t arenaCapacity_ = 0;
-  std::vector<ManifestFamily> families_;
-  // Every family's files back to back; sized once from the manifest, so it is
-  // allocated nothrow like the arena rather than through vector::reserve.
-  std::unique_ptr<ManifestFile[]> files_;
-  uint32_t fileEntryCount_ = 0;
-  // Manifest-defined labels are dynamic; cap them at the 32-bit membership
-  // mask and retain only labels after parsing so group tags consume no steady-state heap.
-  std::vector<StrRef> scriptGroupLabels_;
-  // One 4-byte index per manifest family, allocated once and reused for every group.
-  std::vector<int> filteredIndices_;
-  freeink::ui::ListNav groupNav_;
+  // One activity-owned allocation for all manifest labels and file names.
+  // It remains alive while an update batch uses a copied ManifestFamily.
+  std::unique_ptr<char[]> manifestStringArena_;
+  size_t manifestStringArenaUsed_ = 0;
+  size_t manifestStringArenaCapacity_ = 0;
+  std::unique_ptr<ManifestFile[]> manifestFiles_;
+  std::unique_ptr<ManifestFamily[]> manifestFamilies_;
+  size_t manifestFamilyCount_ = 0;
+  // Built once after each manifest load. The renderer borrows these pointers,
+  // so keeping them activity-owned avoids heap growth on every redraw.
+  std::unique_ptr<freeink::ui::ListItem[]> listItems_;
+  size_t listItemCapacity_ = 0;
+  size_t listItemCount_ = 0;
+  char updateAllLabel_[96] = {};
+  int selectedIndex_ = 0;
+  ManifestFamily retryFamily_;
+  bool hasRetryFamily_ = false;
+  bool manifestReloadNeeded_ = false;
+  std::string activeDownloadFamilyName_;
+  bool fontsChanged_ = false;
 
   // Download progress
   size_t currentFileIndex_ = 0;
   size_t currentFileTotal_ = 0;
   size_t fileProgress_ = 0;
   size_t fileTotal_ = 0;
-  unsigned long lastProgressRepaintMs_ = 0;
+  int downloadAttempt_ = 0;
+  int downloadAttemptTotal_ = 0;
   int downloadingFamilyIndex_ = 0;
   std::string errorMessage_;
+  std::string errorHint_;
   bool cancelRequested_ = false;
-  // Set when the cancel came from the home gesture (consumed by the download
-  // callback's own input pump); exit to home after the abort unwinds.
+  // Set when a blocking download consumed Home; exit only after its file and
+  // network resources have unwound.
   bool goHomeRequested_ = false;
 
-  // Shared cache for group and family rows. It is rebuilt only when the visible
-  // list changes, never for cursor movement or tap flash repaints.
-  std::vector<std::string> rowLabels_;
-  std::vector<freeink::ui::ListItem> rowItems_;
-  bool rowsDirty_ = true;
-  void rebuildRowItems();
-  void rebuildGroupRowItems();
-  void rebuildFamilyRowItems();
+  // FreeInkApp hosts the family list (themed rows, touch routing); the other
+  // states keep their legacy centered-text rendering.
+  using UiApp = freeink::ui::FreeInkApp<20, 4>;
+  freeink::ui::GfxRendererTarget uiTarget_;  // must precede `app_`: the app holds a reference to it
+  UiApp app_;
+  // render() rebuilds the app's interaction table; loop() only routes touch
+  // snapshots against it while this is true (the two run on different tasks).
+  std::atomic<bool> uiReady_{false};
+  int visibleRows_ = 1;  // rows per page at the current scale; set by the screen builder
+  int topIndex_ = 0;     // viewport scroll position, decoupled from the selection
 
-  int listCount() const override;
-  void buildScreen(UiScreen& screen) override;
-  void drawChrome() override;
-  void drawFooter() override;
-  void activateIndex(int index) override;
-  freeink::ui::ListNav& activeNav() override;
-  void onBackButton() override;
-  // Non-list states (loading, downloading, complete, error) consume the loop
-  // pass here; the group and family lists use the base list protocol.
-  bool handleCustomInput() override;
-
+  static void listScreen(UiApp::ScreenType& screen, void* user);
+  static void onRowEvent(const freeink::ui::ActionEvent& event, void* user);
+  void buildListScreen(UiApp::ScreenType& screen);
   void activateSelected();
+  bool pollCancelInput(bool includeDownloadScreenButton);
 
   void onWifiSelectionComplete(bool success);
   bool fetchAndParseManifest();
-  // cppcheck-suppress arithOperationsOnVoidPointer // unique_ptr<char[]>::get() is char*, not void*
-  const char* str(StrRef ref) const { return stringArena_ ? stringArena_.get() + ref : ""; }
-  // Returns false if the string does not fit the arena reserved for the manifest.
-  bool internString(const char* text, StrRef& outRef);
-  void clearManifest();
+  bool internManifestString(const char* text, const char*& out);
+  bool rebuildListItems();
+  const SdCardFontFamilyInfo* findInstalledFamilyCandidate(const char* familyName) const;
+  bool installedFilesMatch(const ManifestFamily& family, bool& hasUpdate,
+                           std::string* resolvedFamilyName = nullptr) const;
+  void resolveInstalledFamilyName(ManifestFamily& family) const;
+  void clearManifestFamilies();
   void downloadFamily(ManifestFamily& family);
-  void downloadAll();
+  void returnToFamilyList();
   void updateAll();
   static bool computeFileCrc32(const char* path, uint32_t& outCrc);
-  bool showDownloadAllRow() const;
   bool showUpdateAllRow() const;
   int specialRowCount() const;
-  bool isDownloadAllRow(int index) const;
   bool isUpdateAllRow(int index) const;
   bool isSelectedFamilyDeletable() const;
   void promptDeleteSelectedFamily();
   void onDeleteConfirmationResult(const ActivityResult& result);
-  int familyIndexFromList(int listIndex) const;
+  int familyIndexFromList(int listIndex) const { return listIndex - specialRowCount(); }
   int listItemCount() const;
-  bool hasGroupScreen() const { return !scriptGroupLabels_.empty(); }
-  int groupListItemCount() const { return 1 + static_cast<int>(scriptGroupLabels_.size()); }
-  int groupMemberCount(int scriptGroupIndex) const;
-  void buildFilteredIndices(int groupListIndex);
-  void enterGroup(int groupListIndex);
-  size_t totalDownloadSize() const;
   size_t totalUpdateSize() const;
-  static std::string formatSize(size_t bytes);
+  static void formatSize(size_t bytes, char* buffer, size_t bufferSize);
 };

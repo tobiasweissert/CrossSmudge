@@ -1,102 +1,254 @@
+> **Experimental migration candidate — not release-ready.** Crosscub remains Sticky-only.
+> This branch uses pinned CrossPoint develop directly, selectively adopts CrossInk,
+> and preserves Crosscub behavior. Stable Crosscub **1.6.5.5 is unchanged**.
+> Source/host checks do not establish a complete firmware build or device acceptance.
+> See [the feature and readiness ledger](../SCOPE.md).
+
+---
+title: Dictionary
+nav_order: 5
+---
+
 # Dictionary
 
-Look up words and phrases while reading an EPUB using an offline StarDict dictionary stored on the SD card.
+> [!TIP]
+> For the best experience, prepare your dictionary using the web companion tool [Inky](https://inky.crossink.dev/#dictionary-tools), which creates `.oft` and `.oft.cspt` accelerator files. An unprepared dictionary with uncompressed `.dict` and `.idx` files also works: on its first lookup, Crosscub creates a smaller on-device `.qidx` quick index automatically.
 
 ## Supported Format
 
 The reader supports **StarDict** dictionaries. When searching for dictionaries online, look for "StarDict format" or files with `.dict`, `.idx`, and `.ifo` extensions.
 
-A dictionary folder must contain:
+A dictionary folder typically contains:
 
-- `.idx` — word index (required, **must be uncompressed** — a `.idx.gz` will not work; decompress it on your computer with `gzip -d` first)
-- `.dict` or `.dict.dz` — definition data (`.dict.dz` is supported as-is; entries are decompressed on the fly during lookup)
-- `.syn` — synonym index (optional; maps alternate spellings and irregular forms to their headword)
-- `.ifo` — metadata (optional)
+- `.dict` -- definition data (required; compressed `.dict.dz` files must be prepared on a computer first)
+- `.idx` -- word index (required)
+- `.ifo` -- metadata such as dictionary name and word count (recommended)
+- `.syn` -- alternate forms and synonyms (optional, enhances lookup coverage)
 
-Not supported: dictionaries with 64-bit index offsets (`idxoffsetbits=64` in the `.ifo` — rare, and rejected with an error).
+Minimum requirement: one `.dict` and one `.idx` file in the same folder. Their filename stems should match. Without `.ifo`, the dictionary will still work but metadata and HTML definition rendering may be limited.
 
-> [!NOTE]  
-> If you use .dict.dz and Crosspoint failed to load your dictionary with error message "Not enough memory", try unzipping it.
+---
 
 ## Setting Up a Dictionary
 
-1. Copy your dictionary folder(s) to `/dictionaries/` on the SD card — one dictionary per folder, e.g. `/dictionaries/webster/webster.idx` + `webster.dict.dz`. A hidden `/.dictionaries/` folder (dot-prefixed) works the same way, for keeping it out of the file browser.
-2. Open **Settings → Reader → Dictionary** on the device.
-3. Select a dictionary from the list, or **None** to disable lookups.
+Example folder structure: `SDCARD/.dictionaries/Cambridge/*.dict`. Make sure the dictionary folder is **NOT** nested like `/Cambridge/Cambridge/*.dict`
 
-The Dictionary setting only appears when at least one usable dictionary folder exists. Folders containing more than one dictionary (multiple `.idx` stems) are skipped as ambiguous.
+1. Copy your dictionary folder(s) to one of these directories on the SD card:
+   - `/.dictionaries/` (checked first)
+   - `/dictionaries/`
+2. If no dictionary has been selected before, the first dictionary in the alphabetical device list is selected automatically.
+3. To choose between multiple dictionaries, open **Settings -> Reader -> Dictionary** on the device and select one from the list.
+4. Per book dictionaries can be set from within the in-reader menu `Book Options -> Settings Gear tab -> Book Dictionary`
 
-## Looking Up Words and Phrases
+### Preparing Compressed or Large Dictionaries
 
-Two ways to start a lookup while reading:
+Crosscub does not decompress dictionaries on the device. If a download contains `.dict.dz` or `.syn.dz`, run the bundled preparation tool on a computer before copying the folder to the SD card (see [Dictionary Tools](#dictionary-tools)).
 
-- Open the reader menu (**Confirm**) and choose **Look Up**.
-- Or set **Settings → Controls → Front buttons → Menu long press** to "Dictionary", then hold **Confirm** (~0.4s) on the reading page.
+An uncompressed dictionary with only `.dict` and `.idx` files is usable without desktop preparation. During the first lookup, if neither `*.idx.oft` nor `*.idx.oft.cspt` is present, Crosscub creates `*.qidx` beside the dictionary files. It records a sample every 256 index entries, letting later direct and stemmed lookups jump near the requested word before scanning a small part of the original `.idx`.
 
-### Selecting Text
+`.qidx` is a disposable device cache: it is rebuilt when it is missing, invalid, or belongs to a differently sized `.idx` file, and it can be deleted safely. If the lookup is cancelled or the SD card cannot create the cache, the lookup still works by scanning the full `.idx`; Crosscub will try to create the quick index again on a later lookup.
 
-**On button-driven devices:**
+Desktop preparation remains recommended for large dictionaries. `*.idx.oft.cspt` is the preferred direct-lookup accelerator, with `*.idx.oft` as its fallback; either one prevents Crosscub from creating `.qidx`. The desktop files also speed up synonym resolution and ordinal lookups. The smaller `.qidx` accelerates direct lookup and bounds spelling-suggestion searches, but it does not accelerate synonyms or ordinal lookups.
 
-1. A selection cursor appears on a word. Use **Left/Right** to navigate between words in reading order, and the side **Up/Down** buttons to jump between lines or flip across nearby pages.
-2. Press **Confirm** (**Select**) to anchor the start of the selection.
-3. **Single word:** Press **Confirm** again immediately (**Look Up**) to look up the highlighted word.
-4. **Phrase / multiple words:** Use **Left/Right** or **Up/Down** to extend the highlighted selection across words, lines, or pages. Then press **Confirm** (**Look Up**).
-5. Press **Back** at any time to cancel and return to reading.
+---
 
-**On touchscreen devices:**
+## Looking Up a Word
 
-- Tap or drag the selection handles across words to highlight a word or phrase, then tap **Look Up**.
+The **Look Up Word** option in the reader menu is only visible when a dictionary is active.
 
-On the very first lookup with a dictionary (and again whenever the `.idx` or `.syn` source file changes), the reader shows *"Indexing dictionary…"* while it builds small sidecar files next to them — a `.qidx` for the word index, and a `.sidx` when a `.syn` synonym file is present. Each sidecar is rebuilt independently, only when its own source changes. This takes a few seconds for large dictionaries and makes all subsequent lookups fast. The sidecars can be deleted safely at any time — they will simply be rebuilt.
+### Buttons
+
+1. Open the reader menu and choose **Look Up Word**.
+2. The page becomes a word-select overlay - one word is highlighted, initially near the centre of the page.
+3. Use **Up/Down** to move between rows, **Left/Right** to move between words on the same row.
+4. Press **Confirm** to look up the highlighted word.
+5. Press **Back** to exit word-select without looking anything up.
+
+### Touchscreen
+
+In an EPUB reader with **Touch Reader Controls** enabled, touch and hold a
+word for about one second. Crosscub opens word selection on that word; lift
+your finger to look it up. To look up a phrase, keep holding after the
+selection opens, drag to the last word, then lift your finger. This is a
+direct shortcut from the reading page, so you do not need to open the reader
+menu first.
+
+From a definition, touch and hold a word for about one second to start another
+lookup. Keep holding and drag to select a phrase, then lift your finger to look
+it up. Once word selection is open, touching a word starts the range
+immediately.
+
+### Quick Lookup
+
+Set a shortcut to **Look Up Word** in **Settings -> Controls**. Holding that shortcut in the EPUB reader then enters word-select directly, skipping the reader menu. Release and navigate to a word as usual.
 
 ### How Lookup Works
 
-1. **Direct match** — the word or phrase is searched case-insensitively in the dictionary index. Leading and trailing punctuation and whitespace are stripped automatically. Hebrew niqqud and cantillation marks are removed from the search term so pointed text can match unpointed headwords. Basic Arabic vowel marks (U+064B–U+0650, U+0652) and superscript alef (U+0670) are also removed; shaddah, hamza, and maddah remain significant. Multi-word phrases match dictionary entries containing spaces (such as idioms, phrasal verbs, or compound terms). An index may list the same headword more than once (one entry per part of speech, for example); every entry it lists is shown, each labelled with its headword.
-2. **Synonyms** — on a miss, if the dictionary ships a `.syn` file, alternate spellings and irregular forms recorded there are resolved to their headword (e.g. `oxen` → `ox`, `colour` → `color`). All the headwords a synonym points at are shown. This step is skipped if the `.sidx` sidecar could not be built (e.g. transient low memory during indexing); the dictionary otherwise stays usable, and the build is retried the next time it is opened.
-3. **Stemming** — still no match: common English word forms are retried automatically: possessives and plurals (`dogs` → `dog`, `stories` → `story`) and verb endings (`walked` → `walk`, `running` → `run`, `making` → `make`).
-4. **Not found** — a short popup appears. Touchscreen devices return to reading; buttons-only devices return to word selection.
+When you select a word, the reader searches for it in this order:
 
-## Vocabulary History
+1. **Direct match** - the word is found as-is in the dictionary index.
+2. **Stemming** - the reader automatically tries common word forms (plurals, verb conjugations, comparatives). For example, "running" finds "run".
+3. **Alternate forms** - if the dictionary includes a synonym/alternate forms file and no match was found yet, a prompt appears. Press **Confirm** to search alternate forms, or **Back** to skip.
+4. **Suggestions** - if nothing matched, a list of similar words from the dictionary is shown. Select one to view its definition.
+5. **Not found** - if no matches or suggestions exist, a not-found message appears. Press **Back** to return to word-select, or **Confirm** to exit to the reader.
 
-Successful lookups started from a book page are appended to `/Vocabulary.txt` at the root of the SD card. This is separate from `My Clippings.txt`; looking up a word does not create a highlight. Failed lookups are not recorded, and an SD-card write failure does not interrupt the dictionary.
-
-The file uses UTF-8 **JSON Lines**: one JSON object per line, versioned with `"v":1`. Each record has a random `id`, `word` (selected text), `headword` (dictionary match), `definition` (plain text), and `timestamp` (Unix seconds, or `null` when the clock is unavailable). It also includes `title`, `author`, `series`, `series_index`, `chapter`, `page` (1-based chapter page), `spine` (0-based EPUB spine index), and `start_offset` (EPUB source offset, or `null` when unavailable). Missing series information is represented by an empty name and a `null` index. Definitions are limited to 2 KiB, looked-up words and matched headwords to 160 UTF-8 bytes each, and book fields to bounded lengths. The `definition_truncated` boolean indicates whether the definition (but not the word or headword) was shortened; when possible the saved definition ends at a complete line. HTML dictionary definitions are converted to plain text.
-
-Repeated lookups are recorded separately. Positions reflect the reader layout at lookup time and may change when the book is reflowed. The `chapter` title is resolved from the selected word's rendered page, not its exact offset: if two TOC chapter boundaries share a page, the title may refer to the later chapter rather than the one containing the word. Lookups made from inside a dictionary definition are not currently included.
+---
 
 ## The Definition Screen
 
-When a word is found, the definition screen shows the matched headword at the top and the definition text below, with a page counter for long definitions. A word that maps to several definitions shows them one after another, each labelled with its headword. Definitions that exceed the remaining size limit are skipped, and later definitions are still considered. If no labelled definition fits, the first definition is shown alone without an extra label.
+When a word is found, the definition screen shows the headword at the top and the definition text below.
 
-HTML dictionaries (`sametypesequence=h`) and XDXF dictionaries (`sametypesequence=x`) use the EPUB text-layout engine for supported formatting such as headings, bold, italics, lists, and line breaks. Unrecognized tags keep their text without special formatting. Images and CSS styling are ignored. Definitions that are too large or cannot be parsed or laid out within the available memory fall back to plain text.
+- **Page Forward** - next page (for long definitions)
+- **Page Back** - previous page
+- **Confirm** (labelled **Look Up Word**) - enter word-select mode on the definition text (see Chaining Lookups below)
+- **Left** (labelled **Switch**) - choose another dictionary and repeat the current lookup
+- **Back** (short press) - return to the previous screen
+- **Back** (long press) - exit all the way back to the reader
 
-A readable `.ifo` file with a missing or empty `sametypesequence` enables the type stored in each entry field. HTML (`h`) and XDXF (`x`) fields use the same formatting support. Text fields are shown as text; binary fields, such as images and sounds, are skipped. Missing, empty, or unreadable `.ifo` files retain plain-text handling.
+---
 
-Inline entries with only empty or binary fields are skipped. If all matching entries are empty, the lookup reports no match.
+## Chaining Lookups
 
-Definitions are drawn in your reading font. Dictionaries may use IPA symbols (e.g. `ˈ ː ɹ ɪ ʊ`…) as pronunciation guide, which built-in reader fonts do not include, so they are shown as `�`. To see them, install an [SD card font](./sd-card-fonts.md) that covers IPA and select it as the reading font.
+From a definition screen, you can look up any word within the definition text without returning to the reader.
 
-- **Left/Right** or side **Up/Down** — previous / next page
-- **Confirm** — select words or a phrase inside the definition, then choose **Look Up**
-- **Long press on text** — select the touched word on touchscreen devices when touch reader controls are enabled
-- **Back during selection** — cancel selection
-- **Back while reading a definition** — return to the previous definition. At the first definition, touchscreen devices return to reading; buttons-only devices return to book word selection
-- **Long Back while reading a definition** — hold **Back** for at least one second, then release to close all definitions and return directly to reading
-- **Long press the header Back arrow** — close all definitions and return directly to reading on touchscreen devices, even when touch reader controls are disabled
+1. Press **Confirm** (**Look Up Word**) on the definition screen. On a touchscreen, touch and hold the word you want to look up instead.
+2. A word in the definition becomes highlighted. Navigate to any word and press **Confirm**, or lift your finger after the touchscreen selection starts.
+3. A new definition screen opens for that word.
+4. You can chain further by pressing **Look Up Word** again from the new definition.
+5. Short-press **Back** to exit word-select and return to the current definition.
+6. Short-press **Back** again to go back through the chain (each press returns to the previous definition).
+7. Long-press **Back** at any point to exit directly to the reader.
 
-During definition word selection, press **Back** to cancel selection first, then hold **Back** or long-press the header Back arrow to leave the lookup chain.
+Going back returns you to each prior definition **on the page you were reading** when you chained away from it, not the first page.
 
-Nested lookups use the same dictionary. Both formatted and plain-text definitions support selection.
-Returning to a previous definition restores its page and remembers its selection for the next press of **Confirm**.
+**Chain depth limit:** the chain follows the 50 entries visible in lookup history. If you chain deeper than that, the oldest chain entries are dropped, so backing out eventually returns you to the reader.
 
-The reader keeps up to 16 previous definitions. At this limit, another lookup shows a brief message and leaves the current definition open.
-A failed lookup reloads the current definition and keeps its page and selection.
+---
 
-The current definition is released before loading another entry, so two definitions do not need to fit in memory together.
-Returning to a previous definition reads it from the SD card again.
-If a previous definition cannot be read or its position restored, the definition screen closes. Touchscreen devices return to reading; buttons-only devices return to book word selection.
-The screen also closes if a failed forward lookup cannot reload the current definition.
+## Phrase / Multi-word Lookup
 
+In word-select mode, you can select a sequence of words to look up as a phrase.
+
+1. Navigate to the first word of the phrase.
+2. Long-press **Confirm** to anchor on that word.
+3. Use the navigation buttons to extend (or shrink) the selection to cover the full phrase. All selected words are highlighted.
+4. Short-press **Confirm** to look up the selected phrase.
+5. Press **Back** to cancel and return to single-word select mode.
+
+Multi-word select works in both the reader word-select and the definition word-select (chained lookup).
+
+On a touchscreen, use a press-and-drag selection instead of the button
+sequence: touch the first word, drag to the last word, and lift your finger to
+look up the selected phrase. The first long hold on the reading page is only
+needed to enter lookup; once word selection is open, touching a word starts
+the range immediately.
+
+**Limitation:** Multi-word selection cannot span a page boundary. If a phrase crosses from one page to the next, only the words on the current page are available for selection. As a workaround, reduce the reader font size so more words fit on a single page, perform the lookup, then restore the original font size.
+
+---
+
+## Per-Book Dictionary
+
+Each book can have its own dictionary, independent of the global setting.
+
+1. Open the reader menu, navigate to the 3rd tab (settings gear icon) and choose **Book Dictionary**.
+2. Select a dictionary from the picker.
+3. The per-book choice is saved and restored each time the book is opened.
+4. To remove the override, open **Book Dictionary** and select **Use Global**. The picker shows the current global dictionary name in parentheses next to Use Global.
+
+The global dictionary is automatically restored whenever the book is closed. Changing a book's dictionary does not affect the global setting or other books.
+
+Using **Switch Dictionary** during a word lookup is temporary. It applies only to that lookup flow; when lookup closes, the reader returns to the book's dictionary override, or the global dictionary when the book has no override.
+
+---
+
+## Lookup History
+
+Each book maintains its own lookup history, accessible from the reader menu.
+
+1. Open the reader menu and choose **Lookup History**.
+2. Each entry shows the searched word and a status indicator:
+   - Square root (√) -- found directly
+   - Tilde (~) -- resolved via stemming or alternate forms
+   - Question mark (?) -- reached via the suggestions screen
+   - X -- not found
+3. Select any entry and press **Confirm** to look it up again. Press **Back** from the definition to return to the history screen.
+4. To delete an entry, long-press **Confirm** on it. A confirmation popup appears -- press **Confirm** to delete, or **Back** to cancel.
+
+The history screen shows the 50 most recent entries. The on-disk history is append-only, so older entries remain stored but are not shown. The visible window also bounds how deep a chained lookup can go back (see Chaining Lookups).
+
+---
+
+## IPA Phonetic Characters
+
+Dictionary definitions use the active reader font and size by default. If at least one dictionary is installed, you can set the default dictionary font and size in **Settings > Reader > Font Options**. Books inherit those defaults unless you choose a different font or size in **Book Options > Font Options**. Choose **Use Global** in Book Options to return a book to the global defaults. When the reader uses an SD-card font, you can choose a different dictionary size while keeping that same family; built-in reader fonts continue to use their active size. A saved size with no matching file uses the closest available size from the dictionary family.
+
+Only one SD-card font family is loaded at a time: Crosscub temporarily swaps to the dictionary font while a definition is open, then restores the reader font when you close it. If a book's selected dictionary font is missing, the definition temporarily uses the global dictionary font. If that is also unavailable, it falls back to the reader font. The per-book selection is kept so it resumes automatically if you reinstall the family.
+
+Built-in fonts keep the glyphs they contain and approximate only unsupported pronunciation symbols. If you see a filled diamond, choose an SD-card font that includes that character.
+
+You can download an SD card catalog of fonts with IPA glyphs built-in from [Inky](https://inky.crossink.dev/#downloads).
+
+See the [dictionary font builder](dictionary-development.md#generating-dictionary-fonts) if you want to build your own dictionary fonts via the CLI.
+
+---
+
+## Dictionary Tools
+
+## Inky
+
+The web companion app, [Inky](https://inky.crossink.dev/#dictionary-tools), prepares one StarDict dictionary at a time and generates the accelerator indexes used for fast lookups. It accepts either:
+
+- an uncompressed dictionary folder; or
+- a `.zip`, `.tar.zst`, or `.rar` archive containing that folder or its dictionary files.
+
+1. Open Inky's **Dictionary Tools** page.
+2. Drag the dictionary archive or folder onto the upload area. Alternatively, click it and choose **Archive** or **Folder**.
+3. Select **Prepare Dictionary**. The input must include matching `.ifo`, `.idx`, and `.dict` or `.dict.dz` files. `.syn` and `.syn.dz` are optional.
+4. Download the prepared ZIP when the job finishes, then unzip it into `/.dictionaries/` or `/dictionaries/` on the SD card. Keep the resulting dictionary folder intact.
+
+Inky decompresses `.dict.dz` and `.syn.dz` when needed, creates `.idx.oft`, `.idx.oft.cspt`, `.syn.oft`, and `.syn.oft.cspt`, and packages the prepared dictionary for you. The prepared download is available for 10 minutes.
+
+### Command Line
+
+A command-line tool is included for working with StarDict dictionaries on your computer, without the device. It requires Python 3 and has no external dependencies.
+
+#### Pre-processing
+
+Decompress dictionary data and generate accelerator indexes on your computer:
+
+```bash
+python3 scripts/dictionary_tools.py prep /path/to/dictionary-folder
+```
+
+Run this before copying compressed dictionaries to the SD card. It is also recommended for large uncompressed dictionaries because it makes lookups much faster.
+
+The command produces, when applicable, `.dict`, `.syn`, `.idx.oft`, `.syn.oft`, `.idx.oft.cspt`, and `.syn.oft.cspt`. Copy these alongside the original `.idx` and optional `.ifo`. Crosscub uses `.idx.oft.cspt` first, then `.idx.oft`; when neither exists, it creates and uses `.qidx` on the device. If a quick index cannot be created, Crosscub scans the original index instead.
+
+### Looking Up a Word
+
+Look up a word from the command line:
+
+```bash
+python3 scripts/dictionary_tools.py lookup /path/to/dictionary-folder apple
+```
+
+Prints the definition to stdout. Compressed dictionary data must be prepared with `prep` first.
+
+### Merging Dictionaries
+
+Combine two or more StarDict dictionaries into a single monolithic dictionary:
+
+```bash
+python3 scripts/dictionary_tools.py merge \
+  --source /path/to/dict-a \
+  --source /path/to/dict-b \
+  --output /path/to/merged-dict
+```
+
+Specify `--source` once per dictionary to include. The merged output contains the full union of all headwords and synonyms. When the same word appears in multiple sources, definitions are concatenated in source order.
+
+Source dictionaries must be prepared (decompressed `.dict` files) before merging. The output is a complete, ready-to-use StarDict dictionary that can be copied directly to the SD card.
 
 ## Where to find dictionaries
 
@@ -111,3 +263,10 @@ The screen also closes if a failed forward lookup cannot reload the current defi
 - [Fictionaries](https://fictionary.gumroad.com/) provides dictionaries for various speculative fiction books and series.
 - [World Factbooks Archive](https://github.com/MilkMp/CIA-World-Factbooks-Archive-1990-2025) provides 36 years of CIA's World Factbook dictionaries in StarDict format.
 - [StarDict-Hebrew](https://github.com/Uri-Tauber/StarDict-Hebrew) Hebrew-English StarDict versions of Babylon dictionaries.
+
+## Migration boundary
+
+The owner lookup/index/phrase-history behavior remains authoritative. Modern vocabulary
+interfaces and source changes are candidates, not evidence of a qualified compressed
+dictionary pipeline. Prepare `.dict.dz` on a computer before use. Real dictionary/font
+rendering, recursive lookup and migration remain target/device gates.

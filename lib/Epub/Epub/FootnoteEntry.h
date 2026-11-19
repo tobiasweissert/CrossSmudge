@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <cstring>
 
 #define FOOTNOTE_NUMBER_LEN 32
@@ -7,10 +8,14 @@
 // ponytail: bumped from 96 to 256; calibre-generated EPUBs with long filenames
 // and URL-encoded characters routinely exceed 96 chars (e.g.
 // "Author-Title_split_NNN.html#_ftnN" encoded is ~150 chars).
+inline constexpr uint16_t EPUB_MAX_FOOTNOTES_PER_PAGE = 16;
 
 struct FootnoteEntry {
   char number[FOOTNOTE_NUMBER_LEN];
   char href[FOOTNOTE_HREF_LEN];
+  // Matches this destination to the laid-out words that display the link.
+  // Zero is reserved for older/non-interactive entries.
+  uint8_t linkId = 0;
 
   FootnoteEntry() {
     number[0] = '\0';

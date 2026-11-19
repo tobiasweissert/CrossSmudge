@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Memory.h>
+
 #include <cstddef>
 #include <cstdint>
 
@@ -12,7 +14,7 @@ struct tinfl_decompressor_tag;
 // Replaces the uzlib-backed InflateReader on the throughput paths (EPUB zip
 // entries, PNG IDAT). tinfl decodes via lookup tables where uzlib walks the
 // Huffman tree bit-by-bit -- several times faster on this CPU -- at the cost
-// of a larger decompressor state (~8KB, transient for the scope of the
+// of a larger decompressor state (~11KB, transient for the scope of the
 // stream; taken from the lent framebuffer bytes via buildscratch::claim()
 // when a FrameBufferLoan is active, heap otherwise). FontDecompressor
 // intentionally stays on InflateReader:
@@ -35,6 +37,8 @@ struct tinfl_decompressor_tag;
 // zlib header (e.g. PNG IDAT).
 class InflateStream {
  public:
+  static constexpr size_t STREAMING_WINDOW_SIZE = 32768;
+
   enum class Status {
     Ok,     // Output buffer full; more decompressed data remains.
     Done,   // Stream ended cleanly. produced may be < maxLen.
@@ -49,8 +53,16 @@ class InflateStream {
   InflateStream& operator=(const InflateStream&) = delete;
 
   // Allocate decompressor state (and the 32KB window when streaming) and reset
-  // stream state. Releases prior storage first; leaves no allocation on OOM.
+  // stream state, releasing any previous backing first. Returns false on OOM.
   bool init(bool streaming);
+
+  // Transient storage needed when the framebuffer scratch loan is unavailable.
+  static size_t requiredStorageSize(bool streaming);
+  // Admission hint: preserve the conservative full-storage requirement unless
+  // a scratch loan or an admitted external window removes those heap bytes.
+  static size_t requiredInternalStorageSize(bool streaming);
+  MemoryPool windowPool() const { return byteBufferPool(windowOwner.get()); }
+  bool usesBuildScratch() const { return arenaBase != nullptr; }
 
   // Free the decompressor state and window.
   void deinit();
@@ -72,7 +84,9 @@ class InflateStream {
   Status readAtMost(uint8_t* dest, size_t maxLen, size_t* produced);
 
  private:
-  tinfl_decompressor_tag* state = nullptr;  // ~8KB: heap, or inside the claimed build scratch
+  HeapByteBuffer stateOwner;
+  HeapByteBuffer windowOwner;
+  tinfl_decompressor_tag* state = nullptr;  // ~11KB: heap, or inside the claimed build scratch
   uint8_t* window = nullptr;                // 32KB ring, streaming mode only
   uint8_t* arenaBase = nullptr;             // non-null when state/window live in lent framebuffer bytes
   size_t windowPos = 0;                     // ring write cursor

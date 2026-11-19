@@ -3,44 +3,74 @@
 #include <Utf8.h>
 
 #include <algorithm>
-
-namespace StringUtils {
+#include <cctype>
 
 namespace {
-constexpr size_t MAX_PRESERVED_EXTENSION_BYTES = 16;
 
-bool hasConventionalExtension(const std::string& name, const size_t dot) {
-  const size_t extensionBytes = name.size() - dot;
-  if (dot == 0 || extensionBytes < 2 || extensionBytes > MAX_PRESERVED_EXTENSION_BYTES) return false;
-  return std::all_of(name.begin() + dot + 1, name.end(), [](const unsigned char c) { return std::isalnum(c) != 0; });
+constexpr size_t MAX_EXTENSION_BYTES = 16;
+
+bool isInvalidFilenameCodepoint(uint32_t cp) {
+  return cp == '/' || cp == '\\' || cp == ':' || cp == '*' || cp == '?' || cp == '"' || cp == '<' || cp == '>' ||
+         cp == '|';
 }
 
-std::string sanitizeFilenameRange(const std::string& name, const size_t endOffset, const size_t contentMaxBytes,
-                                  const size_t reserveBytes) {
+std::string trimFilenameEdges(const std::string& name) {
+  size_t start = 0;
+  while (start < name.size() && (name[start] == ' ' || name[start] == '.')) {
+    start++;
+  }
+
+  size_t end = name.size();
+  while (end > start && (name[end - 1] == ' ' || name[end - 1] == '.')) {
+    end--;
+  }
+
+  return name.substr(start, end - start);
+}
+
+size_t findSafeExtensionStart(const std::string& name) {
+  const size_t dot = name.find_last_of('.');
+  if (dot == std::string::npos || dot == 0 || dot + 1 >= name.size()) {
+    return std::string::npos;
+  }
+
+  const size_t extensionBytes = name.size() - dot;
+  if (extensionBytes > MAX_EXTENSION_BYTES) {
+    return std::string::npos;
+  }
+
+  for (size_t i = dot + 1; i < name.size(); i++) {
+    if (!std::isalnum(static_cast<unsigned char>(name[i]))) {
+      return std::string::npos;
+    }
+  }
+
+  return dot;
+}
+
+std::string sanitizeFilenamePart(const std::string& name, size_t maxBytes) {
   std::string result;
-  result.reserve(std::min(name.size(), reserveBytes));
+  result.reserve(std::min(name.size(), maxBytes));
 
   const auto* text = reinterpret_cast<const unsigned char*>(name.c_str());
-  const auto* rangeEnd = text + std::min(name.size(), endOffset);
 
   // Skip leading spaces and dots so they don't consume the byte budget
-  while (text < rangeEnd && (*text == ' ' || *text == '.')) {
+  while (*text == ' ' || *text == '.') {
     text++;
   }
 
   // Process full UTF-8 codepoints to avoid trimming in the middle of a multibyte sequence
-  while (text < rangeEnd) {
+  while (*text != 0) {
     const auto* cpStart = text;
     uint32_t cp = utf8NextCodepoint(&text);
 
-    if (cp == '/' || cp == '\\' || cp == ':' || cp == '*' || cp == '?' || cp == '"' || cp == '<' || cp == '>' ||
-        cp == '|') {
+    if (isInvalidFilenameCodepoint(cp)) {
       // Replace illegal and control characters with '_'
-      if (result.length() + 1 > contentMaxBytes) break;
+      if (result.length() + 1 > maxBytes) break;
       result += '_';
     } else if (cp >= 128 || (cp >= 32 && cp < 127)) {
       const size_t cpBytes = text - cpStart;
-      if (result.length() + cpBytes > contentMaxBytes) break;
+      if (result.length() + cpBytes > maxBytes) break;
       result.append(reinterpret_cast<const char*>(cpStart), cpBytes);
     }
   }
@@ -55,22 +85,33 @@ std::string sanitizeFilenameRange(const std::string& name, const size_t endOffse
 
   return result.empty() ? "book" : result;
 }
+
 }  // namespace
 
+namespace StringUtils {
+
 std::string sanitizeFilename(const std::string& name, size_t maxBytes) {
-  return sanitizeFilenameRange(name, name.size(), maxBytes, maxBytes);
-}
+  const std::string trimmedName = trimFilenameEdges(name);
+  const size_t extensionStart = findSafeExtensionStart(trimmedName);
+  if (extensionStart != std::string::npos) {
+    const std::string extension = trimmedName.substr(extensionStart);
+    if (extension.size() < maxBytes) {
+      const size_t baseBudget = maxBytes - extension.size();
+      std::string base = sanitizeFilenamePart(trimmedName.substr(0, extensionStart), baseBudget);
+      if (base.size() > baseBudget) {
+        base.resize(baseBudget);
+      }
+      if (!base.empty()) {
+        return base + extension;
+      }
+    }
+  }
 
-std::string sanitizeFilenamePreservingExtension(const std::string& name, const size_t maxBytes) {
-  const size_t dot = name.find_last_of('.');
-  if (dot == std::string::npos || !hasConventionalExtension(name, dot)) return sanitizeFilename(name, maxBytes);
-
-  const size_t extensionBytes = name.size() - dot;
-  if (extensionBytes >= maxBytes) return sanitizeFilename(name, maxBytes);
-
-  std::string stem = sanitizeFilenameRange(name, dot, maxBytes - extensionBytes, maxBytes);
-  stem.append(name, dot, extensionBytes);
-  return stem;
+  return sanitizeFilenamePart(name, maxBytes);
 }
 
 }  // namespace StringUtils
+
+namespace StringUtils {
+std::string sanitizeFilenamePreservingExtension(const std::string& name, size_t maxBytes) { return sanitizeFilename(name,maxBytes); }
+}

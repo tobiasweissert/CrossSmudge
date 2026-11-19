@@ -1,18 +1,23 @@
+---
+title: Activity Manager
+nav_order: 10
+---
+
 # Activity & ActivityManager Migration Guide
 
 This document explains the refactoring from the original per-activity render task model to the centralized `ActivityManager` introduced in [PR #1016](https://github.com/crosspoint-reader/crosspoint-reader/pull/1016). It covers the architectural differences, what changed for activity authors, and the FreeRTOS task and locking model that underpins the system.
 
 ## Overview of Changes
 
-| Aspect | Old Model | New Model |
-|--------|-----------|-----------|
-| Render task | One per activity (8KB stack each) | Single shared task in `ActivityManager` |
-| Render mutex | Per-activity `renderingMutex` | Single global mutex in `ActivityManager` |
-| `RenderLock` | Inner class of `Activity` | Standalone class, acquires global mutex |
-| Subactivities | `ActivityWithSubactivity` base class | Activity stack managed by `ActivityManager` |
-| Navigation | Free functions in `main.cpp` | `activityManager.goHome()`, `goToReader()`, etc. |
-| Subactivity results | Callback lambdas stored in parent | `startActivityForResult()` / `setResult()` / `finish()` |
-| `requestUpdate()` | Notifies activity's own render task | Delegates to `ActivityManager` (immediate or deferred) |
+| Aspect              | Old Model                            | New Model                                               |
+| ------------------- | ------------------------------------ | ------------------------------------------------------- |
+| Render task         | One per activity (8KB stack each)    | Single shared task in `ActivityManager`                 |
+| Render mutex        | Per-activity `renderingMutex`        | Single global mutex in `ActivityManager`                |
+| `RenderLock`        | Inner class of `Activity`            | Standalone class, acquires global mutex                 |
+| Subactivities       | `ActivityWithSubactivity` base class | Activity stack managed by `ActivityManager`             |
+| Navigation          | Free functions in `main.cpp`         | `activityManager.goHome()`, `goToReader()`, etc.        |
+| Subactivity results | Callback lambdas stored in parent    | `startActivityForResult()` / `setResult()` / `finish()` |
+| `requestUpdate()`   | Notifies activity's own render task  | Delegates to `ActivityManager` (immediate or deferred)  |
 
 ## Architecture
 
@@ -28,16 +33,16 @@ Each activity created its own FreeRTOS render task on entry and destroyed it on 
 │  │   ├── handle input                                │  │
 │  │   ├── update state (under RenderLock)             │  │
 │  │   └── requestUpdate()  ──notify──►  Render Task   │  │
-│  │                                      (per-activity)│  │
-│  │                                      8KB stack     │  │
-│  │                                      owns mutex    │  │
+│  │                                     (per-activity)│  │
+│  │                                     8KB stack     │  │
+│  │                                     owns mutex    │  │
 │  └───────────────────────────────────────────────────┘  │
 │                                                         │
 │ ActivityWithSubactivity:                                │
 │  ┌──────────────┐     ┌──────────────┐                  │
-│  │ Parent        │────►│ SubActivity   │                 │
-│  │ (has render   │     │ (has own      │                 │
-│  │  task)        │     │  render task) │                 │
+│  │ Parent       │────►│ SubActivity   │                 │
+│  │ (has render  │     │ (has own      │                 │
+│  │  task)       │     │  render task) │                 │
 │  └──────────────┘     └──────────────┘                  │
 └─────────────────────────────────────────────────────────┘
 ```

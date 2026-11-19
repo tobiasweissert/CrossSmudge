@@ -98,7 +98,12 @@ class GfxRenderer {
   bool sdFont = false;
   mutable size_t coldMeasurements = 0;
   mutable std::set<std::tuple<int, uint8_t, uint32_t>> preparedAdvances;
-  int getTextAdvanceX(int fontId, const char* text, EpdFontFamily::Style style, int8_t tracking = 0,
+  // The synthetic font has zero following-codepoint kerning. Keep the owner
+  // Unicode seam distinct from signed modern tracking, matching production.
+  int getTextAdvanceX(int fontId, const char* text, EpdFontFamily::Style style, uint32_t = 0) const {
+    return getTextAdvanceXTracked(fontId, text, style, 0);
+  }
+  int getTextAdvanceXTracked(int fontId, const char* text, EpdFontFamily::Style style, int8_t tracking = 0,
                       BidiUtils::BidiBaseDir = BidiUtils::BidiBaseDir::AUTO,
                       TextMeasureMode = TextMeasureMode::Layout) const {
     int width = 0;

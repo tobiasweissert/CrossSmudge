@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <deque>
 #include <vector>
 
 #include "EpdFont.h"
@@ -59,9 +60,9 @@ class SdCardFont {
   // and callers never build a concatenated copy — a heap-tight screen aborting
   // in a bare-new string append is exactly what this avoids). A null getter
   // result skips that index. Unique codepoints cap at MAX_PAGE_GLYPHS.
-  // loadKernLig=false skips kern/ligature loading and the mini kern matrix:
-  // UI fallback text (CJK titles) has no useful kern pairs, and the per-rebuild
-  // class-table and matrix work is wasted there. Reader-quality paths keep the default.
+  // loadKernLig=false skips kern class IO and the mini kern matrix but retains
+  // ligatures (DictionaryLean); UI fallback text (CJK titles) has no useful kern pairs,
+  // and the per-rebuild class-table and matrix work is wasted there. Reader-quality paths keep the default.
   using TextGetter = const char* (*)(const void* ctx, uint32_t index);
   int prewarm(TextGetter getter, const void* ctx, uint32_t textCount, uint8_t styleMask = 0x0F,
               bool metadataOnly = false, bool loadKernLig = true, bool accumulate = true);
@@ -82,6 +83,13 @@ class SdCardFont {
 
   // Look up advanceX for a codepoint from the advance table.
   // Returns the 12.4 fixed-point advance, or 0 if not found.
+  bool readAdvance(uint32_t codepoint, uint8_t style, uint16_t* outAdvance) const;
+  void releaseForLowMemory(bool preserveAdvanceTable = false);
+  bool lastPrewarmFailed() const { return lastPrewarmFailed_; }
+  int buildAdvanceTable(const std::deque<std::string>& words, bool includeHyphen, uint8_t styleMask = 0x0F,
+                        const char* extraText = nullptr);
+  int buildAdvanceTableForCodepoints(const uint32_t* codepoints, uint32_t cpCount, bool includeSpace,
+                                     bool includeHyphen, uint8_t styleMask = 0x0F);
   uint16_t getAdvance(uint32_t codepoint, uint8_t style) const;
 
   // Returns true if advance table is populated for at least one style.
@@ -146,11 +154,12 @@ class SdCardFont {
   void resetStats();
   const Stats& getStats() const { return stats_; }
 
-  // Content hash of the file header + style TOC entries (computed during load).
-  // Used to generate deterministic font IDs for section cache invalidation.
+  // Full file content hash, streamed once during load (no retained file copy).
+  // Same-size metric/bitmap replacements invalidate derived section font IDs.
   uint32_t contentHash() const { return contentHash_; }
 
  private:
+  bool lastPrewarmFailed_ = false;
   // Per-style metadata (parsed from file header/TOC)
   struct CpFontHeader {
     uint32_t intervalCount = 0;
@@ -278,6 +287,7 @@ class SdCardFont {
   // Zero means absent; present styles store their array slot plus one.
   uint8_t styleSlots_[MAX_STYLES] = {};
   PerStyle& styleData(uint8_t style) { return styles_[styleSlots_[style] - 1]; }
+  const PerStyle& styleData(uint8_t style) const { return styles_[styleSlots_[style] - 1]; }
   uint8_t styleCount_ = 0;
 
   char filePath_[128] = {};
@@ -333,6 +343,7 @@ class SdCardFont {
   bool loaded_ = false;
 
   // Per-style helpers
+  bool ensureBitmapCapacity(PerStyle& s, uint32_t needed);
   void freeStyleMiniData(PerStyle& s);
   // Per-scope variant: drop the page's data, keep the allocations (see the
   // PerStyle comment). May escalate to freeStyleMiniData under heap pressure

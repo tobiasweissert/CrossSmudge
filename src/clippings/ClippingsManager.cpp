@@ -3,30 +3,109 @@
 #include <HalClock.h>
 #include <HalStorage.h>
 #include <Logging.h>
-#include <Utf8.h>
 #include <common/FsApiConstants.h>
 
 #include <algorithm>
 #include <cstdio>
-#include <ctime>
+
+#include "CrossPointSettings.h"
 
 namespace {
 constexpr const char* WEEKDAY_NAMES[] = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
 constexpr const char* MONTH_NAMES[] = {"January", "February", "March",     "April",   "May",      "June",
                                        "July",    "August",   "September", "October", "November", "December"};
 
-bool formatKindleAddedOn(char* buf, const size_t bufSize) {
-  if (!buf || bufSize == 0) return false;
-  struct tm local;
-  if (!halClock.localTime(local) || local.tm_year < 100 || local.tm_year > 199) return false;
+bool isLeapYear(const uint16_t year) { return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0; }
 
-  int hour12 = local.tm_hour % 12;
+uint8_t daysInMonth(const uint16_t year, const uint8_t month) {
+  static constexpr uint8_t DAYS[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  if (month < 1 || month > 12) return 0;
+  if (month == 2 && isLeapYear(year)) return 29;
+  return DAYS[month - 1];
+}
+
+bool isValidDate(const uint16_t year, const uint8_t month, const uint8_t day) {
+  if (year < 2000 || year > 2099) return false;
+  const uint8_t monthDays = daysInMonth(year, month);
+  return monthDays > 0 && day >= 1 && day <= monthDays;
+}
+
+void adjustDateByDays(uint16_t& year, uint8_t& month, uint8_t& day, int delta) {
+  while (delta > 0) {
+    const uint8_t monthDays = daysInMonth(year, month);
+    if (day < monthDays) {
+      day++;
+    } else {
+      day = 1;
+      if (month < 12) {
+        month++;
+      } else {
+        month = 1;
+        year++;
+      }
+    }
+    delta--;
+  }
+
+  while (delta < 0) {
+    if (day > 1) {
+      day--;
+    } else {
+      if (month > 1) {
+        month--;
+      } else {
+        month = 12;
+        year--;
+      }
+      day = daysInMonth(year, month);
+    }
+    delta++;
+  }
+}
+
+uint32_t dayIndexSince2000(const uint16_t year, const uint8_t month, const uint8_t day) {
+  uint32_t dayIndex = 0;
+  for (uint16_t y = 2000; y < year; ++y) {
+    dayIndex += isLeapYear(y) ? 366u : 365u;
+  }
+  for (uint8_t m = 1; m < month; ++m) {
+    dayIndex += daysInMonth(year, m);
+  }
+  return dayIndex + static_cast<uint32_t>(day - 1);
+}
+
+bool formatKindleAddedOn(char* buf, const size_t bufSize) {
+  if (!buf || bufSize == 0 || !halClock.isAvailable()) return false;
+
+  uint16_t year = 0;
+  uint8_t month = 0;
+  uint8_t day = 0;
+  uint8_t hour = 0;
+  uint8_t minute = 0;
+  if (!halClock.getDateTime(year, month, day, hour, minute) || !isValidDate(year, month, day)) return false;
+
+  const uint8_t offsetQ = std::min<uint8_t>(SETTINGS.clockUtcOffsetQ, 104);
+  const int offsetMinutes = (static_cast<int>(offsetQ) - 48) * 15;
+  int localMinutes = static_cast<int>(hour) * 60 + static_cast<int>(minute) + offsetMinutes;
+  while (localMinutes < 0) {
+    adjustDateByDays(year, month, day, -1);
+    localMinutes += 24 * 60;
+  }
+  while (localMinutes >= 24 * 60) {
+    adjustDateByDays(year, month, day, 1);
+    localMinutes -= 24 * 60;
+  }
+  if (!isValidDate(year, month, day)) return false;
+
+  const int hour24 = localMinutes / 60;
+  const int localMinute = localMinutes % 60;
+  int hour12 = hour24 % 12;
   if (hour12 == 0) hour12 = 12;
 
-  const int weekdayIndex = (local.tm_wday + 6) % 7;
-  snprintf(buf, bufSize, "Added on %s, %s %u, %u, %02d:%02d %s", WEEKDAY_NAMES[weekdayIndex], MONTH_NAMES[local.tm_mon],
-           static_cast<unsigned>(local.tm_mday), static_cast<unsigned>(local.tm_year + 1900), hour12, local.tm_min,
-           local.tm_hour >= 12 ? "PM" : "AM");
+  // 2000-01-01 was a Saturday; convert to Monday = 0 for WEEKDAY_NAMES.
+  const uint8_t weekdayIndex = static_cast<uint8_t>((5u + dayIndexSince2000(year, month, day)) % 7u);
+  snprintf(buf, bufSize, "Added on %s, %s %u, %u, %02d:%02d %s", WEEKDAY_NAMES[weekdayIndex], MONTH_NAMES[month - 1],
+           static_cast<unsigned>(day), static_cast<unsigned>(year), hour12, localMinute, hour24 >= 12 ? "PM" : "AM");
   return true;
 }
 }  // namespace
@@ -39,7 +118,6 @@ bool ClippingsManager::saveClipping(const std::string& bookTitle, const std::str
     LOG_ERR("CLIP", "Failed to open %s for append", CLIPPINGS_PATH);
     return false;
   }
-  const size_t originalSize = file.fileSize();
 
   std::string location = "- Your Highlight on Page " + std::to_string(pageNumber);
   if (!chapterTitle.empty()) {
@@ -53,8 +131,7 @@ bool ClippingsManager::saveClipping(const std::string& bookTitle, const std::str
   location += "\n";
 
   static constexpr size_t MAX_TEXT_BYTES = 2000;
-  const size_t rawTextLen = std::min(selectedText.size(), MAX_TEXT_BYTES);
-  const size_t textLen = static_cast<size_t>(utf8SafeTruncateBuffer(selectedText.data(), rawTextLen));
+  const size_t textLen = std::min(selectedText.size(), MAX_TEXT_BYTES);
   static constexpr char separator[] = "\n==========\n";
 
   std::string buffer;
@@ -69,11 +146,10 @@ bool ClippingsManager::saveClipping(const std::string& bookTitle, const std::str
   buffer += separator;
 
   const bool ok = file.write(buffer.data(), buffer.size()) == buffer.size();
-  const bool rolledBack = ok || file.truncate(originalSize);
   file.flush();
+  file.close();
 
   if (!ok) {
-    if (!rolledBack) LOG_ERR("CLIP", "Failed to roll back partial write to %s", CLIPPINGS_PATH);
     LOG_ERR("CLIP", "Failed to write clipping to %s", CLIPPINGS_PATH);
     return false;
   }

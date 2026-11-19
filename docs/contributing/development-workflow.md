@@ -1,3 +1,9 @@
+> **Experimental migration candidate — not release-ready.** Crosscub remains Sticky-only.
+> This branch uses pinned CrossPoint develop directly, selectively adopts CrossInk,
+> and preserves Crosscub behavior. Stable Crosscub **1.6.5.5 is unchanged**.
+> Source/host checks do not establish a complete firmware build or device acceptance.
+> See [the feature and readiness ledger](../../SCOPE.md).
+
 # Development Workflow
 
 This page defines the expected local workflow before opening a pull request.

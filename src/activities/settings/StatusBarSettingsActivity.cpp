@@ -4,250 +4,605 @@
 #include <HalClock.h>
 #include <I18n.h>
 
-#include <cstring>
-#include <memory>
+#include <algorithm>
+#include <string>
+#include <vector>
 
 #include "CrossPointSettings.h"
 #include "MappedInputManager.h"
+#include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
 namespace fui = freeink::ui;
 
 namespace {
-// Menu items in their natural order. The clock position entry is appended only
-// when the RTC probe found hardware; time, zone, and format live in Settings >
-// System > Clock.
-enum MenuItem {
-  ITEM_CHAPTER_PAGE_COUNT = 0,
-  ITEM_BOOK_PROGRESS_PERCENTAGE,
-  ITEM_PROGRESS_BAR,
-  ITEM_PROGRESS_BAR_THICKNESS,
-  ITEM_TITLE,
-  ITEM_BATTERY,
-  ITEM_XTC_STATUS_BAR,
-  ITEM_CLOCK,  // RTC boards only
-  ITEM_COUNT
+ReaderStatusBarConfig settingsReaderStatusBar(ReaderStatusBarPosition position) {
+  return position == ReaderStatusBarPosition::Top ? SETTINGS.topReaderStatusBar : SETTINGS.bottomReaderStatusBar;
+}
+
+void setSettingsReaderStatusBar(ReaderStatusBarPosition position, const ReaderStatusBarConfig& config) {
+  if (position == ReaderStatusBarPosition::Top) SETTINGS.topReaderStatusBar = config;
+  else SETTINGS.bottomReaderStatusBar = config;
+}
+
+enum BarItem {
+  SLOT_LEFT_1,
+  SLOT_LEFT_2,
+  SLOT_LEFT_3,
+  SLOT_CENTER,
+  SLOT_RIGHT_1,
+  SLOT_RIGHT_2,
+  SLOT_RIGHT_3,
+  PERCENTAGE_FORMAT,
+  PROGRESS_BAR,
+  PROGRESS_BAR_THICKNESS,
 };
 
-constexpr int BASE_MENU_ITEMS = ITEM_CLOCK;  // Items shown on every device
-constexpr int FULL_MENU_ITEMS = ITEM_COUNT;  // Items shown when RTC is available
-static_assert(FULL_MENU_ITEMS == StatusBarSettingsActivity::MAX_STATUS_BAR_ITEMS,
-              "keep StatusBarSettingsActivity::MAX_STATUS_BAR_ITEMS in sync with ITEM_COUNT");
-
-const StrId menuNames[FULL_MENU_ITEMS] = {
-    StrId::STR_CHAPTER_PAGE_COUNT,
-    StrId::STR_BOOK_PROGRESS_PERCENTAGE,
-    StrId::STR_PROGRESS_BAR,
-    StrId::STR_PROGRESS_BAR_THICKNESS,
-    StrId::STR_TITLE,
-    StrId::STR_BATTERY,
-    StrId::STR_XTC_STATUS_BAR,
-    StrId::STR_CLOCK,
+constexpr ReaderStatusBarItem pickerItems[] = {
+    ReaderStatusBarItem::Clock,
+    ReaderStatusBarItem::Date,
+    ReaderStatusBarItem::Battery,
+    ReaderStatusBarItem::TimeLeftBook,
+    ReaderStatusBarItem::TimeLeftChapter,
+    ReaderStatusBarItem::ChapterPageCount,
+    ReaderStatusBarItem::StablePageNumber,
+    ReaderStatusBarItem::BookProgressPercentage,
+    ReaderStatusBarItem::TitleBook,
+    ReaderStatusBarItem::TitleChapter,
+    ReaderStatusBarItem::Empty,
 };
 
-constexpr int PROGRESS_BAR_ITEMS = 3;
-const StrId progressBarNames[PROGRESS_BAR_ITEMS] = {StrId::STR_BOOK, StrId::STR_CHAPTER, StrId::STR_HIDE};
+std::string itemLabel(const ReaderStatusBarItem item) {
+  switch (item) {
+    case ReaderStatusBarItem::Date:
+      return "Date";
+    case ReaderStatusBarItem::Clock:
+      return tr(STR_CLOCK);
+    case ReaderStatusBarItem::Battery:
+      return tr(STR_BATTERY);
+    case ReaderStatusBarItem::TimeLeftBook:
+      return std::string(tr(STR_TIME_LEFT)) + " (" + tr(STR_BOOK) + ")";
+    case ReaderStatusBarItem::TimeLeftChapter:
+      return std::string(tr(STR_TIME_LEFT)) + " (" + tr(STR_CHAPTER) + ")";
+    case ReaderStatusBarItem::ChapterPageCount:
+      return tr(STR_CHAPTER_PAGE_COUNT);
+    case ReaderStatusBarItem::StablePageNumber:
+      return tr(STR_STABLE_PAGE_NUMBERS);
+    case ReaderStatusBarItem::BookProgressPercentage:
+      return tr(STR_BOOK_PROGRESS_PERCENTAGE);
+    case ReaderStatusBarItem::TitleBook:
+      return std::string(tr(STR_TITLE)) + " (" + tr(STR_BOOK) + ")";
+    case ReaderStatusBarItem::TitleChapter:
+      return std::string(tr(STR_TITLE)) + " (" + tr(STR_CHAPTER) + ")";
+    default:
+      return tr(STR_NONE_OPT);
+  }
+}
 
-constexpr int PROGRESS_BAR_THICKNESS_ITEMS = 3;
-const StrId progressBarThicknessNames[PROGRESS_BAR_THICKNESS_ITEMS] = {
-    StrId::STR_PROGRESS_BAR_THIN, StrId::STR_PROGRESS_BAR_MEDIUM, StrId::STR_PROGRESS_BAR_THICK};
+const char* xtcModeLabel(const uint8_t mode) {
+  switch (mode) {
+    case CrossPointSettings::XTC_STATUS_BAR_BOTTOM:
+      return tr(STR_BOTTOM);
+    case CrossPointSettings::XTC_STATUS_BAR_TOP:
+      return tr(STR_TOP);
 
-constexpr int TITLE_ITEMS = 3;
-const StrId titleNames[TITLE_ITEMS] = {StrId::STR_BOOK, StrId::STR_CHAPTER, StrId::STR_HIDE};
+    default:
+      return tr(STR_HIDE);
+  }
+}
 
-constexpr int XTC_STATUS_BAR_ITEMS = 3;
-const StrId xtcStatusBarNames[XTC_STATUS_BAR_ITEMS] = {StrId::STR_HIDE, StrId::STR_BOTTOM, StrId::STR_TOP};
+const char* progressModeLabel(const uint8_t mode) {
+  switch (mode) {
+    case CrossPointSettings::BOOK_PROGRESS:
+      return tr(STR_BOOK);
+    case CrossPointSettings::CHAPTER_PROGRESS:
+      return tr(STR_CHAPTER);
+    default:
+      return tr(STR_HIDE);
+  }
+}
 
-constexpr int STATUS_BAR_CLOCK_ITEMS = CrossPointSettings::STATUS_BAR_CLOCK_MODE_COUNT;
-const StrId statusBarClockNames[STATUS_BAR_CLOCK_ITEMS] = {StrId::STR_HIDE, StrId::STR_DIR_RIGHT, StrId::STR_DIR_LEFT};
+const char* thicknessLabel(const uint8_t thickness) {
+  switch (thickness) {
+    case CrossPointSettings::PROGRESS_BAR_THIN:
+      return tr(STR_PROGRESS_BAR_THIN);
+    case CrossPointSettings::PROGRESS_BAR_THICK:
+      return tr(STR_PROGRESS_BAR_THICK);
+    default:
+      return tr(STR_PROGRESS_BAR_MEDIUM);
+  }
+}
 
-const int verticalPreviewTextPadding = 40;
+const StrId percentageFormatNames[] = {StrId::STR_PERCENTAGE_FORMAT_WHOLE, StrId::STR_PERCENTAGE_FORMAT_ONE_DECIMAL,
+                                       StrId::STR_PERCENTAGE_FORMAT_TWO_DECIMALS};
 }  // namespace
 
-StatusBarSettingsActivity::StatusBarSettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : UiListActivity("StatusBarSettings", renderer, mappedInput) {}
-
 void StatusBarSettingsActivity::onEnter() {
-  UiListActivity::onEnter();
-
-  visibleItemCount = halClock.isAvailable() ? FULL_MENU_ITEMS : BASE_MENU_ITEMS;
-
-  // Clamp statusBarProgressBar and statusBarTitle in case of corrupt/migrated data
-  if (SETTINGS.statusBarProgressBar >= PROGRESS_BAR_ITEMS) {
-    SETTINGS.statusBarProgressBar = CrossPointSettings::STATUS_BAR_PROGRESS_BAR::HIDE_PROGRESS;
-  }
-
-  if (SETTINGS.statusBarProgressBarThickness >= PROGRESS_BAR_THICKNESS_ITEMS) {
-    SETTINGS.statusBarProgressBarThickness = CrossPointSettings::STATUS_BAR_PROGRESS_BAR_THICKNESS::PROGRESS_BAR_NORMAL;
-  }
-
-  if (SETTINGS.statusBarTitle >= TITLE_ITEMS) {
-    SETTINGS.statusBarTitle = CrossPointSettings::STATUS_BAR_TITLE::HIDE_TITLE;
-  }
-
-  if (SETTINGS.xtcStatusBarMode >= XTC_STATUS_BAR_ITEMS) {
-    SETTINGS.xtcStatusBarMode = CrossPointSettings::XTC_STATUS_BAR_MODE::XTC_STATUS_BAR_HIDE;
-  }
-
-  if (SETTINGS.statusBarClock >= STATUS_BAR_CLOCK_ITEMS) {
-    SETTINGS.statusBarClock = CrossPointSettings::STATUS_BAR_CLOCK_MODE::STATUS_BAR_CLOCK_HIDE;
-  }
-
-  // Labels never change (unlike the values, which track live SETTINGS
-  // state), so they're set once here rather than every buildScreen() call.
-  for (int i = 0; i < visibleItemCount; i++) {
-    rowItems_[i].label = I18N.get(menuNames[i]);
-    rowItems_[i].actionValue = static_cast<int16_t>(i);
-  }
-}
-
-bool StatusBarSettingsActivity::handleCustomInput() {
-  return optionPopup.handleInput(mappedInput, [this] { requestUpdate(); });
-}
-
-void StatusBarSettingsActivity::activateIndex(const int index) {
-  if (optionPopup.isActive()) return;
-  nav.selected = index;
-  // Activation opens a popup/sub-activity or repaints a new value; a lingering
-  // flash would gray an unrelated row.
-  app.clearTapFlash();
-  handleSelection();
+  Activity::onEnter();
+  view = displayContext ? View::Top : View::Root;
+  selectedIndex = 0;
+  topIndex = 0;
+  visibleRows = 1;
+  listNav.reset();
+  uiReady = false;
+  refreshItemCount();
+  viewInputGate.beginPaint();
+  viewPaintPending = true;
+  applySharedUiTheme(app, uiTarget);
+  app.on(ACTION_ROW, &StatusBarSettingsActivity::onRowEvent, this);
+  app.setScreen(&StatusBarSettingsActivity::settingsScreen, this);
   requestUpdate();
 }
 
-void StatusBarSettingsActivity::handleSelection() {
-  switch (nav.selected) {
-    case ITEM_CHAPTER_PAGE_COUNT:
-      SETTINGS.statusBarChapterPageCount = (SETTINGS.statusBarChapterPageCount + 1) % 2;
-      break;
-    case ITEM_BOOK_PROGRESS_PERCENTAGE:
-      SETTINGS.statusBarBookProgressPercentage = (SETTINGS.statusBarBookProgressPercentage + 1) % 2;
-      break;
-    case ITEM_PROGRESS_BAR:
-      optionPopup.show(StrId::STR_PROGRESS_BAR, progressBarNames, PROGRESS_BAR_ITEMS, SETTINGS.statusBarProgressBar,
-                       [this](int idx) {
-                         SETTINGS.statusBarProgressBar = idx;
-                         SETTINGS.saveToFile();
-                       });
-      return;
-    case ITEM_PROGRESS_BAR_THICKNESS:
-      optionPopup.show(StrId::STR_PROGRESS_BAR_THICKNESS, progressBarThicknessNames, PROGRESS_BAR_THICKNESS_ITEMS,
-                       SETTINGS.statusBarProgressBarThickness, [this](int idx) {
-                         SETTINGS.statusBarProgressBarThickness = idx;
-                         SETTINGS.saveToFile();
-                       });
-      return;
-    case ITEM_TITLE:
-      optionPopup.show(StrId::STR_TITLE, titleNames, TITLE_ITEMS, SETTINGS.statusBarTitle, [this](int idx) {
-        SETTINGS.statusBarTitle = idx;
-        SETTINGS.saveToFile();
-      });
-      return;
-    case ITEM_BATTERY:
-      SETTINGS.statusBarBattery = (SETTINGS.statusBarBattery + 1) % 2;
-      break;
-    case ITEM_XTC_STATUS_BAR:
-      optionPopup.show(StrId::STR_XTC_STATUS_BAR, xtcStatusBarNames, XTC_STATUS_BAR_ITEMS, SETTINGS.xtcStatusBarMode,
-                       [this](int idx) {
-                         SETTINGS.xtcStatusBarMode = idx;
-                         SETTINGS.saveToFile();
-                       });
-      return;
-    case ITEM_CLOCK:
-      SETTINGS.statusBarClock = (SETTINGS.statusBarClock + 1) % STATUS_BAR_CLOCK_ITEMS;
-      break;
-    default:
-      return;
-  }
-  SETTINGS.saveToFile();
+void StatusBarSettingsActivity::onExit() { Activity::onExit(); }
+
+bool StatusBarSettingsActivity::handleHomeGesture() {
+  goBack();
+  return true;
 }
 
-std::string StatusBarSettingsActivity::rowValueText(const int index) {
-  switch (index) {
-    case ITEM_PROGRESS_BAR:
-      return I18N.get(progressBarNames[SETTINGS.statusBarProgressBar]);
-    case ITEM_PROGRESS_BAR_THICKNESS:
-      return I18N.get(progressBarThicknessNames[SETTINGS.statusBarProgressBarThickness]);
-    case ITEM_TITLE:
-      return I18N.get(titleNames[SETTINGS.statusBarTitle]);
-    case ITEM_XTC_STATUS_BAR:
-      return I18N.get(xtcStatusBarNames[SETTINGS.xtcStatusBarMode]);
-    case ITEM_CLOCK:
-      return I18N.get(statusBarClockNames[SETTINGS.statusBarClock]);
-    default:
-      return "";
+void StatusBarSettingsActivity::goBack() {
+  if (displayContext || view == View::Root) {
+    finishAfterBackPress();
+  } else {
+    view = View::Root;
+    uiReady = false;
+    viewInputGate.beginPaint();
+    viewPaintPending = true;
+    selectedIndex = 0;
+    topIndex = 0;
+    listNav.reset();
+    refreshItemCount();
+    requestUpdate();
   }
 }
 
-void StatusBarSettingsActivity::buildScreen(UiScreen& screen) {
+ReaderStatusBarPosition StatusBarSettingsActivity::selectedPosition() const {
+  return view == View::Top ? ReaderStatusBarPosition::Top : ReaderStatusBarPosition::Bottom;
+}
+
+void StatusBarSettingsActivity::refreshItemCount() {
+  visibleItemCount = displayContext || view == View::Root ? 3 : PROGRESS_BAR_THICKNESS + 1;
+  selectedIndex = std::clamp(selectedIndex, 0, visibleItemCount - 1);
+}
+
+int StatusBarSettingsActivity::previewHeight() const {
+  if (view == View::Root) return 0;
   const auto& metrics = UITheme::getInstance().getMetrics();
-  // Reserve the bottom band for the live status-bar preview footer (label +
-  // bar) so the list never runs underneath it, plus the button-hints row below.
-  // The preview is pinned directly above the hints (see render()), so the band
-  // is just the bar + its label, not a floating gap.
-  const int statusBarHeight = UITheme::getInstance().getStatusBarHeight();
-  const auto previewFooter =
-      static_cast<int16_t>(statusBarHeight + verticalPreviewTextPadding + metrics.verticalSpacing);
-  screen.setContentMarginFromScreen(fui::Insets{static_cast<int16_t>(metrics.topPadding + metrics.headerHeight), 0,
-                                                static_cast<int16_t>(metrics.buttonHintsHeight + previewFooter), 0});
-  screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
+  return renderer.getLineHeight(UI_10_FONT_ID) + 18 +
+         (displayContext ? metrics.statusBarVerticalMargin + ReaderStatusBarConfig::TOP_TEXT_INSET
+                         : UITheme::getReaderStatusBarHeight()) +
+         metrics.verticalSpacing;
+}
 
-  // rowItems_'s labels/actionValue were set once in onEnter(); only the live
-  // value text needs refreshing here, by assigning into the existing
-  // rowValues_ strings (no array growth) rather than building a new
-  // items/values vector on every render.
-  for (int i = 0; i < visibleItemCount; i++) {
-    rowValues_[i] = rowValueText(i);
-    rowItems_[i].value = rowValues_[i].empty() ? nullptr : rowValues_[i].c_str();
+int StatusBarSettingsActivity::topPreviewOriginY() const {
+  int marginTop, marginRight, marginBottom, marginLeft;
+  renderer.getOrientedViewableTRBL(&marginTop, &marginRight, &marginBottom, &marginLeft);
+  (void)marginRight;
+  (void)marginBottom;
+  (void)marginLeft;
+  return marginTop + UITheme::getInstance().getMetrics().topPadding;
+}
+
+Rect StatusBarSettingsActivity::settingsHeaderRect() const {
+  Rect header = TouchHeaderBackButton::headerRect(renderer, mappedInput);
+  if (view == View::Top) header.y = topPreviewOriginY() + previewHeight();
+  return header;
+}
+
+void StatusBarSettingsActivity::loop() {
+  if (!viewInputGate.allowInput(mappedInput)) return;
+  if (optionPopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
+  if (TouchHeaderBackButton::wasTapped(mappedInput, settingsHeaderRect())) {
+    goBack();
+    return;
   }
-  GUI.setCheckboxRow(rowItems_[ITEM_CHAPTER_PAGE_COUNT], SETTINGS.statusBarChapterPageCount);
-  GUI.setCheckboxRow(rowItems_[ITEM_BOOK_PROGRESS_PERCENTAGE], SETTINGS.statusBarBookProgressPercentage);
-  GUI.setCheckboxRow(rowItems_[ITEM_BATTERY], SETTINGS.statusBarBattery);
+  if (uiReady) {
+    const fui::InputSnapshot snap = touchSnapshotFrom(mappedInput);
+    if (snap.touchPressed || snap.touchReleased) {
+      const auto event = app.route(snap);
+      if (app.invalidated()) requestUpdate();
+      if (event) return;
+    }
+  }
+  if (mappedInput.hasTouch()) {
+    const auto swipe = mappedInput.wasSwipe();
+    if (swipe == MappedInputManager::SwipeDir::Up || swipe == MappedInputManager::SwipeDir::Down) {
+      const int delta = swipe == MappedInputManager::SwipeDir::Up ? visibleRows : -visibleRows;
+      const int next = scrollListBy(topIndex, delta, visibleRows, visibleItemCount);
+      if (next != topIndex) {
+        topIndex = next;
+        requestUpdate();
+      }
+      return;
+    }
+  }
+  if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
+    goBack();
+    return;
+  }
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+    handleSelection();
+    requestUpdate();
+    return;
+  }
+  buttonNavigator.onNextRelease([this] {
+    selectedIndex = ButtonNavigator::nextIndex(selectedIndex, visibleItemCount);
+    topIndex = followListSelection(selectedIndex, topIndex, visibleRows, visibleItemCount);
+    requestUpdate();
+  });
+  buttonNavigator.onPreviousRelease([this] {
+    selectedIndex = ButtonNavigator::previousIndex(selectedIndex, visibleItemCount);
+    topIndex = followListSelection(selectedIndex, topIndex, visibleRows, visibleItemCount);
+    requestUpdate();
+  });
+  buttonNavigator.onNextContinuous([this] {
+    selectedIndex = ButtonNavigator::nextIndex(selectedIndex, visibleItemCount);
+    topIndex = followListSelection(selectedIndex, topIndex, visibleRows, visibleItemCount);
+    requestUpdate();
+  });
+  buttonNavigator.onPreviousContinuous([this] {
+    selectedIndex = ButtonNavigator::previousIndex(selectedIndex, visibleItemCount);
+    topIndex = followListSelection(selectedIndex, topIndex, visibleRows, visibleItemCount);
+    requestUpdate();
+  });
+}
 
+void StatusBarSettingsActivity::handleSelection() {
+  if (view == View::Root && selectedIndex < 2) {
+    view = selectedIndex == 0 ? View::Top : View::Bottom;
+    uiReady = false;
+    viewInputGate.beginPaint();
+    viewPaintPending = true;
+    selectedIndex = 0;
+    topIndex = 0;
+    listNav.reset();
+    refreshItemCount();
+    requestUpdate();
+    return;
+  }
+  openOptionPicker();
+}
+
+void StatusBarSettingsActivity::openOptionPicker() {
+  if (view == View::Root) {
+    // Persisted XTC mode still has the owner's three stable values.
+    const std::vector<std::string> options = {tr(STR_HIDE), tr(STR_BOTTOM), tr(STR_TOP)};
+    optionPopup.show(StrId::STR_XTC_STATUS_BAR, options, SETTINGS.xtcStatusBarMode, [this](const int selected) {
+      if (selected < 0 || selected >= CrossPointSettings::XTC_STATUS_BAR_MODE_COUNT) return;
+      if (SETTINGS.xtcStatusBarMode != selected) SETTINGS.legacyXtcTopUsesBottom = 0;
+      SETTINGS.xtcStatusBarMode = static_cast<uint8_t>(selected);
+      SETTINGS.saveToFile();
+      requestUpdate();
+    });
+    requestUpdate();
+    return;
+  }
+
+  const auto position = selectedPosition();
+  const int item = selectedIndex;
+  const auto config = settingsReaderStatusBar(position);
+  const auto currentItem = displayContext ? SETTINGS.displayStatusBar.slots[item]
+                                          : config.slots[std::min(item, static_cast<int>(SLOT_RIGHT_3))];
+  std::vector<std::string> options;
+  std::vector<uint8_t> rawValues;
+  StrId titleId = displayContext      ? StrId::STR_CUSTOMISE_STATUS_BAR
+                  : view == View::Top ? StrId::STR_TOP
+                                      : StrId::STR_BOTTOM;
+  int currentIndex = 0;
+  if (item <= SLOT_RIGHT_3) {
+    for (const auto choice : pickerItems) {
+      if (displayContext && !validDisplayStatusBarItemValue(static_cast<int>(choice), halClock.isAvailable())) continue;
+      if ((choice == ReaderStatusBarItem::Clock || choice == ReaderStatusBarItem::Date) && !halClock.isAvailable())
+        continue;
+      if (currentItem == choice) currentIndex = static_cast<int>(options.size());
+      options.push_back(itemLabel(choice));
+      rawValues.push_back(static_cast<uint8_t>(choice));
+    }
+  } else if (item == PERCENTAGE_FORMAT) {
+    titleId = StrId::STR_PERCENTAGE_FORMAT;
+    for (uint8_t i = 0; i < CrossPointSettings::BOOK_PERCENTAGE_FORMAT_COUNT; ++i) {
+      options.emplace_back(I18N.get(percentageFormatNames[i]));
+      rawValues.push_back(i);
+    }
+    currentIndex = config.percentageFormat;
+  } else if (item == PROGRESS_BAR) {
+    titleId = StrId::STR_PROGRESS_BAR;
+    options = {tr(STR_HIDE), tr(STR_BOOK), tr(STR_CHAPTER)};
+    rawValues = {CrossPointSettings::HIDE_PROGRESS, CrossPointSettings::BOOK_PROGRESS,
+                 CrossPointSettings::CHAPTER_PROGRESS};
+    for (unsigned i = 0; i < rawValues.size(); ++i) {
+      if (rawValues[i] == config.progressBar) currentIndex = static_cast<int>(i);
+    }
+  } else {
+    titleId = StrId::STR_PROGRESS_BAR_THICKNESS;
+    options = {tr(STR_PROGRESS_BAR_THIN), tr(STR_PROGRESS_BAR_MEDIUM), tr(STR_PROGRESS_BAR_THICK)};
+    rawValues = {0, 1, 2};
+    currentIndex = config.progressBarThickness;
+  }
+  optionPopup.show(titleId, options, currentIndex, [this, position, item, rawValues](const int selected) {
+    if (selected < 0 || static_cast<size_t>(selected) >= rawValues.size()) return;
+    if (displayContext) {
+      SETTINGS.displayStatusBar.slots[item] = static_cast<ReaderStatusBarItem>(rawValues[selected]);
+      SETTINGS.saveToFile();
+      requestUpdate();
+      return;
+    }
+    auto updated = settingsReaderStatusBar(position);
+    const uint8_t value = rawValues[selected];
+    if (item <= SLOT_RIGHT_3) {
+      updated.slots[item] = static_cast<ReaderStatusBarItem>(value);
+    } else if (item == PERCENTAGE_FORMAT) {
+      updated.percentageFormat = value;
+    } else if (item == PROGRESS_BAR) {
+      updated.progressBar = value;
+    } else {
+      updated.progressBarThickness = value;
+    }
+    setSettingsReaderStatusBar(position, updated);
+    SETTINGS.saveToFile();
+    refreshItemCount();
+    requestUpdate();
+  });
+  requestUpdate();
+}
+
+void StatusBarSettingsActivity::settingsScreen(UiApp::ScreenType& screen, void* user) {
+  static_cast<StatusBarSettingsActivity*>(user)->buildSettingsScreen(screen);
+}
+
+void StatusBarSettingsActivity::onRowEvent(const fui::ActionEvent& event, void* user) {
+  auto* self = static_cast<StatusBarSettingsActivity*>(user);
+  if (self->optionPopup.isActive() || event.value < 0 || event.value >= self->visibleItemCount) return;
+  self->selectedIndex = event.value;
+  self->app.clearTapFlash();
+  self->handleSelection();
+}
+
+void StatusBarSettingsActivity::buildSettingsScreen(UiApp::ScreenType& screen) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int pageWidth = renderer.getScreenWidth();
+  const int pageHeight = renderer.getScreenHeight();
+  const auto orientation = renderer.getOrientation();
+  const bool landscape = orientation == GfxRenderer::Orientation::LandscapeClockwise ||
+                         orientation == GfxRenderer::Orientation::LandscapeCounterClockwise;
+  const int hintGutterWidth = landscape ? metrics.buttonHintsHeight : 0;
+  const int contentX = orientation == GfxRenderer::Orientation::LandscapeClockwise ? hintGutterWidth : 0;
+  const int contentWidth = pageWidth - hintGutterWidth;
+  const Rect header = settingsHeaderRect();
+  const int contentTop = header.y + header.height + metrics.verticalSpacing;
+  const int bottomPreviewHeight = view == View::Bottom ? previewHeight() : 0;
+  const int contentHeight =
+      pageHeight - contentTop - metrics.buttonHintsHeight - bottomPreviewHeight - metrics.verticalSpacing * 2;
+  screen.setContentMargin(
+      fui::Insets{static_cast<int16_t>(contentTop), static_cast<int16_t>(pageWidth - (contentX + contentWidth)),
+                  static_cast<int16_t>(pageHeight - (contentTop + contentHeight)), static_cast<int16_t>(contentX)});
+
+  const auto config = view == View::Root ? ReaderStatusBarConfig{} : settingsReaderStatusBar(selectedPosition());
+  std::vector<std::string> labels(visibleItemCount);
+  std::vector<std::string> values(visibleItemCount);
+  std::vector<fui::ListItem> items;
+  items.reserve(visibleItemCount);
+  for (int i = 0; i < visibleItemCount; ++i) {
+    fui::ListItem row;
+    row.actionValue = static_cast<int16_t>(i);
+    if (displayContext) {
+      row.label = i == 0 ? tr(STR_DIR_LEFT) : i == 1 ? tr(STR_CENTER) : tr(STR_DIR_RIGHT);
+      values[i] = itemLabel(SETTINGS.displayStatusBar.slots[i]);
+      row.value = values[i].c_str();
+    } else if (view == View::Root) {
+      row.label = i == 0 ? tr(STR_TOP) : i == 1 ? tr(STR_BOTTOM) : tr(STR_XTC_STATUS_BAR);
+      row.value = i == 2 ? xtcModeLabel(SETTINGS.xtcStatusBarMode) : ">";
+    } else {
+      const int item = i;
+      if (item <= SLOT_RIGHT_3) {
+        values[i] = itemLabel(config.slots[item]);
+        if (item <= SLOT_LEFT_3) {
+          labels[i] = std::string(tr(STR_DIR_LEFT)) + " " + std::to_string(item + 1);
+        } else if (item == SLOT_CENTER) {
+          labels[i] = tr(STR_CENTER);
+        } else {
+          labels[i] = std::string(tr(STR_DIR_RIGHT)) + " " + std::to_string(item - SLOT_RIGHT_1 + 1);
+        }
+        row.label = labels[i].c_str();
+        row.value = values[i].c_str();
+        if (item == SLOT_LEFT_1) row.sectionHeading = tr(STR_DIR_LEFT);
+        if (item == SLOT_CENTER) row.sectionHeading = tr(STR_CENTER);
+        if (item == SLOT_RIGHT_1) row.sectionHeading = tr(STR_DIR_RIGHT);
+      } else if (item == PERCENTAGE_FORMAT) {
+        row.label = tr(STR_PERCENTAGE_FORMAT);
+        row.value = I18N.get(percentageFormatNames[config.percentageFormat]);
+      } else if (item == PROGRESS_BAR) {
+        row.label = tr(STR_PROGRESS_BAR);
+        row.value = progressModeLabel(config.progressBar);
+      } else {
+        row.label = tr(STR_PROGRESS_BAR_THICKNESS);
+        row.value = thicknessLabel(config.progressBarThickness);
+      }
+    }
+    items.push_back(row);
+  }
   fui::ListProps props;
-  props.items = rowItems_;
-  props.count = static_cast<uint16_t>(visibleItemCount);
+  props.items = items.data();
+  props.count = static_cast<uint16_t>(items.size());
+  props.selectedIndex = static_cast<int16_t>(selectedIndex);
   props.action = ACTION_ROW;
-  props.inputMask = fui::InputTouch;  // physical buttons stay in loop()
-  props.valueInset = 8;               // air between the value and the row edge
-  props.labelText = screen.theme().smallText;
-  props.labelText.maxLines = 2;  // also the explicitly-set marker, see SettingsActivity
-  syncListViewport(screen, props);
-  screen.list(props);
+  props.inputMask = fui::InputTouch;
+  props.valueInset = 8;
+  props.labelText = screen.theme().bodyText;
+  props.labelText.maxLines = 2;
+  props.headerText = screen.theme().smallText;
+  props.headerText.bold = true;
+  const auto rows = configureUiList(props, screen.theme(), screen.body());
+  // Section headings and wrapped values can fit fewer rows than this fixed-height estimate.
+  visibleRows = listNav.trusts(visibleItemCount) ? listNav.pageRowsFor(visibleItemCount) : std::max<int>(rows, 1);
+  topIndex = scrollListBy(topIndex, 0, visibleRows, visibleItemCount);
+  props.topIndex = static_cast<uint16_t>(topIndex);
+  if (displayContext || view == View::Root) {
+    props.nav = &listNav;
+    screen.list(props);
+    visibleRows = listNav.pageRowsFor(visibleItemCount);
+    topIndex = listNav.top;
+    return;
+  }
+
+  const auto renderScrollingList = [&] {
+    props.nav = &listNav;
+    screen.list(props);
+    visibleRows = listNav.pageRowsFor(visibleItemCount);
+    topIndex = listNav.top;
+  };
+
+  // Keep the separator aligned with FreeInkUI's variable-height rows when the list scrolls or wraps.
+  const auto resolvedProps = screen.resolveListProps(props);
+  const auto body = screen.body();
+  const int dividerItem = SLOT_RIGHT_3;
+  const int dividerIndex = [&] {
+    for (int i = topIndex; i < visibleItemCount; ++i) {
+      if (i == dividerItem) return i;
+    }
+    return -1;
+  }();
+  if (dividerIndex < topIndex) {
+    renderScrollingList();
+    return;
+  }
+
+  fui::ListProps layoutProps = resolvedProps;
+  layoutProps.scrollIndicator = false;
+  int16_t rowWidth = body.width;
+  if (layoutProps.rowInset > 0) rowWidth = static_cast<int16_t>(rowWidth - layoutProps.rowInset * 2);
+  const int16_t headerLineHeight = screen.target().lineHeight(layoutProps.headerText.font);
+  const int16_t headerHeight =
+      layoutProps.headerRowHeight > 0 ? layoutProps.headerRowHeight : static_cast<int16_t>(headerLineHeight + 4);
+  int16_t dividerY = body.y;
+  for (int i = topIndex; i <= dividerIndex; ++i) {
+    const auto& item = items[static_cast<size_t>(i)];
+    if (item.sectionHeading != nullptr && item.sectionHeading[0] != '\0') {
+      if (i != topIndex) dividerY = static_cast<int16_t>(dividerY + layoutProps.sectionGap);
+      dividerY = static_cast<int16_t>(dividerY + headerHeight + layoutProps.rowGap);
+    }
+    dividerY = static_cast<int16_t>(dividerY +
+                                    fui::measureListRow(screen.target(), nullptr, rowWidth, layoutProps, item).height);
+    if (i != dividerIndex) dividerY = static_cast<int16_t>(dividerY + layoutProps.rowGap);
+  }
+
+  int16_t afterDividerHeight = 0;
+  for (int i = dividerIndex + 1; i < visibleItemCount; ++i) {
+    const auto& item = items[static_cast<size_t>(i)];
+    afterDividerHeight = static_cast<int16_t>(
+        afterDividerHeight + fui::measureListRow(screen.target(), nullptr, rowWidth, layoutProps, item).height);
+    if (i + 1 < visibleItemCount) afterDividerHeight = static_cast<int16_t>(afterDividerHeight + layoutProps.rowGap);
+  }
+  const int16_t availableAfterDivider = static_cast<int16_t>(body.bottom() - dividerY);
+  const int16_t maxDividerMargin = static_cast<int16_t>((availableAfterDivider - afterDividerHeight - 1) / 2);
+  if (maxDividerMargin < 0) {
+    // On compact screens, keep every option in one scrollable list instead of
+    // splitting off a segment that cannot fit its first row.
+    renderScrollingList();
+    screen.target().fill(fui::Rect{body.x, dividerY, body.width, 1}, fui::Paint::solid(fui::Color::Black));
+    return;
+  }
+  const int16_t dividerMargin = std::min(layoutProps.sectionGap, maxDividerMargin);
+
+  fui::ListProps beforeDivider = props;
+  beforeDivider.items = items.data() + topIndex;
+  beforeDivider.count = static_cast<uint16_t>(dividerIndex - topIndex + 1);
+  beforeDivider.topIndex = 0;
+  beforeDivider.selectedIndex =
+      selectedIndex >= topIndex && selectedIndex <= dividerIndex ? static_cast<int16_t>(selectedIndex - topIndex) : -1;
+  beforeDivider.scrollIndicator = false;
+  screen.list(beforeDivider, static_cast<int16_t>(dividerY - body.y));
+
+  screen.spacer(dividerMargin);
+  const auto dividerBody = screen.body();
+  screen.target().fill(fui::Rect{dividerBody.x, dividerBody.y, dividerBody.width, 1},
+                       fui::Paint::solid(fui::Color::Black));
+  screen.spacer(1);
+  screen.spacer(dividerMargin);
+
+  fui::ListProps afterDivider = props;
+  afterDivider.items = items.data() + dividerIndex + 1;
+  afterDivider.count = static_cast<uint16_t>(visibleItemCount - dividerIndex - 1);
+  afterDivider.topIndex = 0;
+  afterDivider.selectedIndex =
+      selectedIndex > dividerIndex ? static_cast<int16_t>(selectedIndex - dividerIndex - 1) : -1;
+  afterDivider.scrollIndicator = false;
+  screen.list(afterDivider);
+
+  // The split sections share one scroll position, so keep one indicator for the full list.
+  if (resolvedProps.scrollIndicator) {
+    fui::drawListScrollIndicator(screen.target(), body, static_cast<uint32_t>(visibleItemCount),
+                                 static_cast<uint32_t>(visibleItemCount - topIndex), static_cast<uint32_t>(topIndex),
+                                 resolvedProps.scrollIndicatorWidth, resolvedProps.scrollIndicatorSide,
+                                 resolvedProps.scrollIndicatorInset);
+  }
 }
 
 void StatusBarSettingsActivity::render(RenderLock&&) {
   if (optionPopup.processRender(renderer, mappedInput)) return;
-
   renderer.clearScreen();
-
-  auto metrics = UITheme::getInstance().getMetrics();
-  const auto pageWidth = renderer.getScreenWidth();
-
-  // Header via GUI.drawHeader (already FreeInkUI-themed) for the battery
-  // indicator; the list renders through the app; the preview stays raw.
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_CUSTOMISE_STATUS_BAR));
-
-  renderUi();
-
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_TOGGLE), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
-  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-
-  std::string title;
-  if (SETTINGS.statusBarTitle == CrossPointSettings::STATUS_BAR_TITLE::BOOK_TITLE) {
-    title = tr(STR_EXAMPLE_BOOK);
-  } else if (SETTINGS.statusBarTitle == CrossPointSettings::STATUS_BAR_TITLE::CHAPTER_TITLE) {
-    title = tr(STR_EXAMPLE_CHAPTER);
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int pageWidth = renderer.getScreenWidth();
+  const int pageHeight = renderer.getScreenHeight();
+  const auto orientation = renderer.getOrientation();
+  const bool landscape = orientation == GfxRenderer::Orientation::LandscapeClockwise ||
+                         orientation == GfxRenderer::Orientation::LandscapeCounterClockwise;
+  const int contentX = orientation == GfxRenderer::Orientation::LandscapeClockwise ? metrics.buttonHintsHeight : 0;
+  const int contentWidth = pageWidth - (landscape ? metrics.buttonHintsHeight : 0);
+  const char* headerTitle = displayContext       ? tr(STR_CUSTOMISE_STATUS_BAR)
+                            : view == View::Root ? tr(STR_CUSTOMISE_STATUS_BAR)
+                            : view == View::Top  ? tr(STR_TOP)
+                                                 : tr(STR_BOTTOM);
+  const auto labels =
+      mappedInput.mapLabels(mappedInput.withBackArrow(tr(STR_BACK)), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const Rect header = settingsHeaderRect();
+  if (mappedInput.hasTouchHardware()) {
+    TouchHeaderBackButton::draw(renderer, uiTarget, header, headerTitle, readerContext);
+  } else {
+    GUI.drawHeader(renderer, Rect{contentX, header.y, contentWidth, header.height}, headerTitle, nullptr, readerContext);
   }
-
-  // Anchor the preview as a footer directly above the button hints.
-  GUI.drawStatusBar(renderer, 75, 8, 32, title, metrics.buttonHintsHeight, 0, false);
-
-  renderer.drawCenteredText(UI_10_FONT_ID,
-                            renderer.getScreenHeight() - UITheme::getInstance().getStatusBarHeight() -
-                                metrics.buttonHintsHeight - verticalPreviewTextPadding,
-                            tr(STR_PREVIEW));
-
+  uiReady = false;
+  app.render();
+  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4, true);
+  if (view != View::Root) {
+    const int barHeight = displayContext ? metrics.statusBarVerticalMargin + ReaderStatusBarConfig::TOP_TEXT_INSET
+                                         : UITheme::getReaderStatusBarHeight();
+    const int previewOriginY = view == View::Top
+                                   ? topPreviewOriginY()
+                                   : pageHeight - metrics.buttonHintsHeight - metrics.verticalSpacing - barHeight;
+    const int labelY = view == View::Top ? previewOriginY + barHeight + 9
+                                         : previewOriginY - renderer.getLineHeight(UI_10_FONT_ID) - 18;
+    renderer.drawText(UI_10_FONT_ID, contentX + metrics.contentSidePadding, labelY, tr(STR_PREVIEW));
+    // Configuration preview only. The reader owns final slot collision/layout
+    // and must consume the same persisted config before device acceptance.
+    const auto config = displayContext ? SETTINGS.displayStatusBar.asReaderConfig()
+                                       : settingsReaderStatusBar(selectedPosition());
+    const int cellWidth = contentWidth / ReaderStatusBarConfig::SLOT_COUNT;
+    for (unsigned slot = 0; slot < ReaderStatusBarConfig::SLOT_COUNT; ++slot) {
+      const char* sample = "";
+      switch (config.slots[slot]) {
+        case ReaderStatusBarItem::Clock: sample = "12:34"; break;
+        case ReaderStatusBarItem::Date: sample = "11/19"; break;
+        case ReaderStatusBarItem::Battery: sample = "80%"; break;
+        case ReaderStatusBarItem::TimeLeftBook: sample = "3h40"; break;
+        case ReaderStatusBarItem::TimeLeftChapter: sample = "1h20"; break;
+        case ReaderStatusBarItem::ChapterPageCount: sample = "8/32"; break;
+        case ReaderStatusBarItem::StablePageNumber: sample = "120"; break;
+        case ReaderStatusBarItem::BookProgressPercentage: sample = "75%"; break;
+        case ReaderStatusBarItem::TitleBook: sample = "Book"; break;
+        case ReaderStatusBarItem::TitleChapter: sample = "Chapter"; break;
+        default: break;
+      }
+      if (renderer.getTextWidth(UI_10_FONT_ID, sample) < cellWidth) {
+        renderer.drawText(UI_10_FONT_ID, contentX + slot * cellWidth, previewOriginY, sample);
+      }
+    }
+  }
   renderer.displayBuffer();
+  uiReady = true;
+  if (viewPaintPending.exchange(false)) {
+    viewInputGate.endPaint();
+  }
 }

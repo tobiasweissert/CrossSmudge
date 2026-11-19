@@ -1,0 +1,75 @@
+{
+  "source_repository": "ma-r-s/crossplay",
+  "revision": "d3a49ce8e85f9bd0d3e0c774a54adc267fd7547b",
+  "renderer": "actual native TriviaScreens builders / production GfxRendererTarget and EpdFont glyphs+fixedpoint kerning; standalone host native adapter, not device screenshot",
+  "font_bindings": "readingChromeFaces: small Jersey14 / body NotoSerif14 / title Jersey30",
+  "fixture": {
+    "clue": "Which planet is known as the Red Planet?",
+    "options": [
+      "Mercury",
+      "Venus",
+      "Mars",
+      "Jupiter"
+    ],
+    "correct": 2,
+    "chosen_by_capture": {
+      "choice": -1,
+      "wrong": 1,
+      "correct": 2
+    },
+    "asked": 1,
+    "right": 0,
+    "difficulty": 1
+  },
+  "pixels": {
+    "choice-480x800.png": "defc0bed87448f832ca8ee7cedd6fde085d9e92e244b5533553cf9881ec3fc75",
+    "wrong-480x800.png": "e9856e3b71f5eddbcc4df828096b4957de2a63a59f1fd333395d7d3bf63d6b0d",
+    "correct-480x800.png": "c93b763d1c2d7c6e9ae24071d2acade7f10a4cd7d39d96edae228e92318a1113",
+    "notice-480x800.png": "9d37ae6ff4791b225699831a76c94a4511db7f37ba32d9db993dd42452e88a55"
+  },
+  "native_harness_source_sha256": {
+    "native_catalog.cpp": "eb4127f4113befcb17a0c238b05b0d8531b272663530d30afb3137805c50ec1b",
+    "GfxRenderer.h": "b3adf106d95b8934f690943f2921308b90be5b766c4c8ba250c792de56400201",
+    "build.py": "1946715e22eab3616ee888a824b5b5f4c2b3510100ea385d306013c3545c37a0"
+  },
+  "comparison_regions": {
+    "header_title": [
+      0,
+      0,
+      400,
+      83
+    ],
+    "question": [
+      0,
+      130,
+      480,
+      420
+    ],
+    "options": [
+      0,
+      424,
+      480,
+      696
+    ],
+    "end": [
+      332,
+      720,
+      464,
+      784
+    ]
+  },
+  "exclusions": "source-only score/difficulty and provider status/skip unsupported report action differences are explicit, no full-image equality claimed",
+  "license": "CrossPlay MIT in apps/cp-trivia/LICENSE; font notices OFL-Jersey25/OFL-NotoSerif in app",
+  "notice_fixture": {
+    "headline": "NO QUESTIONS",
+    "body": "Select to fetch a question\n\nOpen Trivia DB / CC BY-SA 4.0. Fetch one live question; no bundled questions.",
+    "actionLabel": "FETCH QUESTION",
+    "native_builder": "triviaui::buildNotice"
+  },
+  "full_notice_comparison": [
+    0,
+    0,
+    480,
+    800
+  ]
+}

@@ -1,91 +1,137 @@
 #pragma once
 #include <Epub.h>
+#include <FreeInkApp.h>
+#include <FreeInkUIGfxRenderer.h>
 #include <I18n.h>
 
+#include <array>
+#include <atomic>
 #include <string>
 #include <vector>
 
-#include "activities/UiListActivity.h"
+#include "ControlsOptionsActivity.h"
+#include "EpubReaderMenuModel.h"
+#include "ReaderOptionsActivity.h"
+#include "activities/Activity.h"
 #include "components/OptionPopup.h"
+#include "util/ButtonNavigator.h"
 
-class EpubReaderMenuActivity final : public UiListActivity {
+struct Rect;
+
+class EpubReaderMenuActivity final : public Activity {
  public:
-  // Menu actions available from the reader menu.
-  enum class MenuAction {
-    SELECT_CHAPTER,
-    FOOTNOTES,
-    TEXT_SETTINGS,
-    NIGHT_MODE,
-    FRONTLIGHT,
-    BLUETOOTH,
-    GO_TO_PERCENT,
-    AUTO_PAGE_TURN,
-    ROTATE_SCREEN,
-    BOOKMARKS,
-    SAVE_CLIPPING,
-    VIEW_CLIPPINGS,
-    TOGGLE_BOOKMARK,
-    SCREENSHOT,
-    DISPLAY_QR,
-    GO_HOME,
-    SYNC,
-    DELETE_CACHE,
-    DICTIONARY
-  };
+  using MenuAction = EpubReaderMenuAction;
+  // Reader-local extension; does not renumber persisted owner menu/action IDs.
+  static constexpr MenuAction TOGGLE_BOOK_STATS_TRACKING = static_cast<MenuAction>(250);
 
+  explicit EpubReaderMenuActivity(
+      GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& title, const int currentPage,
+      const int totalPages, const int bookProgressPercent, const uint8_t currentOrientation, const bool hasFootnotes,
+      const bool hasDictionary, const bool hasBookmarks, const bool hasClippings, const bool isCurrentPageBookmarked,
+      const bool isBookCompleted, const bool autoPageTurnActive = false, const uint16_t autoPageTurnIntervalSeconds = 0,
+      const bool showReadingPaceReset = false,
+      ReaderOptionsActivity::SaveSettingsCallback saveReaderSettingsCallback = nullptr,
+      void* saveReaderSettingsContext = nullptr,
+      ReaderOptionsActivity::SaveGlobalSettingsCallback saveGlobalSettingsCallback = nullptr,
+      void* saveGlobalSettingsContext = nullptr,
+      ReaderOptionsActivity::GlobalSettingsEditCallback beginGlobalSettingsEditCallback = nullptr,
+      void* beginGlobalSettingsEditContext = nullptr, uint32_t stableCurrentPage = 0, uint32_t stablePageCount = 0,
+      ReaderOptionsActivity::GlobalSettingsEditCallback endGlobalSettingsEditCallback = nullptr,
+      void* endGlobalSettingsEditContext = nullptr, const char* dictionaryFontFamilyName = nullptr,
+      uint8_t dictionaryFontPointSize = 0, bool hasDictionaryFontOverride = false,
+      ReaderOptionsActivity::DictionaryFontChangedCallback dictionaryFontChangedCallback = nullptr,
+      void* dictionaryFontChangedContext = nullptr);
+
+  void onEnter() override;
+  void onExit() override;
+  void loop() override;
+  void render(RenderLock&&) override;
+  bool isReaderActivity() const override { return true; }
+  bool allowFrontlightPanelGesture() const override { return false; }
+  bool allowPowerAsConfirmInReaderMode() const override { return true; }
+  bool allowGlobalHomeGesture() const override { return false; }
+
+ private:
   struct MenuItem {
     MenuAction action;
     StrId labelId;
   };
 
-  static void toggleBluetooth();
-  static void buildMenuItems(std::vector<MenuItem>& items, bool hasFootnotes, bool hasBookmarks, bool hasClippings);
+  enum class MenuTab : uint8_t { Main = 0, Bookmarks = 1, Settings = 2 };
+  static constexpr size_t MAIN_TAB_INDEX = 0;
+  static constexpr size_t BOOKMARKS_TAB_INDEX = 1;
+  static constexpr size_t SETTINGS_TAB_INDEX = 2;
+  static constexpr size_t MENU_TAB_COUNT = 3;
+  static constexpr size_t TOUCH_LOCK_ICON_INDEX = MENU_TAB_COUNT;
+  static constexpr size_t TOUCH_HOME_ICON_INDEX = MENU_TAB_COUNT + 1;
+  static constexpr size_t TOUCH_ICON_COUNT = MENU_TAB_COUNT + 1;
+  using TabMenuItems = std::array<std::vector<MenuItem>, MENU_TAB_COUNT>;
 
-  explicit EpubReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& title,
-                                  const int currentPage, const int totalPages, const int bookProgressPercent,
-                                  const uint8_t currentOrientation, const bool hasFootnotes, bool hasBookmarks,
-                                  bool hasClippings, MenuAction& selectedAction);
+  static TabMenuItems buildMenuItems(bool hasFootnotes, bool hasBookmarks, bool hasClippings,
+                                     bool isCurrentPageBookmarked, bool isBookCompleted, bool showReadingPaceReset,
+                                     bool hasDictionary, bool hasStablePageNumbers);
+  [[nodiscard]] const std::vector<MenuItem>& activeMenuItems() const;
+  [[nodiscard]] size_t activeTabIndex() const { return static_cast<size_t>(activeTab); }
+  void cycleActiveTab();
+  void moveActiveTab(bool forward);
+  void focusTabRow();
+  void finishCancelled();
+  bool activateSelectedItem();
+  bool handleTouchInput();
+  void drawIconTabBar(Rect rect, bool drawBottomBorder);
+  static void dictionaryFontChangedForMenu(void* ctx, const char* familyName, uint8_t pointSize);
 
-  void onEnter() override;
-  void onExit() override;
-  void render(RenderLock&&) override;
-  bool handleHomeGesture() override;
-  bool acceptsRemoteInput() const override { return routingReady(); }
+  // FreeInkApp hosts the menu list (themed rows, touch routing); the header
+  // stays on GUI.drawHeader for the battery indicator, and OptionPopup keeps
+  // its legacy overlay rendering.
+  using UiApp = freeink::ui::FreeInkApp<20, 4>;
 
- private:
-  // Row storage: menuItems is at most MAX_MENU_ITEMS, so a
-  // fixed-capacity array avoids any heap allocation for the row list. Labels
-  // are set once in the constructor (buildMenuRowItems()); buildScreen()
-  // only refreshes rows whose values reflect live state.
-  static constexpr size_t MAX_MENU_ITEMS = 19;
-  freeink::ui::ListItem menuRowItems[MAX_MENU_ITEMS]{};
-  void buildMenuRowItems();
+  static void menuScreen(UiApp::ScreenType& screen, void* user);
+  static void onRowEvent(const freeink::ui::ActionEvent& event, void* user);
+  void buildMenuScreen(UiApp::ScreenType& screen);
 
-  int listCount() const override { return static_cast<int>(menuItems.size()); }
-  void buildScreen(UiScreen& screen) override;
-  void activateIndex(int index) override;
-  // Popup input runs before any button or touch handling.
-  bool handleCustomInput() override;
-  // Back closes on RELEASE and Confirm activates on RELEASE; everything else
-  // (row navigation, page jumps) falls through to the base handler.
-  bool handleButtons() override;
-  // Header via GUI.drawHeader inside the safe area for the battery indicator.
-  void drawChrome() override;
+  // Fixed menu layout, except for rows tied to toggles inside this menu.
+  TabMenuItems menuItems;
 
-  void closeCancelled();
+  int selectedIndex = -1;
+  MenuTab activeTab = MenuTab::Main;
 
-  // Fixed menu layout
-  std::vector<MenuItem> menuItems;
-  MenuAction& selectedAction;
-
+  ButtonNavigator buttonNavigator;
   OptionPopup optionPopup;
   std::string title = "Reader Menu";
   uint8_t pendingOrientation = 0;
-  uint8_t selectedPageTurnOption = 0;
   const std::vector<StrId> orientationLabels = {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_INVERTED,
                                                 StrId::STR_LANDSCAPE_CCW};
-  const std::vector<const char*> pageTurnLabels = {I18N.get(StrId::STR_STATE_OFF), "1", "3", "6", "12"};
   int currentPage = 0;
   int totalPages = 0;
   int bookProgressPercent = 0;
+  bool autoPageTurnActive = false;
+  uint16_t autoPageTurnIntervalSeconds = 0;
+  ReaderOptionsActivity::SaveSettingsCallback saveReaderSettingsCallback = nullptr;
+  void* saveReaderSettingsContext = nullptr;
+  ReaderOptionsActivity::SaveGlobalSettingsCallback saveGlobalSettingsCallback = nullptr;
+  void* saveGlobalSettingsContext = nullptr;
+  ReaderOptionsActivity::GlobalSettingsEditCallback beginGlobalSettingsEditCallback = nullptr;
+  void* beginGlobalSettingsEditContext = nullptr;
+  uint32_t stableCurrentPage = 0;
+  uint32_t stablePageCount = 0;
+  ReaderOptionsActivity::GlobalSettingsEditCallback endGlobalSettingsEditCallback = nullptr;
+  void* endGlobalSettingsEditContext = nullptr;
+  char dictionaryFontFamilyName[64] = "";
+  uint8_t dictionaryFontPointSize = 0;
+  bool hasDictionaryFontOverride = false;
+  ReaderOptionsActivity::DictionaryFontChangedCallback dictionaryFontChangedCallback = nullptr;
+  void* dictionaryFontChangedContext = nullptr;
+  bool settingsChanged = false;
+  ReaderSettingsChangeMask changeMask = ReaderSettingsChangeMask::None;
+
+  MenuResult makeMenuResult(int action) const;
+
+  freeink::ui::GfxRendererTarget uiTarget;  // must precede `app`: the app holds a reference to it
+  UiApp app;
+  // render() rebuilds the app's interaction table; loop() only routes touch
+  // snapshots against it while this is true (the two run on different tasks).
+  std::atomic<bool> uiReady{false};
+  int visibleRows = 1;  // rows per page at the current scale; set by the screen builder
+  int topIndex = 0;     // viewport scroll position, decoupled from the selection
 };

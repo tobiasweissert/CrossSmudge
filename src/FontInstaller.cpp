@@ -2,6 +2,7 @@
 
 #include <HalStorage.h>
 #include <Logging.h>
+#include <SdCardFontSystem.h>
 
 #include <cctype>
 #include <cstring>
@@ -9,6 +10,13 @@
 #include "CrossPointSettings.h"
 
 FontInstaller::FontInstaller(SdCardFontRegistry& registry) : registry_(registry) {}
+
+namespace {
+bool isSafeFontPathChar(const char c) {
+  return std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_' || c == ' ' || c == '.' || c == '(' ||
+         c == ')';
+}
+}  // namespace
 
 bool FontInstaller::isValidFamilyName(const char* name) {
   if (name == nullptr || name[0] == '\0') return false;
@@ -20,7 +28,7 @@ bool FontInstaller::isValidFamilyName(const char* name) {
 
   for (const char* p = name; *p != '\0'; ++p) {
     char c = *p;
-    if (!std::isalnum(static_cast<unsigned char>(c)) && c != '-' && c != '_') {
+    if (!isSafeFontPathChar(c)) {
       return false;
     }
   }
@@ -47,7 +55,7 @@ static bool isValidFontFilenameWithExt(const char* name, const char* ext) {
   const size_t baseLen = nameLen - extLen;
   for (size_t i = 0; i < baseLen; ++i) {
     char c = name[i];
-    if (!std::isalnum(static_cast<unsigned char>(c)) && c != '-' && c != '_') {
+    if (!isSafeFontPathChar(c)) {
       return false;
     }
   }
@@ -57,7 +65,8 @@ static bool isValidFontFilenameWithExt(const char* name, const char* ext) {
 bool FontInstaller::isValidCpfontFilename(const char* name) { return isValidFontFilenameWithExt(name, ".cpfont"); }
 
 bool FontInstaller::isValidVectorFontFilename(const char* name) {
-  return isValidFontFilenameWithExt(name, ".ttf") || isValidFontFilenameWithExt(name, ".otf");
+  return isValidFontFilenameWithExt(name, ".ttf") || isValidFontFilenameWithExt(name, ".otf") ||
+         isValidFontFilenameWithExt(name, ".ttc");
 }
 
 bool FontInstaller::ensureFamilyDir(const char* familyName) {
@@ -73,7 +82,7 @@ bool FontInstaller::ensureFamilyDir(const char* familyName) {
     }
   }
 
-  char dirPath[160];
+  char dirPath[192];
   snprintf(dirPath, sizeof(dirPath), "%s/%s", root, familyName);
 
   if (!Storage.exists(dirPath)) {
@@ -121,13 +130,14 @@ FontInstaller::Error FontInstaller::deleteFamily(const char* familyName) {
   if (!isValidFamilyName(familyName)) {
     return Error::INVALID_FAMILY_NAME;
   }
+  sdFontSystem.markRegistryDirty();
 
   // A family may exist in either root (or, edge case, both). Remove from both.
   const char* roots[] = {SdCardFontRegistry::FONTS_DIR_HIDDEN, SdCardFontRegistry::FONTS_DIR_VISIBLE};
   bool removedAny = false;
   bool sawAny = false;
   for (const char* root : roots) {
-    char dirPath[160];
+    char dirPath[192];
     snprintf(dirPath, sizeof(dirPath), "%s/%s", root, familyName);
     if (!Storage.exists(dirPath)) continue;
     sawAny = true;
@@ -153,8 +163,7 @@ FontInstaller::Error FontInstaller::deleteFamily(const char* familyName) {
   return Error::OK;
 }
 
-void FontInstaller::refreshRegistry() { registry_.discover(); }
-
-bool FontInstaller::isFamilyInstalled(const char* familyName) const {
-  return registry_.findFamily(familyName) != nullptr;
+bool FontInstaller::refreshRegistry() {
+  registry_.discover();
+  return !registry_.lastDiscoveryFailed();
 }

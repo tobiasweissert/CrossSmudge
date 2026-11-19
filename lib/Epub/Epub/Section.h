@@ -1,51 +1,60 @@
 #pragma once
-#include <deque>
+#include <HalStorage.h>
+
 #include <functional>
 #include <memory>
 #include <optional>
 #include <string>
-#include <vector>
 
 #include "Epub.h"
+#include "EpubRenderMode.h"
 #include "ReaderRenderSpec.h"
+#include "SectionPageIndex.h"
 
 class Page;
 class GfxRenderer;
 class ChapterHtmlSlimParser;
 class CssParser;
 
+struct SectionBuildOptions {
+  const char* previewAnchor = nullptr;
+  uint16_t previewMaxPages = 0;
+  // Full-section callers can stop between parser chunks without creating a
+  // readable partial cache. The callback must remain valid for the build.
+  bool (*shouldCancel)(void* context) = nullptr;
+  void* cancelContext = nullptr;
+  bool* cancellationObserved = nullptr;
+  // Stable-page coordinates stay in the manifest's word/character units until
+  // the parser knows the spine's source-text length. This avoids treating page
+  // density as uniform when selecting the rendered screen.
+  uint32_t referenceUnitOffset = 0;
+  uint32_t referenceUnitCount = 0;
+  bool referenceUnitsAreCharacters = false;
+  uint16_t* resolvedReferencePage = nullptr;
+
+  bool isPreview() const { return previewAnchor && previewAnchor[0] != '\0' && previewMaxPages > 0; }
+  bool isCancellationRequested() const { return shouldCancel && shouldCancel(cancelContext); }
+};
+
 class Section {
-  std::shared_ptr<Epub> epub;
+  std::shared_ptr<Epub> epubOwner;
+  Epub* epub;
   const int spineIndex;
   GfxRenderer& renderer;
   std::string filePath;
   HalFile file;
 
-  void writeSectionFileHeader(const ReaderRenderSpec& spec);
-  uint32_t onPageComplete(std::unique_ptr<Page> page);
-
-  // Page-offset table entry, kept in RAM while an incremental build is running so
-  // already-built pages can be located in the partially-written .bin.
-  struct PageLutEntry {
-    uint32_t fileOffset;
-    uint16_t paragraphIndex;
-    uint16_t listItemIndex;
-    uint32_t visibleTextOffset;
-  };
-  // Held only while an incremental build is in progress (see startBuild). Carries the
-  // live parser plus the strings it references (the parser stores them by reference)
-  // and the in-RAM page-offset table. The table is a deque so it grows in small chunks: a vector
-  // doubling past 1024 pages needs 24 KB contiguous, and a failed allocation aborts. The deque
-  // (like the parser's anchor list) takes one ~0.5 KB node as soon as the build starts.
   struct BuildContext {
     std::unique_ptr<ChapterHtmlSlimParser> parser;
-    std::deque<PageLutEntry> lut;
+    SectionPageIndex pageIndex;
     std::string parsePath;
     std::string contentBase;
     std::string imageBasePath;
     std::string htmlPath;
     std::string tmpHtmlPath;
+    std::string tmpSectionPath;
     bool reusedHtml = false;
+    bool pageCompletionFailed = false;
     CssParser* cssParser = nullptr;
     // HTML byte progress, for estimating the section's total page count while it's still building.
     uint32_t bytesConsumed = 0;
@@ -58,16 +67,23 @@ class Section {
   };
   std::unique_ptr<BuildContext> build_;
   bool buildComplete_ = false;
-  // Pages laid out by the active build (== build_->lut.size()). Distinct from pageCount,
-  // which is the pages *available to read* and also counts a loaded partial file's pages.
+  bool lastImagesWereSuppressed_ = false;
+  bool lastLayoutAbortedForLowMemory_ = false;
+  uint16_t imageEstimateViewportHeight_ = 0;
+  uint32_t protectedImageUnits_ = 0;
+  // Pages laid out by the active build. Distinct from pageCount, which is the pages
+  // available to read and may include a loaded partial file's pages.
   uint16_t builtPageCount_ = 0;
-  // A partial section file (suspended build from a previous session) is loaded at filePath.
-  // Its pages 0..partialPageCount_-1 are readable while a rebuild extends past them.
   bool partial_ = false;
   uint16_t partialPageCount_ = 0;
-  // Parse watermark from the partial's trailer, for estimating the total page count.
+  uint32_t partialProtectedImageUnits_ = 0;
   uint32_t partialBytesConsumed_ = 0;
   uint32_t partialTotalBytes_ = 0;
+  std::string activeBuildTmpSectionPath_;
+
+  bool writeSectionFileHeader(const ReaderRenderSpec& spec);
+  uint32_t onPageComplete(std::unique_ptr<Page> page);
+  bool ensureBuildFileOpen();
   bool finalizeBuild();
   // Write the LUTs/anchor map (and, for a partial, the watermark trailer), patch the
   // header, stamp the version byte, and swap the tmp .bin over filePath.
@@ -79,34 +95,30 @@ class Section {
   // Read a page already laid out by the in-progress build (page < build LUT size), from
   // the partially-written tmp .bin without disturbing the build's write cursor.
   std::unique_ptr<Page> loadPageDuringBuild(int page);
-  bool openAnchorMap(HalFile& anchorFile, uint16_t& count) const;
 
  public:
   uint16_t pageCount = 0;
   int currentPage = 0;
 
-  // Constructor and destructor are out-of-line: BuildContext holds a unique_ptr to the
-  // forward-declared ChapterHtmlSlimParser, whose full definition is only visible in the .cpp.
-  explicit Section(const std::shared_ptr<Epub>& epub, int spineIndex, GfxRenderer& renderer);
+  explicit Section(const std::shared_ptr<Epub>& epub, int spineIndex, GfxRenderer& renderer,
+                   const char* cacheSuffix = "");
+  explicit Section(Epub& epub, int spineIndex, GfxRenderer& renderer, const char* cacheSuffix = "");
   ~Section();
   bool loadSectionFile(const ReaderRenderSpec& spec);
   bool clearCache() const;
-  bool createSectionFile(const ReaderRenderSpec& spec, const std::function<void()>& popupFn = nullptr);
+  bool createSectionFile(const ReaderRenderSpec& spec, const std::function<void()>& popupFn = nullptr,
+                         bool* imagesWereSuppressed = nullptr, bool* layoutAbortedForLowMemory = nullptr,
+                         SectionBuildOptions buildOptions = {});
 
-  // Incremental build: lay out the section a few pages at a time so a large chapter
-  // can show its first page immediately and keep the UI responsive while the rest
-  // builds. createSectionFile() above is the one-shot wrapper over these.
-  //   if (!startBuild(...)) fail;
-  //   each tick: buildSomeMore(N); render up to pageCount; when isBuildComplete() stop.
-  bool startBuild(const ReaderRenderSpec& spec, const std::function<void()>& popupFn = nullptr);
-  // Lay out up to maxPages more pages (maxPages <= 0 = build to completion). Returns
-  // false on error (the build is abandoned). Sets isBuildComplete() when finished.
-  // yieldNow, when given, is asked after every parse step (1 KB of HTML, whose callbacks may
-  // lay out and write several pages); true ends the call early so the caller can serve input.
-  // The next call resumes where this one left off.
-  bool buildSomeMore(int maxPages, bool (*yieldNow)() = nullptr);
+  bool startBuild(const ReaderRenderSpec& spec, SectionBuildOptions buildOptions = {},
+                  const std::function<void()>& popupFn = nullptr);
+  bool buildSomeMore(int maxPages);
+  void releaseBuildFile();
+  bool lastBuildImagesWereSuppressed() const { return lastImagesWereSuppressed_; }
+  bool lastBuildLayoutAbortedForLowMemory() const { return lastLayoutAbortedForLowMemory_; }
   bool isBuilding() const { return static_cast<bool>(build_); }
   bool isBuildComplete() const { return buildComplete_; }
+  bool activeBuildHasCaughtReadablePages() const { return !build_ || builtPageCount_ >= pageCount; }
   // Best-known total page count: the exact pageCount once finalized, or a smoothed byte-based
   // estimate (pages so far scaled by totalBytes/bytesConsumed, damped by an EMA) while a giant spine
   // is still building, so "page X of Y" / progress don't read off the small build watermark.
@@ -125,13 +137,11 @@ class Section {
   // the on-disk file (finalized section, or a partial the rebuild hasn't caught up to).
   std::unique_ptr<Page> loadPage(int page);
 
-  std::string getTextFromSectionFile();
+  std::unique_ptr<Page> loadPageFromSectionFile();
 
   // Resolve an anchor from the in-progress build first, then the on-disk anchor map
   // (covers finalized sections and partials from a previous session).
   std::optional<uint16_t> findAnchor(const std::string& anchor) const;
-  // Select a TOC boundary without reopening the anchor map for every story.
-  int getTocIndexForPage(int page) const;
 
   // True if this spine's unzipped HTML is already cached, so a build won't pay the (multi-second on a
   // giant spine) zip inflation. Lets the reader skip the indexing popup on a fast reopen/rebuild.
@@ -148,8 +158,18 @@ class Section {
   // Get the page count from the section cache file without fully loading it.
   std::optional<uint16_t> getCachedPageCount() const;
 
+  // Image units already protected by laid-out pages, and the non-image units
+  // projected through the section's XHTML byte density. Both accessors are
+  // allocation-free and are used by grouped-chapter progress estimates.
+  uint64_t estimatedProtectedImageUnits() const;
+  uint64_t estimatedNonImageProjectionUnits() const;
+
   // Look up the page number for a synthetic paragraph index from XPath p[N].
+  // Checks the active incremental build before falling back to the committed cache.
   std::optional<uint16_t> getPageForParagraphIndex(uint16_t pIndex) const;
+
+  // Look up a synthetic paragraph among pages produced by the active build only.
+  std::optional<uint16_t> findParagraphDuringBuild(uint16_t pIndex) const;
 
   // Look up the page number for a running list-item index from the li LUT.
   std::optional<uint16_t> getPageForListItemIndex(uint16_t liIndex) const;
@@ -157,22 +177,11 @@ class Section {
   // Look up the synthetic paragraph index for the given rendered page.
   std::optional<uint16_t> getParagraphIndexForPage(uint16_t page) const;
 
-  // Exact zero-based visible Unicode-codepoint offset where a rendered page
-  // starts. Available from both an active build and finalized/partial caches.
+  // Look up the running list-item index for the given rendered page.
+  std::optional<uint16_t> getListItemIndexForPage(uint16_t page) const;
+
+  // Content coordinate recorded at the start of each rendered page. Available
+  // for finalized sections and the readable prefix of incremental sections.
   std::optional<uint32_t> getVisibleTextOffsetForPage(uint16_t page) const;
-
-  // Derive the local page containing an exact visible-text offset. When
-  // preferFirstAtOffset is true, ties caused by zero-width content such as an
-  // image-only page select the first page at that offset.
   std::optional<uint16_t> getPageForVisibleTextOffset(uint32_t offset, bool preferFirstAtOffset = false) const;
-
-  // True once the active build has laid out a page starting at or past `offset`, i.e.
-  // getPageForVisibleTextOffset() can resolve it from the build without laying out more.
-  // Lets a caller build to a content target instead of a page number, which is what a
-  // re-pagination needs: the old page index no longer names the same content.
-  // False with no build running -- there is nothing left to wait for, so the on-disk
-  // cache answers directly.
-  bool buildReachedVisibleTextOffset(uint32_t offset) const {
-    return build_ && !build_->lut.empty() && offset <= build_->lut.back().visibleTextOffset;
-  }
 };

@@ -81,7 +81,8 @@ class KOReaderSyncClient {
     JSON_ERROR,
     NOT_FOUND,
     LOW_MEMORY,
-    USER_EXISTS
+    USER_EXISTS,
+    INVALID_AUTH_RESPONSE
   };
 
   /**

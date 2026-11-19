@@ -9,6 +9,7 @@ each one against the libdep working tree.
 
 Each patch's idempotency is decided by git itself:
   * `git apply --check --reverse` succeeds  -> already applied, skip
+  * source already contains the equivalent fix -> already applied, skip
   * `git apply --check`            succeeds  -> apply
   * neither succeeds                          -> abort the build
 
@@ -61,6 +62,8 @@ def _apply_one(jpeg_dir, patch_path):
     name = os.path.basename(patch_path)
     if _git_apply_succeeds(jpeg_dir, patch_path, reverse=True):
         return
+    if _patch_already_satisfied(jpeg_dir, name):
+        return
     if not _git_apply_succeeds(jpeg_dir, patch_path, reverse=False):
         # Not applied, not appliable -- the libdep source has diverged from
         # what the patch expects. Don't write a half-patched file.
@@ -77,6 +80,34 @@ def _apply_one(jpeg_dir, patch_path):
         raise SystemExit(1)
     subprocess.run(["git", "apply", patch_path], cwd=jpeg_dir, check=True)
     print("Applied JPEGDEC patch: %s" % name)
+
+
+def _patch_already_satisfied(jpeg_dir, patch_name):
+    jpeg_inl = os.path.join(jpeg_dir, "src", "jpeg.inl")
+    if not os.path.isfile(jpeg_inl):
+        return False
+    with open(jpeg_inl, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    if patch_name.startswith("0001-"):
+        return (
+            "signed short *pMCU = (iMCU < 0) ? pJPEG->sMCUs" in content
+            and ": &pJPEG->sMCUs[iMCU & 0xffffff];" in content
+        )
+
+    if patch_name.startswith("0002-"):
+        return (
+            "if (iMCU >= 0)\n                    pMCU[0] |= iPositive;" in content
+            and "if (iMCU >= 0)\n            pMCU[0] = (short)*iDCPredictor;" in content
+        )
+
+    if patch_name.startswith("0003-"):
+        return (
+            "if (pJPEG->JPCI[1].component_needed)" in content
+            and "if (pJPEG->JPCI[2].component_needed) {" in content
+        )
+
+    return False
 
 
 def _git_apply_succeeds(jpeg_dir, patch_path, *, reverse):

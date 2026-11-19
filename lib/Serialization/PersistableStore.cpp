@@ -3,7 +3,6 @@
 #include <HalStorage.h>
 #include <Logging.h>
 #include <ObfuscationUtils.h>
-
 #include <cstring>
 #include <limits>
 
@@ -18,21 +17,66 @@ bool PersistableStoreBase::writeDocToFile(const char* path, const JsonDocument& 
   return true;
 }
 
-bool PersistableStoreBase::readDocFromFile(const char* path, JsonDocument& doc) {
-  if (!Storage.exists(path)) {
-    return false;  // Expected on first boot — not an error.
-  }
-  String json = Storage.readFile(path);
-  if (json.isEmpty()) {
-    LOG_ERR("PERSIST", "Failed to read %s (empty)", path);
+bool PersistableStoreBase::writeDocToFileAtomically(const char* path, const JsonDocument& doc) {
+  Storage.mkdir("/.crosspoint");
+  String json;
+  serializeJson(doc, json);
+
+  const std::string tempPath = std::string(path) + ".tmp";
+  const std::string backupPath = std::string(path) + ".bak";
+  // A prior unacknowledged operation may have left FAT aliases. Never truncate,
+  // unlink or rotate those roots during a retry (including after reboot).
+  if (Storage.exists(tempPath.c_str()) || Storage.exists(backupPath.c_str())) {
+    LOG_ERR("PERSIST", "Retained recovery roots block write to %s", path);
     return false;
   }
-  auto error = deserializeJson(doc, json);
-  if (error) {
-    LOG_ERR("PERSIST", "JSON parse error in %s: %s", path, error.c_str());
+  if (!Storage.writeFile(tempPath.c_str(), json) || Storage.readFile(tempPath.c_str()) != json) {
+    LOG_ERR("PERSIST", "Temporary write/readback failed for %s", path);
     return false;
+  }
+
+  const bool hadOriginal = Storage.exists(path);
+  if (hadOriginal) {
+    if (!Storage.rename(path, backupPath.c_str())) {
+      LOG_ERR("PERSIST", "Failed to back up %s", path);
+      // Keep both names: a negative acknowledgement need not mean no mutation.
+      return false;
+    }
+  }
+
+  if (!Storage.rename(tempPath.c_str(), path)) {
+    LOG_ERR("PERSIST", "Failed to replace %s", path);
+    // Do not roll back or remove either name after an ambiguous rename.
+    return false;
+  }
+
+  if (Storage.readFile(path) != json) {
+    LOG_ERR("PERSIST", "Published readback failed for %s", path);
+    return false;
+  }
+  if (hadOriginal && Storage.exists(backupPath.c_str()) && !Storage.remove(backupPath.c_str())) {
+    LOG_ERR("PERSIST", "Failed to remove completed backup %s", backupPath.c_str());
   }
   return true;
+}
+
+bool PersistableStoreBase::readDocFromFile(const char* path, JsonDocument& doc) {
+  const std::string backup = std::string(path) + ".bak";
+  const std::string temporary = std::string(path) + ".tmp";
+  auto read = [&](const char* candidate) {
+    if (!Storage.exists(candidate)) return false;
+    String json = Storage.readFile(candidate);
+    if (json.isEmpty()) return false;
+    doc.clear();
+    return !deserializeJson(doc, json);
+  };
+  // Retained temp+backup means publication was not acknowledged. Prefer the
+  // complete old snapshot, without renaming/unlinking possible FAT aliases.
+  if (Storage.exists(temporary.c_str()) && Storage.exists(backup.c_str())) {
+    return read(backup.c_str());
+  }
+  if (read(path)) return true;
+  return read(backup.c_str());
 }
 
 std::string PersistableStoreBase::extractPassword(JsonVariantConst doc, bool& needsResave) {

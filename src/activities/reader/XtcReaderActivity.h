@@ -1,15 +1,63 @@
+/**
+ * XtcReaderActivity.h
+ *
+ * XTC ebook reader activity for CrossPoint Reader
+ * Displays pre-rendered XTC pages on e-ink display
+ */
+
 #pragma once
 
 #include <Xtc.h>
 
 #include <memory>
 #include <string>
+#include <utility>
 
+#include "BookReadingStats.h"
+#include "BookStatsTracking.h"
+#include "EndOfBookOptions.h"
+#include "GlobalReadingStats.h"
+#include "ReaderProgressSaveDebouncer.h"
 #include "ReaderActivity.h"
+#include "components/OptionPopup.h"
 
 class XtcReaderActivity final : public ReaderActivity {
+  OptionPopup quickActionsPopup;
   std::shared_ptr<Xtc> xtc;
+
   uint32_t currentPage = 0;
+  int pagesUntilFullRefresh = 0;
+  unsigned long lastPageTurnTime = 0UL;
+  unsigned long pageShownAtMs = 0UL;
+  uint32_t sessionReadingSeconds = 0;
+  bool statsTrackingActive = false;
+  bool bookStatsEnabled = true;
+  bool pendingStatsCommit = false;
+  uint32_t globalStatsResetRevision = 0;
+  void commitReadingStatsSession();
+  bool savePendingReadingStats();
+  void syncStatsTrackingState();
+  void refreshStatsAfterOverlay();
+
+  BookReadingStats stats;
+  GlobalReadingStats globalStats;
+  ReadingStatsDateTime sessionStartLocalDateTime;
+  bool hasSessionStartLocalDateTime = false;
+  bool longPowerPageTurnHandled = false;
+  // Home-key shortcuts are dispatched before this activity's normal input loop.
+  // Queue the turn so it follows the same guarded XTC page-turn path.
+  bool shortcutPageTurnPending = false;
+  bool shortcutPreviousPagePending = false;
+  // Session-only display toggle; fixed-layout XTC pages are never regenerated.
+  bool statusBarVisible = true;
+  bool longPressMenuHandled = false;
+  bool sideButtonLongPressHandled = false;
+  bool frontButtonLongPressHandled = false;
+  bool longPressBackHandled = false;
+  bool skipRecentBookUpdateOnEntry = false;
+  ReaderProgressSaveDebouncer progressSaveDebouncer;
+  // The end screen owns these UI resources only while it is visible.
+  std::unique_ptr<EndOfBookOptions> endOfBookOptions;
 
   enum class StatusBarOverlayPosition { Bottom, Top };
   struct StatusBarInfo {
@@ -18,31 +66,101 @@ class XtcReaderActivity final : public ReaderActivity {
     std::string title;
   };
 
-  void renderPage();
-  void openChapterSelection();
-  void renderStatusBarOverlay(GfxRenderer& renderer, StatusBarOverlayPosition position) const;
-  StatusBarInfo getStatusBarInfo() const;
-  void saveProgress() const;
+  void renderPage(uint32_t pageToRender);
+  void renderStatusBarOverlay(StatusBarOverlayPosition position, uint32_t pageToRender) const;
+  StatusBarInfo getStatusBarInfo(uint32_t pageToRender) const;
+  bool saveProgress(uint32_t page);
+  bool queueProgressSave(uint32_t pageToRender);
+  bool flushQueuedProgress();
   void loadProgress();
+  void pauseReadingStatsTimer(const char* source = "unknown");
+  void resumeReadingStatsTimer(const char* source = "unknown");
+  bool currentPageReadingSecondsForStats(uint32_t& seconds, const char* source) const;
+  bool forwardPageReadElapsed(uint32_t& seconds, const char* source) const;
+  void recordCurrentPageReadingTime(const char* source = "unknown");
+  void recordForwardPageTurn(uint32_t seconds, bool recordPace);
+  bool formatTimeLeftLabel(char* buf, size_t len, uint32_t pageToRender, uint8_t mode = 255) const;
+  void commitReadingStats();
+  void resetCurrentBookStatsAfterDelete();
+  void setBookCompleted(bool isCompleted);
+  float getCurrentBookProgressPercent() const;
+  void openChapterSelection();
+  void openReadingStats();
+  void deleteBookStats();
+  void deleteBookCache();
+  void openReaderMenu();
+  void onReaderMenuConfirm(int action);
+  void toggleHomeButtonInReader();
+  static bool supportsQuickAction(CrossPointSettings::SHORT_PWRBTN action);
+  bool executeReaderShortcutAction(CrossPointSettings::SHORT_PWRBTN action);
+  bool executeLongPressBackAction();
 
+ public:
+  bool isBookStatsTrackingEnabled() const { return bookStatsEnabled; }
+  bool setBookStatsTrackingEnabled(bool enabled);
+  explicit XtcReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::unique_ptr<Xtc> xtc,
+                             int initialRefreshCountdown, bool skipRecentBookUpdateOnEntry = false)
+      : ReaderActivity("XtcReader", renderer, mappedInput, xtc ? xtc->getPath() : std::string{}, initialRefreshCountdown > 0),
+        xtc(std::move(xtc)),
+        pagesUntilFullRefresh(initialRefreshCountdown),
+        skipRecentBookUpdateOnEntry(skipRecentBookUpdateOnEntry) {}
+
+  explicit XtcReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
+                             std::string path, bool fast)
+      : ReaderActivity("XtcReader", renderer, mappedInput, std::move(path), fast),
+        pagesUntilFullRefresh(fast ? std::max(2, static_cast<int>(SETTINGS.getRefreshFrequency())) : 0),
+        skipRecentBookUpdateOnEntry(fast) {}
   bool loadBook() override;
   std::string getBookTitle() const override { return xtc ? xtc->getTitle() : ""; }
   std::string getBookAuthor() const override { return xtc ? xtc->getAuthor() : ""; }
   std::string getBookThumbBmpPath() const override { return xtc ? xtc->getThumbBmpPath() : ""; }
-  bool handleFormatInput() override;
-  void renderBook() override;
-  void applyInitialOrientation() override;
-
- public:
-  explicit XtcReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string bookPath,
-                             bool allowFastInitialRefresh)
-      : ReaderActivity("XtcReader", renderer, mappedInput, std::move(bookPath), allowFastInitialRefresh) {}
-  ~XtcReaderActivity() override = default;
-
-  bool pageTurn(bool isForward) override;
+  bool pageTurn(bool forward) override;
   bool skipPages(int amount) override;
   bool isAtEndOfBook() const override;
-  void onReturnFromEndOfBook() override;
+  bool inputOverPage() const override;
+  bool remoteShortcut(bool readerMenu) override;
+  void prepareForSleep() override;
+  void onEnter() override;
+  void onExit() override;
+  void loop() override;
+  void render(RenderLock&&) override;
+  bool handleTwoFingerSwipeAction(CrossPointSettings::TWO_FINGER_SWIPE_ACTION action) override;
+  bool prepareManualRefresh() override {
+    pagesUntilFullRefresh = -1;
+    return true;
+  }
+  bool isReaderActivity() const override { return true; }
+  bool usesFullScreenReaderVerticalSwipes() const override {
+#if defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY
+    return true;
+#else
+    return false;
+#endif
+  }
+  void onInputLockChanged(bool locked) override;
+  bool handleQuickLockUnlock(QuickLockTrigger trigger) override;
+  bool canSnapshotForSleepOverlay() const override { return true; }
+  bool allowPowerAsConfirmInReaderMode() const override { return quickActionsPopup.isActive(); }
+  bool blocksGlobalInput() const override { return quickActionsPopup.isActive(); }
+  bool handleShortcutAction(CrossPointSettings::SHORT_PWRBTN action) override;
+  bool openReaderSettingsMenu() override {
+    if (!xtc) {
+      return false;
+    }
+    openReaderMenu();
+    return true;
+  }
+  std::string getCurrentBookPath() const override { return xtc ? xtc->getPath() : std::string{}; }
+  std::string getCurrentBookTitle() const override { return xtc ? xtc->getTitle() : std::string{}; }
+  bool getFrontlightPanelBookDetails(FrontlightPanelBookDetails& details) override;
+  std::unique_ptr<Activity> createFrontlightReadingStatsActivity() override;
+  void onFrontlightPanelOpened() override { pauseReadingStatsTimer("frontlight_panel"); }
+  void onFrontlightPanelClosed() override;
+  bool handleFrontlightPanelResult(const FrontlightPanelResult& result) override;
 
+  // Renders the last saved page to the frame buffer without flushing to display.
+  // Used by SleepActivity to prepare the background for the overlay sleep mode.
+  // Returns false if the page cannot be loaded (missing cache / file error).
+  static bool drawCurrentPageToBuffer(const std::string& filePath, GfxRenderer& renderer);
   ScreenshotInfo getScreenshotInfo() const override;
 };

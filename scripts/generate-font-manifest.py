@@ -47,6 +47,7 @@ STYLE_NAMES = {0: "regular", 1: "bold", 2: "italic", 3: "bolditalic"}
 # Family descriptions and browser groups can be loaded from sd-fonts.yaml via
 # --descriptions-from. Missing metadata keeps the existing flat-list fallback.
 FAMILY_DESCRIPTIONS: dict[str, str] = {}
+FAMILY_LANGUAGES: dict[str, str] = {}
 FAMILY_SCRIPTS: dict[str, list[str]] = {}
 SCRIPT_GROUPS: list[tuple[str, str]] = []
 
@@ -221,6 +222,7 @@ def build_manifest(
             {
                 "name": family_name,
                 "description": description,
+                "languages": FAMILY_LANGUAGES.get(family_name, ""),
                 "styles": styles,
                 "scripts": scripts,
                 "files": file_entries,
@@ -281,11 +283,18 @@ def main():
         base_url += "/"
 
     # Load catalog metadata from YAML config if provided
-    global FAMILY_DESCRIPTIONS, FAMILY_SCRIPTS, SCRIPT_GROUPS
+    global FAMILY_DESCRIPTIONS, FAMILY_SCRIPTS, SCRIPT_GROUPS, FAMILY_LANGUAGES
     if args.descriptions_from:
         desc_path = Path(args.descriptions_from)
         if desc_path.exists():
             FAMILY_DESCRIPTIONS, FAMILY_SCRIPTS, SCRIPT_GROUPS = load_catalog_from_yaml(desc_path)
+            try:
+                import yaml
+                with open(desc_path) as metadata_file:
+                    metadata = yaml.safe_load(metadata_file) or {}
+                FAMILY_LANGUAGES = {f["name"]: f.get("languages", "") for f in metadata.get("families", [])}
+            except ImportError:
+                pass
             print(
                 f"Loaded {len(FAMILY_DESCRIPTIONS)} descriptions, "
                 f"{len(FAMILY_SCRIPTS)} script memberships from {desc_path}"

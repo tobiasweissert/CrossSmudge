@@ -4,11 +4,19 @@
 #include <BatteryMonitor.h>
 #include <InputManager.h>
 #include <Logging.h>
+#include <Wire.h>
 #include <freertos/semphr.h>
 
 #include <cassert>
 
 #include "HalGPIO.h"
+
+// Opt-in battery telemetry for diagnosing a miscalibrated fuel gauge. Off in
+// every shipping environment; the `debug` PlatformIO env sets it to 1. Defined
+// here because this is the lowest layer that consumes it.
+#ifndef CROSSINK_BATTERY_DIAG_LOG
+#define CROSSINK_BATTERY_DIAG_LOG 0
+#endif
 
 class HalPowerManager;
 extern HalPowerManager powerManager;  // Singleton
@@ -17,7 +25,8 @@ class HalPowerManager {
   int normalFreq = 0;  // MHz
   bool isLowPower = false;
 
-  mutable int _batteryCachedPercent = 0;         // Last read battery percentage (0-100)
+  mutable int _batteryCachedPercent = 0;  // Last read battery percentage * 10 (0-1000); callers divide by 10 (ADC
+                                          // path only — legacy I2C path stores 0-100 directly)
   mutable unsigned long _batteryLastPollMs = 0;  // Timestamp of last battery read in milliseconds
 
   enum LockMode { None, NormalSpeed };
@@ -25,7 +34,7 @@ class HalPowerManager {
   SemaphoreHandle_t modeMutex = nullptr;  // Protect access to currentLockMode
 
  public:
-#if BOARD_HAS_PSRAM
+#if defined(BOARD_HAS_PSRAM)
   static constexpr int LOW_POWER_FREQ = 80;  // MHz
 #else
   static constexpr int LOW_POWER_FREQ = 10;  // MHz
@@ -40,21 +49,30 @@ class HalPowerManager {
 
   // Setup wake up GPIO and enter deep sleep
   // Should be called inside main loop() to handle the currentLockMode
-  // wakeOnHeldButton: arm the wake without waiting for the power button's
-  // release, so a press that is still down wakes the device straight back up
-  // through the normal power-button wake path.
   void startDeepSleep(HalGPIO& gpio, bool wakeOnHeldButton = false) const;
-
-#if FREEINK_DEVICE_PICCO
-  // While USB powers the device, light-sleep instead of deep sleep (deep sleep
-  // cannot observe the charger), calling onStatus whenever the charging state
-  // or percentage changes. Returns true when the power button ended the hold,
-  // false when USB went away or was never present.
-  bool holdWhileUsbPowered(HalGPIO& gpio, void (*onStatus)(bool charging, uint16_t percent)) const;
-#endif
 
   // Get battery percentage (range 0-100)
   uint16_t getBatteryPercentage() const;
+
+#if CROSSINK_BATTERY_DIAG_LOG
+  // Raw battery telemetry for the diagnostic log, kept behind the flag so
+  // shipping builds carry neither the struct nor the extra I2C traffic.
+  struct BatteryDiagnostics {
+    uint16_t soc = 0;         // 0-100, as reported by the backend
+    uint16_t millivolts = 0;  // cell voltage; gauge boards report it directly
+    bool charging = false;
+    // Each field can fail independently, so a valid zero stays distinguishable
+    // from an unread one.
+    bool socKnown = false;
+    bool millivoltsKnown = false;
+    bool chargingKnown = false;
+  };
+
+  // Samples the battery backend directly, bypassing getBatteryPercentage()'s
+  // poll cache and smoothing so every row is a fresh read. Returns false when
+  // the active board reports no battery telemetry at all.
+  bool getBatteryDiagnostics(BatteryDiagnostics& out) const;
+#endif
 
   // RAII helper class to manage power saving locks
   // Usage: create an instance of Lock in a scope to disable power saving, for example when running a task that needs

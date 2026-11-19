@@ -28,6 +28,7 @@ class EndOfBookOptions : private UiAppHost {
   void loadOnce(const std::string& currentBookPath);
 
   // True when the suggestion menu is showing and should own the reader's input.
+  bool loaded() const { return isLoaded.load(std::memory_order_acquire); }
   bool menuActive() const;
 
   // Menu input handling, following the standard list idiom: a tap on a row opens it

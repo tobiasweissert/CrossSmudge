@@ -15,7 +15,7 @@
  *     drawing a progress bar; on success ESP.restart().
  *
  * Used both from Settings -> System -> "SD Card Firmware Update", and as the only
- * activity launched in boot recovery mode (left side button + power on X3).
+ * activity launched in boot recovery mode.
  */
 class SdFirmwareUpdateActivity : public Activity {
  public:

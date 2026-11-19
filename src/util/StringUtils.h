@@ -1,9 +1,12 @@
 #pragma once
 
 #include <cctype>
+#include <cstddef>
 #include <string>
 
 namespace StringUtils {
+
+constexpr size_t kDefaultMaxFilenameBytes = 150;
 
 /**
  * Case-insensitive ASCII strcmp. Returns <0, 0, or >0 like strcmp, comparing
@@ -32,7 +35,7 @@ inline int asciiCaseCmp(const char* a, const char* b) {
  * Replaces invalid characters with underscores, trims spaces/dots,
  * and limits length to maxBytes bytes.
  */
-std::string sanitizeFilename(const std::string& name, size_t maxBytes = 100);
+std::string sanitizeFilename(const std::string& name, size_t maxBytes = kDefaultMaxFilenameBytes);
 
 /**
  * Sanitize a complete filename while keeping a conventional extension inside

@@ -3,20 +3,35 @@
 #include <Arduino.h>
 #include <HalStorage.h>
 #include <I18n.h>
+#include <SdCardFontSystem.h>
 
 #include "MappedInputManager.h"
 #include "SilentRestart.h"
+#include "components/CompactHeader.h"
+#include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
-
-namespace fui = freeink::ui;
+#include "fontIds.h"
+#include "platform/UsbSerialJtagHandoff.h"
 
 void UsbDriveActivity::onEnter() {
   Activity::onEnter();
-  resetUi();
-  app.setScreen(&UsbDriveActivity::driveScreen, this);
+  state = State::Unsupported;
+  preparing = true;
+  startFailed = false;
+  restartRequested = false;
+  forcedDisconnectRequested = false;
+  hostSuspendPending = false;
+  hostWaitStartedAt = 0;
+  startFailureStartedAt = 0;
+  forcedDisconnectRequestedAt = 0;
+  hostSuspendStartedAt = 0;
 
-  // Show the safety instructions before giving the raw SD card to the USB host.
+  // Paint the instruction screen before detaching the filesystem and exposing
+  // its block device to the host. The two operations must never overlap.
   requestUpdateAndWait();
+#ifndef SIMULATOR
+  // The host can replace fonts without going through firmware file APIs.
+  sdFontSystem.markRegistryDirty();
   if (!Storage.beginUsbDrive()) {
     LOG_ERR("USB", "Unable to start USB Drive");
     preparing = false;
@@ -27,6 +42,7 @@ void UsbDriveActivity::onEnter() {
     return;
   }
 
+#endif
   preparing = false;
   state = State::WaitingForHost;
   hostWaitStartedAt = millis();
@@ -34,34 +50,42 @@ void UsbDriveActivity::onEnter() {
 }
 
 void UsbDriveActivity::onExit() {
+#ifndef SIMULATOR
   if (!restartRequested) Storage.endUsbDrive();
+#endif
   Activity::onExit();
 }
 
 void UsbDriveActivity::loop() {
+#ifndef SIMULATOR
   if (!startFailed) {
-    const State nextState = Storage.usbDriveState();
+    const auto storageState = Storage.usbDriveState();
+    const State nextState = static_cast<State>(storageState);
     if (nextState != state) {
+      const bool messageChanged = state != State::Connected || nextState != State::Accessed;
       state = nextState;
-      requestUpdate();
+      if (messageChanged) requestUpdate();
     }
   }
+#endif
 
-  // A battery-powered USB device may stay mounted after cable removal. End
-  // sustained suspend sessions too; host sleep intentionally has the same policy.
-  if (state == State::Connected && Storage.usbDriveHostSuspended()) {
+// The simulator HAL does not expose TinyUSB's host-suspend signal.
+#if !defined(SIMULATOR)
+  // Cable removal can leave a battery-powered USB device mounted but
+  // suspended. A sleeping host intentionally follows the same timeout policy.
+  if ((state == State::Connected || state == State::Accessed) && Storage.usbDriveHostSuspended()) {
     if (!hostSuspendPending) {
       hostSuspendPending = true;
       hostSuspendStartedAt = millis();
     } else if (millis() - hostSuspendStartedAt >= HOST_SUSPEND_TIMEOUT_MS) {
       LOG_INF("USB", "USB Drive host suspend timed out; ending session");
-      // endUsbDrive() soft-disconnects before teardown and reboot.
       restartToHome();
       return;
     }
   } else {
     hostSuspendPending = false;
   }
+#endif
 
   if (state == State::WaitingForHost && millis() - hostWaitStartedAt >= HOST_WAIT_TIMEOUT_MS) {
     LOG_INF("USB", "USB Drive host wait timed out");
@@ -75,27 +99,35 @@ void UsbDriveActivity::loop() {
     return;
   }
 
-  if (!startFailed && state == State::IoError) {
-    if (!forcedDisconnectRequested) {
-      forcedDisconnectRequested = true;
-      forcedDisconnectRequestedAt = millis();
-      LOG_ERR("USB", "USB Drive I/O error; disconnecting host");
-      if (!Storage.disconnectUsbDriveHost()) {
-        LOG_ERR("USB", "Unable to request USB Drive host disconnect");
-      }
-    } else if (millis() - forcedDisconnectRequestedAt >= FORCED_DISCONNECT_TIMEOUT_MS) {
-      LOG_ERR("USB", "USB Drive host disconnect timed out; forcing restart");
+  if (forcedDisconnectRequested) {
+    if (millis() - forcedDisconnectRequestedAt >= FORCED_DISCONNECT_TIMEOUT_MS) {
+      LOG_ERR("USB", "USB Drive host disconnect grace period ended; forcing restart");
       restartToHome();
     }
     return;
   }
 
-  const bool canExitWithInput = state == State::WaitingForHost || startFailed;
-  if (canExitWithInput && (mappedInput.wasPressed(MappedInputManager::Button::Back) ||
-                           mappedInput.wasPressed(MappedInputManager::Button::Power) || mappedInput.wasHomeGesture())) {
-    if (mappedInput.wasPressed(MappedInputManager::Button::Power)) mappedInput.consumePowerGesture();
-    restartToHome();
+  if (!startFailed && state == State::IoError) {
+    forcedDisconnectRequested = true;
+    forcedDisconnectRequestedAt = millis();
+    LOG_ERR("USB", "USB Drive I/O error; disconnecting host");
+#ifndef SIMULATOR
+    if (!Storage.disconnectUsbDriveHost()) {
+      LOG_ERR("USB", "Unable to request USB Drive host disconnect");
+    }
+#endif
     return;
+  }
+
+  const bool canExitWithInput = state == State::WaitingForHost || state == State::IoError;
+  if (canExitWithInput) {
+    if (TouchHeaderBackButton::wasTapped(mappedInput, renderer) ||
+        mappedInput.wasPressed(MappedInputManager::Button::Back) ||
+        mappedInput.wasPressed(MappedInputManager::Button::Power) || mappedInput.wasHomeGesture()) {
+      restartToHome();
+      return;
+    }
+    if (state == State::WaitingForHost) return;
   }
 
   if (state == State::Ejected || state == State::Disconnected || state == State::Unsupported) {
@@ -105,89 +137,66 @@ void UsbDriveActivity::loop() {
 
 void UsbDriveActivity::render(RenderLock&&) {
   renderer.clearScreen();
-
-  const auto& metrics = UITheme::getInstance().getMetrics();
-  const int pageWidth = renderer.getScreenWidth();
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_USB_DRIVE));
-
-  renderUi();
-
-  if (state == State::WaitingForHost || startFailed) {
-    const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
-    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-  }
-  renderer.displayBuffer();
-}
-
-void UsbDriveActivity::driveScreen(UiScreen& screen, void* user) {
-  static_cast<UsbDriveActivity*>(user)->buildDriveScreen(screen);
-}
-
-void UsbDriveActivity::buildDriveScreen(UiScreen& screen) const {
-  const char* message = nullptr;
-  const char* detail = nullptr;
-  const char* secondaryDetail = nullptr;
-  if (preparing) {
-    message = tr(STR_USB_DRIVE_PREPARING);
-    detail = tr(STR_USB_DRIVE_EJECT_HINT);
+  const char* title = tr(STR_USB_DRIVE);
+  const bool canExitWithInput = state == State::WaitingForHost || state == State::IoError;
+  if (mappedInput.hasTouchHardware() && canExitWithInput) {
+    TouchHeaderBackButton::drawCompact(renderer, title);
   } else {
+    CompactHeader::drawTitle(renderer, title);
+  }
+
+  if (preparing) {
+    renderMessage(tr(STR_USB_DRIVE_PREPARING), tr(STR_USB_DRIVE_EJECT_HINT));
+  } else if (forcedDisconnectRequested) {
+    renderMessage(tr(STR_USB_DRIVE_ERROR));
+  } else
     switch (state) {
       case State::WaitingForHost:
-        message = tr(STR_USB_DRIVE_WAITING);
+        renderMessage(tr(STR_USB_DRIVE_WAITING));
         break;
       case State::Connected:
-        message = tr(STR_USB_DRIVE_CONNECTED);
-        detail = tr(STR_USB_DRIVE_CONNECT_DELAY);
-        secondaryDetail = tr(STR_USB_DRIVE_EJECT_HINT);
+      case State::Accessed:
+        renderMessage(tr(STR_USB_DRIVE_CONNECTED), tr(STR_USB_DRIVE_EJECT_HINT));
         break;
       case State::IoError:
-        message = startFailed ? tr(STR_USB_DRIVE_START_ERROR) : tr(STR_USB_DRIVE_ERROR);
+        renderMessage(startFailed ? tr(STR_USB_DRIVE_START_ERROR) : tr(STR_USB_DRIVE_ERROR));
         break;
       case State::Ejected:
       case State::Disconnected:
       case State::Unsupported:
-        return;
+        break;
     }
-  }
 
+  if (state == State::WaitingForHost || state == State::IoError) {
+    const auto labels = mappedInput.mapLabels(mappedInput.withBackArrow(tr(STR_BACK)), "", "", "");
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  }
+  renderer.displayBuffer(screenTransitionRefresh.modeFor(0));
+}
+
+void UsbDriveActivity::renderMessage(const char* message, const char* detail) const {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  screen.setContentMarginFromScreen(fui::Insets{
-      static_cast<int16_t>(metrics.topPadding + metrics.headerHeight), static_cast<int16_t>(metrics.contentSidePadding),
-      static_cast<int16_t>(metrics.buttonHintsHeight), static_cast<int16_t>(metrics.contentSidePadding)});
-
-  auto messageStyle = screen.theme().smallText;
-  messageStyle.align = fui::TextAlign::Center;
-  messageStyle.bold = true;
-  messageStyle.maxLines = 2;
-  auto detailStyle = screen.theme().smallText;
-  detailStyle.align = fui::TextAlign::Center;
-  detailStyle.maxLines = 3;
-
-  const fui::Rect body = screen.body();
-  const int16_t messageHeight = fui::measureWrappedText(screen.target(), message, messageStyle, body.width).height;
-  const int16_t detailHeight =
-      detail ? fui::measureWrappedText(screen.target(), detail, detailStyle, body.width).height : 0;
-  const int16_t secondaryDetailHeight =
-      secondaryDetail ? fui::measureWrappedText(screen.target(), secondaryDetail, detailStyle, body.width).height : 0;
-  const int16_t gap = detail ? screen.theme().spaceMd : 0;
-  const int16_t secondaryGap = secondaryDetail ? screen.theme().spaceMd : 0;
-  const int16_t totalHeight =
-      static_cast<int16_t>(messageHeight + gap + detailHeight + secondaryGap + secondaryDetailHeight);
-  if (body.height > totalHeight) screen.spacer(static_cast<int16_t>((body.height - totalHeight) / 2));
-
-  screen.target().text(screen.takeTop(messageHeight, gap), message, messageStyle);
+  const Rect textArea{metrics.contentSidePadding, 0, renderer.getScreenWidth() - metrics.contentSidePadding * 2,
+                      renderer.getScreenHeight()};
+  int y = renderer.getScreenHeight() / 2 - renderer.getLineHeight(UI_10_FONT_ID);
+  y += UITheme::drawCenteredWrappedText(renderer, textArea, UI_10_FONT_ID, y, message, 2, true, EpdFontFamily::BOLD);
   if (detail) {
-    screen.target().text(screen.takeTop(detailHeight, secondaryGap), detail, detailStyle);
-  }
-  if (secondaryDetail) {
-    screen.target().text(screen.takeTop(secondaryDetailHeight), secondaryDetail, detailStyle);
+    y += metrics.verticalSpacing;
+    UITheme::drawCenteredWrappedText(renderer, textArea, UI_10_FONT_ID, y, detail, 3);
   }
 }
 
 void UsbDriveActivity::restartToHome() {
   if (restartRequested) return;
   restartRequested = true;
+#ifndef SIMULATOR
   Storage.endUsbDrive();
+#endif
+#ifdef SIMULATOR
+  activityManager.goHome();
+#else
   delay(20);
+  handoffUsbOtgToSerialJtag();
   restartToHomeAfterStorageHandoff();
+#endif
 }

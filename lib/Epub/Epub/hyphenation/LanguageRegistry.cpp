@@ -43,10 +43,10 @@ const EntryArray& entries() {
                                        {"spanish", "es", &spanishHyphenator},
                                        {"italian", "it", &italianHyphenator},
                                        {"polish", "pl", &polishHyphenator},
+                                       {"portuguese", "pt", &portugueseHyphenator},
                                        {"swedish", "sv", &swedishHyphenator},
                                        {"ukrainian", "uk", &ukrainianHyphenator},
-                                       {"finnish", "fi", &finnishHyphenator},
-                                       {"portuguese", "pt", &portugueseHyphenator}}};
+                                       {"finnish", "fi", &finnishHyphenator}}};
   return kEntries;
 }
 

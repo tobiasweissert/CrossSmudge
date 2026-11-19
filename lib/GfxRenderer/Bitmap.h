@@ -65,16 +65,20 @@ class Bitmap {
  public:
   static const char* errorToString(BmpReaderError err);
 
-  explicit Bitmap(HalFile& file, bool dithering = false, bool originalThresholds = false)
-      : file(file), dithering(dithering), originalThresholds(originalThresholds) {}
+  explicit Bitmap(HalFile& file, bool dithering = false, bool imageLevels = false)
+      : file(file), dithering(dithering), imageLevels(imageLevels) {}
   ~Bitmap();
   BmpReaderError parseHeaders();
   BmpReaderError readNextRow(uint8_t* data, uint8_t* rowBuffer) const;
-  BmpReaderError rewindToData() const;
-  // Unprocessed luminance of display-order row y (0 = top); leaves readNextRow()'s dither state alone.
+  // Display-order raw luminance at the current output size; does not advance
+  // sequential reading or dither state. rowBuffer still needs getRowBytes().
   BmpReaderError readRowGray(int y, uint8_t* gray, uint8_t* rowBuffer) const;
-  int getWidth() const { return width; }
-  int getHeight() const { return height; }
+  BmpReaderError rewindToData() const;
+  // Downsample high-color images before error diffusion. This is intentionally
+  // limited to smaller output dimensions; the renderer still handles upscale.
+  bool setDitheredOutputSize(int targetWidth, int targetHeight);
+  int getWidth() const { return outputWidth; }
+  int getHeight() const { return outputHeight; }
   bool isTopDown() const { return topDown; }
   bool hasGreyscale() const { return bpp > 1; }
   int getRowBytes() const { return rowBytes; }
@@ -87,7 +91,7 @@ class Bitmap {
 
   HalFile& file;
   bool dithering = false;
-  bool originalThresholds = false;
+  bool imageLevels = false;
   int width = 0;
   int height = 0;
   bool topDown = false;
@@ -96,12 +100,15 @@ class Bitmap {
   uint32_t colorsUsed = 0;
   bool nativePalette = false;  // true if all palette entries map to native gray levels
   int rowBytes = 0;
+  int outputWidth = 0;
+  int outputHeight = 0;
   uint8_t paletteLum[256] = {};
 
   // Dithering state (mutable for const methods)
   mutable int16_t* errorCurRow = nullptr;
   mutable int16_t* errorNextRow = nullptr;
-  mutable int prevRowY = -1;  // Track row progression for error propagation
+  mutable int sourceRowsRead = 0;
+  mutable int outputRowsRead = 0;
 
   mutable AtkinsonDitherer* atkinsonDitherer = nullptr;
   mutable FloydSteinbergDitherer* fsDitherer = nullptr;

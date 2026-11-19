@@ -3,7 +3,9 @@
 #include <ArduinoJson.h>
 #include <HalMemory.h>
 #include <Logging.h>
-#include <SecureHttpClient.h>
+#include "network/HttpDownloader.h"
+#include "network/HttpRedirectPolicy.h"
+#include <cstring>
 
 #include <string>
 
@@ -12,6 +14,37 @@
 int KOReaderSyncClient::lastHttpCode = 0;
 
 namespace {
+// Synchronous verified transport. Each exchange owns and closes its ESP HTTP
+// client; this facade keeps only bounded response bytes for the JSON consumer.
+class SyncHttpClient {
+  std::string url_, response_;
+  std::vector<HttpDownloader::Header> headers_;
+ public:
+  bool begin(const std::string& url) {
+    HttpRedirectPolicy::Url parsed;
+    if (!HttpRedirectPolicy::parseUrl(url, parsed)) return false;
+    url_ = url; return true;
+  }
+  void addHeader(const std::string& key, const std::string& value) { headers_.emplace_back(key, value); }
+  int GET() { return exchange("GET", nullptr); }
+  int sendRequest(const char* method, const std::string& body) { return exchange(method, &body); }
+  const std::string& getString() const { return response_; }
+  void end() { headers_.clear(); }
+ private:
+  int exchange(const char* method, const std::string* body) {
+    response_.clear();
+    HttpDownloader::DownloadOptions options;
+    options.headers = headers_; options.body = body; options.method = method;
+    int status = 0; options.statusOut = &status;
+    const auto result = HttpDownloader::streamUrl(url_, [&](const uint8_t* data, size_t len) {
+      if (len > 32768 - response_.size()) return false;
+      response_.append(reinterpret_cast<const char*>(data), len); return true;
+    }, nullptr, "", "", std::move(options));
+    if (result != HttpDownloader::OK && result != HttpDownloader::UNAUTHORIZED) return -1;
+    return status;
+  }
+};
+
 // Device identifier for CrossPoint reader
 constexpr char DEVICE_NAME[] = "CrossPoint";
 constexpr char DEVICE_ID[] = "crosspoint-reader";
@@ -25,7 +58,7 @@ constexpr uint32_t MIN_BLOCK_FOR_TLS = 20000;
 
 // Apply the shared KOSync auth headers after begin(). x-auth-* is the native
 // KOSync scheme; Basic auth is added for Calibre-Web-Automated compatibility.
-void applyAuthHeaders(freeink::SecureHttpClient& http) {
+void applyAuthHeaders(SyncHttpClient& http) {
   http.addHeader("Accept", "application/vnd.koreader.v1+json");
   http.addHeader("x-auth-user", KOREADER_STORE.getUsername());
   http.addHeader("x-auth-key", KOREADER_STORE.getMd5Password());
@@ -35,7 +68,7 @@ void applyAuthHeaders(freeink::SecureHttpClient& http) {
 // Caller-configured headers (e.g. a Cloudflare Access service token) applied
 // on top of the KOSync auth scheme, including on createUser() which has no
 // KOSync credentials yet.
-void applyCustomHeaders(freeink::SecureHttpClient& http) {
+void applyCustomHeaders(SyncHttpClient& http) {
   for (const auto& header : KOREADER_STORE.getCustomHeaders()) {
     if (!header.name.empty()) http.addHeader(header.name, header.value);
   }
@@ -65,8 +98,7 @@ KOReaderSyncClient::Error KOReaderSyncClient::authenticate() {
   LOG_DBG("KOSync", "Authenticating: %s (heap: %u)", url.c_str(), (unsigned)ESP.getFreeHeap());
   if (insufficientHeap()) return LOW_MEMORY;
 
-  freeink::SecureHttpClient http;
-  http.setInsecure();
+  SyncHttpClient http;
   if (!http.begin(url)) {
     LOG_ERR("KOSync", "Bad URL: %s", url.c_str());
     return NETWORK_ERROR;
@@ -83,7 +115,14 @@ KOReaderSyncClient::Error KOReaderSyncClient::authenticate() {
   // Any 2xx is success. The reference kosync server answers 200, but
   // KOSync-compatible implementations differ (BookLore/grimmory is a Spring
   // service and uses the idiomatic codes) — see issue #2876.
-  if (httpCode >= 200 && httpCode < 300) return OK;
+  if (httpCode >= 200 && httpCode < 300) {
+    JsonDocument doc;
+    if (deserializeJson(doc, http.getString().c_str())) return JSON_ERROR;
+    if (!doc.is<JsonObject>()) return INVALID_AUTH_RESPONSE;
+    const char* authorized = doc["authorized"] | nullptr;
+    if (authorized && std::strcmp(authorized, "OK") != 0) return INVALID_AUTH_RESPONSE;
+    return OK;
+  }
   if (httpCode == 401) return AUTH_FAILED;
   return SERVER_ERROR;
 }
@@ -105,8 +144,7 @@ KOReaderSyncClient::Error KOReaderSyncClient::createUser() {
   std::string body;
   serializeJson(doc, body);
 
-  freeink::SecureHttpClient http;
-  http.setInsecure();
+  SyncHttpClient http;
   if (!http.begin(url)) {
     LOG_ERR("KOSync", "Bad URL: %s", url.c_str());
     return NETWORK_ERROR;
@@ -139,8 +177,7 @@ KOReaderSyncClient::Error KOReaderSyncClient::getProgress(const std::string& doc
   LOG_DBG("KOSync", "Getting progress: %s (heap: %u)", url.c_str(), (unsigned)ESP.getFreeHeap());
   if (insufficientHeap()) return LOW_MEMORY;
 
-  freeink::SecureHttpClient http;
-  http.setInsecure();
+  SyncHttpClient http;
   if (!http.begin(url)) {
     LOG_ERR("KOSync", "Bad URL: %s", url.c_str());
     return NETWORK_ERROR;
@@ -226,7 +263,7 @@ KOReaderSyncClient::Error KOReaderSyncClient::updateProgress(const KOReaderProgr
   // Build JSON body
   JsonDocument doc;
   doc["document"] = progress.document;
-  if (progress.metadata.has_value()) {
+  if (progress.metadata.has_value() && KOREADER_STORE.getSendMetadata()) {
     auto meta = doc["metadata"].to<JsonObject>();
     meta["filename"] = progress.metadata->filename;
     meta["title"] = progress.metadata->title;
@@ -271,10 +308,8 @@ KOReaderSyncClient::Error KOReaderSyncClient::updateProgress(const KOReaderProgr
   std::string body;
   serializeJson(doc, body);
 
-  LOG_DBG("KOSync", "Request body: %s", body.c_str());
 
-  freeink::SecureHttpClient http;
-  http.setInsecure();
+  SyncHttpClient http;
   if (!http.begin(url)) {
     LOG_ERR("KOSync", "Bad URL: %s", url.c_str());
     return NETWORK_ERROR;
@@ -308,6 +343,8 @@ const char* KOReaderSyncClient::errorString(Error error) {
       return "Network error";
     case AUTH_FAILED:
       return "Authentication failed";
+    case INVALID_AUTH_RESPONSE:
+      return "Invalid authentication response";
     case SERVER_ERROR:
       return "Server error (try again later)";
     case JSON_ERROR:

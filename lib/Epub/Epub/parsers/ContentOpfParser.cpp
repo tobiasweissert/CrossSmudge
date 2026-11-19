@@ -17,6 +17,7 @@ constexpr char MEDIA_TYPE_NCX[] = "application/x-dtbncx+xml";
 constexpr char MEDIA_TYPE_CSS[] = "text/css";
 constexpr char MEDIA_TYPE_IMAGE_PREFIX[] = "image/";
 constexpr char itemCacheFile[] = "/.items.bin";
+constexpr size_t ITEM_INDEX_ARENA_SLAB_BYTES = 4096;
 
 bool startsWithImageMediaType(const std::string& mediaType) {
   constexpr size_t prefixLen = sizeof(MEDIA_TYPE_IMAGE_PREFIX) - 1;
@@ -109,12 +110,123 @@ std::optional<float> parseFiniteFloat(const std::string& value) {
   if (end == value.c_str() || *end != '\0' || !std::isfinite(parsed)) return std::nullopt;
   return parsed;
 }
+
+bool readItemIdMatches(HalFile& file, const std::string& targetId, bool& matches) {
+  uint32_t storedLength = 0;
+  if (!serialization::tryReadPod(file, storedLength)) {
+    return false;
+  }
+
+  const uint64_t idEnd = static_cast<uint64_t>(file.position()) + storedLength;
+  if (idEnd > file.size()) {
+    return false;
+  }
+
+  matches = storedLength == targetId.size();
+  if (!matches) {
+    return file.seekCur(static_cast<int64_t>(storedLength));
+  }
+
+  constexpr size_t COMPARE_BUFFER_SIZE = 64;
+  uint8_t compareBuffer[COMPARE_BUFFER_SIZE];
+  size_t compared = 0;
+  while (compared < storedLength) {
+    const size_t chunkSize = std::min(COMPARE_BUFFER_SIZE, static_cast<size_t>(storedLength) - compared);
+    if (file.read(compareBuffer, chunkSize) != chunkSize) {
+      return false;
+    }
+    if (std::memcmp(compareBuffer, targetId.data() + compared, chunkSize) != 0) {
+      matches = false;
+    }
+    compared += chunkSize;
+  }
+  return true;
+}
 }  // namespace
 
+bool ContentOpfParser::appendItemIndexEntry(const ItemIndexEntry& entry) {
+  if (!itemIndexTail || itemIndexTail->count == ITEM_INDEX_CHUNK_CAPACITY) {
+    auto* const chunk = arenaNew<ItemIndexChunk>(itemIndexArena);
+    if (!chunk) {
+      return false;
+    }
+    if (itemIndexTail) {
+      itemIndexTail->next = chunk;
+    } else {
+      itemIndexHead = chunk;
+    }
+    itemIndexTail = chunk;
+    ++itemIndexChunkCount;
+  }
+
+  itemIndexTail->entries[itemIndexTail->count++] = entry;
+  ++itemIndexCount;
+  return true;
+}
+
+void ContentOpfParser::sortItemIndexChunks() {
+  for (auto* chunk = itemIndexHead; chunk; chunk = chunk->next) {
+    std::sort(chunk->entries, chunk->entries + chunk->count, itemIndexEntryLess);
+  }
+}
+
+bool ContentOpfParser::findItemHref(const std::string& idref, std::string& href) {
+  if (!tempItemStore) {
+    return false;
+  }
+
+  const uint64_t targetHash = fnvHash(idref);
+  const uint16_t targetLen = static_cast<uint16_t>(idref.size());
+  const ItemIndexEntry target{targetHash, targetLen, 0};
+  for (auto* chunk = itemIndexHead; chunk; chunk = chunk->next) {
+    auto* const begin = chunk->entries;
+    auto* const end = begin + chunk->count;
+    auto* it = std::lower_bound(begin, end, target, itemIndexEntryLess);
+    while (it != end && it->idHash == targetHash && it->idLen == targetLen) {
+      if (!tempItemStore.seek(it->fileOffset)) {
+        LOG_ERR("COF", "Failed seeking manifest index row at %u", static_cast<unsigned>(it->fileOffset));
+        return false;
+      }
+
+      uint64_t rowHash = 0;
+      uint16_t rowLen = 0;
+      if (!serialization::tryReadPod(tempItemStore, rowHash) || !serialization::tryReadPod(tempItemStore, rowLen)) {
+        LOG_ERR("COF", "Failed reading manifest index row at %u", static_cast<unsigned>(it->fileOffset));
+        return false;
+      }
+
+      if (rowHash == targetHash && rowLen == targetLen) {
+        bool idMatches = false;
+        if (!readItemIdMatches(tempItemStore, idref, idMatches)) {
+          LOG_ERR("COF", "Failed reading manifest item ID at %u", static_cast<unsigned>(it->fileOffset));
+          return false;
+        }
+        if (idMatches && !serialization::tryReadString(tempItemStore, href)) {
+          LOG_ERR("COF", "Failed reading manifest item href at %u", static_cast<unsigned>(it->fileOffset));
+          return false;
+        }
+        if (idMatches) {
+          return true;
+        }
+      }
+      ++it;
+    }
+  }
+  return false;
+}
+
 bool ContentOpfParser::setup() {
+  if (!itemIndexArena.init(ITEM_INDEX_ARENA_SLAB_BYTES)) {
+    LOG_ERR("COF", "Failed to allocate manifest index arena (%u bytes)",
+            static_cast<unsigned>(ITEM_INDEX_ARENA_SLAB_BYTES));
+    lowMemoryFailure = true;
+    return false;
+  }
+
   parser = XML_ParserCreate(nullptr);
   if (!parser) {
     LOG_DBG("COF", "Couldn't allocate memory for parser");
+    lowMemoryFailure = true;
     return false;
   }
 
@@ -141,7 +253,7 @@ ContentOpfParser::~ContentOpfParser() {
 size_t ContentOpfParser::write(const uint8_t data) { return write(&data, 1); }
 
 size_t ContentOpfParser::write(const uint8_t* buffer, const size_t size) {
-  if (!parser) return 0;
+  if (!parser || parseFailed) return 0;
 
   const uint8_t* currentBufferPos = buffer;
   auto remainingInBuffer = size;
@@ -151,6 +263,7 @@ size_t ContentOpfParser::write(const uint8_t* buffer, const size_t size) {
 
     if (!buf) {
       LOG_ERR("COF", "Couldn't allocate memory for buffer");
+      lowMemoryFailure = true;
       destroyXmlParser(parser);
       return 0;
     }
@@ -158,9 +271,12 @@ size_t ContentOpfParser::write(const uint8_t* buffer, const size_t size) {
     const auto toRead = remainingInBuffer < 1024 ? remainingInBuffer : 1024;
     memcpy(buf, currentBufferPos, toRead);
 
-    if (XML_ParseBuffer(parser, static_cast<int>(toRead), remainingSize == toRead) == XML_STATUS_ERROR) {
-      LOG_DBG("COF", "Parse error at line %lu: %s", XML_GetCurrentLineNumber(parser),
-              XML_ErrorString(XML_GetErrorCode(parser)));
+    const XML_Status parseStatus = XML_ParseBuffer(parser, static_cast<int>(toRead), remainingSize == toRead);
+    if (parseStatus != XML_STATUS_OK) {
+      if (!parseFailed) {
+        LOG_DBG("COF", "Parse error at line %lu: %s", XML_GetCurrentLineNumber(parser),
+                XML_ErrorString(XML_GetErrorCode(parser)));
+      }
       destroyXmlParser(parser);
       return 0;
     }
@@ -246,24 +362,17 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
       LOG_ERR("COF", "Couldn't open temp items file for reading. This is probably going to be a fatal error.");
     }
 
-    // Sort the (unconditionally-built) item index so every idref lookup uses binary
-    // search. Without this, small/medium manifests fell back to an O(spine × manifest)
-    // linear rescan of .items.bin per itemref (up to ~200ms/item at large scale).
-    if (!self->itemIndex.empty()) {
-      std::sort(self->itemIndex.begin(), self->itemIndex.end(), [](const ItemIndexEntry& a, const ItemIndexEntry& b) {
-        return a.idHash < b.idHash || (a.idHash == b.idHash && a.idLen < b.idLen);
-      });
-      self->useItemIndex = true;
-      LOG_DBG("COF", "Using fast index for %zu manifest items", self->itemIndex.size());
-    }
+    // Sort each fixed-capacity chunk so every idref lookup can use binary search.
+    self->sortItemIndexChunks();
+    LOG_DBG("COF", "Using chunked manifest index for %zu items in %zu chunks (arena high-water=%u bytes)",
+            self->itemIndexCount, self->itemIndexChunkCount, static_cast<unsigned>(self->itemIndexArena.used()));
     return;
   }
 
   if (self->state == IN_PACKAGE && xmlLocalNameEquals(name, "guide")) {
     self->state = IN_GUIDE;
     // TODO Remove print
-    LOG_DBG("COF", "Entering guide state.");
-    if (self->cache && !Storage.openFileForRead("COF", self->cachePath + itemCacheFile, self->tempItemStore)) {
+    if (!Storage.openFileForRead("COF", self->cachePath + itemCacheFile, self->tempItemStore)) {
       LOG_ERR("COF", "Couldn't open temp items file for reading. This is probably going to be a fatal error.");
     }
     return;
@@ -331,12 +440,24 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
       entry.idHash = fnvHash(itemId);
       entry.idLen = static_cast<uint16_t>(itemId.size());
       entry.fileOffset = static_cast<uint32_t>(self->tempItemStore.position());
-      self->itemIndex.push_back(entry);
+      if (!self->appendItemIndexEntry(entry)) {
+        LOG_ERR("COF", "Manifest index arena OOM at %zu items", self->itemIndexCount);
+        self->parseFailed = true;
+        self->lowMemoryFailure = true;
+        if (self->parser) {
+          XML_StopParser(self->parser, XML_FALSE);
+        }
+        return;
+      }
     }
 
     if (self->tempItemStore) {
-      serialization::writeString(self->tempItemStore, itemId);
-      serialization::writeString(self->tempItemStore, href);
+    // Write manifest rows down to SD card. The full ID makes hash collisions
+    // safe while the in-memory index keeps idref lookup fast.
+    serialization::writePod(self->tempItemStore, fnvHash(itemId));
+    serialization::writePod(self->tempItemStore, static_cast<uint16_t>(itemId.size()));
+    serialization::writeString(self->tempItemStore, itemId);
+    serialization::writeString(self->tempItemStore, href);
     }
 
     if (itemId == self->coverItemId) {
@@ -359,7 +480,7 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
     }
 
     // Collect CSS files
-    if (mediaType == MEDIA_TYPE_CSS) {
+    if (self->collectCssFiles && mediaType == MEDIA_TYPE_CSS) {
       self->cssFiles.push_back(href);
     }
 
@@ -368,7 +489,6 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
       // Properties is space-separated, check if "nav" is present as a word
       if (properties == "nav" || properties.find("nav ") == 0 || properties.find(" nav") != std::string::npos) {
         self->tocNavPath = href;
-        LOG_DBG("COF", "Found EPUB 3 nav document: %s", href.c_str());
       }
     }
 
@@ -390,47 +510,7 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
         if (strcmp(atts[i], "idref") == 0) {
           const std::string idref = atts[i + 1];
           std::string href;
-          bool found = false;
-
-          if (self->useItemIndex) {
-            // Fast path: binary search
-            uint32_t targetHash = fnvHash(idref);
-            uint16_t targetLen = static_cast<uint16_t>(idref.size());
-
-            auto it = std::lower_bound(self->itemIndex.begin(), self->itemIndex.end(),
-                                       ItemIndexEntry{targetHash, targetLen, 0},
-                                       [](const ItemIndexEntry& a, const ItemIndexEntry& b) {
-                                         return a.idHash < b.idHash || (a.idHash == b.idHash && a.idLen < b.idLen);
-                                       });
-
-            // Check for match (may need to check a few due to hash collisions)
-            while (it != self->itemIndex.end() && it->idHash == targetHash) {
-              self->tempItemStore.seek(it->fileOffset);
-              std::string itemId;
-              serialization::readString(self->tempItemStore, itemId);
-              if (itemId == idref) {
-                serialization::readString(self->tempItemStore, href);
-                found = true;
-                break;
-              }
-              ++it;
-            }
-          } else {
-            // Fallback linear scan, only reached when the index is empty (no manifest
-            // items). The fast binary-search path above is used for all real manifests.
-            self->tempItemStore.seek(0);
-            std::string itemId;
-            while (self->tempItemStore.available()) {
-              serialization::readString(self->tempItemStore, itemId);
-              serialization::readString(self->tempItemStore, href);
-              if (itemId == idref) {
-                found = true;
-                break;
-              }
-            }
-          }
-
-          if (found && self->cache) {
+          if (self->findItemHref(idref, href)) {
             self->cache->createSpineEntry(href);
           }
         }
@@ -456,9 +536,11 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
       if (type == "start" && !self->hasExplicitStartReference) {
         LOG_DBG("COF", "Found %s reference in guide: %s", type.c_str(), guideHref.c_str());
         self->textReferenceHref = guideHref;
-        self->hasExplicitStartReference = type == "start";
+        self->hasExplicitStartReference = true;
+      } else if (type == "toc" && self->guideTocPageHref.empty()) {
+        const auto fragmentPos = guideHref.find('#');
+        self->guideTocPageHref = guideHref.substr(0, fragmentPos);
       } else if ((type == "cover" || type == "cover-page") && self->guideCoverPageHref.empty()) {
-        LOG_DBG("COF", "Found cover reference in guide: %s", guideHref.c_str());
         self->guideCoverPageHref = guideHref;
       }
     }

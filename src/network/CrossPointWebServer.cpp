@@ -1,4 +1,12 @@
 #include "CrossPointWebServer.h"
+#include "AppVersion.h"
+#include "activities/apps/lua/AppPackage.h"
+#include "activities/boot_sleep/ImageFolderIndex.h"
+#include "html/ApplicationsPageHtml.generated.h"
+#include "html/LogoPng.generated.h"
+#include "html/StyleCss.generated.h"
+#include "util/StringUtils.h"
+
 
 #include <ArduinoJson.h>
 #include <BoardConfig.h>
@@ -60,6 +68,8 @@
 #include "html/js/jszip_minJs.generated.h"
 #include "html/js/plugin_hostJs.generated.h"
 #include "util/BookCacheUtils.h"
+#include "util/BookMoveUtils.h"
+#include "activities/home/BookActions.h"
 #include "util/DictionaryRegistry.h"
 #include "util/FirmwareIdentity.h"
 #include "util/PluginHttp.h"
@@ -71,6 +81,23 @@ static void sendStaticContent(WebServer* server, const char* data, size_t len, c
                               const char* contentType);
 
 namespace {
+// Extend upstream credential families without weakening its FAT alias and
+// canonical-path checks. Prefix matching also protects temp/backup siblings.
+bool networkCredentialPath(const char* path) {
+  std::string mapped(path);
+  for (char& c : mapped) if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+  const auto mapFamily = [&](const char* from, const char* to) {
+    size_t at = 0;
+    while ((at = mapped.find(from, at)) != std::string::npos) {
+      mapped.replace(at, strlen(from), to);
+      at += strlen(to);
+    }
+  };
+  mapFamily("opds_tokens.json", "opds.json");
+  mapFamily("lcp_passphrases.json", "koreader.json");
+  return protectedpaths::isSensitivePath(mapped.c_str());
+}
+
 // Arduino's WebServer retains parsed request arguments until the next request.
 // For JSON POSTs, that includes the complete "plain" body. Expose a narrowly
 // scoped release operation so large request bodies do not remain resident
@@ -446,6 +473,17 @@ void CrossPointWebServer::begin() {
   server->addHandler(new WebDAVHandler());  // Note: WebDAVHandler will be deleted by WebServer when server is stopped
   LOG_DBG("WEB", "WebDAV handler initialized");
 
+  // Application management endpoints
+  server->on("/applications", HTTP_GET, [this] { handleApplicationsPage(); });
+  server->on("/api/applications", HTTP_GET, [this] { handleApplicationsList(); });
+  server->on("/api/applications/files", HTTP_GET, [this] { handleApplicationsFileList(); });
+  server->on("/api/applications/download", HTTP_GET, [this] { handleApplicationsFileDownload(); });
+  server->on("/api/applications/upload", HTTP_POST, [this] { handleAppUpload(); }, [this] { handleAppUploadData(); });
+  server->on("/api/applications/delete", HTTP_POST, [this] { handleAppDelete(); });
+
+  server->on("/style.css", HTTP_GET, [this] { handleStyleCss(); });
+  server->on("/logo.png", HTTP_GET, [this] { handleLogo(); });
+
   server->begin();
 
   // Start WebSocket server for fast binary uploads
@@ -717,7 +755,7 @@ void CrossPointWebServer::handleStatus() const {
   const String ipAddr = apMode ? WiFi.softAPIP().toString() : WiFi.localIP().toString();
 
   JsonDocument doc;
-  doc["version"] = CROSSPOINT_VERSION;
+  doc["version"] = CROSSSMUDGE_VERSION;
   doc["firmwareFamily"] = firmwareidentity::FAMILY;
   doc["pluginApi"] = firmwareidentity::PLUGIN_API_VERSION;
   doc["pluginCapabilities"] = firmwareidentity::PLUGIN_CAPABILITIES;
@@ -913,7 +951,7 @@ void CrossPointWebServer::handleDownload() const {
   }
 
   const String itemName = itemPath.substring(itemPath.lastIndexOf('/') + 1);
-  if (itemName.startsWith(".") || protectedpaths::isSensitivePath(itemPath.c_str())) {
+  if (itemName.startsWith(".") || networkCredentialPath(itemPath.c_str())) {
     server->send(403, "text/plain", "Cannot access system files");
     return;
   }
@@ -1051,7 +1089,7 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
     String filePath = state.path;
     if (!filePath.endsWith("/")) filePath += "/";
     filePath += state.fileName;
-    if (protectedpaths::isSensitivePath(filePath.c_str())) {
+    if (networkCredentialPath(filePath.c_str())) {
       state.error = "Cannot write protected items";
       return;
     }
@@ -1156,7 +1194,7 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
                                    : "Failed to replace the existing file";
           if (keepStaged) {
             // The original is gone: drop its cache and Library entry.
-            clearBookCache(dest.c_str());
+            BookActions::clearBookCache(dest.c_str());
             if (library::isLibraryBookFile(dest.c_str())) library::markLibraryIndexDirty();
           }
         }
@@ -1177,7 +1215,7 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
         String filePath = state.path;
         if (!filePath.endsWith("/")) filePath += "/";
         filePath += state.fileName;
-        clearBookCache(filePath.c_str());
+        BookActions::clearBookCache(filePath.c_str());
         if (library::isLibraryBookFile(filePath.c_str())) library::markLibraryIndexDirty();
       }
     }
@@ -1322,7 +1360,7 @@ void CrossPointWebServer::handleRename() const {
     newPath += "/";
   }
   newPath += newName;
-  if (protectedpaths::isSensitivePath(itemPath.c_str()) || protectedpaths::isSensitivePath(newPath.c_str())) {
+  if (networkCredentialPath(itemPath.c_str()) || networkCredentialPath(newPath.c_str())) {
     file.close();
     server->send(403, "text/plain", "Cannot move protected item");
     return;
@@ -1334,16 +1372,23 @@ void CrossPointWebServer::handleRename() const {
     return;
   }
 
-  clearBookCache(itemPath.c_str());
-  file.close();
-  const bool success = ClippingStore::moveBook(itemPath.c_str(), newPath.c_str());
+  // Do not clear progress/stats or call clipping moveBook (it renames the book).
+  if (!file.close()) {
+    server->send(500, "text/plain", "Failed to close file");
+    return;
+  }
+  const auto moved = BookMoveUtils::moveFile(itemPath.c_str(), newPath.c_str());
+  const bool success = moved == BookMoveUtils::RenameMigrationResult::Success;
 
   if (success) {
     LOG_DBG("WEB", "Renamed file: %s -> %s", itemPath.c_str(), newPath.c_str());
     server->send(200, "text/plain", "Renamed successfully");
   } else {
     LOG_ERR("WEB", "Failed to rename file: %s -> %s", itemPath.c_str(), newPath.c_str());
-    server->send(500, "text/plain", "Failed to rename file");
+    server->send(moved == BookMoveUtils::RenameMigrationResult::Uncertain ? 409 : 500, "text/plain",
+                 moved == BookMoveUtils::RenameMigrationResult::Uncertain
+                     ? "Move outcome uncertain; recovery records retained. Do not retry before reviewed recovery."
+                     : "Failed to rename file");
   }
 }
 
@@ -1415,7 +1460,7 @@ void CrossPointWebServer::handleMove() const {
     newPath += "/";
   }
   newPath += itemName;
-  if (protectedpaths::isSensitivePath(itemPath.c_str()) || protectedpaths::isSensitivePath(newPath.c_str())) {
+  if (networkCredentialPath(itemPath.c_str()) || networkCredentialPath(newPath.c_str())) {
     file.close();
     server->send(403, "text/plain", "Cannot move protected item");
     return;
@@ -1432,16 +1477,23 @@ void CrossPointWebServer::handleMove() const {
     return;
   }
 
-  clearBookCache(itemPath.c_str());
-  file.close();
-  const bool success = ClippingStore::moveBook(itemPath.c_str(), newPath.c_str());
+  // Do not clear progress/stats or call clipping moveBook (it renames the book).
+  if (!file.close()) {
+    server->send(500, "text/plain", "Failed to close file");
+    return;
+  }
+  const auto moved = BookMoveUtils::moveFile(itemPath.c_str(), newPath.c_str());
+  const bool success = moved == BookMoveUtils::RenameMigrationResult::Success;
 
   if (success) {
     LOG_DBG("WEB", "Moved file: %s -> %s", itemPath.c_str(), newPath.c_str());
     server->send(200, "text/plain", "Moved successfully");
   } else {
     LOG_ERR("WEB", "Failed to move file: %s -> %s", itemPath.c_str(), newPath.c_str());
-    server->send(500, "text/plain", "Failed to move file");
+    server->send(moved == BookMoveUtils::RenameMigrationResult::Uncertain ? 409 : 500, "text/plain",
+                 moved == BookMoveUtils::RenameMigrationResult::Uncertain
+                     ? "Move outcome uncertain; recovery records retained. Do not retry before reviewed recovery."
+                     : "Failed to move file");
   }
 }
 
@@ -1500,7 +1552,7 @@ void CrossPointWebServer::handleDelete() const {
     const String itemName = itemPath.substring(itemPath.lastIndexOf('/') + 1);
 
     // Credential stores are protected. Hidden (dot-named) items can be deleted.
-    if (protectedpaths::isSensitivePath(itemPath.c_str())) {
+    if (networkCredentialPath(itemPath.c_str())) {
       failedItems += itemPath + " (protected file); ";
       allSuccess = false;
       continue;
@@ -1545,7 +1597,7 @@ void CrossPointWebServer::handleDelete() const {
     } else {
       // It's a file (or couldn't open as dir) — remove file
       if (f) f.close();
-      success = removeBookFile(itemPath.c_str());
+      success = BookActions::deleteFile(itemPath.c_str());
     }
 
     if (!success) {
@@ -1607,11 +1659,19 @@ void CrossPointWebServer::handleGetSettings() const {
         const bool toggle = s.enumStringValues.empty() && labels.size() == 2 && labels[0] == StrId::STR_STATE_OFF &&
                             labels[1] == StrId::STR_STATE_ON;
         doc["type"] = toggle ? "toggle" : "enum";
-        if (s.valuePtr) {
-          doc["value"] = static_cast<int>(SETTINGS.*(s.valuePtr));
-        } else if (s.valueGetter) {
-          doc["value"] = static_cast<int>(s.valueGetter());
+        // Wire values are display indexes, never owner raw enum bytes.
+        const int raw = s.valuePtr ? SETTINGS.*(s.valuePtr) : (s.valueGetter ? s.valueGetter() : -1);
+        const size_t count = settingEnumOptionCount(s);
+        if (!s.enumRawValues.empty() && s.enumRawValues.size() != count) return;
+        int display = -1;
+        for (size_t i = 0; i < count; ++i) {
+          if (raw == (s.enumRawValues.empty() ? static_cast<int>(i) : s.enumRawValues[i])) {
+            display = static_cast<int>(i);
+            break;
+          }
         }
+        if (display < 0) doc["value"] = nullptr;
+        else doc["value"] = display;
         if (toggle) break;
         JsonArray options = doc["options"].to<JsonArray>();
         if (!s.enumStringValues.empty()) {
@@ -1627,7 +1687,9 @@ void CrossPointWebServer::handleGetSettings() const {
       }
       case SettingType::VALUE: {
         doc["type"] = "value";
-        if (s.valuePtr) {
+        if (s.value16Ptr) {
+          doc["value"] = static_cast<int>(SETTINGS.*(s.value16Ptr));
+        } else if (s.valuePtr) {
           doc["value"] = static_cast<int>(SETTINGS.*(s.valuePtr));
         }
         doc["min"] = s.valueRange.min;
@@ -1697,38 +1759,42 @@ void CrossPointWebServer::handlePostSettings() {
 
     switch (s.type) {
       case SettingType::TOGGLE: {
-        const int val = doc[s.key].as<int>() ? 1 : 0;
-        if (s.valuePtr) {
-          SETTINGS.*(s.valuePtr) = val;
-        }
+        if (!doc[s.key].is<bool>() && !doc[s.key].is<int>()) break;
+        const int val = doc[s.key].is<bool>() ? (doc[s.key].as<bool>() ? 1 : 0) : doc[s.key].as<int>();
+        if (val != 0 && val != 1) break;
+        if (s.valuePtr) SETTINGS.*(s.valuePtr) = static_cast<uint8_t>(val);
+        else if (s.valueSetter) s.valueSetter(static_cast<uint8_t>(val));
+        else break;
         applied++;
         break;
       }
       case SettingType::ENUM: {
-        const int val = doc[s.key].as<int>();
-        const int maxVal = s.enumStringValues.empty() ? static_cast<int>(s.enumLabels().size())
-                                                      : static_cast<int>(s.enumStringValues.size());
-        if (val >= 0 && val < maxVal) {
-          if (s.valuePtr) {
-            SETTINGS.*(s.valuePtr) = static_cast<uint8_t>(val);
-          } else if (s.valueSetter) {
-            s.valueSetter(static_cast<uint8_t>(val));
-          }
-          applied++;
-        }
+        if (!doc[s.key].is<int>() && !doc[s.key].is<bool>()) break;
+        const int val = doc[s.key].is<bool>() ? (doc[s.key].as<bool>() ? 1 : 0) : doc[s.key].as<int>();
+        const size_t count = settingEnumOptionCount(s);
+        if (val < 0 || static_cast<size_t>(val) >= count || val > UINT8_MAX ||
+            (!s.enumRawValues.empty() && s.enumRawValues.size() != count)) break;
+        const uint8_t raw = s.enumRawValues.empty() ? static_cast<uint8_t>(val) : s.enumRawValues[val];
+        if (s.valuePtr) SETTINGS.*(s.valuePtr) = raw;
+        else if (s.valueSetter) s.valueSetter(raw);
+        else break;
+        applied++;
         break;
       }
       case SettingType::VALUE: {
+        if (!doc[s.key].is<int>()) break;
         const int val = doc[s.key].as<int>();
-        if (val >= s.valueRange.min && val <= s.valueRange.max) {
-          if (s.valuePtr) {
-            SETTINGS.*(s.valuePtr) = static_cast<uint8_t>(val);
-          }
-          applied++;
-        }
+        if (val < s.valueRange.min || val > s.valueRange.max || !s.valueRange.step ||
+            (val - s.valueRange.min) % s.valueRange.step != 0) break;
+        if (s.value16Ptr) SETTINGS.*(s.value16Ptr) = static_cast<uint16_t>(val);
+        else if (s.valuePtr && val <= UINT8_MAX) SETTINGS.*(s.valuePtr) = static_cast<uint8_t>(val);
+        else break;
+        applied++;
         break;
       }
       case SettingType::STRING: {
+        // GET's masked null is not an instruction to erase a credential.
+        if (!doc[s.key].is<const char*>()) break;
         const std::string val = doc[s.key].as<std::string>();
         if (s.stringSetter) {
           s.stringSetter(val);
@@ -1745,7 +1811,10 @@ void CrossPointWebServer::handlePostSettings() {
     }
   }
 
-  SETTINGS.saveToFile();
+  if (!SETTINGS.saveToFile()) {
+    server->send(500, "text/plain", "Settings persistence failed; recovery records retained");
+    return;
+  }
 
   LOG_DBG("WEB", "Applied %d setting(s)", applied);
   server->send(200, "text/plain", String("Applied ") + String(applied) + " setting(s)");
@@ -2481,7 +2550,7 @@ void CrossPointWebServer::handleFetch() {
   size_t segmentLimit = req["maxBytes"] | 0;
   static constexpr size_t FETCH_MAX_SEGMENT_SIZE = 4 * 1024 * 1024;
   if (segmentLimit > FETCH_MAX_SEGMENT_SIZE) segmentLimit = FETCH_MAX_SEGMENT_SIZE;
-  if (url.empty() || !protectedpaths::isPluginPath(dest)) {
+  if (url.empty() || (!protectedpaths::isPluginPath(dest) || networkCredentialPath(dest.c_str()))) {
     server->send(400, "application/json", "{\"error\":\"bad url/dest\"}");
     return;
   }
@@ -2786,7 +2855,7 @@ void CrossPointWebServer::handlePluginFsUpload() {
         return;
       }
       const String plugin = server->arg("plugin");
-      if (!safeComponent(plugin) || !protectedpaths::isPluginPath(st.path)) {
+      if (!safeComponent(plugin) || (!protectedpaths::isPluginPath(st.path) || networkCredentialPath(st.path.c_str()))) {
         LOG_ERR("WEB", "Rejected plugin file write: plugin='%s' path='%s'", plugin.c_str(), st.path.c_str());
         fail(400, "bad path");
         return;
@@ -2866,7 +2935,7 @@ void CrossPointWebServer::handleBookKey() {
   const int64_t expires = req["expires"] | static_cast<int64_t>(0);
   uint8_t key[bookkey::MAX_KEY_LEN];
   const int32_t n = freeink::content::base64Decode(keyB64, strlen(keyB64), key, sizeof(key));
-  if (!protectedpaths::isPluginPath(path) || (n != 16 && n != 32) || expires < 0) {
+  if ((!protectedpaths::isPluginPath(path) || networkCredentialPath(path.c_str())) || (n != 16 && n != 32) || expires < 0) {
     server->send(400, "application/json", "{\"error\":\"bad path/key\"}");
     return;
   }
@@ -3094,7 +3163,7 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
           String filePath = wsUploadPath;
           if (!filePath.endsWith("/")) filePath += "/";
           filePath += wsUploadFileName;
-          if (protectedpaths::isSensitivePath(filePath.c_str())) {
+          if (networkCredentialPath(filePath.c_str())) {
             wsServer->sendTXT(num, "ERROR:Cannot write protected items");
             return;
           }
@@ -3127,7 +3196,7 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
             wsLastCompleteSize = 0;
             wsLastCompleteAt = millis();
             LOG_DBG("WS", "Zero-byte upload complete: %s", filePath.c_str());
-            clearBookCache(filePath.c_str());
+            BookActions::clearBookCache(filePath.c_str());
             if (library::isLibraryBookFile(filePath.c_str())) library::markLibraryIndexDirty();
             wsServer->sendTXT(num, "DONE");
             wsLastProgressSent = 0;
@@ -3197,7 +3266,7 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
         String filePath = wsUploadPath;
         if (!filePath.endsWith("/")) filePath += "/";
         filePath += wsUploadFileName;
-        clearBookCache(filePath.c_str());
+        BookActions::clearBookCache(filePath.c_str());
         if (library::isLibraryBookFile(filePath.c_str())) library::markLibraryIndexDirty();
 
         wsServer->sendTXT(num, "DONE");
@@ -3490,4 +3559,490 @@ void CrossPointWebServer::handleFontDelete() {
     server->send(500, "application/json", "{\"error\":\"Delete failed\"}");
     LOG_ERR("WEB", "Failed to delete font family: %s", familyName);
   }
+}
+
+namespace {
+class FontListJsonWriter {
+ public:
+  explicit FontListJsonWriter(WebServer& server) : server_(server) {}
+
+  void append(const char* text) { append(text, strlen(text)); }
+
+  void append(const char* text, size_t textLength) {
+    while (textLength > 0) {
+      if (length_ == sizeof(buffer_)) flush();
+      const size_t copyLength = std::min(textLength, sizeof(buffer_) - length_);
+      memcpy(buffer_ + length_, text, copyLength);
+      length_ += copyLength;
+      text += copyLength;
+      textLength -= copyLength;
+    }
+  }
+
+  void appendUnsigned(unsigned long value) {
+    char number[16];
+    const int length = snprintf(number, sizeof(number), "%lu", value);
+    append(number, static_cast<size_t>(length));
+  }
+
+  void appendJsonString(const char* value) {
+    append("\"");
+    for (const unsigned char* p = reinterpret_cast<const unsigned char*>(value); *p; ++p) {
+      switch (*p) {
+        case '\"':
+          append("\\\"");
+          break;
+        case '\\':
+          append("\\\\");
+          break;
+        case '\b':
+          append("\\b");
+          break;
+        case '\f':
+          append("\\f");
+          break;
+        case '\n':
+          append("\\n");
+          break;
+        case '\r':
+          append("\\r");
+          break;
+        case '\t':
+          append("\\t");
+          break;
+        default:
+          if (*p < 0x20) {
+            static constexpr char kHexDigits[] = "0123456789ABCDEF";
+            const char escaped[] = {'\\', 'u', '0', '0', kHexDigits[*p >> 4], kHexDigits[*p & 0x0F]};
+            append(escaped, sizeof(escaped));
+          } else {
+            append(reinterpret_cast<const char*>(p), 1);
+          }
+          break;
+      }
+    }
+    append("\"");
+  }
+
+  void flush() {
+    if (length_ == 0) return;
+    server_.sendContent(buffer_, length_);
+    length_ = 0;
+  }
+
+ private:
+  static constexpr size_t BUFFER_SIZE = 192;
+  WebServer& server_;
+  char buffer_[BUFFER_SIZE];
+  size_t length_ = 0;
+};
+
+}
+
+// --- Application management handlers ---
+
+namespace {
+struct AppScanFile {
+  std::string relPath;
+  size_t size;
+};
+
+void scanAppFilesRecursive(const std::string& baseDir, const std::string& subDir, std::vector<AppScanFile>& out) {
+  std::string fullDir = subDir.empty() ? baseDir : (baseDir + "/" + subDir);
+  HalFile dir = Storage.open(fullDir.c_str());
+  if (!dir || !dir.isDirectory()) {
+    if (dir) dir.close();
+    return;
+  }
+  char nameBuf[128];
+  for (HalFile f = dir.openNextFile(); f; f = dir.openNextFile()) {
+    nameBuf[0] = '\0';
+    f.getName(nameBuf, sizeof(nameBuf));
+    if (nameBuf[0] == '\0' || strcmp(nameBuf, ".") == 0 || strcmp(nameBuf, "..") == 0) {
+      f.close();
+      continue;
+    }
+    std::string rel = subDir.empty() ? nameBuf : (subDir + "/" + nameBuf);
+    if (f.isDirectory()) {
+      f.close();
+      scanAppFilesRecursive(baseDir, rel, out);
+    } else {
+      out.push_back({rel, static_cast<size_t>(f.size())});
+      f.close();
+    }
+    yield();
+  }
+  dir.close();
+}
+
+bool isValidAppIdentifier(const char* id) {
+  if (!id || *id == '\0') return false;
+  for (const char* p = id; *p; ++p) {
+    if (!isalnum(static_cast<unsigned char>(*p)) && *p != '_' && *p != '-') {
+      return false;
+    }
+  }
+  return true;
+}
+
+std::string findAppDirectory(const char* appId) {
+  const char* candidates[] = {"/.crosssmudge/applications", "/applications", "/apps", "/.smudge/applications",
+                              "/.crosspoint/applications"};
+  for (const char* base : candidates) {
+    std::string path = std::string(base) + "/" + appId;
+    if (Storage.exists(path.c_str())) {
+      return path;
+    }
+  }
+  return "";
+}
+}  // namespace
+
+
+void CrossPointWebServer::handleApplicationsPage() const {
+  sendStaticContent(server.get(), ApplicationsPageHtml, sizeof(ApplicationsPageHtml), ApplicationsPageHtmlETag, "text/html");
+}
+
+void CrossPointWebServer::handleApplicationsList() const {
+  auto apps = AppPackage::scanApplications();
+
+  server->setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server->send(200, "application/json", "");
+  FontListJsonWriter json(*server);
+  json.append("{\"apps\":[");
+
+  bool firstApp = true;
+  for (const auto& pkg : apps) {
+    if (!firstApp) json.append(",");
+    firstApp = false;
+
+    // Calculate total size of files in this app
+    std::vector<AppScanFile> appFiles;
+    scanAppFilesRecursive(pkg.path, "", appFiles);
+    size_t totalBytes = 0;
+    for (const auto& af : appFiles) {
+      totalBytes += af.size;
+    }
+
+    json.append("{\"id\":");
+    json.appendJsonString(pkg.id.c_str());
+    json.append(",\"name\":");
+    json.appendJsonString(pkg.name.c_str());
+    json.append(",\"version\":");
+    json.appendJsonString(pkg.version.c_str());
+    json.append(",\"author\":");
+    json.appendJsonString(pkg.author.c_str());
+    json.append(",\"description\":");
+    json.appendJsonString(pkg.description.c_str());
+    json.append(",\"path\":");
+    json.appendJsonString(pkg.path.c_str());
+    json.append(",\"size\":");
+    json.appendUnsigned(totalBytes);
+
+    if (pkg.hasIcon) {
+      char hex[257];
+      for (size_t b = 0; b < 128; ++b) {
+        snprintf(hex + b * 2, 3, "%02x", pkg.iconData[b]);
+      }
+      hex[256] = '\0';
+      json.append(",\"icon\":");
+      json.appendJsonString(hex);
+    } else {
+      json.append(",\"icon\":null");
+    }
+    json.append("}");
+    json.flush();
+    yield();
+  }
+
+  json.append("]}");
+  json.flush();
+  server->sendContent("");
+}
+
+void CrossPointWebServer::handleApplicationsFileList() const {
+  String id = server->arg("id");
+  if (!isValidAppIdentifier(id.c_str())) {
+    server->send(400, "application/json", "{\"error\":\"Invalid application id\"}");
+    return;
+  }
+
+  std::string appDir = findAppDirectory(id.c_str());
+  if (appDir.empty()) {
+    server->send(404, "application/json", "{\"error\":\"Application not found\"}");
+    return;
+  }
+
+  std::vector<AppScanFile> files;
+  scanAppFilesRecursive(appDir, "", files);
+
+  server->setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server->send(200, "application/json", "");
+  FontListJsonWriter json(*server);
+  json.append("{\"id\":");
+  json.appendJsonString(id.c_str());
+  json.append(",\"files\":[");
+
+  bool first = true;
+  for (const auto& f : files) {
+    if (!first) json.append(",");
+    first = false;
+    json.append("{\"name\":");
+    json.appendJsonString(f.relPath.c_str());
+    json.append(",\"size\":");
+    json.appendUnsigned(f.size);
+    json.append("}");
+    json.flush();
+    yield();
+  }
+  json.append("]}");
+  json.flush();
+  server->sendContent("");
+}
+
+void CrossPointWebServer::handleApplicationsFileDownload() const {
+  String id = server->arg("id");
+  String fileRel = server->arg("file");
+
+  if (!isValidAppIdentifier(id.c_str())) {
+    server->send(400, "text/plain", "Invalid application id");
+    return;
+  }
+
+  // Prevent path traversal
+  if (fileRel.indexOf("..") >= 0 || fileRel.startsWith("/") || fileRel.startsWith("\\")) {
+    server->send(400, "text/plain", "Invalid file path");
+    return;
+  }
+
+  std::string appDir = findAppDirectory(id.c_str());
+  if (appDir.empty()) {
+    server->send(404, "text/plain", "Application not found");
+    return;
+  }
+
+  std::string fullPath = appDir + "/" + fileRel.c_str();
+  if (!Storage.exists(fullPath.c_str())) {
+    server->send(404, "text/plain", "File not found");
+    return;
+  }
+
+  HalFile file = Storage.open(fullPath.c_str());
+  if (!file || file.isDirectory()) {
+    if (file) file.close();
+    server->send(400, "text/plain", "Cannot download directory");
+    return;
+  }
+
+  String contentType = "application/octet-stream";
+  if (fileRel.endsWith(".json"))
+    contentType = "application/json";
+  else if (fileRel.endsWith(".lua"))
+    contentType = "text/plain";
+  else if (fileRel.endsWith(".txt"))
+    contentType = "text/plain";
+
+  const char* baseName = strrchr(fileRel.c_str(), '/');
+  String downloadName = baseName ? String(baseName + 1) : fileRel;
+
+  server->setContentLength(file.size());
+  server->sendHeader("Content-Disposition", "attachment; filename=\"" + downloadName + "\"");
+  server->send(200, contentType, "");
+
+  constexpr size_t BUFFER_SIZE = 1400;
+  auto buffer = makeUniqueNoThrow<uint8_t[]>(BUFFER_SIZE);
+  if (!buffer) {
+    LOG_ERR("WEB", "Failed to allocate file download buffer");
+    file.close();
+    return;
+  }
+
+  while (file.available()) {
+    size_t bytesRead = file.read(buffer.get(), BUFFER_SIZE);
+    if (bytesRead == 0) break;
+    server->sendContent(reinterpret_cast<char*>(buffer.get()), bytesRead);
+    yield();
+  }
+  file.close();
+}
+
+void CrossPointWebServer::handleAppUploadData() {
+  HTTPUpload& upload = server->upload();
+
+  switch (upload.status) {
+    case UPLOAD_FILE_START: {
+      appUpload.file = HalFile();
+      appUpload.appId.clear();
+      appUpload.relPath.clear();
+      appUpload.fullPath.clear();
+      appUpload.valid = false;
+      appUpload.bytesWritten = 0;
+      appUpload.bufferPos = 0;
+      appUpload.error.clear();
+
+      String appIdArg = server->arg("app");
+      String pathArg = server->arg("path");
+      if (pathArg.isEmpty()) {
+        pathArg = upload.filename;
+      }
+
+      if (!isValidAppIdentifier(appIdArg.c_str())) {
+        appUpload.error = "Invalid application ID";
+        LOG_ERR("WEB", "Invalid app ID: %s", appIdArg.c_str());
+        break;
+      }
+
+      // Check path traversal
+      if (pathArg.indexOf("..") >= 0 || pathArg.startsWith("/") || pathArg.startsWith("\\")) {
+        appUpload.error = "Invalid relative file path";
+        LOG_ERR("WEB", "Invalid relPath: %s", pathArg.c_str());
+        break;
+      }
+
+      appUpload.appId = appIdArg.c_str();
+      appUpload.relPath = pathArg.c_str();
+
+      // Canonical install root is /.crosssmudge/applications/<appId>
+      std::string appBaseDir = "/.crosssmudge/applications/" + appUpload.appId;
+      Storage.ensureDirectoryExists("/.crosssmudge");
+      Storage.ensureDirectoryExists("/.crosssmudge/applications");
+      Storage.ensureDirectoryExists(appBaseDir.c_str());
+
+      std::string fullPath = appBaseDir + "/" + appUpload.relPath;
+      appUpload.fullPath = fullPath;
+
+      // Ensure any subdirectories in relPath exist
+      size_t lastSlash = appUpload.fullPath.find_last_of('/');
+      if (lastSlash != std::string::npos) {
+        std::string parentDir = appUpload.fullPath.substr(0, lastSlash);
+        Storage.ensureDirectoryExists(parentDir.c_str());
+      }
+
+      // If file already exists, remove it before writing
+      if (Storage.exists(fullPath.c_str())) {
+        Storage.remove(fullPath.c_str());
+      }
+
+      if (!Storage.openFileForWrite("APP", fullPath.c_str(), appUpload.file)) {
+        appUpload.error = "Failed to open file for writing on SD card";
+        LOG_ERR("WEB", "Failed to open app file for write: %s", fullPath.c_str());
+        break;
+      }
+
+      appUpload.valid = true;
+      LOG_DBG("WEB", "App upload started: %s (%s)", fullPath.c_str(), appUpload.appId.c_str());
+      break;
+    }
+
+    case UPLOAD_FILE_WRITE: {
+      if (!appUpload.valid) break;
+
+      size_t remaining = upload.currentSize;
+      const uint8_t* src = upload.buf;
+      while (remaining > 0) {
+        size_t space = AppUploadState::BUFFER_SIZE - appUpload.bufferPos;
+        size_t chunk = (remaining < space) ? remaining : space;
+        memcpy(appUpload.buffer.data() + appUpload.bufferPos, src, chunk);
+        appUpload.bufferPos += chunk;
+        src += chunk;
+        remaining -= chunk;
+
+        if (appUpload.bufferPos >= AppUploadState::BUFFER_SIZE) {
+          appUpload.file.write(appUpload.buffer.data(), appUpload.bufferPos);
+          appUpload.bytesWritten += appUpload.bufferPos;
+          appUpload.bufferPos = 0;
+        }
+      }
+      break;
+    }
+
+    case UPLOAD_FILE_END: {
+      if (appUpload.valid && appUpload.bufferPos > 0) {
+        appUpload.file.write(appUpload.buffer.data(), appUpload.bufferPos);
+        appUpload.bytesWritten += appUpload.bufferPos;
+        appUpload.bufferPos = 0;
+      }
+      if (appUpload.file.isOpen()) {
+        appUpload.file.close();
+      }
+      if (!appUpload.valid && !appUpload.fullPath.empty()) {
+        Storage.remove(appUpload.fullPath.c_str());
+      }
+      LOG_DBG("WEB", "App upload end: valid=%d, %zu bytes", appUpload.valid, appUpload.bytesWritten);
+      break;
+    }
+
+    case UPLOAD_FILE_ABORTED: {
+      if (appUpload.file.isOpen()) {
+        appUpload.file.close();
+      }
+      if (!appUpload.fullPath.empty()) {
+        Storage.remove(appUpload.fullPath.c_str());
+      }
+      appUpload.valid = false;
+      LOG_DBG("WEB", "App upload aborted");
+      break;
+    }
+  }
+}
+
+void CrossPointWebServer::handleAppUpload() {
+  if (appUpload.valid) {
+    server->send(200, "application/json", "{\"ok\":true}");
+    LOG_DBG("WEB", "App upload complete: %s", appUpload.fullPath.c_str());
+  } else {
+    String err = appUpload.error.empty() ? "App upload failed" : appUpload.error.c_str();
+    server->send(400, "application/json", "{\"error\":\"" + err + "\"}");
+  }
+}
+
+void CrossPointWebServer::handleAppDelete() {
+  String body = server->arg("plain");
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, body);
+
+  if (err || !doc["id"].is<const char*>()) {
+    server->send(400, "application/json", "{\"error\":\"Invalid request payload\"}");
+    return;
+  }
+
+  const char* appId = doc["id"];
+  if (!isValidAppIdentifier(appId)) {
+    server->send(400, "application/json", "{\"error\":\"Invalid application id\"}");
+    return;
+  }
+
+  bool removedAny = false;
+  const char* baseDirs[] = {"/.crosssmudge/applications", "/applications", "/apps", "/.smudge/applications",
+                            "/.crosspoint/applications"};
+  for (const char* base : baseDirs) {
+    std::string path = std::string(base) + "/" + appId;
+    if (Storage.exists(path.c_str())) {
+      if (Storage.removeDir(path.c_str())) {
+        removedAny = true;
+        LOG_DBG("WEB", "Removed app dir: %s", path.c_str());
+      } else {
+        LOG_ERR("WEB", "Failed to remove app dir: %s", path.c_str());
+      }
+    }
+  }
+
+  if (removedAny) {
+    server->send(200, "application/json", "{\"ok\":true}");
+  } else {
+    server->send(404, "application/json", "{\"error\":\"Application not found or could not be removed\"}");
+  }
+}
+
+void CrossPointWebServer::handleStyleCss() const {
+  server->sendHeader("Content-Encoding", "gzip");
+  server->sendHeader("Cache-Control", "public, max-age=31536000, immutable");
+  server->send_P(200, "text/css", StyleCss, StyleCssCompressedSize);
+}
+
+
+void CrossPointWebServer::handleLogo() const {
+  // Raw PNG (already compressed); no Content-Encoding.
+  server->sendHeader("Cache-Control", "public, max-age=31536000, immutable");
+  server->send_P(200, "image/png", LogoPng, LogoPngSize);
 }

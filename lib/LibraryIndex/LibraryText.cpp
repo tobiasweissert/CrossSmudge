@@ -46,8 +46,8 @@ constexpr CharMap EXPLICIT_MAP[] = {
     {0x00FE, "th"},  // þ
     {0x0131, "i"},   // ı
     {0x0027, "'"},   // ' — kept, not turned into a space, so "O'Brien" stays one word
-    {0x2019, "'"},   // ’ — and so the curly form folds to the same thing
-    {0x2018, "'"},   // ‘
+    {0x2019, "'"},   // ' — and so the curly form folds to the same thing
+    {0x2018, "'"},   // '
 };
 
 const char* explicitMapping(const uint32_t cp) {
@@ -57,15 +57,11 @@ const char* explicitMapping(const uint32_t cp) {
   return nullptr;
 }
 
-// Reverse lookup in the NFC table: given a precomposed codepoint, return the
-// base letter it was composed from, or 0.
-//
-// The table is sorted by (base, mark) so this is a linear scan rather than a
-// binary search. It runs once per non-ASCII character at index-build time and
-// over a short query per keystroke, never over the whole index, so the scan is
-// not on any hot path. Reusing the generated table costs no extra flash — it is
-// already linked for utf8ComposeNfc().
 // Fully decompose: é -> e, and the rare doubly-accented forms (ế -> ê -> e).
+// Reuses Utf8's NFC compose table in reverse rather than adding a second one:
+// that table runs once per non-ASCII character at index-build time and over a
+// short query per keystroke, never over the whole index, so a linear scan
+// against the grain of its (base, mark) sort is not on any hot path.
 uint32_t stripDiacritics(uint32_t cp) {
   for (int guard = 0; guard < 4; guard++) {
     const uint32_t base = utf8DecomposedBase(cp);
@@ -96,8 +92,8 @@ constexpr bool inRanges(const uint32_t cp, const CodepointRange* ranges, const s
 }
 
 // Script coverage follows the SD-font catalog. Keeping the ranges here costs a
-// few hundred flash bytes; linking libunibreak solely for its general-category
-// table would add roughly 75 KiB of tables plus the classifier code.
+// few hundred flash bytes; linking a general Unicode-category table would cost
+// far more for coverage this firmware doesn't render anyway.
 constexpr CodepointRange LETTER_RANGES[] = {
     {0x0041, 0x005A},   {0x0061, 0x007A},   {0x00C0, 0x02AF},  // Latin and IPA
     {0x0370, 0x03FF},   {0x1F00, 0x1FFF},                      // Greek
@@ -122,8 +118,9 @@ constexpr CodepointRange NUMBER_RANGES[] = {
 };
 
 constexpr CodepointRange MARK_RANGES[] = {
-    {0x0483, 0x0489}, {0x0610, 0x061A}, {0x0651, 0x065F}, {0x06D6, 0x06DC},
-    {0x06DF, 0x06E4}, {0x06E7, 0x06E8}, {0x06EA, 0x06ED}, {0x08D3, 0x08FF},
+    {0x0483, 0x0489}, {0x0591, 0x05BD}, {0x05BF, 0x05BF}, {0x05C1, 0x05C2}, {0x05C4, 0x05C5},
+    {0x05C7, 0x05C7}, {0x0610, 0x061A}, {0x064B, 0x065F}, {0x0670, 0x0670}, {0x06D6, 0x06DC},
+    {0x06DF, 0x06E4}, {0x06E7, 0x06E8}, {0x06EA, 0x06ED}, {0x08D3, 0x08FF}, {0xFB1E, 0xFB1E},
 };
 
 bool isUnicodeNumber(const uint32_t cp) {
@@ -131,8 +128,7 @@ bool isUnicodeNumber(const uint32_t cp) {
 }
 
 bool isUnicodeMark(const uint32_t cp) {
-  return isHebrewMark(cp) || isArabicVowelMark(cp) || utf8IsCombiningMark(cp) ||
-         inRanges(cp, MARK_RANGES, sizeof(MARK_RANGES) / sizeof(MARK_RANGES[0]));
+  return utf8IsCombiningMark(cp) || inRanges(cp, MARK_RANGES, sizeof(MARK_RANGES) / sizeof(MARK_RANGES[0]));
 }
 
 bool isUnicodeLetter(const uint32_t cp) {
@@ -168,6 +164,12 @@ bool isSingleCodepoint(const std::string_view text) {
 
 std::string fold(const std::string_view text) {
   std::string out;
+  foldInto(text, out);
+  return out;
+}
+
+void foldInto(const std::string_view text, std::string& out) {
+  out.clear();
   out.reserve(text.size());
 
   const auto* cursor = reinterpret_cast<const unsigned char*>(text.data());
@@ -218,8 +220,6 @@ std::string fold(const std::string_view text) {
     // words. Deferring the space keeps runs collapsed and drops trailing ones.
     if (!out.empty()) pendingSpace = true;
   }
-
-  return out;
 }
 
 uint32_t foldedGroupInitial(const std::string_view folded) {

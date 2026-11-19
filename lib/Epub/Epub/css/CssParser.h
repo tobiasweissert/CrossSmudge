@@ -1,6 +1,7 @@
 #pragma once
 
 #include <HalStorage.h>
+#include <Memory.h>
 
 #include <memory>
 #include <string>
@@ -58,7 +59,9 @@ class CssParser {
   };
 
   // Bump when CSS cache format or rules change; section caches are invalidated when this changes
-  static constexpr uint8_t CSS_CACHE_VERSION = 19;
+  static constexpr uint8_t CSS_CACHE_VERSION = 20;
+
+  static size_t maxSourceBytes() { return psramHeapAvailable() ? 512U * 1024U : 128U * 1024U; }
 
   explicit CssParser(std::string cachePath) : cachePath(std::move(cachePath)) {}
   ~CssParser() = default;

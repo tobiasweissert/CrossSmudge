@@ -25,14 +25,16 @@ struct Reader {
   }
 };
 struct PreviewOutput {
-  std::array<char, clippingPreview::BUFFER_BYTES> buffer{};
+  std::string buffer = std::string(clippingPreview::MAX_BYTES + clippingPreview::ELLIPSIS_BYTES + 1, '\0');
   size_t length = 0;
 
   std::string text() const { return std::string(buffer.data(), length); }
 };
 
 bool readPreview(Reader& reader, const size_t remaining, PreviewOutput& out) {
-  return clippingPreview::read(reader, remaining, out.buffer.data(), out.buffer.size(), out.length);
+  const bool ok = clippingPreview::read(reader, remaining, out.buffer);
+  out.length = out.buffer.size();
+  return ok;
 }
 constexpr const char* ELLIPSIS = "\xe2\x80\xa6";
 }  // namespace
@@ -313,4 +315,18 @@ TEST(SelectionGeometry, KeepsCursorClearOfHintsOnEitherAxis) {
   EXPECT_EQ(selectionGeometry::keepVisible(0, 20, 40, 700), 40);
   EXPECT_EQ(selectionGeometry::keepVisible(735, 20, 40, 700), -15);
   EXPECT_EQ(selectionGeometry::keepVisible(100, 20, 40, 700), 0);
+}
+
+
+// Preserved owner regression cases; current-runtime harness above.
+TEST(ClippingPreview, RepeatedReadsReuseReservedStorage) {
+  Reader reader{std::string(4096, 'x')};
+  std::string out;
+  out.reserve(clippingPreview::MAX_BYTES + clippingPreview::ELLIPSIS_BYTES);
+  const char* buffer = out.data();
+  for (int i = 0; i < 3; ++i) {
+    reader.pos = 0;
+    ASSERT_TRUE(clippingPreview::read(reader, reader.text.size(), out));
+    EXPECT_EQ(out.data(), buffer);
+  }
 }

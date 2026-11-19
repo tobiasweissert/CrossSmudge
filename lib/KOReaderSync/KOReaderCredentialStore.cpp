@@ -21,14 +21,14 @@ constexpr uint8_t CONFIG_VERSION = 3;
 
 void KOReaderCredentialStore::toJson(JsonDocument& doc) const {
   doc["cfgVersion"] = CONFIG_VERSION;
-  doc["username"] = getUsername();
-  doc["password_obf"] = obfuscation::obfuscateToBase64(getPassword());
-  doc["serverUrl"] = getServerUrl();
-  doc["serverType"] = static_cast<uint8_t>(getServerType());
-  doc["matchMethod"] = static_cast<uint8_t>(getMatchMethod());
-  doc["sendMetadata"] = getSendMetadata();
-  doc["syncClippings"] = getSyncClippings();
-  doc["syncBehavior"] = static_cast<uint8_t>(getSyncBehavior());
+  doc["username"] = username;
+  doc["password_obf"] = obfuscation::obfuscateToBase64(password);
+  doc["serverUrl"] = serverUrl;
+  doc["serverType"] = static_cast<uint8_t>(serverType);
+  doc["matchMethod"] = static_cast<uint8_t>(matchMethod);
+  doc["sendMetadata"] = sendMetadata;
+  doc["syncClippings"] = syncClippings;
+  doc["syncBehavior"] = static_cast<uint8_t>(syncBehavior);
   JsonArray headers = doc["headers"].to<JsonArray>();
   for (const auto& header : customHeaders) {
     JsonObject headerObj = headers.add<JsonObject>();
@@ -116,12 +116,13 @@ bool KOReaderCredentialStore::fromJson(JsonVariantConst doc) {
 }
 
 void KOReaderCredentialStore::setCredentials(const std::string& user, const std::string& pass) {
+  ensureLoaded();
   username = user;
   password = pass;
-  LOG_DBG("KRS", "Set credentials for user: %s", user.c_str());
 }
 
 std::string KOReaderCredentialStore::getMd5Password() const {
+  ensureLoaded();
   if (password.empty()) {
     return "";
   }
@@ -136,6 +137,7 @@ std::string KOReaderCredentialStore::getMd5Password() const {
 }
 
 std::string KOReaderCredentialStore::getBasicAuthorization() const {
+  ensureLoaded();
   const std::string credentials = username + ":" + password;
   return std::string("Basic ") + base64::encode(credentials.c_str()).c_str();
 }
@@ -143,11 +145,13 @@ std::string KOReaderCredentialStore::getBasicAuthorization() const {
 bool KOReaderCredentialStore::hasCredentials() const { return !username.empty() && !password.empty(); }
 
 void KOReaderCredentialStore::setServerUrl(const std::string& url) {
+  ensureLoaded();
   serverUrl = url;
   LOG_DBG("KRS", "Set server URL: %s", url.empty() ? "(default)" : url.c_str());
 }
 
 std::string KOReaderCredentialStore::getBaseUrl() const {
+  ensureLoaded();
   std::string url;
   if (serverUrl.empty()) {
     url = DEFAULT_SERVER_URL;
@@ -167,6 +171,7 @@ std::string KOReaderCredentialStore::getBaseUrl() const {
 }
 
 void KOReaderCredentialStore::setServerType(KOReaderServerType type) {
+  ensureLoaded();
   if (static_cast<uint8_t>(type) > static_cast<uint8_t>(KOReaderServerType::OTHER)) {
     type = KOReaderServerType::KOSYNC;
   }
@@ -175,16 +180,19 @@ void KOReaderCredentialStore::setServerType(KOReaderServerType type) {
 }
 
 void KOReaderCredentialStore::setMatchMethod(DocumentMatchMethod method) {
+  ensureLoaded();
   matchMethod = method;
   LOG_DBG("KRS", "Set match method: %s", method == DocumentMatchMethod::FILENAME ? "Filename" : "Binary");
 }
 
 void KOReaderCredentialStore::setSendMetadata(bool enabled) {
+  ensureLoaded();
   sendMetadata = enabled;
   LOG_DBG("KRS", "Set send metadata: %s", enabled ? "true" : "false");
 }
 
 void KOReaderCredentialStore::setSyncBehavior(KOReaderSyncBehavior behavior) {
+  ensureLoaded();
   if (static_cast<uint8_t>(behavior) > static_cast<uint8_t>(KOReaderSyncBehavior::SMART)) {
     behavior = KOReaderSyncBehavior::ASK_EVERY_TIME;
   }
@@ -193,6 +201,7 @@ void KOReaderCredentialStore::setSyncBehavior(KOReaderSyncBehavior behavior) {
 }
 
 void KOReaderCredentialStore::setCustomHeader(size_t index, const std::string& name, const std::string& value) {
+  ensureLoaded();
   if (index >= MAX_CUSTOM_HEADERS) return;
   customHeaders[index].name = name;
   customHeaders[index].value = value;

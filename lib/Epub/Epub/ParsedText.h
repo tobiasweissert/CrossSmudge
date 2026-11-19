@@ -28,6 +28,8 @@ class ParsedText {
   // rubyTexts stays a deque of strings: ruby is rare and per-block small.
   // The per-token parallel arrays below stay vectors: 1 byte / 1 bit each,
   // they never approach the contiguous-block ceiling.
+  std::deque<uint32_t> wordReferenceOffsets;
+  uint32_t pendingReferenceOffset = 0, lineReferenceOffset = 0;
   WordStore wordStore;
   std::deque<WordStore::StoredWord> words;
   std::vector<EpdFontFamily::Style> wordStyles;
@@ -46,6 +48,12 @@ class ParsedText {
   // Zero means plain text; non-zero indexes linkTargets. Kept at one byte per
   // token and discarded after layout, never added to the page-cache TextBlock.
   std::vector<uint8_t> wordLinkIds;
+  std::vector<uint8_t> wordBackgroundBlack;
+  bool guideReadingEnabled = false;
+  int extraWordGap = 0;
+  uint8_t legacyWordSpacing = 0;
+  bool honorPublisherIndent = false;
+  bool pendingBackgroundBlack = false;
   // Words sized by an inline font-size span: a slot per word into sizeSlotScales (absolute
   // multiples of the reader's body size). Slot 0 follows the block's own size; the parser
   // resolves each slot's font before layout.
@@ -56,6 +64,7 @@ class ParsedText {
   uint8_t sizeSlotCount = 1;
   int wordFontId(size_t wordIndex, int blockFontId) const;
   std::vector<std::string> linkTargets;
+  std::vector<uint8_t> ownerLinkIds;
   // Zero-based visible Unicode-codepoint offsets in the spine body, stored as
   // uint16_t deltas from a shared base to keep this layout-only metadata small.
   // Pathological spans wider than uint16_t use sparse rebases; rendered
@@ -137,7 +146,32 @@ class ParsedText {
   std::vector<uint16_t> calculateWordWidths(const GfxRenderer& renderer, int fontId);
 
  public:
-  explicit ParsedText(const bool hyphenationEnabled = false, const bool focusReadingEnabled = false,
+  struct InlineImagePlacement {
+    uint16_t id;
+    int16_t x;
+    uint16_t height;
+  };
+
+ private:
+  std::vector<InlineImagePlacement> lineImages;
+
+ public:
+  // Placements belong to the current extraction callback and are replaced by the next line.
+  const std::vector<InlineImagePlacement>& currentLineImages() const { return lineImages; }
+  void addInlineImage(uint16_t id, uint16_t width, uint16_t height, bool attached, uint32_t offset);
+  void setReferenceOffset(uint32_t offset) { pendingReferenceOffset = offset; }
+  uint32_t currentLineReferenceOffset() const { return lineReferenceOffset; }
+  void setHonorPublisherIndent(bool enabled) { honorPublisherIndent = enabled; }
+  void setLegacyWordSpacing(uint8_t level) { legacyWordSpacing = std::min<uint8_t>(level, 4); }
+  void setGuideReading(bool enabled) { guideReadingEnabled = enabled; }
+  void setBackgroundBlack(bool black) { pendingBackgroundBlack = black; }
+  bool isContinuation() const { return firstLineConsumed; }
+  bool layoutAndExtractLinesPreservingSource(const GfxRenderer& renderer, int fontId, uint16_t width,
+                                             const std::function<void(std::unique_ptr<TextBlock>)>& processLine,
+                                             bool allowCharacterBreaks = false) const;
+  ParsedText() : ParsedText(false, false, BlockStyle(), 2) {}
+  explicit ParsedText(bool extraSpacing) : ParsedText(false, false, BlockStyle(), 0) {}
+  explicit ParsedText(const bool hyphenationEnabled, const bool focusReadingEnabled,
                       const BlockStyle& blockStyle = BlockStyle(), const uint8_t paragraphIndentSpaces = 2)
       : blockStyle(blockStyle),
         paragraphIndentSpaces(paragraphIndentSpaces),
@@ -145,11 +179,18 @@ class ParsedText {
         focusReadingEnabled(focusReadingEnabled),
         isNaturalAlign(false),
         hasRtlWord(false) {}
+  ParsedText(bool extraSpacing, bool forceIndents, bool hyphenation, bool focus, bool guide, uint8_t spacing,
+             const BlockStyle& style, bool trackReference = false)
+      : ParsedText(hyphenation, focus, style, forceIndents ? 2 : 0) {
+    honorPublisherIndent = !extraSpacing || forceIndents;
+    guideReadingEnabled = guide;
+    setLegacyWordSpacing(spacing);
+  }
   ~ParsedText() = default;
 
   void addWord(std::string word, EpdFontFamily::Style fontStyle, bool underline = false, bool attachToPrevious = false,
                uint32_t visibleTextOffset = 0, uint8_t linkId = 0, uint8_t sizeSlot = 0, bool noSpaceBefore = false);
-  uint8_t addLinkTarget(const char* href);
+  uint8_t addLinkTarget(const char* href, uint8_t ownerId = 0);
   bool linkTargetMatches(uint8_t linkId, const char* href) const;
   void setRubyForWordAt(size_t index, const std::string& ruby);
   void setRubyGroupAt(size_t startIndex, size_t count, const std::string& ruby);

@@ -21,21 +21,40 @@ class EpdFontFamily {
   };
   static constexpr uint8_t TEXT_DECORATION_MASK = static_cast<uint8_t>(UNDERLINE | STRIKETHROUGH);
 
+  struct GlyphData {
+    const EpdFontData* fontData;
+    const EpdGlyph* glyph;
+  };
+
   // pointSize becomes pixels at FONT_RASTER_DPI.
   explicit EpdFontFamily(uint16_t pointSize, const EpdFont* regular, const EpdFont* bold = nullptr,
-                         const EpdFont* italic = nullptr, const EpdFont* boldItalic = nullptr)
+                         const EpdFont* italic = nullptr, const EpdFont* boldItalic = nullptr,
+                         const EpdFont* fallback = nullptr)
       : regular(regular),
         bold(bold),
         italic(italic),
         boldItalic(boldItalic),
-        sizeInPixels(pointSize * FONT_RASTER_DPI / 72.0f) {}
+        sizeInPixels(pointSize * FONT_RASTER_DPI / 72.0f), fallback(fallback) {}
+
+  // Legacy bitmap callers lack point metadata. Infer an em from ascent+descent;
+  // reader/CSS callers should use the point-size constructor above.
+  explicit EpdFontFamily(const EpdFont* regular, const EpdFont* bold = nullptr,
+                         const EpdFont* italic = nullptr, const EpdFont* boldItalic = nullptr,
+                         const EpdFont* fallback = nullptr)
+      : regular(regular), bold(bold), italic(italic), boldItalic(boldItalic),
+        sizeInPixels(regular ? regular->data->ascender - regular->data->descender : 0), fallback(fallback) {}
   ~EpdFontFamily() = default;
   float getSizeInPixels() const { return sizeInPixels; }
   void getTextDimensions(const char* string, int* w, int* h, Style style = REGULAR) const;
   const EpdFontData* getData(Style style = REGULAR) const;
+  GlyphData findGlyphData(uint32_t cp, Style style = REGULAR) const;
+  GlyphData getGlyphData(uint32_t cp, Style style = REGULAR) const;
+  uint32_t getFallbackCodepoint(uint32_t cp, Style style = REGULAR) const;
   const EpdGlyph* getGlyph(uint32_t cp, Style style = REGULAR) const;
   const EpdGlyph* getGlyphMetrics(uint32_t cp, EpdGlyph& solidFallback, Style style = REGULAR) const {
-    return getFont(style)->getGlyphMetrics(cp, solidFallback);
+    if (const auto found = findGlyphData(cp, style); found.glyph) return found.glyph;
+    if (syntheticGlyph::isSolid(cp)) return getFont(style)->getGlyphMetrics(cp, solidFallback);
+    return getGlyph(cp, style);
   }
   /// Returns true if the resolved style's font can render `cp` directly
   /// (interval coverage only — see EpdFont::hasCodepoint).
@@ -52,6 +71,7 @@ class EpdFontFamily {
   const EpdFont* italic;
   const EpdFont* boldItalic;
   float sizeInPixels;
+  const EpdFont* fallback;
 
   const EpdFont* getFont(Style style) const;
 };

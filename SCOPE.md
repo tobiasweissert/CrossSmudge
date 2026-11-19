@@ -1,114 +1,65 @@
-# Project Vision & Scope: CrossPoint Reader
+# Crosscub scope and migration readiness
 
-The goal of CrossPoint Reader is to create an efficient, open-source reading experience for ESP32-based e-reader devices. Xteink hardware (X3, X4) is where the project started and remains a primary target, but CrossPoint is explicitly broadening to support the wider ecosystem of small ESP32 e-ink readers. We believe a dedicated e-reader should do one thing exceptionally well: **facilitate focused reading.**
+Crosscub is the active owner brand; no replacement name has been chosen.
+Product target: **Seeed reTerminal Sticky only** (ESP32-S3). SDK board profiles
+are dependency internals, not Crosscub product targets. Stable **1.6.5.5 remains
+unchanged**. This direct-upstream candidate is **experimental, not release-ready**.
 
-## 1. Core Mission
+## Architecture and provenance
 
-To provide a lightweight, high-performance firmware that maximizes the potential of ESP32-based e-reader hardware, prioritizing legibility, performance, and usability over "swiss-army-knife" functionality.
+- Direct technical upstream: CrossPoint develop `9ac3475733e677b7f61ba3f6e8ce41ce1b9b2967`.
+- Selective CrossInk source: `9914146eeae7b46b300f475a16c32426fc02ec1f`.
+- Owner preservation baseline: `818b0befac4d9249c7abded67fa980187c4b41af`.
+- FreeInk SDK: `634a3f8c067a3714a6a7c622015138af096ab5d2`;
+  pioarduino platform 55.03.311, Core 6.1.19 outer and nested.
 
-CrossPoint is **not** a kitchen-sink firmware, and it is **not** Xteink-only. We want clean, maintainable code that the community can build on, and that runs across the range of ESP32 e-reader devices (ESP32-C3, ESP32-S3, and adjacent variants). Every accepted change should make that goal easier, not harder. Device-specific code should live behind the HAL / SDK boundary so the reader core stays portable.
+This is a fresh CrossPoint foundation with selected Ink and retained Crosscub
+behavior, not mechanical replay through historical forks. Keep upstream fixes,
+credits and licenses; do not fake ancestry by discarding modern features.
 
-## 2. Guiding Principle: Fill Gaps the Stock Firmware Leaves
+## Preservation requirements
 
-CrossPoint exists to do the things the stock firmware does poorly or not at all. New work is evaluated against that delineator:
+Owner Home/welcome bear, grouped Settings, reader touch/preview/Quick Lock and
+existing navigation routes remain. Preserve all 41 owner Store apps and complete
+package assets/licenses, Lua/API7/saves, Browser 0.3.5 keyless/TLS/SSRF/cancellation,
+AirDrop one-file fresh painted consent/30MB/no-overwrite/seamless Wi-Fi handoff,
+file actions, simplified reading heatmap, owner OTA and manual SD recovery.
+Legacy `.crosspoint`, `.crosssmudge`, `.smudge` names are compatibility identifiers;
+never erase SD/NVS or durable book/app state for a rebrand or derived cache rebuild.
 
-* **Does the stock firmware already do this well?** We should hit that bar or surpass it 
-* **Is another popular CrossPoint fork already solving this well?** If yes, we generally defer to that fork if it's not part of the core reading experience. e.g. stats
-* **Does this directly improve the reading experience or the firmware's long-term maintainability?** If no, it is out of scope.
+## New-feature ledger — source is not release acceptance
 
-## 3. Current Focus
+| Feature family | Candidate source / actual boundary | Remaining gate |
+| --- | --- | --- |
+| BLE page turners | Modern pairing/config/runtime and painted-reader admission; teardown does not stop Sync | Combined target/radio/physical contacts and AirDrop handoff |
+| Declarative SD plugins | Modern manifests/jobs/subscriptions/web relay alongside Lua apps; queued lifecycle events | Independent PluginHttp/relay TLS/SSRF/security review; sleep networking default-off |
+| OPDS 2 and custom headers | SDK Atom+JSON interfaces; verified shared HTTP transport and origin-bound secrets; owner naming retained | Full SDK compile, auth/redirect/device tests; overwrite/resume/recovery not complete |
+| KOReader | Modern profiles/headers/metadata interfaces with owner metadata consent | Durable clipping sync/UI and actual end-to-end transport qualification |
+| EPUB CSS/images | Modern dropcaps/smallcaps/ruby/RTL/box styles/GIF plus owner tables/selection, cooperative images | Final parser/layout composition, cache versions, font pixels and vendor JPEG sanitizer defect |
+| Fonts | One upstream TtfEpdFont/FreeInkFont runtime; bitmap IDs/assets preserved; OTF/TTC discovery; vector 8–22pt reader | Actual vector rendering, memory/SD lifecycle; no full Ink hinting/weight/slant controls or profile UI |
+| Library | Modern index/routes plus persisted Ink metadata/filter preferences | Real Ink indexed view/search/sort/filter parity and mutation invalidation |
+| TXT/Markdown/JPEG | Modern engine interfaces/JPEG viewer coexist; TXT retains legacy raw progress | TXT anchor conversion is not implemented; combined routing and conversion transactions |
+| Status bars/controls | Independent seven-slot configuration, side hold bindings, completed-contact edge actions | Actual reader status rendering/collision; full live edge dragging not implemented |
+| Timezone/About | Modern timezone/DST and About route with owner quarter-hour fallback | RTC stays UTC for TLS; physical date/day/heatmap and UI qualification |
+| Stats/persistence | Owner pace/history/heatmap; per-book stats-off; explicit migration/recovery guards | Full metadata moves/delete/reset, durable error acknowledgement, FAT interruption/recovery |
+| Web/security | Modern plugin/fetch/protected routes plus owner applications; credentials denied independently of hidden preference | Enum display-index/raw POST, value16 and save acknowledgement; independent transports and publication limits |
+| SDK/memory/display | New SDK APIs/dependencies/security overlays retain owner memory and refresh policies | Standard Sticky BIN+ELF compile, actual resolved toolchain, trust/display/power tests |
 
-We are intentionally narrowing scope to consolidate the codebase as we open it up to more ESP32 e-reader devices.
+## Delivery/security gates
 
-During this period, the priorities are:
+Normal PR or manual CI compiles only standard `sticky`; no release/Pages/Store
+publication permission. Retain exact BIN+ELF, build log, source/SDK/toolchain manifest
+and image-validation result immediately in access-controlled Actions artifacts.
+A passing compile is not physical acceptance. This reconciliation has not run CI.
 
-* **Memory footprint:** Reducing DRAM usage and heap fragmentation. The ESP32-C3 is the tightest target and sets the ceiling, but the gains benefit every ESP32 variant we run on. 
-* **Flash footprint:** Trimming binary size to leave room for additional device targets and features. 
-* **Code cleanup:** Refactoring, removing dead code, tightening abstractions, and improving readability. 
-* **Reading experience:** EPUB parsing and rendering, typography, hyphenation, line spacing, font handling, and legibility improvements.
+Stable publication remains an explicit owner operation from approved main ancestry,
+with committed numeric descriptor/version, `Crosscub` project, `sticky` board,
+`crosscub-v<V>` tag and `crosscub-sticky-v<V>.bin` asset. Validate exact ESP framing,
+slot size, chip, descriptor, XOR checksum, appended hash and full-file SHA-256;
+verify owner URL/tag/size/digest before publication. Never overwrite an existing
+release, promote a feature build or redirect OTA to another product. TLS verification,
+public-address SSRF admission, numeric pinning and secret isolation are not optional.
 
-### Temporarily Closed Areas
-
-PRs in the following areas will be closed until this notice is lifted. Adding these now makes the cleanup and multi-device work materially harder:
-
-* **New themes.** The existing theming surface is frozen. 
-* **New external network connectors.** This includes sync engines, cloud storage clients, remote file access, and any new "talk to a server" feature. Fixes and improvements to the *existing* OPDS support (usability, performance, compatibility with more catalogs) remain in scope and welcome; what is closed is adding entirely new protocols or connectors. We now have our own CrossPoint KOSync server which gives us a way to sync to 3rd party systems like Hardcover at an API level instead of bloating the firmware. If you're interested in helping here, the sync server is also open source.
-
-If you are unsure whether your idea falls into one of these categories, open a Discussion first.
-
-## 4. Scope
-
-### In-Scope
-
-*Features that directly improve the core reading experience or the firmware's maintainability.*
-
-* **EPUB Rendering & Optimization:** Improvements to the rendering engine, CSS/image handling, and parsing performance. 
-* **Typography & Legibility:** Custom font support, hyphenation, line and paragraph spacing, margins. 
-* **E-Ink Driver Refinement:** Reducing full-screen flashes (ghosting management) and improving general rendering. 
-* **Reading UX:** Bookmarks, progress tracking, button mapping, page navigation, and other in-reader interactions. 
-* **Library Management:** Simple, intuitive ways to organize and navigate a local book collection. 
-* **Memory, Flash, and Code Quality:** Refactors and cleanups that reduce resource use or improve maintainability, even without a user-visible feature.
-
-### Out-of-Scope
-
-*Rejected because they compromise the device's stability, maintainability, or core mission.*
-
-* **Interactive Apps:** No notepads, calculators, or games. These belong in other forks and are not part of CrossPoint's focus. 
-* **Writing / Authoring Tools:** No typed notes, journals, or editors. Input hardware and RAM are wrong for this, and other forks already explore this space. 
-* **Active Connectivity:** No RSS readers, news aggregators, or web browsers. Background Wi-Fi drains the battery and complicates the single-core CPU. 
-* **PDF Rendering:** PDFs are fixed-layout documents, so rendering them requires displaying pages as images rather than reflowable text, resulting in constant panning and zooming that makes for a poor reading experience on e-ink. Out of scope on the current hardware class.
-
-### CrossPoint as a downstream foundation
-
-CrossPoint is also used as a foundation for downstream forks with different
-product goals. Supporting that ecosystem does not expand CrossPoint's own
-product scope, but narrowly scoped, product-neutral improvements to existing
-low-level infrastructure may still be accepted when they are broadly reusable
-and do not impose substantial new dependencies, resource cost, or maintenance
-burden on CrossPoint itself.
-
-Downstream-specific UI, policy, workflows, and feature semantics remain out of
-scope. If a reusable primitive cannot be cleanly separated from the downstream
-feature that needs it, that work belongs in the downstream fork unless
-CrossPoint independently chooses to adopt it.
-
-## 5. Calls to Action
-
-These are the areas where contributor help is most valuable right now. If you want to take one of these on, open a Discussion or issue first so we can coordinate.
-
-### Theme System: Move Themes Off-Firmware
-
-We want to abstract themes out of the firmware entirely so they no longer consume flash, and instead load from the SD card. This directly supports the current focus on flash footprint and code cleanup.
-
-* **Status:** [@itsthisjustin](https://github.com/itsthisjustin) plans to take this on eventually but is very open to someone else claiming it sooner. 
-* **Why it matters:** Every built-in theme costs flash that we would rather spend on rendering, fonts, or future device support. SD-loaded themes also let users customize without rebuilding firmware. It also leads to SD font loading for better language support in the UI. 
-* **How to claim:** Comment on the relevant Discussion (or open one) before starting.
-
-### Identifying Other Stock-Firmware Gaps
-
-We want help cataloguing things the stock firmware (and other popular CrossPoint forks) handle poorly or not at all, so future work has a clear target list. Particularly interested in:
-
-* **RTL (right-to-left) text support:** Arabic, Hebrew, Persian, and similar scripts. 
-* **Languages with poor stock and fork coverage:** Especially those that need shaping, complex layout, or non-Latin font work that nobody is handling well today. 
-* **Other gaps:** Rendering edge cases, accessibility issues, input quirks, anything stock does badly and existing forks have not fixed.
-
-If you can read or use the device in one of these languages, your feedback (even without code) is genuinely useful. Open a Discussion with concrete examples (screenshots, sample EPUBs, expected vs actual behavior) and we will prioritize from there.
-
-## 6. Funding and Contributor Sustainability
-
-CrossPoint uses [Royalty.dev](https://royalty.dev) (yes, a product built by [@itsthisjustin](https://github.com/itsthisjustin)) to fund contributors. There has been some tension in the community around this, so the intent is being clarified here directly.
-
-**Why we do this:**
-
-* To maintain long-term interest from contributors and maintainers, in direct response to substantial community requests for a way to give back. 
-* To motivate contributors to invest in the *core* project rather than spinning up competing forks. 
-* To help pay for new ESP32 devices so we can port CrossPoint to additional hardware. 
-* To give the project a credible long-term path to sustainability.
-
-**How it works:**
-
-* Funds are distributed automatically to contributors based on impact to the codebase and tenure on the project. 
-* Over **$600** was raised in the first few hours after opening up funding, which is a signal the demand is real. 
-* The exact scoring methodology is published at <https://app.royalty.dev/transparency>.
-
-**This is not fixed in stone.** The weighting, eligibility, and distribution rules can be tweaked as we learn what works for this project. If you have concerns or suggestions about how funds are allocated, open a Discussion. The goal is a system that fairly recognizes the people doing the work, not a perfect one on day one.
+Independent combined-source review, full selected-SDK build, simulator/real-font
+captures, physical input/radio/display/SD/power tests and separately approved release
+remain mandatory. Marker-free source and portable doubles do not satisfy these gates.

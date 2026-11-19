@@ -1,0 +1,9 @@
+{
+  "id": "cp-minesweeper",
+  "name": "Minesweeper",
+  "version": "0.1.5",
+  "author": "CrossPlay contributors; Lua port",
+  "description": "CrossPlay graphical Minesweeper with saved games; hold-to-flag requires the updated host.",
+  "entry": "main.lua",
+  "min_api": 2
+}

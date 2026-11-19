@@ -1,0 +1,9 @@
+{
+  "id": "cp-knucklebones",
+  "name": "Knucklebones",
+  "version": "0.1.4",
+  "author": "CrossPlay contributors; Lua port",
+  "description": "Local CrossPlay rules port. See PARITY.md for stock firmware limitations.",
+  "entry": "main.lua",
+  "min_api": 2
+}

@@ -10,6 +10,9 @@ inline const uint8_t bayer4x4[4][4] = {
     {15, 7, 13, 5},
 };
 
+// Divide the full 8-bit range into four equally sized display levels.
+inline uint8_t quantizeGrayTo4Level(uint8_t gray) { return gray >> 6; }
+
 // Apply Bayer dithering and quantize to 4 levels (0-3)
 // Stateless - works correctly with any pixel processing order
 inline uint8_t applyBayerDither4Level(uint8_t gray, int x, int y) {
@@ -24,4 +27,10 @@ inline uint8_t applyBayerDither4Level(uint8_t gray, int x, int y) {
   if (adjusted < 128) return 1;
   if (adjusted < 192) return 2;
   return 3;
+}
+
+// Ordered one-bit output uses only black (0) and white (3), preserving average
+// luminance when the destination is a single BW framebuffer. No scratch buffer.
+inline uint8_t applyBayerDither1Bit(uint8_t gray, int x, int y) {
+  return gray > bayer4x4[y & 3][x & 3] * 16 + 8 ? 3 : 0;
 }

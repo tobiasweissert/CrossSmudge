@@ -1,0 +1,31 @@
+#pragma once
+
+#include <string>
+#include <vector>
+
+#include "FileBrowserActionActivity.h"
+
+class GfxRenderer;
+
+namespace BookActions {
+
+std::vector<FileBrowserActionActivity::MenuItem> buildBookActionItems(const std::string& fullPath,
+                                                                      bool includeRemoveFromRecents);
+bool hasClearableBookCache(const std::string& path);
+bool canSendNearby(const std::string& path);
+bool deleteFile(const std::string& fullPath);
+// Call only after acknowledged physical deletion. False includes clipping recovery
+// refusal; bookmark deletion is still a legacy void API (not a checked success).
+bool clearFileMetadata(const std::string& fullPath);
+bool clearBookCache(const std::string& fullPath);
+bool deleteBookStats(const std::string& fullPath);
+bool resetBookReaderSettings(const std::string& fullPath);
+std::vector<std::string> epubRenderModeOptions();
+uint8_t epubRenderModeDisplayIndex(uint8_t renderMode);
+uint8_t epubRenderModeForDisplayIndex(uint8_t displayIndex);
+std::string confirmationHeading(StrId actionLabelId);
+bool isBookCompleted(const std::string& fullPath);
+bool toggleBookCompleted(const std::string& fullPath, const std::string& displayName, bool& completed);
+void drawToast(const GfxRenderer& renderer, const char* msg);
+
+}  // namespace BookActions

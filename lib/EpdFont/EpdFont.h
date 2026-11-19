@@ -10,6 +10,8 @@ class EpdFont {
   ~EpdFont() = default;
   void getTextDimensions(const char* string, int* w, int* h) const;
 
+  // Exact lookup, including dynamic runtime glyphs; never returns replacement.
+  const EpdGlyph* findGlyph(uint32_t cp) const;
   const EpdGlyph* getGlyph(uint32_t cp) const;
 
   /// Like getGlyph(), but supplies metrics for missing solid block symbols.

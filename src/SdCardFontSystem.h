@@ -16,13 +16,30 @@
 #include <string>
 #include <vector>
 
+#include "ReaderFontSizeStep.h"
+
 class GfxRenderer;
 class TtfEpdFont;
 
 /// Facade that owns the SD card font registry, manager, and resolver logic.
 /// Hides implementation details behind a single begin() + ensureLoaded() API.
+struct DictionaryFontActivation {int fontId=0;bool usingDictionaryFont=false;};
 class SdCardFontSystem {
  public:
+  using SettingsPersistenceCallback = void (*)(void*);
+  void setSettingsPersistenceCallback(SettingsPersistenceCallback cb, void* context) {
+    settingsPersistenceCallback_=cb;settingsPersistenceContext_=context;
+  }
+  void releaseLoadedFont(GfxRenderer& renderer);
+  void releaseForNetwork(GfxRenderer& renderer);
+  void ensureRegistry();
+  void releaseRegistry();
+  void refreshIfDirty() { ensureRegistry(); }
+  void markRegistryDirtyForPath(const char* path);
+  bool changeReaderFontSize(bool larger, FontSizeStepMode mode=FontSizeStepMode::Wrap);
+  uint8_t resolveLegacySizeStep(const char* familyName,uint8_t step);
+  DictionaryFontActivation activateDictionaryFont(GfxRenderer& renderer,const char* familyName,uint8_t size=0);
+  int restoreReaderFont(GfxRenderer& renderer);
   // Constructor and destructor are out-of-line (defined in the .cpp where
   // TtfEpdFont is a complete type) so the std::unique_ptr<TtfEpdFont> member
   // can be constructed/destroyed with only a forward declaration visible here.
@@ -47,18 +64,22 @@ class SdCardFontSystem {
 
   /// Mark the registry as needing re-discovery.
   /// Thread-safe: can be called from the web server task.
-  void markRegistryDirty() { registryDirty_.store(true, std::memory_order_release); }
+  void markRegistryDirty() {
+    registryDirty_.store(true, std::memory_order_release);
+    SdCardFontRegistry::invalidateIndex();
+  }
 
   /// If the registry is dirty, re-scan the SD card now and clear the flag.
   /// Used by the web UI so uploaded/deleted fonts appear in the list
   /// without waiting for the reader activity to run ensureLoaded().
-  void refreshIfDirty() {
-    if (registryDirty_.exchange(false, std::memory_order_acquire)) {
-      registry_.discover();
-    }
-  }
 
  private:
+  void persistSettingsChange() const;
+  bool selectFamily(GfxRenderer& renderer,const char* name,uint8_t size,bool dirty,bool ui);
+  bool registryLoaded_=false, fontReloadPending_=false;
+  uint32_t loadedRegistryRevision_=0;
+  SettingsPersistenceCallback settingsPersistenceCallback_=nullptr;
+  void* settingsPersistenceContext_=nullptr;
   // Load the active SD family at the built-in UI point sizes and register each
   // as a size-matched script fallback for the corresponding UI font, so book
   // titles/list rows in scripts the built-ins lack (CJK, Greek, Cyrillic, ...)
@@ -72,7 +93,7 @@ class SdCardFontSystem {
   // Load/refresh the selected TTF family at the current reader size, register
   // it with the renderer, and track it so ensureSdCardFontReady() rebuilds its
   // glyph set per page. registryWasDirty forces a reload even if unchanged.
-  void loadTtfFamily(const SdCardFontFamilyInfo& family, GfxRenderer& renderer, bool registryWasDirty);
+  void loadTtfFamily(const SdCardFontFamilyInfo& family, GfxRenderer& renderer, bool registryWasDirty, uint8_t requestedSize=0, bool ui=true);
   // Unregister + free the active TTF font (and its UI-size fallbacks), if any.
   void unloadTtf(GfxRenderer& renderer);
   // Register the loaded TTF at each built-in UI size as a script fallback, so UI
@@ -131,6 +152,8 @@ class SdCardFontSystem {
   std::unique_ptr<TtfEpdFont> ttf_;
   // Up to 4 style sources: 0=regular (required), 1=bold, 2=italic, 3=bold-italic.
   TtfSource ttfSources_[4];
+  uint32_t ttfSourceIdentity_=0;
+  uint32_t ttfProfileIdentity_=0;
   std::string ttfFamily_;     // loaded vector family name ("" = none)
   int ttfFontId_ = 0;         // renderer font id for ttf_ (0 = none)
   uint8_t ttfPointSize_ = 0;  // size ttf_ was built at

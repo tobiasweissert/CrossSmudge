@@ -1,0 +1,12 @@
+{
+  "command": [
+    "unshare",
+    "-n",
+    "python3",
+    "-c",
+    "import socket,json; s=socket.socket(); s.settimeout(1);\ntry:s.connect((\"192.0.2.1\",443));print(\"UNEXPECTED CONNECT\")\nexcept OSError as e: print(json.dumps({\"errno\":e.errno,\"error\":str(e)}))"
+  ],
+  "exit_code": 0,
+  "stdout": "{\"errno\": 101, \"error\": \"[Errno 101] Network is unreachable\"}\n",
+  "stderr": ""
+}

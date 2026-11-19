@@ -3,7 +3,18 @@
 #include <BoardConfig.h>
 #include <esp_rom_sys.h>
 
+#include <cstdio>
 #include <string>
+
+#ifdef SIMULATOR
+#include <Arduino.h>
+
+MySerialImpl MySerialImpl::instance;
+
+size_t MySerialImpl::write(uint8_t b) { return logSerial.write(b); }
+size_t MySerialImpl::write(const uint8_t* buffer, size_t size) { return logSerial.write(buffer, size); }
+void MySerialImpl::flush() { logSerial.flush(); }
+#endif
 
 #define MAX_ENTRY_LEN 256
 #define MAX_LOG_LINES 16
@@ -62,7 +73,9 @@ void logPrintf(const char* level, const char* origin, const char* format, ...) {
     }
   }
   va_end(args);
-#if FREEINK_LOG_TRANSPORT == FREEINK_LOG_TRANSPORT_ROM_PRINTF
+#if defined(SIMULATOR)
+  std::fputs(buf, stderr);
+#elif FREEINK_LOG_TRANSPORT == FREEINK_LOG_TRANSPORT_ROM_PRINTF
   // Sticky's USB serial bridge uses UART0; ROM output also works before Serial0.begin().
   esp_rom_printf("%s", buf);
 #else

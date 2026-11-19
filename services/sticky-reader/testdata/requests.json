@@ -1,0 +1,40 @@
+{
+  "open": {
+    "v": 1,
+    "rid": "cccccccccccccccccccccccccccccccc",
+    "url": "https://example.org/story",
+    "mode": "simplified",
+    "images": "on-demand"
+  },
+  "poll": {
+    "v": 1,
+    "job": "dddddddddddddddddddddddddddddddd"
+  },
+  "chunk": {
+    "v": 1,
+    "doc": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "chunk": 0
+  },
+  "locate": {
+    "v": 1,
+    "doc": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "fragment": "end"
+  },
+  "find": {
+    "v": 1,
+    "doc": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "text": "original",
+    "after": null
+  },
+  "image": {
+    "v": 1,
+    "doc": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "asset": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "width": 160,
+    "height": 80
+  },
+  "cancel": {
+    "v": 1,
+    "rid": "cccccccccccccccccccccccccccccccc"
+  }
+}

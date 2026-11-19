@@ -7,6 +7,7 @@
 
 #include "EndOfBookOptions.h"
 #include "ReaderSession.h"
+#include "ReaderUtils.h"
 #include "activities/Activity.h"
 
 class ReaderActivity : public Activity {
@@ -20,9 +21,16 @@ class ReaderActivity : public Activity {
   std::unique_ptr<EndOfBookOptions> endOfBookOptions;
   std::atomic<bool> endOfBookOptionsReady{false};
   ReaderSession readerSession;
+  std::atomic<int8_t> pendingSessionTurn{0};
+  ReaderUtils::SideShortcutState sideShortcutState;
+  virtual bool handleSideShortcut(uint8_t action);
+  bool routeIndependentSideShortcuts();
   std::atomic<bool> pageRendered{false};
   bool bookRemembered = false;
+  bool recentUpdateOnRender = true;
   void markPageRendered() { pageRendered.store(true, std::memory_order_release); }
+  // Called only after owner render has completed a real book page, under RenderLock.
+  void noteRenderedPage();
   void rememberBookOnceRendered();
 
   explicit ReaderActivity(const char* name, GfxRenderer& renderer, MappedInputManager& mappedInput,
@@ -55,7 +63,6 @@ class ReaderActivity : public Activity {
   virtual bool isAtEndOfBook() const = 0;
   virtual void onReturnFromEndOfBook() {}
 
-  virtual void renderBook() = 0;
   virtual void applyInitialOrientation();
   virtual void onEndOfBookRendered() {}
 
@@ -81,9 +88,9 @@ class ReaderActivity : public Activity {
   void onExit() override;
   void prepareForSleep() override;
   void loop() override;
-  void render(RenderLock&& lock) override;
+  void render(RenderLock&& lock) override = 0;
 
-  bool isReaderActivity() const final { return true; }
-  bool acceptsRemoteInput() const final { return pageRendered.load(std::memory_order_acquire); }
+  bool isReaderActivity() const override { return true; }
+  bool acceptsRemoteInput() const final { return pageRendered.load(std::memory_order_acquire) && !inputOverPage(); }
   bool handleForcedRefresh() final;
 };

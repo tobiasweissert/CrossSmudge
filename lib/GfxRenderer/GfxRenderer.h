@@ -16,6 +16,11 @@ class SdCardFont;
 class TtfEpdFont;
 
 #include <array>
+#include <type_traits>
+#include <cassert>
+#include <deque>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 #include <cstring>
 #include <map>
 #include <string>
@@ -83,6 +88,14 @@ class GfxRenderer {
   // Swap in (and clear) the promoted mode, if one is pending.
   HalDisplay::RefreshMode applyPromotedRefresh(HalDisplay::RefreshMode refreshMode) const;
 
+  // Shared bitmap row buffers. Every read/write must be inside BitmapScratchLock;
+  // ensureBitmapScratchBuffers() asserts that contract before exposing them.
+  mutable SemaphoreHandle_t bitmapScratchMutex_ = nullptr;
+  mutable uint8_t* bitmapScratchOutputRow_ = nullptr;
+  mutable size_t bitmapScratchOutputRowSize_ = 0;
+  mutable uint8_t* bitmapScratchRowBytes_ = nullptr;
+  mutable size_t bitmapScratchRowBytesSize_ = 0;
+
   // Tiled grayscale strip target. When active, drawPixel()/clearScreen()
   // operate on a caller-owned scratch holding one horizontal band of physical
   // rows [_stripY0, _stripY0 + _stripRows) (panelWidthBytes wide) instead of
@@ -98,6 +111,28 @@ class GfxRenderer {
   mutable int clipTop_ = 0;
   mutable int clipRight_ = 32767;
   mutable int clipBottom_ = 32767;
+
+  // Optional logical-space clip used while a TextBlock is rendered inside a
+  // table cell. Glyph bitmaps and background fills both pass through this
+  // guard, so an emergency oversized codepoint cannot paint into a neighbour.
+  mutable bool textClipActive_ = false;
+  mutable int textClipLeft_ = 0;
+  mutable int textClipTop_ = 0;
+  mutable int textClipRight_ = 0;   // half-open
+  mutable int textClipBottom_ = 0;  // half-open
+
+  class BitmapScratchLock {
+    const GfxRenderer& renderer_;
+    bool locked_ = false;
+
+   public:
+    explicit BitmapScratchLock(const GfxRenderer& renderer);
+    BitmapScratchLock(const BitmapScratchLock&) = delete;
+    BitmapScratchLock& operator=(const BitmapScratchLock&) = delete;
+    ~BitmapScratchLock();
+
+    bool isLocked() const { return locked_; }
+  };
 
   // CJK UI font fallback map: primary (built-in, Latin-only) UI font id -> a
   // size-matched SD-card font id that carries CJK glyphs. When a string drawn
@@ -128,6 +163,11 @@ class GfxRenderer {
   void renderChar(const EpdFontFamily& fontFamily, uint32_t cp, int* x, int* y, bool pixelState,
                   EpdFontFamily::Style style) const;
   void freeBwBufferChunks();
+  void freeBitmapScratchBuffers();
+  bool ensureBitmapScratchBuffers(size_t outputRowSize, size_t rowBytesSize) const;
+  bool bitmapScratchLockHeldByCurrentTask() const;
+  int getTextAdvanceXImpl(int fontId, const char* text, EpdFontFamily::Style style, int8_t tracking,
+                          BidiUtils::BidiBaseDir baseDir, int mode, uint32_t followingCp) const;
   template <Color color>
   void drawPixelDither(int x, int y) const;
   template <Color color>
@@ -141,9 +181,17 @@ class GfxRenderer {
 
  public:
   explicit GfxRenderer(HalDisplay& halDisplay)
-      : display(halDisplay), renderMode(BW), orientation(Portrait), fadingFix(false) {}
-  ~GfxRenderer() { freeBwBufferChunks(); }
+      : display(halDisplay), renderMode(BW), orientation(Portrait), fadingFix(false), bitmapScratchMutex_(xSemaphoreCreateMutex()) {
+    assert(bitmapScratchMutex_);
+  }
+  GfxRenderer(const GfxRenderer&) = delete;
+  GfxRenderer& operator=(const GfxRenderer&) = delete;
+  ~GfxRenderer() { freeBwBufferChunks(); freeBitmapScratchBuffers(); }
 
+  static constexpr int VIEWABLE_MARGIN_TOP = 9;
+  static constexpr int VIEWABLE_MARGIN_RIGHT = 3;
+  static constexpr int VIEWABLE_MARGIN_BOTTOM = 3;
+  static constexpr int VIEWABLE_MARGIN_LEFT = 3;
   // Setup
   void begin();  // must be called right after display.begin()
   void insertFont(int fontId, EpdFontFamily font);
@@ -153,6 +201,10 @@ class GfxRenderer {
   void removeFont(int fontId) {
     fontMap.erase(fontId);
     sdCardFonts_.erase(fontId);
+    ttfFonts_.erase(fontId);
+    for (auto it = fallbackFontMap_.begin(); it != fallbackFontMap_.end();) {
+      if (it->first == fontId || it->second == fontId) it = fallbackFontMap_.erase(it); else ++it;
+    }
   }
   void setFontCacheManager(FontCacheManager* m) { fontCacheManager_ = m; }
   FontCacheManager* getFontCacheManager() const { return fontCacheManager_; }
@@ -173,6 +225,7 @@ class GfxRenderer {
   bool isFontCacheScanning() const;
   const std::map<int, EpdFontFamily>& getFontMap() const { return fontMap; }
   void registerSdCardFont(int fontId, SdCardFont* font) { sdCardFonts_[fontId] = font; }
+  void unregisterSdCardFont(int fontId) { removeFont(fontId); }
   void clearSdCardFonts() { sdCardFonts_.clear(); }
   const std::map<int, SdCardFont*>& getSdCardFonts() const { return sdCardFonts_; }
   bool isSdCardFont(int fontId) const { return sdCardFonts_.count(fontId) > 0; }
@@ -209,6 +262,13 @@ class GfxRenderer {
                              bool includeSpace, bool includeHyphen, uint8_t styleMask = 0x0F,
                              bool includeSmallCaps = false) const;
 
+  void ensureSdCardFontReady(int fontId, const std::deque<std::string>& words, bool includeHyphen,
+                             uint8_t styleMask = 0x0F) const;
+  void ensureSdCardFontReady(int fontId, const uint32_t* cps, uint32_t count, bool includeSpace,
+                             bool includeHyphen, uint8_t styleMask = 0x0F) const;
+  bool collectSdCardFontShapedRtlCodepoints(const char* text, uint32_t* cps, uint16_t& count, uint16_t capacity,
+                                           std::string& tokenScratch, std::string& visualScratch) const;
+  bool releaseSdCardFontForLowMemory(int fontId, bool preserveAdvanceTable = false) const;
   // Orientation control (affects logical width/height and coordinate transforms)
   void setOrientation(const Orientation o) { orientation = o; }
   Orientation getOrientation() const { return orientation; }
@@ -220,7 +280,7 @@ class GfxRenderer {
   int getScreenWidth() const;
   int getScreenHeight() const;
   void tapToLogical(float nx, float ny, int& outX, int& outY) const;
-  void displayBuffer(HalDisplay::RefreshMode refreshMode = HalDisplay::FAST_REFRESH) const;
+  void displayBuffer(HalDisplay::RefreshMode refreshMode = HalDisplay::FAST_REFRESH, bool turnOffScreen = false) const;
   // One-shot: the next displayBuffer(), displayBufferAsync(), or
   // displayGrayscaleBase() call uses `mode`
   // instead of what its caller asked for, then the override clears itself.
@@ -288,6 +348,9 @@ class GfxRenderer {
     clipRight_ = x + width;
     clipBottom_ = y + height;
   }
+  bool isPixelBlack(int x, int y) const;
+  void beginTextClip(int x, int y, int width, int height) const;
+  void endTextClip() const;
   void drawPixel(int x, int y, bool state = true) const;
   // Draw glyph ink with clipping and orientation resolved once per glyph.
   void drawGlyphBitmap(const uint8_t* bitmap, int width, int height, const glyphBitmap::Frame& frame, bool twoBit,
@@ -308,13 +371,20 @@ class GfxRenderer {
   void fillRoundedRect(int x, int y, int width, int height, int cornerRadius, bool roundTopLeft, bool roundTopRight,
                        bool roundBottomLeft, bool roundBottomRight, Color color) const;
   void drawImage(const uint8_t bitmap[], int x, int y, int width, int height) const;
+  void drawImageInverted(const uint8_t bitmap[], int x, int y, int width, int height) const;
   void drawIcon(const uint8_t bitmap[], int x, int y, int size) const;
+  void drawIcon(const uint8_t bitmap[], int x, int y, int width, int height) const;
+  void drawIconInverted(const uint8_t bitmap[], int x, int y, int size) const;
+  void drawIconInverted(const uint8_t bitmap[], int x, int y, int width, int height) const;
+
   bool drawBitmap(const Bitmap& bitmap, int x, int y, int maxWidth, int maxHeight, float cropX = 0, float cropY = 0,
                   bool whiteAsTransparent = false) const;
   bool drawBitmap1Bit(const Bitmap& bitmap, int x, int y, int maxWidth, int maxHeight) const;
   // Counter-invert content images in the logical framebuffer so output-level
   // dark mode leaves their original polarity unchanged.
   void preserveImagePolarity(int x, int y, int width, int height) const;
+  void drawPerspectiveBitmap(const Bitmap& bitmap, int x, int y, int w, int hL, int hR) const;
+  void invertRect(int x, int y, int width, int height) const;
   void fillPolygon(const int* xPoints, const int* yPoints, int numPoints, bool state = true) const;
 
   // Snapshot / restore a screen-coordinate framebuffer region (byte-aligned in
@@ -351,7 +421,12 @@ class GfxRenderer {
   int getSpaceAdvance(int fontId, uint32_t leftCp, uint32_t rightCp, EpdFontFamily::Style style) const;
   /// Returns kerning plus optional tracking between two adjacent codepoints.
   int getKerning(int fontId, uint32_t leftCp, uint32_t rightCp, EpdFontFamily::Style style, int8_t tracking = 0) const;
-  int getTextAdvanceX(int fontId, const char* text, EpdFontFamily::Style style, int8_t tracking = 0,
+  int getTextAdvanceX(int fontId, const char* text, EpdFontFamily::Style style, uint32_t followingCp = 0) const;
+  // A byte-sized fourth argument is a legacy tracking call, not a Unicode scalar.
+  // Reject it rather than silently interpreting spacing as a following codepoint.
+  template <typename T> requires(std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>)
+  int getTextAdvanceX(int, const char*, EpdFontFamily::Style, T) const = delete;
+  int getTextAdvanceXTracked(int fontId, const char* text, EpdFontFamily::Style style, int8_t tracking = 0,
                       BidiUtils::BidiBaseDir baseDir = BidiUtils::BidiBaseDir::AUTO,
                       TextMeasureMode mode = TextMeasureMode::Layout) const;
   int getFontAscenderSize(int fontId) const;
@@ -377,15 +452,23 @@ class GfxRenderer {
   // Settle the full frame after displaying the B/W base and before writing
   // the grayscale planes (no-op on X4).
   void preconditionGrayscale() const;
+  void preconditionGrayscale(int x, int y, int w, int h) const;
+  bool supportsAsyncGrayscaleBase() const;
+  bool supportsAbsoluteGrayscale() const;
+  bool supportsDirectGrayscale() const;
+  bool displayAbsoluteGrayscaleBase(HalDisplay::RefreshMode fallback = HalDisplay::HALF_REFRESH) const;
+  bool displayDirectGrayscaleBase(HalDisplay::RefreshMode fallback = HalDisplay::HALF_REFRESH) const;
+  bool shouldSkipImageBlanking() const;
+  bool supportsStripGrayscale() const;
   // Display the framebuffer as the base frame for a grayscale overlay that
   // follows (X3: OEM differential base waveform; others: plain display with
   // `fallback`).
-  void displayGrayscaleBase(HalDisplay::RefreshMode fallback = HalDisplay::HALF_REFRESH) const;
+  void displayGrayscaleBase(HalDisplay::RefreshMode fallback = HalDisplay::HALF_REFRESH, bool turnOffScreen = false) const;
   bool displayGrayscaleBase(HalDisplay::GrayscaleMode mode,
                             HalDisplay::RefreshMode fallback = HalDisplay::HALF_REFRESH) const;
   void copyGrayscaleLsbBuffers() const;
   void copyGrayscaleMsbBuffers() const;
-  void displayGrayBuffer() const;
+  void displayGrayBuffer(bool turnOffScreen = false) const;
   // Active input encoding, used when drawing monochrome overlays into planes.
   bool grayPlanesAreAbsolute() const { return absoluteGrayPlanes; }
   // B/W pass: draw 2-bit image pixels as a 2x2 ordered dither instead of

@@ -1,41 +1,70 @@
 #pragma once
-#include <string>
+#include <FreeInkApp.h>
+#include <FreeInkUIGfxRenderer.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+#include <freertos/task.h>
 
-#include "activities/UiListActivity.h"
+#include <atomic>
+
+#include "activities/Activity.h"
 #include "components/OptionPopup.h"
+#include "components/UIThemeTokens.h"
+#include "components/UiAppHelpers.h"
+#include "util/ButtonNavigator.h"
+#include "CrossPointSettings.h"
+#include "activities/home/FileMutationInputGate.h"
 
 // Reader status bar configuration activity
-class StatusBarSettingsActivity final : public UiListActivity {
+class StatusBarSettingsActivity final : public Activity {
  public:
-  explicit StatusBarSettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
-
-  // Must equal ITEM_COUNT in the .cpp (static_assert'd there) — the max
-  // possible row count (RTC-equipped devices show all of them).
-  static constexpr int MAX_STATUS_BAR_ITEMS = 8;
+  explicit StatusBarSettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, bool readerContext = false,
+                                     bool stablePageNumbersAvailable = false, bool displayContext = false)
+      : Activity("StatusBarSettings", renderer, mappedInput),
+        readerContext(readerContext),
+        displayContext(displayContext),
+        uiTarget(makeUiTarget(renderer)),
+        app(uiTarget, uiTarget.deviceContext()) {
+    (void)stablePageNumbersAvailable;
+  }
 
   void onEnter() override;
+  void onExit() override;
+  void loop() override;
   void render(RenderLock&&) override;
+  bool handleHomeGesture() override;
 
  private:
+  enum class View : uint8_t { Root, Top, Bottom };
+  ButtonNavigator buttonNavigator;
   OptionPopup optionPopup;
 
-  // Decided in onEnter() based on halClock.isAvailable() so clock entries are hidden on X4.
+  int selectedIndex = 0;
   int visibleItemCount = 0;
+  bool readerContext = false;
+  bool displayContext = false;
+  View view = View::Root;
 
-  int listCount() const override { return visibleItemCount; }
-  void buildScreen(UiScreen& screen) override;
-  void activateIndex(int index) override;
-  bool handleCustomInput() override;
-
-  std::string rowValueText(int index);
+  using UiApp = freeink::ui::FreeInkApp<20, 4>;
+  static constexpr freeink::ui::ActionId ACTION_ROW = 1;
+  freeink::ui::GfxRendererTarget uiTarget;  // Must precede app: the app holds a reference to it.
+  UiApp app;
+  std::atomic<bool> uiReady{false};
+  FileMutationInputGate viewInputGate;
+  std::atomic<bool> viewPaintPending{true};
+  freeink::ui::ListNav listNav;
+  int visibleRows = 1;
+  int topIndex = 0;
 
   void handleSelection();
-
-  // Row storage: MAX_STATUS_BAR_ITEMS is a compile-time constant, so
-  // fixed-capacity storage avoids any heap allocation for the row list.
-  // Labels are set once in onEnter() (visibleItemCount is decided there);
-  // buildScreen() only refreshes the live value text (rowValues_) by
-  // assigning into the existing strings (no array growth).
-  std::string rowValues_[MAX_STATUS_BAR_ITEMS];
-  freeink::ui::ListItem rowItems_[MAX_STATUS_BAR_ITEMS]{};
+  void openOptionPicker();
+  void goBack();
+  ReaderStatusBarPosition selectedPosition() const;
+  void refreshItemCount();
+  int previewHeight() const;
+  int topPreviewOriginY() const;
+  Rect settingsHeaderRect() const;
+  static void settingsScreen(UiApp::ScreenType& screen, void* user);
+  static void onRowEvent(const freeink::ui::ActionEvent& event, void* user);
+  void buildSettingsScreen(UiApp::ScreenType& screen);
 };

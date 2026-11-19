@@ -1,0 +1,5143 @@
+{
+  "baseline": "2a477dea03a6db5ed4b5ccd33772c04cf19f8767",
+  "evidence_root": "/root/github/.host-data/crosssmudge/crosscub",
+  "dimensions_are_scope_not_universal_measurement": true,
+  "counts": {
+    "native_activity_headers": 75,
+    "native_render_files": 150,
+    "source_apps": 37,
+    "web_pages": 5
+  },
+  "host_results": {
+    "routine": {
+      "path": "integrated-final/results.json",
+      "sha256": "12ee335c17ff4f9d3fb1a95650750bd8d7f4bbe38c3e38609d27a811f51baa34"
+    },
+    "source_stability": {
+      "path": "integrated-final/source-stability.json",
+      "sha256": "41e3230dfb66ab0831784dbc1e770bd29e94f421ece7b06e92a652b8f44b07e3"
+    },
+    "ctest": {
+      "path": "ctest-product-final.log",
+      "sha256": "2f9b136fe6d03998e1efb84a1b6aa66b1c68cc7a7f7633fba4b407fcf814b5ca"
+    },
+    "app_suites": 19,
+    "core_suites": 16,
+    "lua_raster_cases": 242,
+    "lua_raster_frames": 2184,
+    "stock_synthetic_cases": 16
+  },
+  "native_activities": [
+    {
+      "path": "src/activities/Activity.h",
+      "sha256": "cc97ebc06f5a104c42e9ec4070748ce49f1f826ca8df4cd7fc806ca6b8acb109",
+      "baseline_sha256": "03be5d859a8955f39c51f60ba1104455d02427be98ac36cac01f0d040bfea81e",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/apps/AppSettingsActivity.h",
+      "sha256": "202912787dd54a27d9a9b2157e7277a45e845af96cb354aa33f57749e90fd269",
+      "baseline_sha256": "202912787dd54a27d9a9b2157e7277a45e845af96cb354aa33f57749e90fd269",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/apps/AppStoreActivity.h",
+      "sha256": "955209459d11dcb1ebdd597553efb434a2b8b7105233b3f56e7146f5f7c9eb13",
+      "baseline_sha256": "955209459d11dcb1ebdd597553efb434a2b8b7105233b3f56e7146f5f7c9eb13",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": [
+        "test/app_store/run_tests.sh: production methods with host storage/input/renderer; portrait/landscape geometry and paging"
+      ]
+    },
+    {
+      "path": "src/activities/apps/ApplicationsActivity.h",
+      "sha256": "6c06adc1743f71ad221ac10514cf8a10bb8f7937f4e5aaa6934cb751582b100b",
+      "baseline_sha256": "6c06adc1743f71ad221ac10514cf8a10bb8f7937f4e5aaa6934cb751582b100b",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/apps/lua/LuaAppActivity.h",
+      "sha256": "400a565612267624263713f0872e7ba4a141dd5be6c4a148ae552dca54255610",
+      "baseline_sha256": "400a565612267624263713f0872e7ba4a141dd5be6c4a148ae552dca54255610",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/apps/lua/LuaConsentActivity.h",
+      "sha256": "c763d3b348db81ef29eda2f84b036eec21bbf8cfd8a51f49f8a398f2bdcfff9e",
+      "baseline_sha256": "c763d3b348db81ef29eda2f84b036eec21bbf8cfd8a51f49f8a398f2bdcfff9e",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/boot_sleep/BootActivity.h",
+      "sha256": "f8d5de8945f0ab4b6df9d8e385948b4ef3e09f5577bb1e8988ead59ff206c33d",
+      "baseline_sha256": "f8d5de8945f0ab4b6df9d8e385948b4ef3e09f5577bb1e8988ead59ff206c33d",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": [
+        "test_logo.py: production default boot helper, text stubbed",
+        "test_logo_actual.py: production logo/rotation/pixels only"
+      ]
+    },
+    {
+      "path": "src/activities/boot_sleep/SleepActivity.h",
+      "sha256": "b4bd3941336c1bb033265c1627a7881a7ef264307adc0c2b45dc5b04778089a8",
+      "baseline_sha256": "b4bd3941336c1bb033265c1627a7881a7ef264307adc0c2b45dc5b04778089a8",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/browser/OpdsBookBrowserActivity.h",
+      "sha256": "c616c47fb4ab4cfbe93ba6744c024d5ebfd729be1a66868b5970483b075ca5e2",
+      "baseline_sha256": "c616c47fb4ab4cfbe93ba6744c024d5ebfd729be1a66868b5970483b075ca5e2",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/home/AlertActivity.h",
+      "sha256": "cb178b6307a938624b5d447cb104f4ac76df399eb3cde923424e3c2140fee2da",
+      "baseline_sha256": "cb178b6307a938624b5d447cb104f4ac76df399eb3cde923424e3c2140fee2da",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/home/CrashActivity.h",
+      "sha256": "ff8ac676a5f8c664b08e9aa2c59ea1b2df5a63f67e528a41439e188c660a8ee5",
+      "baseline_sha256": "ff8ac676a5f8c664b08e9aa2c59ea1b2df5a63f67e528a41439e188c660a8ee5",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/home/FileBrowserActionActivity.h",
+      "sha256": "40b6fedc3d022b37fd5d2af65ab2840defa5c4fe3c9a47cc56977612cb199839",
+      "baseline_sha256": "40b6fedc3d022b37fd5d2af65ab2840defa5c4fe3c9a47cc56977612cb199839",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/home/FileBrowserActivity.h",
+      "sha256": "caba06b9d1315c8e0250efa0b359137044c4df143537a630a5c0ea13bec7d966",
+      "baseline_sha256": "caba06b9d1315c8e0250efa0b359137044c4df143537a630a5c0ea13bec7d966",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/home/HomeActivity.h",
+      "sha256": "4638b9afd409d49d4a5c9ed45c7d150a7d13cf4a65b355b7d7e7b29e50b32fb3",
+      "baseline_sha256": "b178cdab40ce02149db112156bc34f9d54a7e4a2af1782b12236b60315747ccd",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/home/RecentBooksActivity.h",
+      "sha256": "ec82a171e977b6a92a175598ee53169c42addae814e1e2da03a14d35b083b0d4",
+      "baseline_sha256": "ec82a171e977b6a92a175598ee53169c42addae814e1e2da03a14d35b083b0d4",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/home/RecentBooksGridActivity.h",
+      "sha256": "654e455818cd1ecb9167e65cad045817309fb5c3ddb461e1a6fc7f909ba4135b",
+      "baseline_sha256": "654e455818cd1ecb9167e65cad045817309fb5c3ddb461e1a6fc7f909ba4135b",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/home/SavedItemsHomeActivity.h",
+      "sha256": "287c234ae2dc22ce8733aeb697ad89b45c0545a1a20bb9f187b298bc44df2c16",
+      "baseline_sha256": "287c234ae2dc22ce8733aeb697ad89b45c0545a1a20bb9f187b298bc44df2c16",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/network/AirDropReceiveActivity.h",
+      "sha256": "e7ab186d68e11ad38c6e00ca0e4f7e1de55e95794a9553815e14bbc47472f5af",
+      "baseline_sha256": "e7ab186d68e11ad38c6e00ca0e4f7e1de55e95794a9553815e14bbc47472f5af",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": [
+        "test/airdrop/ui_render.py: host-adapted activity rendering; not physical radio/display"
+      ]
+    },
+    {
+      "path": "src/activities/network/CalibreConnectActivity.h",
+      "sha256": "a43aabdc337ad6fe68be1c51ca9ca9d681131efc12622135cfb0fe274e94add7",
+      "baseline_sha256": "a43aabdc337ad6fe68be1c51ca9ca9d681131efc12622135cfb0fe274e94add7",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/network/CrossPointWebServerActivity.h",
+      "sha256": "ec31c8ac9c3a6a9296b9ed1776cbffc74048b04be56b91539ac8f91695f0b0c0",
+      "baseline_sha256": "ec31c8ac9c3a6a9296b9ed1776cbffc74048b04be56b91539ac8f91695f0b0c0",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/network/NearbyBookTransferActivity.h",
+      "sha256": "7c8e21707c5c382146b64edb56938cccea28e217ecc045f7ca598d0e23053e2a",
+      "baseline_sha256": "7c8e21707c5c382146b64edb56938cccea28e217ecc045f7ca598d0e23053e2a",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/network/NearbyStatsSyncActivity.h",
+      "sha256": "bdf1321f20125f3fc898dab57903780aded0fd16b2a5a4fc100d1adb6b995faf",
+      "baseline_sha256": "bdf1321f20125f3fc898dab57903780aded0fd16b2a5a4fc100d1adb6b995faf",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/network/NetworkModeSelectionActivity.h",
+      "sha256": "78bd08d40ecd8ec771a64d1670ff1ed68f6d2ce5d9b505a6c4fe63915172d740",
+      "baseline_sha256": "78bd08d40ecd8ec771a64d1670ff1ed68f6d2ce5d9b505a6c4fe63915172d740",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/network/UsbDriveActivity.h",
+      "sha256": "16f7c3378c469972a02794543d09f9810fbf18e984069fd4be28126747296054",
+      "baseline_sha256": "16f7c3378c469972a02794543d09f9810fbf18e984069fd4be28126747296054",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/network/WifiSelectionActivity.h",
+      "sha256": "b9aad65e7e86d4eab1244c1833b0b33814256d3010a9a8d0d1993c9740045fa8",
+      "baseline_sha256": "b9aad65e7e86d4eab1244c1833b0b33814256d3010a9a8d0d1993c9740045fa8",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/BookStatsActivity.h",
+      "sha256": "c6eecc5e0b72255006a994bd5eb0647360134a4430732965f9bdefa2125ff759",
+      "baseline_sha256": "c6eecc5e0b72255006a994bd5eb0647360134a4430732965f9bdefa2125ff759",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/ClipSelectionActivity.h",
+      "sha256": "63d61c1c76aac3a5eda364b69d6eae2d57fcb951d22435c5ceeaac7c4242a28a",
+      "baseline_sha256": "63d61c1c76aac3a5eda364b69d6eae2d57fcb951d22435c5ceeaac7c4242a28a",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/ControlsOptionsActivity.h",
+      "sha256": "33ab0ef5e4adf4047054b012e4ca260d0f05b751eb870bb7bddf2413678f991c",
+      "baseline_sha256": "33ab0ef5e4adf4047054b012e4ca260d0f05b751eb870bb7bddf2413678f991c",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/DictionaryDefinitionActivity.h",
+      "sha256": "4650eb96c1a460f7d4262d4577af245aa6656232ea36f7315b82fa9640ba1ef4",
+      "baseline_sha256": "4650eb96c1a460f7d4262d4577af245aa6656232ea36f7315b82fa9640ba1ef4",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/DictionarySuggestionsActivity.h",
+      "sha256": "f385a1966d518afe88e4f8c808b50d38e9ae1b50c896192385fa2e4ad1f610b7",
+      "baseline_sha256": "f385a1966d518afe88e4f8c808b50d38e9ae1b50c896192385fa2e4ad1f610b7",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/DictionaryWordSelectActivity.h",
+      "sha256": "62ea209e64ce1f74eadb4fc20567e18a5e5cff246fdd979a856e1c6cc3352903",
+      "baseline_sha256": "62ea209e64ce1f74eadb4fc20567e18a5e5cff246fdd979a856e1c6cc3352903",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/EpubReaderActivity.h",
+      "sha256": "29fc9b79b8d968a385544e3369f0cd66dc3497bf5019f2eef1ec636b41383c60",
+      "baseline_sha256": "29fc9b79b8d968a385544e3369f0cd66dc3497bf5019f2eef1ec636b41383c60",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/EpubReaderBookmarkListActivity.h",
+      "sha256": "07bf7351a32d29284e6a64d5f1ec7a3146ee9b2f8e2676c7e11c6fe5ccc5f91d",
+      "baseline_sha256": "07bf7351a32d29284e6a64d5f1ec7a3146ee9b2f8e2676c7e11c6fe5ccc5f91d",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/EpubReaderChapterSelectionActivity.h",
+      "sha256": "89931e33ac4efe980baba7a88ef599be1e60ba66cd0cab0aecee2408d03537d6",
+      "baseline_sha256": "89931e33ac4efe980baba7a88ef599be1e60ba66cd0cab0aecee2408d03537d6",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/EpubReaderClippingListActivity.h",
+      "sha256": "78a0d84e1f9950d228f26eb9ed2366aff3b0abafdba0b179eb60a591b241be53",
+      "baseline_sha256": "78a0d84e1f9950d228f26eb9ed2366aff3b0abafdba0b179eb60a591b241be53",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/EpubReaderFootnotesActivity.h",
+      "sha256": "ebdcb41a2b4a47288048859825185a5227295f012b36aebc64a7a45935f8dafb",
+      "baseline_sha256": "ebdcb41a2b4a47288048859825185a5227295f012b36aebc64a7a45935f8dafb",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/EpubReaderMenuActivity.h",
+      "sha256": "305fb03567e2427bef3b2c037e6f05d9b0751fccb860a211f87c38fd328d7f8a",
+      "baseline_sha256": "305fb03567e2427bef3b2c037e6f05d9b0751fccb860a211f87c38fd328d7f8a",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/EpubReaderPercentSelectionActivity.h",
+      "sha256": "bc371bc866d63ba7931a9456b3aaf3fa2edb5cae5c0ea2f8f2cf70aaa2da728e",
+      "baseline_sha256": "bc371bc866d63ba7931a9456b3aaf3fa2edb5cae5c0ea2f8f2cf70aaa2da728e",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/EpubReaderTouchMenuActivity.h",
+      "sha256": "19764b506924ca2bad871fcf2c12e4f2d1d03d3defe1632458d65c3b1d49fbf4",
+      "baseline_sha256": "19764b506924ca2bad871fcf2c12e4f2d1d03d3defe1632458d65c3b1d49fbf4",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/KOReaderSyncActivity.h",
+      "sha256": "4b0dde94343302c4e706ccc1804de7417ab2f465f969215a18d0596e7b4aed24",
+      "baseline_sha256": "4b0dde94343302c4e706ccc1804de7417ab2f465f969215a18d0596e7b4aed24",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/LookedUpWordsActivity.h",
+      "sha256": "6de10e5ddcee3bee2c25b170c30a45a53450f21bf426dadfb7d095561e45ab17",
+      "baseline_sha256": "6de10e5ddcee3bee2c25b170c30a45a53450f21bf426dadfb7d095561e45ab17",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/NearbyBookPositionSyncActivity.h",
+      "sha256": "f89ec4b9d01904907f5c6b91ffcefdcd6b2a994fab42cd3c7a0054b5a4ab3a4f",
+      "baseline_sha256": "f89ec4b9d01904907f5c6b91ffcefdcd6b2a994fab42cd3c7a0054b5a4ab3a4f",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/QrDisplayActivity.h",
+      "sha256": "e2fc8bfce44b99dd1c2eb81d445f9405f567ad68856e9931eadf0eccc39303a5",
+      "baseline_sha256": "e2fc8bfce44b99dd1c2eb81d445f9405f567ad68856e9931eadf0eccc39303a5",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/ReaderActivity.h",
+      "sha256": "79a4cd8021e42f3aa9c43e9f1caa6db60dee91b28d53bd5c05cc447b131dc16d",
+      "baseline_sha256": "79a4cd8021e42f3aa9c43e9f1caa6db60dee91b28d53bd5c05cc447b131dc16d",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/ReaderOptionsActivity.h",
+      "sha256": "c7c15c3aa481ebfaed1a2aa95d81c38ba94f637a10fd70ddb49a956add221e37",
+      "baseline_sha256": "c7c15c3aa481ebfaed1a2aa95d81c38ba94f637a10fd70ddb49a956add221e37",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/TxtReaderActivity.h",
+      "sha256": "839902cd1eb720187c8853e3c36b4382615e00094b2c2d716f3189a754711755",
+      "baseline_sha256": "839902cd1eb720187c8853e3c36b4382615e00094b2c2d716f3189a754711755",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/XtcReaderActivity.h",
+      "sha256": "37175b436a3a08f601b5f4825c9e22e256382d1d3c10668522110f2a0734d64c",
+      "baseline_sha256": "37175b436a3a08f601b5f4825c9e22e256382d1d3c10668522110f2a0734d64c",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/XtcReaderChapterSelectionActivity.h",
+      "sha256": "f1adfa64fdcf87150ce8f662a4eae795e8fd66fe27231094dcbdbd34e9130db9",
+      "baseline_sha256": "f1adfa64fdcf87150ce8f662a4eae795e8fd66fe27231094dcbdbd34e9130db9",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/reader/XtcReaderMenuActivity.h",
+      "sha256": "420a174e0c9dffa170deb74d984abf7bac084496702bfd9d30384eb1254005cc",
+      "baseline_sha256": "420a174e0c9dffa170deb74d984abf7bac084496702bfd9d30384eb1254005cc",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/BackupStatsActivity.h",
+      "sha256": "2ca01dcb84cc0aabfa706ff317d39fc9dac0adfb6a14c55e408e6df39c328456",
+      "baseline_sha256": "2ca01dcb84cc0aabfa706ff317d39fc9dac0adfb6a14c55e408e6df39c328456",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/ButtonRemapActivity.h",
+      "sha256": "dc1d19d8437dd10a9a2918cf3be7d5e3903c3a18d96dccaea121675eb2288ed8",
+      "baseline_sha256": "dc1d19d8437dd10a9a2918cf3be7d5e3903c3a18d96dccaea121675eb2288ed8",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/ClearCacheActivity.h",
+      "sha256": "56f03e28f2b3f688fcbced150cdf01cf4b67bfe8e7c569b5ea4ef5cfa6f7b43c",
+      "baseline_sha256": "56f03e28f2b3f688fcbced150cdf01cf4b67bfe8e7c569b5ea4ef5cfa6f7b43c",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/ClockOffsetActivity.h",
+      "sha256": "b2a1b99990c6fd6e55e582f5d712a384fbe1bfe82b6a8e8f6df2339070ee4b7a",
+      "baseline_sha256": "b2a1b99990c6fd6e55e582f5d712a384fbe1bfe82b6a8e8f6df2339070ee4b7a",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/ClockSyncActivity.h",
+      "sha256": "e98dab2a3742f1630e11896edc8ed346e06af79689891be906de0bb04d66643e",
+      "baseline_sha256": "e98dab2a3742f1630e11896edc8ed346e06af79689891be906de0bb04d66643e",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/DictionarySelectActivity.h",
+      "sha256": "0253531895ef27872fb9baa9d3919bc378608c609e21df5090d2a5196bafa9f2",
+      "baseline_sha256": "0253531895ef27872fb9baa9d3919bc378608c609e21df5090d2a5196bafa9f2",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/FontDownloadActivity.h",
+      "sha256": "6142c119cec759cea9151719724b24be9693a93b78ce90375692ad329c27cdba",
+      "baseline_sha256": "6142c119cec759cea9151719724b24be9693a93b78ce90375692ad329c27cdba",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/FontSelectionActivity.h",
+      "sha256": "a744f348461d4134c9e1a23c6cb11ed477c171f3745ef9a7d02c166d6a6475b0",
+      "baseline_sha256": "a744f348461d4134c9e1a23c6cb11ed477c171f3745ef9a7d02c166d6a6475b0",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/FrontlightTimePickerActivity.h",
+      "sha256": "98cd126127a0f2d43a72babdc6ea4146c88b68f1049a1a2cacc54c0ac55ae833",
+      "baseline_sha256": "98cd126127a0f2d43a72babdc6ea4146c88b68f1049a1a2cacc54c0ac55ae833",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/KOReaderAuthActivity.h",
+      "sha256": "ce0728cbf0b76e964cf5a00ff1302c8c9aa4b372d9d4788585a5212f2b386830",
+      "baseline_sha256": "ce0728cbf0b76e964cf5a00ff1302c8c9aa4b372d9d4788585a5212f2b386830",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/KOReaderSettingsActivity.h",
+      "sha256": "be772cb1c4cb8fa923a81ef094d6ae06818f210e951f0f81179f080cf956b1ed",
+      "baseline_sha256": "be772cb1c4cb8fa923a81ef094d6ae06818f210e951f0f81179f080cf956b1ed",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/KeyboardLayoutsActivity.h",
+      "sha256": "4fb83c8967d43a40d75abaf1c99f4cb75d689e4f8f7a917bffed9efc29bd04b7",
+      "baseline_sha256": "4fb83c8967d43a40d75abaf1c99f4cb75d689e4f8f7a917bffed9efc29bd04b7",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/OpdsServerListActivity.h",
+      "sha256": "87345090dc4c99092e0512e0ac576773da3e2c2335bc40da0e11134490cba0be",
+      "baseline_sha256": "87345090dc4c99092e0512e0ac576773da3e2c2335bc40da0e11134490cba0be",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/OpdsSettingsActivity.h",
+      "sha256": "b6fdf7f1720120e35602e832e30771ee413afe0eec6f25974404fad54aac0629",
+      "baseline_sha256": "b6fdf7f1720120e35602e832e30771ee413afe0eec6f25974404fad54aac0629",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/OtaUpdateActivity.h",
+      "sha256": "be1abe74d12e7877187665003bf2cbbbfc307aae4b0bec8f07f2ebdb44559940",
+      "baseline_sha256": "be1abe74d12e7877187665003bf2cbbbfc307aae4b0bec8f07f2ebdb44559940",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/QuickActionsActivity.h",
+      "sha256": "d4f316a60790a84b544d4187d8ca95b2769fdf4e4ee2a55b4a972a22ac36f42a",
+      "baseline_sha256": "d4f316a60790a84b544d4187d8ca95b2769fdf4e4ee2a55b4a972a22ac36f42a",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/SdFirmwareUpdateActivity.h",
+      "sha256": "9b9caf4032c3811473013742033157004ac8b057b78629ae4a0ed60eb2031a0b",
+      "baseline_sha256": "b38350693f01e245ab6a4d9f611e47aa4e559275612356c0b385a960741e33c8",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/SettingsActivity.h",
+      "sha256": "15bb9bc0ebec47ee18484f04535b563b69f743cefd0f1e941f6c16022b299ebd",
+      "baseline_sha256": "15bb9bc0ebec47ee18484f04535b563b69f743cefd0f1e941f6c16022b299ebd",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/settings/StatusBarSettingsActivity.h",
+      "sha256": "3eb49289c62c76650046ae4876d9612cc5605bf642633dffc483255a646c03a8",
+      "baseline_sha256": "3eb49289c62c76650046ae4876d9612cc5605bf642633dffc483255a646c03a8",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/util/BmpViewerActivity.h",
+      "sha256": "d5d6bad22dd48c0a5c422bda6dd7e9205beef8519e56b8eac2bd027faab9c606",
+      "baseline_sha256": "d5d6bad22dd48c0a5c422bda6dd7e9205beef8519e56b8eac2bd027faab9c606",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/util/ConfirmationActivity.h",
+      "sha256": "dc31e86afe1670f3a6ef8abb5b5fb4d5e9872c9741ed4820823029d0dd9c7578",
+      "baseline_sha256": "dc31e86afe1670f3a6ef8abb5b5fb4d5e9872c9741ed4820823029d0dd9c7578",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/util/FrontlightPanelActivity.h",
+      "sha256": "9df7288daac85e61e027321787d8c30be6a43d0d822b8a674d494652c4c48f27",
+      "baseline_sha256": "dd79a54f1162cb646831e8b6d958cb24b078856469382c4626467c8095f811e7",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/util/FullScreenMessageActivity.h",
+      "sha256": "b81f36207a3a57b8ff44b376456b61e198e5f7d62f94732311a0a628b4aa7411",
+      "baseline_sha256": "b81f36207a3a57b8ff44b376456b61e198e5f7d62f94732311a0a628b4aa7411",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/util/IntervalSelectionActivity.h",
+      "sha256": "d20f5c343b3bc14e3b5787b3bf5ee24e4a68fbf004808f479e8aea37808a6f38",
+      "baseline_sha256": "d20f5c343b3bc14e3b5787b3bf5ee24e4a68fbf004808f479e8aea37808a6f38",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/util/KeyboardEntryActivity.h",
+      "sha256": "68f03114c6faeed531d3c2c05c23eda2cd2e17ec6abc15dcca48fc2e6fb0fed7",
+      "baseline_sha256": "68f03114c6faeed531d3c2c05c23eda2cd2e17ec6abc15dcca48fc2e6fb0fed7",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    },
+    {
+      "path": "src/activities/util/OptionSelectionActivity.h",
+      "sha256": "90dad6680522c942ba9124d62b328ad27332007c39021aaf50402aef610f4754",
+      "baseline_sha256": "90dad6680522c942ba9124d62b328ad27332007c39021aaf50402aef610f4754",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source-preserved; full native screens/states not rendered",
+      "measured_seams": []
+    }
+  ],
+  "native_render_files": [
+    {
+      "path": "src/activities/Activity.h",
+      "sha256": "cc97ebc06f5a104c42e9ec4070748ce49f1f826ca8df4cd7fc806ca6b8acb109",
+      "baseline_sha256": "03be5d859a8955f39c51f60ba1104455d02427be98ac36cac01f0d040bfea81e",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/ActivityManager.cpp",
+      "sha256": "067c93850bf80d7082cd5ac23dce2b267da3853ac21f4e7ae5faa6b704a819e4",
+      "baseline_sha256": "067c93850bf80d7082cd5ac23dce2b267da3853ac21f4e7ae5faa6b704a819e4",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/apps/AppSettingsActivity.h",
+      "sha256": "202912787dd54a27d9a9b2157e7277a45e845af96cb354aa33f57749e90fd269",
+      "baseline_sha256": "202912787dd54a27d9a9b2157e7277a45e845af96cb354aa33f57749e90fd269",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/apps/AppStoreActivity.h",
+      "sha256": "955209459d11dcb1ebdd597553efb434a2b8b7105233b3f56e7146f5f7c9eb13",
+      "baseline_sha256": "955209459d11dcb1ebdd597553efb434a2b8b7105233b3f56e7146f5f7c9eb13",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/apps/ApplicationsActivity.h",
+      "sha256": "6c06adc1743f71ad221ac10514cf8a10bb8f7937f4e5aaa6934cb751582b100b",
+      "baseline_sha256": "6c06adc1743f71ad221ac10514cf8a10bb8f7937f4e5aaa6934cb751582b100b",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/apps/lua/BrowserImage.cpp",
+      "sha256": "f0ca5292f8c0ad2b65c5f11437e7c2ea1bb5c2882febd206abeff0fcbc56587d",
+      "baseline_sha256": "f0ca5292f8c0ad2b65c5f11437e7c2ea1bb5c2882febd206abeff0fcbc56587d",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/apps/lua/LuaAppActivity.h",
+      "sha256": "400a565612267624263713f0872e7ba4a141dd5be6c4a148ae552dca54255610",
+      "baseline_sha256": "400a565612267624263713f0872e7ba4a141dd5be6c4a148ae552dca54255610",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/apps/lua/LuaConsentActivity.h",
+      "sha256": "c763d3b348db81ef29eda2f84b036eec21bbf8cfd8a51f49f8a398f2bdcfff9e",
+      "baseline_sha256": "c763d3b348db81ef29eda2f84b036eec21bbf8cfd8a51f49f8a398f2bdcfff9e",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/apps/lua/LuaRunner.cpp",
+      "sha256": "4e7e833142628844ff65a8111e1d4abd42df27e9d91781cf7e29c948b722cd8c",
+      "baseline_sha256": "817bdbe3c4ff5c678b766d4b7eb6f6ddb3795e26b9206e002410287b93b12ba1",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/boot_sleep/BootActivity.cpp",
+      "sha256": "c7c03b04774e0bc797a6a04639bfc7b08293082f53f17f25ea9b0f7c27f40eb7",
+      "baseline_sha256": "9c4d7b9f85e3f2a82adb6eeb37a26e096cec0ec0ab8f56f8c2266eabefebbc93",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/boot_sleep/SleepActivity.cpp",
+      "sha256": "b20b5f100c7ca95d40036efbc38cd6c4d3484f08cf11e7b88ce9f4f6b80ae411",
+      "baseline_sha256": "b2964ad49a726260d0bd697cf77d95004a6233c33680fbcd6c0acbe1b8008332",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/browser/OpdsBookBrowserActivity.cpp",
+      "sha256": "466a6f36b958b9984009c260411088ebc19bb4b60ac9b58703b4e815932c4eb5",
+      "baseline_sha256": "466a6f36b958b9984009c260411088ebc19bb4b60ac9b58703b4e815932c4eb5",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/browser/OpdsBookBrowserActivity.h",
+      "sha256": "c616c47fb4ab4cfbe93ba6744c024d5ebfd729be1a66868b5970483b075ca5e2",
+      "baseline_sha256": "c616c47fb4ab4cfbe93ba6744c024d5ebfd729be1a66868b5970483b075ca5e2",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/AlertActivity.cpp",
+      "sha256": "12ee99573a7b2f9820f0b4fb272d37ee2cc84fcfb968ea85d06bc6348a506b39",
+      "baseline_sha256": "12ee99573a7b2f9820f0b4fb272d37ee2cc84fcfb968ea85d06bc6348a506b39",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/AlertActivity.h",
+      "sha256": "cb178b6307a938624b5d447cb104f4ac76df399eb3cde923424e3c2140fee2da",
+      "baseline_sha256": "cb178b6307a938624b5d447cb104f4ac76df399eb3cde923424e3c2140fee2da",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/BookActions.cpp",
+      "sha256": "810adbe6dca04e45a740258ccfe396172defd217a9ca759a693b462cef57d3f5",
+      "baseline_sha256": "810adbe6dca04e45a740258ccfe396172defd217a9ca759a693b462cef57d3f5",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/BookActions.h",
+      "sha256": "b1d4d6cb0fcd03bec5d608521985e7ecdfa3d84fb87ff5531725e0bc3d668300",
+      "baseline_sha256": "b1d4d6cb0fcd03bec5d608521985e7ecdfa3d84fb87ff5531725e0bc3d668300",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/CrashActivity.cpp",
+      "sha256": "025a97b11b3a3a70801071b8515ff0fc47753e3da1eda436a01833b577008468",
+      "baseline_sha256": "025a97b11b3a3a70801071b8515ff0fc47753e3da1eda436a01833b577008468",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/CrashActivity.h",
+      "sha256": "ff8ac676a5f8c664b08e9aa2c59ea1b2df5a63f67e528a41439e188c660a8ee5",
+      "baseline_sha256": "ff8ac676a5f8c664b08e9aa2c59ea1b2df5a63f67e528a41439e188c660a8ee5",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/FileBrowserActionActivity.cpp",
+      "sha256": "02ca88bdc4ee04590fec9446914efea2226aaf7c9c2cf83b46da7d8b51f6a081",
+      "baseline_sha256": "02ca88bdc4ee04590fec9446914efea2226aaf7c9c2cf83b46da7d8b51f6a081",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/FileBrowserActionActivity.h",
+      "sha256": "40b6fedc3d022b37fd5d2af65ab2840defa5c4fe3c9a47cc56977612cb199839",
+      "baseline_sha256": "40b6fedc3d022b37fd5d2af65ab2840defa5c4fe3c9a47cc56977612cb199839",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/FileBrowserActivity.cpp",
+      "sha256": "c19bec862940f94b7c4700f2785647fb14a34fb86dc7aa905cb6e367e686338d",
+      "baseline_sha256": "c19bec862940f94b7c4700f2785647fb14a34fb86dc7aa905cb6e367e686338d",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/FileBrowserActivity.h",
+      "sha256": "caba06b9d1315c8e0250efa0b359137044c4df143537a630a5c0ea13bec7d966",
+      "baseline_sha256": "caba06b9d1315c8e0250efa0b359137044c4df143537a630a5c0ea13bec7d966",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/HomeActivity.cpp",
+      "sha256": "dd5160cf9649acc9260ae47b7c7bef701d1c67bf801db59afa6538404179cd49",
+      "baseline_sha256": "3784dcf6b31c1ea5d419ae93a682cde2b2687649b4713647475d17a89108ae6d",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/HomeActivity.h",
+      "sha256": "4638b9afd409d49d4a5c9ed45c7d150a7d13cf4a65b355b7d7e7b29e50b32fb3",
+      "baseline_sha256": "b178cdab40ce02149db112156bc34f9d54a7e4a2af1782b12236b60315747ccd",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/RecentBooksActivity.cpp",
+      "sha256": "bfca593e3a364c26e8eec9468c1cc06805efaf7382f906bbb8ad66b32263caa4",
+      "baseline_sha256": "bfca593e3a364c26e8eec9468c1cc06805efaf7382f906bbb8ad66b32263caa4",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/RecentBooksActivity.h",
+      "sha256": "ec82a171e977b6a92a175598ee53169c42addae814e1e2da03a14d35b083b0d4",
+      "baseline_sha256": "ec82a171e977b6a92a175598ee53169c42addae814e1e2da03a14d35b083b0d4",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/RecentBooksGridActivity.cpp",
+      "sha256": "d04c485f413bb197e5948eda48e552fc21bd4915399311acc32fdf23f4753da3",
+      "baseline_sha256": "d04c485f413bb197e5948eda48e552fc21bd4915399311acc32fdf23f4753da3",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/RecentBooksGridActivity.h",
+      "sha256": "654e455818cd1ecb9167e65cad045817309fb5c3ddb461e1a6fc7f909ba4135b",
+      "baseline_sha256": "654e455818cd1ecb9167e65cad045817309fb5c3ddb461e1a6fc7f909ba4135b",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/SavedItemsHomeActivity.cpp",
+      "sha256": "467a9988300f9922c30b30802da5b288603d5963e32fcb685283d67045ceabd3",
+      "baseline_sha256": "467a9988300f9922c30b30802da5b288603d5963e32fcb685283d67045ceabd3",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/home/SavedItemsHomeActivity.h",
+      "sha256": "287c234ae2dc22ce8733aeb697ad89b45c0545a1a20bb9f187b298bc44df2c16",
+      "baseline_sha256": "287c234ae2dc22ce8733aeb697ad89b45c0545a1a20bb9f187b298bc44df2c16",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/network/AirDropReceiveActivity.cpp",
+      "sha256": "330d79a44238b0a4953e5512ab670be25b442d059aff8a131f9f0fe15679c066",
+      "baseline_sha256": "330d79a44238b0a4953e5512ab670be25b442d059aff8a131f9f0fe15679c066",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/network/AirDropReceiveActivity.h",
+      "sha256": "e7ab186d68e11ad38c6e00ca0e4f7e1de55e95794a9553815e14bbc47472f5af",
+      "baseline_sha256": "e7ab186d68e11ad38c6e00ca0e4f7e1de55e95794a9553815e14bbc47472f5af",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/network/CalibreConnectActivity.cpp",
+      "sha256": "6cfbe1c9e5df6e940837b87910537efdc3116da350dfcc9cd376fd77b9c91851",
+      "baseline_sha256": "6cfbe1c9e5df6e940837b87910537efdc3116da350dfcc9cd376fd77b9c91851",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/network/CalibreConnectActivity.h",
+      "sha256": "a43aabdc337ad6fe68be1c51ca9ca9d681131efc12622135cfb0fe274e94add7",
+      "baseline_sha256": "a43aabdc337ad6fe68be1c51ca9ca9d681131efc12622135cfb0fe274e94add7",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/network/CrossPointWebServerActivity.cpp",
+      "sha256": "c24cc500b9ff9de3e83d5dfc6f445183fd40b863e7fcdd10f21ea613a7bd89fd",
+      "baseline_sha256": "c24cc500b9ff9de3e83d5dfc6f445183fd40b863e7fcdd10f21ea613a7bd89fd",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/network/CrossPointWebServerActivity.h",
+      "sha256": "ec31c8ac9c3a6a9296b9ed1776cbffc74048b04be56b91539ac8f91695f0b0c0",
+      "baseline_sha256": "ec31c8ac9c3a6a9296b9ed1776cbffc74048b04be56b91539ac8f91695f0b0c0",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/network/NearbyBookTransferActivity.cpp",
+      "sha256": "0cf152ec71af19009d2ec1fe0b192173e9cd1fe177cba32a1611b7b71ca35b6d",
+      "baseline_sha256": "0cf152ec71af19009d2ec1fe0b192173e9cd1fe177cba32a1611b7b71ca35b6d",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/network/NearbyBookTransferActivity.h",
+      "sha256": "7c8e21707c5c382146b64edb56938cccea28e217ecc045f7ca598d0e23053e2a",
+      "baseline_sha256": "7c8e21707c5c382146b64edb56938cccea28e217ecc045f7ca598d0e23053e2a",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/network/NearbyStatsSyncActivity.cpp",
+      "sha256": "f0ede845f4470722d7a1a3d6c1c16d41cfe33b0d964c143310165088fecc76bf",
+      "baseline_sha256": "578f9f0cd6e518b16923fbd4fca1bcf31ab9206645a9ef1d618a8ba375820f08",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/network/NearbyStatsSyncActivity.h",
+      "sha256": "bdf1321f20125f3fc898dab57903780aded0fd16b2a5a4fc100d1adb6b995faf",
+      "baseline_sha256": "bdf1321f20125f3fc898dab57903780aded0fd16b2a5a4fc100d1adb6b995faf",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/network/NetworkModeSelectionActivity.cpp",
+      "sha256": "bc234920b69673e30e986130f7de52b1393805a5dab75ebd21d152a391e43066",
+      "baseline_sha256": "bc234920b69673e30e986130f7de52b1393805a5dab75ebd21d152a391e43066",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/network/NetworkModeSelectionActivity.h",
+      "sha256": "78bd08d40ecd8ec771a64d1670ff1ed68f6d2ce5d9b505a6c4fe63915172d740",
+      "baseline_sha256": "78bd08d40ecd8ec771a64d1670ff1ed68f6d2ce5d9b505a6c4fe63915172d740",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/network/UsbDriveActivity.cpp",
+      "sha256": "5973dda61fdfdfc6e1e6f1648f24df6b986a801fd5a306123ec198d1e465e048",
+      "baseline_sha256": "5973dda61fdfdfc6e1e6f1648f24df6b986a801fd5a306123ec198d1e465e048",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/network/UsbDriveActivity.h",
+      "sha256": "16f7c3378c469972a02794543d09f9810fbf18e984069fd4be28126747296054",
+      "baseline_sha256": "16f7c3378c469972a02794543d09f9810fbf18e984069fd4be28126747296054",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/network/WifiSelectionActivity.cpp",
+      "sha256": "7e61246111906634337452f5218579fd4822cb40e53178a5509e6dc12e91fa6e",
+      "baseline_sha256": "7e61246111906634337452f5218579fd4822cb40e53178a5509e6dc12e91fa6e",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/network/WifiSelectionActivity.h",
+      "sha256": "b9aad65e7e86d4eab1244c1833b0b33814256d3010a9a8d0d1993c9740045fa8",
+      "baseline_sha256": "b9aad65e7e86d4eab1244c1833b0b33814256d3010a9a8d0d1993c9740045fa8",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/BookStatsActivity.cpp",
+      "sha256": "c6e24ea445b3c611b6a9843cb892246dbbff7e4e5a1b2e313c10a8a054105d77",
+      "baseline_sha256": "c6e24ea445b3c611b6a9843cb892246dbbff7e4e5a1b2e313c10a8a054105d77",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/BookStatsActivity.h",
+      "sha256": "c6eecc5e0b72255006a994bd5eb0647360134a4430732965f9bdefa2125ff759",
+      "baseline_sha256": "c6eecc5e0b72255006a994bd5eb0647360134a4430732965f9bdefa2125ff759",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/BookStatsView.cpp",
+      "sha256": "15b9b00422612b10dc3863c7f8755560f7b9d2222b6dff011a8d872ccf5a0bf2",
+      "baseline_sha256": "15b9b00422612b10dc3863c7f8755560f7b9d2222b6dff011a8d872ccf5a0bf2",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/ClipSelectionActivity.cpp",
+      "sha256": "d813ecb20c07a09d0690d2f9487bc41e7fe63f2d6191f10bd5064a6531302890",
+      "baseline_sha256": "d813ecb20c07a09d0690d2f9487bc41e7fe63f2d6191f10bd5064a6531302890",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/ClipSelectionActivity.h",
+      "sha256": "63d61c1c76aac3a5eda364b69d6eae2d57fcb951d22435c5ceeaac7c4242a28a",
+      "baseline_sha256": "63d61c1c76aac3a5eda364b69d6eae2d57fcb951d22435c5ceeaac7c4242a28a",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/ControlsOptionsActivity.cpp",
+      "sha256": "7e8196dd14026e39c32f04f7e45a0eba45e5c3981cf0d791701ee30947f11e17",
+      "baseline_sha256": "7e8196dd14026e39c32f04f7e45a0eba45e5c3981cf0d791701ee30947f11e17",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/ControlsOptionsActivity.h",
+      "sha256": "33ab0ef5e4adf4047054b012e4ca260d0f05b751eb870bb7bddf2413678f991c",
+      "baseline_sha256": "33ab0ef5e4adf4047054b012e4ca260d0f05b751eb870bb7bddf2413678f991c",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/DictionaryDefinitionActivity.cpp",
+      "sha256": "30a7b7e5bf354c4d1a5e705147b1b2645bb3663cbb2a5b0ad685cdce1e6d92bf",
+      "baseline_sha256": "30a7b7e5bf354c4d1a5e705147b1b2645bb3663cbb2a5b0ad685cdce1e6d92bf",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/DictionaryDefinitionActivity.h",
+      "sha256": "4650eb96c1a460f7d4262d4577af245aa6656232ea36f7315b82fa9640ba1ef4",
+      "baseline_sha256": "4650eb96c1a460f7d4262d4577af245aa6656232ea36f7315b82fa9640ba1ef4",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/DictionarySuggestionsActivity.cpp",
+      "sha256": "e187ea2c495517e847eb073c47e53541d2ba391448bc6d2e979755a2324a6d46",
+      "baseline_sha256": "e187ea2c495517e847eb073c47e53541d2ba391448bc6d2e979755a2324a6d46",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/DictionarySuggestionsActivity.h",
+      "sha256": "f385a1966d518afe88e4f8c808b50d38e9ae1b50c896192385fa2e4ad1f610b7",
+      "baseline_sha256": "f385a1966d518afe88e4f8c808b50d38e9ae1b50c896192385fa2e4ad1f610b7",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/DictionaryWordSelectActivity.cpp",
+      "sha256": "9aa62cbb7de2329e9a11dfd8afec17e1fdcd1d479f69b4d93e6deadf09f5d543",
+      "baseline_sha256": "9aa62cbb7de2329e9a11dfd8afec17e1fdcd1d479f69b4d93e6deadf09f5d543",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/DictionaryWordSelectActivity.h",
+      "sha256": "62ea209e64ce1f74eadb4fc20567e18a5e5cff246fdd979a856e1c6cc3352903",
+      "baseline_sha256": "62ea209e64ce1f74eadb4fc20567e18a5e5cff246fdd979a856e1c6cc3352903",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EndOfBookOptions.cpp",
+      "sha256": "6eb7959c7a15397d179ac1312b7b8f9723c0e0faaa7ece3c24d3967ae26138d0",
+      "baseline_sha256": "6eb7959c7a15397d179ac1312b7b8f9723c0e0faaa7ece3c24d3967ae26138d0",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EndOfBookOptions.h",
+      "sha256": "69276dda0e297e160f24102dd6b19e133391e9e514814f5e63fd1182e732526a",
+      "baseline_sha256": "69276dda0e297e160f24102dd6b19e133391e9e514814f5e63fd1182e732526a",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubGrayscale.cpp",
+      "sha256": "bb6e9ab7330a12d7d7090fadfefaa03002351307072a3203ab042519ee629dab",
+      "baseline_sha256": "bb6e9ab7330a12d7d7090fadfefaa03002351307072a3203ab042519ee629dab",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubReaderActivity.cpp",
+      "sha256": "78786763e77710abe9c2b1eed58a2ef25b0323ddd12056fff7b2202e459c0140",
+      "baseline_sha256": "55c93a24c058ee51a1c211d60a150f8eb08490bda3cc0b2b3e24a031a4206e2f",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubReaderActivity.h",
+      "sha256": "29fc9b79b8d968a385544e3369f0cd66dc3497bf5019f2eef1ec636b41383c60",
+      "baseline_sha256": "29fc9b79b8d968a385544e3369f0cd66dc3497bf5019f2eef1ec636b41383c60",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubReaderBookmarkListActivity.cpp",
+      "sha256": "1ad3deb5bf5263a439df42e87d5530ad4ecc4ca098bb5e20e15d07a716684a10",
+      "baseline_sha256": "1ad3deb5bf5263a439df42e87d5530ad4ecc4ca098bb5e20e15d07a716684a10",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubReaderBookmarkListActivity.h",
+      "sha256": "07bf7351a32d29284e6a64d5f1ec7a3146ee9b2f8e2676c7e11c6fe5ccc5f91d",
+      "baseline_sha256": "07bf7351a32d29284e6a64d5f1ec7a3146ee9b2f8e2676c7e11c6fe5ccc5f91d",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubReaderChapterSelectionActivity.cpp",
+      "sha256": "ba292e1bd7ad7c3ddb313d5bcd6c00b590b1b7b07be02382dac2a231d990741c",
+      "baseline_sha256": "ba292e1bd7ad7c3ddb313d5bcd6c00b590b1b7b07be02382dac2a231d990741c",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubReaderChapterSelectionActivity.h",
+      "sha256": "89931e33ac4efe980baba7a88ef599be1e60ba66cd0cab0aecee2408d03537d6",
+      "baseline_sha256": "89931e33ac4efe980baba7a88ef599be1e60ba66cd0cab0aecee2408d03537d6",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubReaderClippingListActivity.cpp",
+      "sha256": "897257322c94cb154dcee6fc63940e12b4ebdec5ce25248a98e45a866ce6ee3c",
+      "baseline_sha256": "897257322c94cb154dcee6fc63940e12b4ebdec5ce25248a98e45a866ce6ee3c",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubReaderClippingListActivity.h",
+      "sha256": "78a0d84e1f9950d228f26eb9ed2366aff3b0abafdba0b179eb60a591b241be53",
+      "baseline_sha256": "78a0d84e1f9950d228f26eb9ed2366aff3b0abafdba0b179eb60a591b241be53",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubReaderFootnotesActivity.cpp",
+      "sha256": "f412aee52483e6fee78fde053e07cdf7eefef6663dac025dfd1e3bf56715aee9",
+      "baseline_sha256": "f412aee52483e6fee78fde053e07cdf7eefef6663dac025dfd1e3bf56715aee9",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubReaderFootnotesActivity.h",
+      "sha256": "ebdcb41a2b4a47288048859825185a5227295f012b36aebc64a7a45935f8dafb",
+      "baseline_sha256": "ebdcb41a2b4a47288048859825185a5227295f012b36aebc64a7a45935f8dafb",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubReaderMenuActivity.cpp",
+      "sha256": "e28027bb7c99374888b9eb514121c432fecfe63ec9640857e1c6ee0ec3830493",
+      "baseline_sha256": "38d6ad8b6740dc491baebc81438b7b0ff141574c7c53fb5c35e7d7a062b618ee",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubReaderMenuActivity.h",
+      "sha256": "305fb03567e2427bef3b2c037e6f05d9b0751fccb860a211f87c38fd328d7f8a",
+      "baseline_sha256": "305fb03567e2427bef3b2c037e6f05d9b0751fccb860a211f87c38fd328d7f8a",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubReaderPercentSelectionActivity.cpp",
+      "sha256": "293ea37e68cb4143efd3dde43535a1d12ead540c2a394b8e22e076072cc24a18",
+      "baseline_sha256": "e218606ae24efd0ba448844ac91ab14ed04cdbbfb3d9c0f5db229c61764e696c",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubReaderPercentSelectionActivity.h",
+      "sha256": "bc371bc866d63ba7931a9456b3aaf3fa2edb5cae5c0ea2f8f2cf70aaa2da728e",
+      "baseline_sha256": "bc371bc866d63ba7931a9456b3aaf3fa2edb5cae5c0ea2f8f2cf70aaa2da728e",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubReaderTouchMenuActivity.cpp",
+      "sha256": "cd7f1a6a98e53a3890127fd140635b4ac7c8f4e72aeb0ab576d4c5bab9840cdf",
+      "baseline_sha256": "cd7f1a6a98e53a3890127fd140635b4ac7c8f4e72aeb0ab576d4c5bab9840cdf",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/EpubReaderTouchMenuActivity.h",
+      "sha256": "19764b506924ca2bad871fcf2c12e4f2d1d03d3defe1632458d65c3b1d49fbf4",
+      "baseline_sha256": "19764b506924ca2bad871fcf2c12e4f2d1d03d3defe1632458d65c3b1d49fbf4",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/FocusReadingText.h",
+      "sha256": "b72e1f999089a545303343e4b1fedd87d46d8eaacf6eb42746ac89e5ca65e205",
+      "baseline_sha256": "b72e1f999089a545303343e4b1fedd87d46d8eaacf6eb42746ac89e5ca65e205",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/KOReaderSyncActivity.cpp",
+      "sha256": "d916d7c686107e14a07681520e79d1d8176891b18fd6a986247e3bebbaf0d093",
+      "baseline_sha256": "d916d7c686107e14a07681520e79d1d8176891b18fd6a986247e3bebbaf0d093",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/KOReaderSyncActivity.h",
+      "sha256": "4b0dde94343302c4e706ccc1804de7417ab2f465f969215a18d0596e7b4aed24",
+      "baseline_sha256": "4b0dde94343302c4e706ccc1804de7417ab2f465f969215a18d0596e7b4aed24",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/LookedUpWordsActivity.cpp",
+      "sha256": "9613308adf80afa13832234c23abdcc7460b626a4d9e862d01fbf18a41535073",
+      "baseline_sha256": "9613308adf80afa13832234c23abdcc7460b626a4d9e862d01fbf18a41535073",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/LookedUpWordsActivity.h",
+      "sha256": "6de10e5ddcee3bee2c25b170c30a45a53450f21bf426dadfb7d095561e45ab17",
+      "baseline_sha256": "6de10e5ddcee3bee2c25b170c30a45a53450f21bf426dadfb7d095561e45ab17",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/NearbyBookPositionSyncActivity.cpp",
+      "sha256": "06608e7c01ad5c374993851cac5a4a2648a4af9838eb806b70c314cdc9a61db0",
+      "baseline_sha256": "cc21d9d683ef67d9c90a721deb9780c48881968e1487fc4af2f09e3b55001b99",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/NearbyBookPositionSyncActivity.h",
+      "sha256": "f89ec4b9d01904907f5c6b91ffcefdcd6b2a994fab42cd3c7a0054b5a4ab3a4f",
+      "baseline_sha256": "f89ec4b9d01904907f5c6b91ffcefdcd6b2a994fab42cd3c7a0054b5a4ab3a4f",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/QrDisplayActivity.cpp",
+      "sha256": "8e779ff3d48389e3b1a559f0231e9aa03102f93da76b2631c112978bb1bdd8e8",
+      "baseline_sha256": "8e779ff3d48389e3b1a559f0231e9aa03102f93da76b2631c112978bb1bdd8e8",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/QrDisplayActivity.h",
+      "sha256": "e2fc8bfce44b99dd1c2eb81d445f9405f567ad68856e9931eadf0eccc39303a5",
+      "baseline_sha256": "e2fc8bfce44b99dd1c2eb81d445f9405f567ad68856e9931eadf0eccc39303a5",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/ReaderActivity.cpp",
+      "sha256": "7c574cdaa912d0760e81ee1957090d01b17a73ccc849952d48af8fd232088cb3",
+      "baseline_sha256": "1d54b96bc99278d0d20818a1876ec5dd7bd4a3b63f3046a198f4efa19820781a",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/ReaderOptionsActivity.cpp",
+      "sha256": "4b10241dbe758687c24ad7a8b11885920635382796589c522c6e7e75ca6405ca",
+      "baseline_sha256": "4b10241dbe758687c24ad7a8b11885920635382796589c522c6e7e75ca6405ca",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/ReaderOptionsActivity.h",
+      "sha256": "c7c15c3aa481ebfaed1a2aa95d81c38ba94f637a10fd70ddb49a956add221e37",
+      "baseline_sha256": "c7c15c3aa481ebfaed1a2aa95d81c38ba94f637a10fd70ddb49a956add221e37",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/TouchReaderPreviewModel.h",
+      "sha256": "e4122358349a2828e1e1ce885e883291f6708575e1d662a9eb119d792b10711c",
+      "baseline_sha256": "e4122358349a2828e1e1ce885e883291f6708575e1d662a9eb119d792b10711c",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/TxtReaderActivity.cpp",
+      "sha256": "9d807c831df4d928c4b1f9c0646035081c23c6d474ae12f69d9b4ce951594efc",
+      "baseline_sha256": "9d807c831df4d928c4b1f9c0646035081c23c6d474ae12f69d9b4ce951594efc",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/TxtReaderActivity.h",
+      "sha256": "839902cd1eb720187c8853e3c36b4382615e00094b2c2d716f3189a754711755",
+      "baseline_sha256": "839902cd1eb720187c8853e3c36b4382615e00094b2c2d716f3189a754711755",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/XtcReaderActivity.cpp",
+      "sha256": "6c11afdb8c05fc05f0fe69ddf5d53feef4dfdabc2ee27780c771be0a31a6dedd",
+      "baseline_sha256": "6c11afdb8c05fc05f0fe69ddf5d53feef4dfdabc2ee27780c771be0a31a6dedd",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/XtcReaderActivity.h",
+      "sha256": "37175b436a3a08f601b5f4825c9e22e256382d1d3c10668522110f2a0734d64c",
+      "baseline_sha256": "37175b436a3a08f601b5f4825c9e22e256382d1d3c10668522110f2a0734d64c",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/XtcReaderChapterSelectionActivity.cpp",
+      "sha256": "ff5c8b3acdad3c8d57880ffbf9406548e7538731d09a0cfdeed63aeb2da5a169",
+      "baseline_sha256": "ff5c8b3acdad3c8d57880ffbf9406548e7538731d09a0cfdeed63aeb2da5a169",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/XtcReaderChapterSelectionActivity.h",
+      "sha256": "f1adfa64fdcf87150ce8f662a4eae795e8fd66fe27231094dcbdbd34e9130db9",
+      "baseline_sha256": "f1adfa64fdcf87150ce8f662a4eae795e8fd66fe27231094dcbdbd34e9130db9",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/XtcReaderMenuActivity.cpp",
+      "sha256": "5c2b6505d933b139e813fdddeff33dab100bdff328cfa72c16ee5efffec3130e",
+      "baseline_sha256": "5c2b6505d933b139e813fdddeff33dab100bdff328cfa72c16ee5efffec3130e",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/reader/XtcReaderMenuActivity.h",
+      "sha256": "420a174e0c9dffa170deb74d984abf7bac084496702bfd9d30384eb1254005cc",
+      "baseline_sha256": "420a174e0c9dffa170deb74d984abf7bac084496702bfd9d30384eb1254005cc",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/BackupStatsActivity.cpp",
+      "sha256": "8eaa62b4f98593c9979e55024a662ed3a58a8c99a2e4c5ccb3be32a49ccdf0bf",
+      "baseline_sha256": "8eaa62b4f98593c9979e55024a662ed3a58a8c99a2e4c5ccb3be32a49ccdf0bf",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/BackupStatsActivity.h",
+      "sha256": "2ca01dcb84cc0aabfa706ff317d39fc9dac0adfb6a14c55e408e6df39c328456",
+      "baseline_sha256": "2ca01dcb84cc0aabfa706ff317d39fc9dac0adfb6a14c55e408e6df39c328456",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/ButtonRemapActivity.cpp",
+      "sha256": "86d4855bae94414604e7e913aae26dedeb7e7cae6c17796109b594d41335b238",
+      "baseline_sha256": "86d4855bae94414604e7e913aae26dedeb7e7cae6c17796109b594d41335b238",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/ButtonRemapActivity.h",
+      "sha256": "dc1d19d8437dd10a9a2918cf3be7d5e3903c3a18d96dccaea121675eb2288ed8",
+      "baseline_sha256": "dc1d19d8437dd10a9a2918cf3be7d5e3903c3a18d96dccaea121675eb2288ed8",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/ClearCacheActivity.cpp",
+      "sha256": "b1027179e893ad2b500348baec9cace9bf962d9b4f27d3e8048cb08b4ea07cc1",
+      "baseline_sha256": "b1027179e893ad2b500348baec9cace9bf962d9b4f27d3e8048cb08b4ea07cc1",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/ClearCacheActivity.h",
+      "sha256": "56f03e28f2b3f688fcbced150cdf01cf4b67bfe8e7c569b5ea4ef5cfa6f7b43c",
+      "baseline_sha256": "56f03e28f2b3f688fcbced150cdf01cf4b67bfe8e7c569b5ea4ef5cfa6f7b43c",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/ClockOffsetActivity.cpp",
+      "sha256": "79fe5f6bf23131bbc0934655b0c4c16d785854be80c0813bb3ea307d360ed99e",
+      "baseline_sha256": "79fe5f6bf23131bbc0934655b0c4c16d785854be80c0813bb3ea307d360ed99e",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/ClockOffsetActivity.h",
+      "sha256": "b2a1b99990c6fd6e55e582f5d712a384fbe1bfe82b6a8e8f6df2339070ee4b7a",
+      "baseline_sha256": "b2a1b99990c6fd6e55e582f5d712a384fbe1bfe82b6a8e8f6df2339070ee4b7a",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/ClockSyncActivity.cpp",
+      "sha256": "fca2658083838565f92f84c55d3cea6d40d8e83df8a7c9cbaf570afcd7f7b5a1",
+      "baseline_sha256": "fca2658083838565f92f84c55d3cea6d40d8e83df8a7c9cbaf570afcd7f7b5a1",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/ClockSyncActivity.h",
+      "sha256": "e98dab2a3742f1630e11896edc8ed346e06af79689891be906de0bb04d66643e",
+      "baseline_sha256": "e98dab2a3742f1630e11896edc8ed346e06af79689891be906de0bb04d66643e",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/DictionarySelectActivity.cpp",
+      "sha256": "64e36d6c2b7c33027e83047b4c21d6bc88b6c234af9c2a950e55f8fa487bd823",
+      "baseline_sha256": "64e36d6c2b7c33027e83047b4c21d6bc88b6c234af9c2a950e55f8fa487bd823",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/DictionarySelectActivity.h",
+      "sha256": "0253531895ef27872fb9baa9d3919bc378608c609e21df5090d2a5196bafa9f2",
+      "baseline_sha256": "0253531895ef27872fb9baa9d3919bc378608c609e21df5090d2a5196bafa9f2",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/FontDownloadActivity.cpp",
+      "sha256": "00e7df505949c2bc183874c742612926ecaf9fd7881189b541584619e9527e42",
+      "baseline_sha256": "00e7df505949c2bc183874c742612926ecaf9fd7881189b541584619e9527e42",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/FontDownloadActivity.h",
+      "sha256": "6142c119cec759cea9151719724b24be9693a93b78ce90375692ad329c27cdba",
+      "baseline_sha256": "6142c119cec759cea9151719724b24be9693a93b78ce90375692ad329c27cdba",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/FontSelectionActivity.cpp",
+      "sha256": "1488e4cf0c7cc7de0a6e4f5cef29b03452f3991ee9dac27454afdb0bbcf53b7c",
+      "baseline_sha256": "1488e4cf0c7cc7de0a6e4f5cef29b03452f3991ee9dac27454afdb0bbcf53b7c",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/FontSelectionActivity.h",
+      "sha256": "a744f348461d4134c9e1a23c6cb11ed477c171f3745ef9a7d02c166d6a6475b0",
+      "baseline_sha256": "a744f348461d4134c9e1a23c6cb11ed477c171f3745ef9a7d02c166d6a6475b0",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/FrontlightTimePickerActivity.cpp",
+      "sha256": "f508f9eb434d925a6d3b78f5b0a29e980b676069c40c22f4dac4f47f4c67dbbc",
+      "baseline_sha256": "f508f9eb434d925a6d3b78f5b0a29e980b676069c40c22f4dac4f47f4c67dbbc",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/FrontlightTimePickerActivity.h",
+      "sha256": "98cd126127a0f2d43a72babdc6ea4146c88b68f1049a1a2cacc54c0ac55ae833",
+      "baseline_sha256": "98cd126127a0f2d43a72babdc6ea4146c88b68f1049a1a2cacc54c0ac55ae833",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/KOReaderAuthActivity.cpp",
+      "sha256": "be4adfc34c2c09234a544f04286177ee7f60db3c94a2d801ac9f17cf4263c92d",
+      "baseline_sha256": "be4adfc34c2c09234a544f04286177ee7f60db3c94a2d801ac9f17cf4263c92d",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/KOReaderAuthActivity.h",
+      "sha256": "ce0728cbf0b76e964cf5a00ff1302c8c9aa4b372d9d4788585a5212f2b386830",
+      "baseline_sha256": "ce0728cbf0b76e964cf5a00ff1302c8c9aa4b372d9d4788585a5212f2b386830",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/KOReaderSettingsActivity.cpp",
+      "sha256": "6e1f3a6453f6ce53940d15220cb8d1958e31fb711ef0009a5f4861727b902eca",
+      "baseline_sha256": "6e1f3a6453f6ce53940d15220cb8d1958e31fb711ef0009a5f4861727b902eca",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/KOReaderSettingsActivity.h",
+      "sha256": "be772cb1c4cb8fa923a81ef094d6ae06818f210e951f0f81179f080cf956b1ed",
+      "baseline_sha256": "be772cb1c4cb8fa923a81ef094d6ae06818f210e951f0f81179f080cf956b1ed",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/KeyboardLayoutsActivity.cpp",
+      "sha256": "9d7bdee2c0b167b7b85281a1b5ec931acdaf4758779440a7d0f2af75c3612ea6",
+      "baseline_sha256": "9d7bdee2c0b167b7b85281a1b5ec931acdaf4758779440a7d0f2af75c3612ea6",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/KeyboardLayoutsActivity.h",
+      "sha256": "4fb83c8967d43a40d75abaf1c99f4cb75d689e4f8f7a917bffed9efc29bd04b7",
+      "baseline_sha256": "4fb83c8967d43a40d75abaf1c99f4cb75d689e4f8f7a917bffed9efc29bd04b7",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/OpdsServerListActivity.cpp",
+      "sha256": "0c80d9dc6d0fea30ac4519036355b3900113be210fc3de4328fe6553c0049e48",
+      "baseline_sha256": "0c80d9dc6d0fea30ac4519036355b3900113be210fc3de4328fe6553c0049e48",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/OpdsServerListActivity.h",
+      "sha256": "87345090dc4c99092e0512e0ac576773da3e2c2335bc40da0e11134490cba0be",
+      "baseline_sha256": "87345090dc4c99092e0512e0ac576773da3e2c2335bc40da0e11134490cba0be",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/OpdsSettingsActivity.cpp",
+      "sha256": "fcc780cfc120d1c8c70b3961ea6668f8b0bc686794125bf1cdaacd03d9dcbea7",
+      "baseline_sha256": "fcc780cfc120d1c8c70b3961ea6668f8b0bc686794125bf1cdaacd03d9dcbea7",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/OpdsSettingsActivity.h",
+      "sha256": "b6fdf7f1720120e35602e832e30771ee413afe0eec6f25974404fad54aac0629",
+      "baseline_sha256": "b6fdf7f1720120e35602e832e30771ee413afe0eec6f25974404fad54aac0629",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/OtaUpdateActivity.cpp",
+      "sha256": "b087ad09bce4e84168b3370c00a0575d0018a3960f37826c09287d7ab0f61c74",
+      "baseline_sha256": "6bb327acaff97a17ca0755e8110707b3afced7df04fd040aabefda14f220a5ed",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/OtaUpdateActivity.h",
+      "sha256": "be1abe74d12e7877187665003bf2cbbbfc307aae4b0bec8f07f2ebdb44559940",
+      "baseline_sha256": "be1abe74d12e7877187665003bf2cbbbfc307aae4b0bec8f07f2ebdb44559940",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/QuickActionsActivity.cpp",
+      "sha256": "b79f313f5debce5a9db88ef930bddb4e0e2bc06b0b78fd7596f892a15fdac059",
+      "baseline_sha256": "9b2ee39f97a7dd36f4a6901ec47aa6663263809d939de698403b0d4a8eba74f4",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/QuickActionsActivity.h",
+      "sha256": "d4f316a60790a84b544d4187d8ca95b2769fdf4e4ee2a55b4a972a22ac36f42a",
+      "baseline_sha256": "d4f316a60790a84b544d4187d8ca95b2769fdf4e4ee2a55b4a972a22ac36f42a",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/SdFirmwareUpdateActivity.cpp",
+      "sha256": "180fb86f8409205d73e4e18ece63dfa03d527bf3468727c4604f7604d4d4dc71",
+      "baseline_sha256": "180fb86f8409205d73e4e18ece63dfa03d527bf3468727c4604f7604d4d4dc71",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/SdFirmwareUpdateActivity.h",
+      "sha256": "9b9caf4032c3811473013742033157004ac8b057b78629ae4a0ed60eb2031a0b",
+      "baseline_sha256": "b38350693f01e245ab6a4d9f611e47aa4e559275612356c0b385a960741e33c8",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/SettingsActivity.cpp",
+      "sha256": "e38fbb3be154d3803dddc23ed02f471224629b607fb3fdcffa39c586e7a64b89",
+      "baseline_sha256": "7561f8a82995a51a9064df6d465ae336143ccb5900694ea129c7e3342d926490",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/SettingsActivity.h",
+      "sha256": "15bb9bc0ebec47ee18484f04535b563b69f743cefd0f1e941f6c16022b299ebd",
+      "baseline_sha256": "15bb9bc0ebec47ee18484f04535b563b69f743cefd0f1e941f6c16022b299ebd",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/StatusBarSettingsActivity.cpp",
+      "sha256": "125baa012480909e8621273ccad65e4ff8964f24ced0255a9d24e0ac2907552b",
+      "baseline_sha256": "125baa012480909e8621273ccad65e4ff8964f24ced0255a9d24e0ac2907552b",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/settings/StatusBarSettingsActivity.h",
+      "sha256": "3eb49289c62c76650046ae4876d9612cc5605bf642633dffc483255a646c03a8",
+      "baseline_sha256": "3eb49289c62c76650046ae4876d9612cc5605bf642633dffc483255a646c03a8",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/util/BmpViewerActivity.cpp",
+      "sha256": "e9566e004683beb0f316dfa9c7ce783896f71895b8fc2246bcbeed4546c421e0",
+      "baseline_sha256": "e9566e004683beb0f316dfa9c7ce783896f71895b8fc2246bcbeed4546c421e0",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/util/ConfirmationActivity.cpp",
+      "sha256": "267c431c5191e3c69fe09f2564c3683c906bad6d3063f4d15936112df54c475e",
+      "baseline_sha256": "267c431c5191e3c69fe09f2564c3683c906bad6d3063f4d15936112df54c475e",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/util/ConfirmationActivity.h",
+      "sha256": "dc31e86afe1670f3a6ef8abb5b5fb4d5e9872c9741ed4820823029d0dd9c7578",
+      "baseline_sha256": "dc31e86afe1670f3a6ef8abb5b5fb4d5e9872c9741ed4820823029d0dd9c7578",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/util/FrontlightPanelActivity.cpp",
+      "sha256": "fb447cc12d021da14376a08184e75d696d170040fd225f04f41ef7463971032d",
+      "baseline_sha256": "fb447cc12d021da14376a08184e75d696d170040fd225f04f41ef7463971032d",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/util/FrontlightPanelActivity.h",
+      "sha256": "9df7288daac85e61e027321787d8c30be6a43d0d822b8a674d494652c4c48f27",
+      "baseline_sha256": "dd79a54f1162cb646831e8b6d958cb24b078856469382c4626467c8095f811e7",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/util/FullScreenMessageActivity.cpp",
+      "sha256": "cabe43d70a7df4ae499400ce96f033f6b806c4110a953f77cfdf799d3dac031b",
+      "baseline_sha256": "cabe43d70a7df4ae499400ce96f033f6b806c4110a953f77cfdf799d3dac031b",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/util/IntervalSelectionActivity.cpp",
+      "sha256": "2ab5d9b43b2c83e435ab660327003b5552cb39f47956c3f19fb95122f6009896",
+      "baseline_sha256": "17b94cc429cd0e2056e81432560a1aa42d9d14af97f304b323e95e7415eb1b65",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/util/IntervalSelectionActivity.h",
+      "sha256": "d20f5c343b3bc14e3b5787b3bf5ee24e4a68fbf004808f479e8aea37808a6f38",
+      "baseline_sha256": "d20f5c343b3bc14e3b5787b3bf5ee24e4a68fbf004808f479e8aea37808a6f38",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/util/KeyboardEntryActivity.cpp",
+      "sha256": "69c476ea792886258897bbfd847c8356aedb9313ea3f0aa4bdc64839ce3ba7fc",
+      "baseline_sha256": "69c476ea792886258897bbfd847c8356aedb9313ea3f0aa4bdc64839ce3ba7fc",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/util/KeyboardEntryActivity.h",
+      "sha256": "68f03114c6faeed531d3c2c05c23eda2cd2e17ec6abc15dcca48fc2e6fb0fed7",
+      "baseline_sha256": "68f03114c6faeed531d3c2c05c23eda2cd2e17ec6abc15dcca48fc2e6fb0fed7",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/util/OptionSelectionActivity.cpp",
+      "sha256": "89f5d21ebd848077c4a4371d539873e5b8b04e425ad756ff905dd6fe3eb021bc",
+      "baseline_sha256": "89f5d21ebd848077c4a4371d539873e5b8b04e425ad756ff905dd6fe3eb021bc",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    },
+    {
+      "path": "src/activities/util/OptionSelectionActivity.h",
+      "sha256": "90dad6680522c942ba9124d62b328ad27332007c39021aaf50402aef610f4754",
+      "baseline_sha256": "90dad6680522c942ba9124d62b328ad27332007c39021aaf50402aef610f4754",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "source inventory only; does not assert every draw state was rendered"
+    }
+  ],
+  "apps": [
+    {
+      "id": "dice",
+      "version": "1.0.0",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "5d35fd89f66e9b0f0d38a488e2c9d40b03593a3a16225750ef5c6ded00d725ab",
+      "measured": [
+        {
+          "kind": "synthetic bounds/input/save callbacks, not production font pixels",
+          "case_count": 2,
+          "evidence": "integrated-final/stock/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "lifecounter",
+      "version": "1.0.0",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "fb7facff0e5f187b4d5269cc6a32ac1a2d67e2e376f2e79c0ce0908845905a8e",
+      "measured": [
+        {
+          "kind": "synthetic bounds/input/save callbacks, not production font pixels",
+          "case_count": 2,
+          "evidence": "integrated-final/stock/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "rosary",
+      "version": "1.0.0",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "68e0b77ef96e7824a1d98c0839cc31b7c070d3ea9852c55077213b505cd91a9b",
+      "measured": [
+        {
+          "kind": "synthetic bounds/input/save callbacks, not production font pixels",
+          "case_count": 2,
+          "evidence": "integrated-final/stock/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "dailyoffice",
+      "version": "1.0.0",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "3985e78ca3bbebe3bd5c337e3524b8775e43bafbd6e318566f3a0078631c5411",
+      "measured": [
+        {
+          "kind": "synthetic bounds/input/save callbacks, not production font pixels",
+          "case_count": 2,
+          "evidence": "integrated-final/stock/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "wordle",
+      "version": "1.2.1",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "a526e797744de4939c62d5ef769225c149ccc3038b325603730e1f0cc571dfd2",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 10,
+          "test_identities": [
+            "wordle_original_ui/callbacks.lua",
+            "wordle_original_ui/failed_write.lua",
+            "wordle_original_ui/long_history.lua",
+            "wordle_original_ui/missing_bank.lua",
+            "wordle_original_ui/records.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "2048",
+      "version": "1.1.0",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "c98815e89a89e0fcf859ce4befeda79518631d2b3289a9daac6e98b61793b05f",
+      "measured": [
+        {
+          "kind": "named existing host regression suite; see raw result for exact scope",
+          "evidence": "integrated-final/apps/test__2048_design__run.py.log"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "sudoku",
+      "version": "1.1.1",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "1477b96d1cfa2ec81e342ff0e2631829545bee8b635fc8386ce5e0021493b609",
+      "measured": [
+        {
+          "kind": "named existing host regression suite; see raw result for exact scope",
+          "evidence": "integrated-final/utility-sudoku/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "blackjack",
+      "version": "1.0.0",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "a5a77d720a4384e41ce269b02324a9c012b48b053de52f997d3d69dfb0775e5a",
+      "measured": [
+        {
+          "kind": "synthetic bounds/input/save callbacks, not production font pixels",
+          "case_count": 2,
+          "evidence": "integrated-final/stock/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "blockdrop",
+      "version": "1.0.1",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "9ea712e9db116ad1406dfbebf3141ae71afacf4bbfae202ff86f2fd4eb3024fc",
+      "measured": [
+        {
+          "kind": "synthetic bounds/input/save callbacks, not production font pixels",
+          "case_count": 2,
+          "evidence": "integrated-final/stock/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "codex",
+      "version": "1.0.0",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "ffae84269f189846612b1e8f5554f1e63fdce7e819dcb7d275ce79dceb7b5ef3",
+      "measured": [
+        {
+          "kind": "synthetic bounds/input/save callbacks, not production font pixels",
+          "case_count": 2,
+          "evidence": "integrated-final/stock/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "watertracker",
+      "version": "1.0.1",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "ad2d4bf78913adb564fc2ad3364ba36cb11da869a7c7e50acc3f064b7565f8bb",
+      "measured": [
+        {
+          "kind": "named existing host regression suite; see raw result for exact scope",
+          "evidence": "integrated-final/apps/test__sticky_app_touch__watertracker__run.py.log"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "stopwatch",
+      "version": "1.0.1",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": false,
+      "runtime_delta": [
+        "apps/stopwatch/main.lua",
+        "apps/stopwatch/manifest.json"
+      ],
+      "runtime_sha256": "2138cf6eda066fcadb4d7515000fb2974abfd02dd1b2f4bed87fc1be9267aadd",
+      "measured": [
+        {
+          "kind": "synthetic bounds/input/save callbacks, not production font pixels",
+          "case_count": 2,
+          "evidence": "integrated-final/stock/results.json"
+        },
+        {
+          "kind": "named existing host regression suite; see raw result for exact scope",
+          "evidence": "integrated-final/05-test_stopwatch.log"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "dashboard",
+      "version": "1.0.3",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "e1d6d3dcbfd97ed3f87039d3b30d517a337d57fed6fc9863d82a42eb7b699ddc",
+      "measured": [
+        {
+          "kind": "named existing host regression suite; see raw result for exact scope",
+          "evidence": "integrated-final/apps/test__sticky_app_touch__dashboard__run.py.log"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "hourglass",
+      "version": "1.0.1",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "9de18b9653e9be1255447cbc61040c4cab070b09b94df3c4db9fe71cb72dc46f",
+      "measured": [
+        {
+          "kind": "named existing host regression suite; see raw result for exact scope",
+          "evidence": "integrated-final/apps/test__sticky_app_touch__hourglass__run.py.log"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "solitaire",
+      "version": "1.1.1",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "2104672cf825eea48108d3c52180fb30c48f4edc34d74b39bdb478cf8ac591c0",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 14,
+          "test_identities": [
+            "crossplay_ui_parity/solitaire.lua",
+            "crossplay_ui_parity/solitaire_capture.lua",
+            "crossplay_ui_parity/solitaire_fans.lua",
+            "crossplay_ui_parity/solitaire_mapped.lua",
+            "crossplay_ui_parity/solitaire_menu.lua",
+            "crossplay_ui_parity/solitaire_records.lua",
+            "crossplay_ui_parity/solitaire_selection.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "chess",
+      "version": "1.1.1",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "669cd927b93d3f5846159a47a210cf2694a5a46d274eedceec218c06c16fc995",
+      "measured": [
+        {
+          "kind": "named existing host regression suite; see raw result for exact scope",
+          "evidence": "integrated-final/chess/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-battleship",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "be5b78fda80406927f60282f23c6b89a01075f22c90a2b24e48bc7752ae5943f",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 34,
+          "test_identities": [
+            "crossplay_ui_parity/battleship.lua",
+            "crossplay_ui_parity/battleship_buttons.lua",
+            "crossplay_ui_parity/battleship_capture_aim.lua",
+            "crossplay_ui_parity/battleship_capture_placement.lua",
+            "crossplay_ui_parity/battleship_capture_results.lua",
+            "crossplay_ui_parity/battleship_cycles.lua",
+            "crossplay_ui_parity/battleship_focus.lua",
+            "crossplay_ui_parity/battleship_footer.lua",
+            "crossplay_ui_parity/battleship_import_own_view.lua",
+            "crossplay_ui_parity/battleship_keyboard_aim.lua",
+            "crossplay_ui_parity/battleship_menu.lua",
+            "crossplay_ui_parity/battleship_new_game.lua",
+            "crossplay_ui_parity/battleship_partial.lua",
+            "crossplay_ui_parity/battleship_placement.lua",
+            "crossplay_ui_parity/battleship_records.lua",
+            "crossplay_ui_parity/battleship_report.lua",
+            "crossplay_ui_parity/battleship_targets.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-calculator",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "f171353ce4b1e08e400a16c3f22c03286af8c0fa0e8c4b1bf805fa020c57a162",
+      "measured": [
+        {
+          "kind": "named existing host regression suite; see raw result for exact scope",
+          "evidence": "integrated-final/utility-sudoku/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-checkers",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "a43c99db8355bd75dda4a555a06814cfcad854e7150d4288807c768e18dc9665",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 14,
+          "test_identities": [
+            "three_original_boards/callbacks.lua",
+            "three_original_boards/failed_records.lua",
+            "three_original_boards/gameplay.lua",
+            "three_original_boards/lifecycle.lua",
+            "three_original_boards/long_records.lua",
+            "three_original_boards/malformed_records.lua",
+            "three_original_boards/results.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-connectfour",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "d7d582f58819626ffd1e091d9c23ffb2a0fd9090a8caae6d0fe44e546b05bd46",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 14,
+          "test_identities": [
+            "three_original_boards/callbacks.lua",
+            "three_original_boards/failed_records.lua",
+            "three_original_boards/gameplay.lua",
+            "three_original_boards/lifecycle.lua",
+            "three_original_boards/long_records.lua",
+            "three_original_boards/malformed_records.lua",
+            "three_original_boards/results.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-forehead",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "8b615e8bc4015e1a5c2ccbcc8b52fd99fbdfebb691163babd22d0eb298a86c15",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 10,
+          "test_identities": [
+            "social_original_ui/forehead.lua",
+            "social_original_ui/forehead_epoch.lua",
+            "social_original_ui/forehead_epoch_persistent.lua",
+            "social_original_ui/forehead_save.lua",
+            "social_original_ui/forehead_stale_ready.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-hearts",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "8e4e1e65765a0d1cf4e84d981379262290a0ebe94300aa6b5686b1916edea634",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 6,
+          "test_identities": [
+            "hearts_jaipur_original_ui/baseline.lua",
+            "hearts_jaipur_original_ui/interaction.lua",
+            "hearts_jaipur_original_ui/queued.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-hex",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "17af1d957ee5cad3258e01ed18ae395a995b0cc19eaf69e2491d4497338474de",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 16,
+          "test_identities": [
+            "four_original_boards/callbacks.lua",
+            "four_original_boards/hex_completion_recovery.lua",
+            "four_original_boards/hex_gameplay.lua",
+            "four_original_boards/hex_older_completion.lua",
+            "four_original_boards/hex_preferences.lua",
+            "four_original_boards/hex_repeat.lua",
+            "four_original_boards/records_bounds.lua",
+            "four_original_boards/settings.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-insider",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "9d2af30871a8b0fb315792cf72a36f50a33f9b32815bf115ec9033ab6305c327",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 8,
+          "test_identities": [
+            "social_original_ui/insider.lua",
+            "social_original_ui/insider_stale.lua",
+            "social_original_ui/insider_stale_role.lua",
+            "social_original_ui/insider_stale_vote.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-knucklebones",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "15c71570dc275d7b567aa85f4b162d7890818efc032e7b6cc337768c7127de8f",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 14,
+          "test_identities": [
+            "three_original_boards/callbacks.lua",
+            "three_original_boards/failed_records.lua",
+            "three_original_boards/gameplay.lua",
+            "three_original_boards/lifecycle.lua",
+            "three_original_boards/long_records.lua",
+            "three_original_boards/malformed_records.lua",
+            "three_original_boards/results.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-minesweeper",
+      "version": "0.1.5",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "a6052ee00077648f81e104addbab8bcce9a1a82c1b4f37776d55011015448d27",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 14,
+          "test_identities": [
+            "four_original_boards/callbacks.lua",
+            "four_original_boards/failed_records.lua",
+            "four_original_boards/mines_chord.lua",
+            "four_original_boards/mines_controls.lua",
+            "four_original_boards/mines_gameplay.lua",
+            "four_original_boards/mines_lessons.lua",
+            "four_original_boards/records_bounds.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-notes",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "b5316fbe400a8ae21feb367d1eea05919ac918adbad15b7fd4c5425f76a26b10",
+      "measured": [
+        {
+          "kind": "named existing host regression suite; see raw result for exact scope",
+          "evidence": "integrated-final/utility-sudoku/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-wavelength",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "96e05b00c61170d228498ac23d01d2ff93244808492cb36dacd7763eca5a5271",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 24,
+          "test_identities": [
+            "wavelength_original_ui/abandon_limit.lua",
+            "wavelength_original_ui/baseline.lua",
+            "wavelength_original_ui/caption.lua",
+            "wavelength_original_ui/distances.lua",
+            "wavelength_original_ui/lifecycle.lua",
+            "wavelength_original_ui/mode_duplicate.lua",
+            "wavelength_original_ui/privacy.lua",
+            "wavelength_original_ui/queued.lua",
+            "wavelength_original_ui/queued_buttons.lua",
+            "wavelength_original_ui/records.lua",
+            "wavelength_original_ui/single.lua",
+            "wavelength_original_ui/states.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-yahtzee",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "15baba1615a41cd7a8a2fda7e1c769804926965e5e5ed6020064907e8616cef3",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 16,
+          "test_identities": [
+            "four_original_boards/callbacks.lua",
+            "four_original_boards/failed_records.lua",
+            "four_original_boards/records_bounds.lua",
+            "four_original_boards/yahtzee_complete.lua",
+            "four_original_boards/yahtzee_gameplay.lua",
+            "four_original_boards/yahtzee_joker.lua",
+            "four_original_boards/yahtzee_lessons.lua",
+            "four_original_boards/yahtzee_results.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-jaipur",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "66892cfd3ca3441a411ac71f22119173ee39214b43414660d2d1f5ee4d00e61c",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 6,
+          "test_identities": [
+            "hearts_jaipur_original_ui/baseline.lua",
+            "hearts_jaipur_original_ui/interaction.lua",
+            "hearts_jaipur_original_ui/queued.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-seasalt",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "a01a91cf1cb1b18e4744053e6bdf862ec9314e8cb682d864022426107f3acdda",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 10,
+          "test_identities": [
+            "seasalt_toybattle_original_ui/baseline.lua",
+            "seasalt_toybattle_original_ui/end_states.lua",
+            "seasalt_toybattle_original_ui/interaction.lua",
+            "seasalt_toybattle_original_ui/lifecycle.lua",
+            "seasalt_toybattle_original_ui/records.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-toybattle",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "e732c2e4297e5f2b3a9c0b02ec6e62da84b3ae0179b176e8db3e2ed698ae332d",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 10,
+          "test_identities": [
+            "seasalt_toybattle_original_ui/baseline.lua",
+            "seasalt_toybattle_original_ui/interaction.lua",
+            "seasalt_toybattle_original_ui/lifecycle.lua",
+            "seasalt_toybattle_original_ui/maps.lua",
+            "seasalt_toybattle_original_ui/toy_endings.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-murdle",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "4e1d4326442af69e9a2d67bd6bce264014186247da6eb7b81e3e5c7640c2b8ff",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 6,
+          "test_identities": [
+            "murdle_original_ui/callbacks.lua",
+            "murdle_original_ui/lifecycle.lua",
+            "murdle_original_ui/stale_back.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-go",
+      "version": "0.1.4",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "d24f7a4fa2bae516484a0781c3274d01dea2e5bafae717ccb740a7f07c38f622",
+      "measured": [
+        {
+          "kind": "production Lua raster with host adapters; named states only",
+          "case_count": 16,
+          "test_identities": [
+            "four_original_boards/callbacks.lua",
+            "four_original_boards/go_doors.lua",
+            "four_original_boards/go_gameplay.lua",
+            "four_original_boards/go_preferences.lua",
+            "four_original_boards/go_repeat.lua",
+            "four_original_boards/go_sizes.lua",
+            "four_original_boards/records_bounds.lua",
+            "four_original_boards/settings.lua"
+          ],
+          "evidence": "integrated-final/ui/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-hackernews",
+      "version": "0.1.3",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "36bcb6bf1ecb37f522d292b1f3e5a0407093f19c89b583fbf5434d8c9646e4aa",
+      "measured": [
+        {
+          "kind": "named existing host regression suite; see raw result for exact scope",
+          "evidence": "integrated-final/hackernews/results.json"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "cp-trivia",
+      "version": "0.1.3",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "16b573c43053d7e5f8906aa30513fe35eda7c636dbbee37a7305043c9ce953ca",
+      "measured": [
+        {
+          "kind": "named existing host regression suite; see raw result for exact scope",
+          "evidence": "integrated-final/core/test__network_apps__run.sh.log"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    },
+    {
+      "id": "browser",
+      "version": "0.3.1",
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "runtime_baseline_bytes_identical": true,
+      "runtime_delta": [],
+      "runtime_sha256": "334bced881e3492ea74c62739650faacac5f39ed0da80431ec67ce4fac7a18d8",
+      "measured": [
+        {
+          "kind": "named existing host regression suite; see raw result for exact scope",
+          "evidence": "integrated-final/core/test__browser_assisted__run.py.log"
+        },
+        {
+          "kind": "named existing host regression suite; see raw result for exact scope",
+          "evidence": "integrated-final/core/test__browser_assisted__replay.py.log"
+        },
+        {
+          "kind": "named existing host regression suite; see raw result for exact scope",
+          "evidence": "integrated-final/core/test__browser_assisted__guard.py.log"
+        }
+      ],
+      "qualification": "named host cases only; exhaustive live/physical app states not qualified"
+    }
+  ],
+  "web_pages": [
+    {
+      "path": "web/pages/applications.html",
+      "sha256": "96de799ae8d25eaa3a9b8c3f59588b875718e41726cd4f86a16c2ff680d67729",
+      "baseline_sha256": "96de799ae8d25eaa3a9b8c3f59588b875718e41726cd4f86a16c2ff680d67729",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "HTML/template identity generated by test_web.py; converter JavaScript executed in Node; no full DOM/browser screenshot or touch fit claim"
+    },
+    {
+      "path": "web/pages/files.html",
+      "sha256": "e02aeee4c6565d7bdf0b499f5344d264e9b732f8741a961ab9bf9bda4e0b7f26",
+      "baseline_sha256": "4873aff101f545d9b2cb3bf9a88e1dee1a5f2d17064cc9807ba207846d82aeff",
+      "baseline_bytes_identical": false,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "HTML/template identity generated by test_web.py; converter JavaScript executed in Node; no full DOM/browser screenshot or touch fit claim"
+    },
+    {
+      "path": "web/pages/fonts.html",
+      "sha256": "ea9930e388e97de45ad1e592ee533d7e63c5db458161425ea6ca9aab22844357",
+      "baseline_sha256": "ea9930e388e97de45ad1e592ee533d7e63c5db458161425ea6ca9aab22844357",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "HTML/template identity generated by test_web.py; converter JavaScript executed in Node; no full DOM/browser screenshot or touch fit claim"
+    },
+    {
+      "path": "web/pages/home.html",
+      "sha256": "1d233c4189e017f6c9a94b248dbb552cc28142f829c90720b303867e4736a50f",
+      "baseline_sha256": "1d233c4189e017f6c9a94b248dbb552cc28142f829c90720b303867e4736a50f",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "HTML/template identity generated by test_web.py; converter JavaScript executed in Node; no full DOM/browser screenshot or touch fit claim"
+    },
+    {
+      "path": "web/pages/settings.html",
+      "sha256": "043dd91215d0ef1f816f6d077e83b0a652ed4b525e7b302c296163ce97632adc",
+      "baseline_sha256": "043dd91215d0ef1f816f6d077e83b0a652ed4b525e7b302c296163ce97632adc",
+      "baseline_bytes_identical": true,
+      "viewports": [
+        [
+          480,
+          800
+        ],
+        [
+          800,
+          480
+        ]
+      ],
+      "qualification": "HTML/template identity generated by test_web.py; converter JavaScript executed in Node; no full DOM/browser screenshot or touch fit claim"
+    }
+  ],
+  "pending": [
+    "full native/theme/translation/state rendering",
+    "physical touch/e-ink/radio/provider/SD/sleep-wake acceptance",
+    "parent independent review and real target compilation"
+  ],
+  "repair_round1": {
+    "findings": [
+      "CC-RUNTIME-OTA-001",
+      "CC-RUNTIME-BOARD-001",
+      "UI-DOC-001",
+      "UI-DOC-002",
+      "UI-SUG-001",
+      "CC-BUILD-001"
+    ],
+    "evidence_carry": {
+      "path": "repair-round1/evidence-carry.json",
+      "sha256": "08fd9436167c5c4671585560c2ac63900ea3c780f4401bb6bf3349050a6c9436"
+    },
+    "current_affected_tests": {
+      "path": "repair-round1/results.json",
+      "sha256": "46b3439fa0c5f970a497001bcda57e637bfecb25cbf1b11a43e33284c78dc89e"
+    },
+    "current_source_freeze": "repair-round1/source-freeze.json (authoritative exact source; legacy source_delta/source_carry/host_results receipts above are pre-repair)",
+    "historical_scope": "Original full host routine 16/16 and raster242/stock16 remain pre-repair evidence ONLY for listed byte-identical UI/app inputs. No full raster replay or fresh full-routine claim.",
+    "pending": "Parent independent re-review and NEW real target build; prior actual target build FAILED exit1. No physical/publication qualification.",
+    "production_contract": "Stable OTA descriptor CROSSCUB_APP_VERSION equals numeric release suffix V in crosscub-vV (1-4 components, <=9 digits/component, NUL within 32 bytes); actual embedded V must compare newer before erase. Manual SD recovery unchanged. All 15 other supported SDK flags rejected at both app and board-tag boundaries; seven valid profiles/aliases compile."
+  }
+}

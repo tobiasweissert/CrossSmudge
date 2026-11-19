@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <utility>
 
 #include "activities/Activity.h"
 
@@ -8,25 +9,39 @@ class HalFile;
 
 class SleepActivity final : public Activity {
  public:
-  explicit SleepActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, bool fromTimeout = false)
-      : Activity("Sleep", renderer, mappedInput), fromTimeout(fromTimeout) {}
+  explicit SleepActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, bool canSnapshotOverlayBackground,
+                         std::string currentBookPath = {}, bool fromTimeout = false,
+                         GfxRenderer::Orientation sleepPopupOrientation = GfxRenderer::Orientation::Portrait)
+      : Activity("Sleep", renderer, mappedInput),
+        canSnapshotOverlayBackground(canSnapshotOverlayBackground),
+        currentBookPath(std::move(currentBookPath)),
+        fromTimeout(fromTimeout),
+        sleepPopupOrientation(sleepPopupOrientation) {}
   void onEnter() override;
 
  private:
   void renderDefaultSleepScreen() const;
   void renderCustomSleepScreen() const;
-  bool renderCustomSleepBmp(const std::string& path) const;
   void renderCoverSleepScreen() const;
-  void renderBitmapSleepScreen(const Bitmap& bitmap, bool preserveBackground = false) const;
+  void renderReadingStatsSleepScreen() const;
+  void renderMinimalSleepScreen() const;
+  void renderMinimalStatsSleepScreen() const;
+  void renderDashboardSleepScreen() const;
+  bool renderBitmapSleepScreen(Bitmap& bitmap) const;
+  void renderLastScreenSleepScreen() const;
+  void renderBlankSleepScreen() const;
+  void renderOverlaySleepScreen() const;
+  void renderModernBitmapSleepScreen(Bitmap& bitmap, bool preserveBackground = false) const;
+  void renderTransparentCustomSleepScreen() const;
   bool renderSleepOverlayFile(HalFile& file, const char* pathForLog) const;
   bool renderTransparentOverlayPng(const std::string& path) const;
   bool renderSleepOverlayPath(const std::string& path) const;
-  void renderLastScreenSleepScreen() const;
-  void renderTransparentCustomSleepScreen() const;
-  void renderBlankSleepScreen() const;
-
+  // Scoped borrows; renderCoverSleepScreen clears both before its Bitmap dies.
+  mutable Bitmap* overlayCover = nullptr;
+  mutable Bitmap* overlayGrayCover = nullptr;
+  bool canSnapshotOverlayBackground = false;
+  bool overlayBackgroundBufferStored = false;
+  std::string currentBookPath;
   bool fromTimeout = false;
-  // Cover + Transparent: the cover under the overlay, and the same cover while its gray planes are redrawn.
-  mutable const Bitmap* overlayCover = nullptr;
-  mutable const Bitmap* overlayGrayCover = nullptr;
+  GfxRenderer::Orientation sleepPopupOrientation = GfxRenderer::Orientation::Portrait;
 };

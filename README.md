@@ -1,300 +1,237 @@
-# CrossPoint Reader
-
-[![Fund contributors](https://img.shields.io/badge/%F0%9F%91%91_Fund_contributors-royalty.dev-BB953A?style=for-the-badge&labelColor=1a1a1a)](https://app.royalty.dev/crosspoint-reader/crosspoint-reader)
-
-CrossPoint is open-source e-reader firmware - community-built, fully hackable, free forever. It's maintained by a growing community of developers and readers who believe your device should do what you want - not what a manufacturer decided for you.
-
-### Now running on:
-
-- **ESP32C3-based** Xteink X4 and X3.
-- **ESP32S3-based** Xteink X4Pro and X4Classic, Seeed reTerminal Sticky, M5PaperMono, Metalio E-Ink 4, EEGOREAD A4 and Boox Picco.
-
-Check [our Devices page](https://crosspointreader.com/devices) for the full list.
-
-![CrossPoint Reader running on Xteink device](./docs/images/cover.jpg)
-
-> If you're planning to buy an Xteink device, consider purchasing an **X3/X4 Developer Edition** through https://crosspointreader.com. CrossPoint receives a small share of each sale, helping fund development costs.
-
-## What can CrossPoint do?
-
-- **Reader engine**: EPUB 2/3 rendering with embedded-style option, image handling, hyphenation, kerning, adaptive table layouts, native CJK ruby annotations, chapter navigation, footnotes, bookmarks, dictionary lookups ([StarDict](docs/dictionary.md)), go-to-percent, auto page turn, orientation control, focus reading, KOReader progress sync and more.
-
-- **Various formats**: native handling for `.epub`, `.xtc/.xtch`, `.txt`, and `.bmp`.
-
-- **Touch reading**: follow EPUB links and look up words in the dictionary on touch-enabled devices.
-
-- **Highlights and clippings**: highlight text in EPUBs and save excerpts as clippings. Use the reader menu on button devices, or hold a word and drag the selection handles on touch devices. Look up selected words or phrases in the dictionary. Enable Sync Clippings to sync saved excerpts through a compatible CrossPoint Sync server. See [Clippings and Highlights](USER_GUIDE.md#53-clippings-and-highlights).
-
-- **Screenshots.**
-
-- **Custom fonts**: install your favorite fonts on the SD card.
-
-- **Tilt page turn (X3 and Sticky)**.
-
-- **Bluetooth page turners**: pair a remote under Settings → Connectivity → Bluetooth Page Turner. Map short and long presses to page turns, chapter navigation, the reader menu, or clipping selection.
-
-- **USB Drive mode (X4Pro)**: access the SD card as USB mass storage.
-
-- **Library workflow**: indexed title/author search, recently-added and alphabetical views, multilingual grouping, folder browser, recent books, and SD-cache management.
-
-- **Wireless workflows**:
-  
-  - File transfer web UI
-  - EPUB Optimizer
-  - Web settings UI/API (edit many device settings from browser)
-  - WebSocket fast uploads
-  - WebDAV handler
-  - AP mode (hotspot) and STA mode (join existing Wi-Fi), both with QR helpers
-  - Calibre wireless connect flow
-  - OPDS browser with saved servers (up to 8), search, pagination, and direct download; hold Back for one second and release in a catalog to return to the main menu
-  - OTA update checks and installs from GitHub releases
-
-- **Customization**: night mode, multiple themes (Classic, Lyra, Lyra Extended, RoundedRaff), sleep screen modes including transparent overlays, front/side button remapping, status bar controls, power-button behavior, refresh cadence, and more.
-
-- **Localization**: 34 UI languages and counting, including CJK font fallback and RTL support.
-
-- **SD card plugins**: install plugins for book catalogs, downloads, and tools in the device's web interface. Enable Plugins under Settings → Connectivity to show them on Home. On-device plugins use existing firmware screens and operations. JavaScript runs in a browser on your phone or computer, and its page must stay open while it works. Plugins follow [CrossPoint's reading-focused scope](SCOPE.md#out-of-scope). See the [plugin guide](docs/sd-plugins.md).
-
-### Coming soon:
-
-- More themes.
-
-- Much more! stay tuned.
-
----
-
-## USB-locked devices (Xteink Unlocker)
-
-Some Xteink units purchased from third-party stores (e.g. AliExpress) ship with USB flashing locked from the factory.
-If your device is locked, you will need to use the **Xteink Unlocker** tool available at
-https://crosspointreader.com/#unlock-tool before you can flash CrossPoint.
-
-**You do not need this tool if you bought your device directly from xteink.com.** Those units are not locked.
-
-**Not sure if your device is locked?** Power it on, connect the USB-C cable, and try flashing via the web flasher first (see
-[Install firmware](#install-firmware) below). If the browser's serial device picker does not show your device, try a different
-USB port or browser before assuming the device is locked. Only reach for the unlocker if the device still doesn't appear.
-
-> ### ⚠️ WARNING: READ THIS BEFORE USING THE UNLOCKER ⚠️
-> 
-> **The only officially supported firmwares in the unlock tool are CrossPoint and CrossInk.**
-> 
-> Flashing any other firmware on a USB-locked device may **permanently brick the device** or leave it **permanently
-> stuck on that firmware with no recovery path**. Once USB flashing is re-locked, your only way back is via OTA, and if
-> the firmware you flashed doesn't support OTA, **there is no way out**.
-
-## Install firmware
-
-### Web installer (recommended)
-
-1. Connect your device to your computer via USB-C and wake/unlock the device
-2. Go to https://crosspointreader.com/#flash-tools, select your device (X3, X4, Xteink X4Pro, Seeed reTerminal Sticky, or M5PaperMono), and choose an official CrossPoint release.
-
-### Web installer (specific version)
-
-1. Connect your device to your computer via USB-C and wake/unlock the device
-2. Download the firmware file for your device from [Releases](https://github.com/crosspoint-reader/crosspoint-reader/releases), or compile yourself.
-3. Go to https://crosspointreader.com/#flash-tools, select your device, click "Custom .bin" and upload the firmware file.
-
-### Revert to Official Firmware
-
-To revert to the official firmware, you can also flash the latest official firmware using https://crosspointreader.com/#flash-tools.
-
-### Command line
-
-1. Install [`esptool`](https://github.com/espressif/esptool):
-
-```bash
-pip install esptool
-```
-
-2. Download the firmware file for your device from the [releases page](https://github.com/crosspoint-reader/crosspoint-reader/releases).
-3. Connect your device via USB-C.
-4. Find the device port. On Linux, run `dmesg` after connecting. On macOS:
-
-```bash
-log stream --predicate 'subsystem == "com.apple.iokit"' --info
-```
-
-5. Flash an X3 or X4:
-
-```bash
-esptool.py --chip esp32c3 --port /dev/ttyACM0 --baud 921600 write_flash 0x10000 /path/to/firmware.bin
-```
-
-   Flash an Xteink X4Pro, Seeed reTerminal Sticky, or M5PaperMono:
-
-```bash
-esptool.py --chip esp32s3 --port /dev/ttyACM0 --baud 921600 write_flash 0x10000 /path/to/firmware.bin
-```
-
-### Manual
-
-See [Development quick start](#development-quick-start) below.
-
----
-
-## Custom SD-card fonts
-
-On devices with external RAM enabled in CrossPoint, copy `.ttf`, `.otf`, or `.ttc` files to the SD card and select them as reader fonts. Put one file in `/fonts/` or `/.fonts/`, or put one family's files in a subfolder. See the [SD card font guide](./docs/sd-card-fonts.md) for the folder layout and styles.
-
-On other devices, convert the font to `.cpfont` first. `.cpfont` files also work on devices with external RAM enabled and have better performance. No firmware reflash is needed to add fonts.
-
-To make `.cpfont` files:
-
-1. Go to https://crosspointreader.com/fonts and open the "SD-card font builder" form.
-2. Upload up to four styles (regular, bold, italic, bold-italic), set the family name, point sizes, and Unicode range.
-3. Download the generated `.cpfont` files.
-4. Copy them to your SD card under `/fonts/YourFont/` (or `/.fonts/YourFont/` to hide the folder).
-5. Select the font on the device from the font settings.
-
-Conversion runs the firmware repo's `lib/EpdFont/scripts/fontconvert_sdcard.py` script unmodified, so output matches a local host build.
-
----
-
-## Documentation
-
-- [User Guide](./USER_GUIDE.md)
-- [Web server usage](./docs/webserver.md)
-- [Web server endpoints](./docs/webserver-endpoints.md)
-- [Project scope](./SCOPE.md)
-- [Contributing docs](./docs/contributing/README.md)
-- [Touch and UI development](./docs/contributing/touch-and-ui.md) - how to build new screens on the FreeInkUI activity bases (UiListActivity and friends), plus build envs for the non-Xteink touch devices
-
----
-
-## Development quick start
-
-### Prerequisites
-
-- [pioarduino PlatformIO Core](https://github.com/pioarduino/platformio-core) or [VS Code + pioarduino IDE](https://github.com/pioarduino/pioarduino-vscode-ide)
-- Python 3.8+
-- `clang-format` 21
-- USB-C cable supporting data transfer
-
-### Setup
-
-```bash
-git clone --recursive https://github.com/crosspoint-reader/crosspoint-reader
-cd crosspoint-reader
-
-# if cloned without --recursive:
-git submodule update --init --recursive
-```
-
-### Nix/NixOS
-
-Nix/NixOS users can enter the development shell with either `nix develop` (flakes) or `nix-shell`:
-
-```bash
-nix develop -f nix
-# or
-nix-shell nix
-```
-
-To flash a connected ESP32-C3 device, enable PlatformIO's udev rules in your NixOS configuration:
-
-```nix
-services.udev.packages = with pkgs; [ platformio-core.udev ];
-```
-
-After rebuilding the system configuration, reconnect the device or reload udev rules.
-
-### Build / flash / monitor
-
-```bash
-pio run --target upload
-```
-
-### Contributor pre-PR checks
-
-```bash
-./bin/clang-format-fix
-pio check -e default
-pio run -e default
-```
-
-### Debugging
-
-After flashing the new features, it’s recommended to capture detailed logs from the serial port.
-
-First, make sure all required Python packages are installed:
-
-```python
-python3 -m pip install pyserial colorama matplotlib
-```
-
-After that run the script:
-
-```sh
-# For Linux
-# This was tested on Debian and should work on most Linux systems.
-python3 scripts/debugging_monitor.py
-
-# For macOS
-python3 scripts/debugging_monitor.py /dev/cu.usbmodem2101
-```
-
-Minor adjustments may be required for Windows.
-
----
-
-## Internals
-
-CrossPoint Reader is pretty aggressive about caching data down to the SD card to minimise RAM usage. The ESP32-C3 only has ~380KB of usable RAM, so we have to be careful. A lot of the decisions made in the design of the firmware were based on this constraint.
-
-### Data caching
-
-The first time chapters of a book are loaded, they are cached to the SD card. Subsequent loads are served from the
-cache. This cache directory exists at `.crosspoint` on the SD card. The structure is as follows:
+# Crosscub
+
+**An e-reader and SD-installable Lua app platform for Seeed Studio reTerminal Sticky.**
+
+Crosscub is a Sticky-only product with historical lineage through [CrossSmudge](https://github.com/Mumfee/CrossSmudge), [CrossInk](https://github.com/uxjulia/crossink), [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader) and the [FreeInk SDK](https://freeink.org/). It preserves the reader, typography, application runtime and existing settings/save locations while developing an owner-controlled firmware and app distribution route.
+
+- **Hardware:** reTerminal Sticky, ESP32-S3, 16 MiB flash, 8 MiB PSRAM, touchscreen e-paper.
+- **Reading:** EPUB library and reading progress, configurable typography, reading statistics, bookmarks, reading aids and inherited transfer/sync features.
+- **Applications:** standalone Lua 5.4 packages, on-device App Store and browser-based application management.
+- **Release status:** stable Crosscub **1.6.5.5 remains unchanged**. This direct-CrossPoint migration is experimental and not release-ready; simulator screenshots below are historical evidence, not captures or device qualification of this candidate.
+
+## Direct-upstream migration
+
+The technical foundation is now pinned directly to CrossPoint develop
+`9ac3475733e677b7f61ba3f6e8ce41ce1b9b2967`, newer development code than upstream
+stable 2.0.0. CrossInk `9914146eeae7b46b300f475a16c32426fc02ec1f` is selectively
+adopted; owner behavior is retained from Crosscub
+`818b0befac4d9249c7abded67fa980187c4b41af`. This is not a fresh product rename
+or a claim that every upstream feature is finished. SDK is pinned to
+`634a3f8c067a3714a6a7c622015138af096ab5d2`, platform 55.03.311, Core 6.1.19
+(outer and nested).
+
+[Feature/readiness ledger](SCOPE.md) distinguishes implemented source, pending
+integration and target/device/security gates. New BLE, plugins, OPDS2, runtime
+vector fonts, richer EPUB layout, library and timezone interfaces coexist with
+owner Lua/API7, all 41 Store apps, Browser 0.3.5, fresh-consent 30MB AirDrop,
+reading heatmap, safe file actions and owner OTA. No combined firmware build,
+physical acceptance or stable promotion is claimed here. PR/manual CI retains
+private BIN+ELF+log+source/SDK/toolchain/image-validation evidence; it cannot publish.
+
+## Install apps
+
+A compatible host firmware is required once. After that, ordinary Lua app updates do **not** require rebuilding or flashing firmware.
+
+1. Connect Sticky to Wi-Fi and open **Applications → App Store**.
+2. Select an app and install or update it. The configured owner store has **41 apps**.
+3. Alternatively, merge an app's complete folder onto the SD card at `/.crosssmudge/applications/<app_id>/`. Include every runtime module and asset listed in its catalog record. Preserve existing saves; do not delete app/save directories for a routine update.
+
+The web application manager is available at `http://<device-ip>/applications` while the device's web server is running. It supports app-folder/ZIP installation and management. These are local-device URLs, not a hosted Crosscub service.
+
+Do not infer Store completeness from a source-catalog count; preserve the complete 41-app owner store. The live store is `tobiasweissert/Crosscub`, branch `integration/sticky-test-all`; do not replace its catalog with the smaller source inventory. App API requirements vary. Browser compatibility must be checked against its actual manifest and Lua/API7 host; the historical gallery describes an older Browser. Assisted mode requires compatible public-mode firmware; availability in a store is not proof that an older host supports it.
+
+## Unified 23-app redesign candidate
+
+[Current redesigned apps, per-app versions and safe manual-overlay instructions](docs/app-redesign.md) · [46-frame portrait/landscape atlas](docs/app-redesign-atlas.html) · [Verified local status](docs/app-redesign-status.md). The linked redesign receipts describe an earlier local candidate, not acceptance of this migration; publication status must be checked separately. Physical-device acceptance remains pending. **Back up the SD first; use copy-only overlay, not App Store Update for this candidate.** The current installer can remove an existing member before a failed replacement. The original41 images/provenance remain unchanged in their original paths;18 non-target thumbnails below are historical.
+
+## App screenshot gallery
+
+These are **actual SDL2 simulator captures**, not AI images, illustrations or reconstructed test-harness renders. The real firmware activity manager, Lua runtime, renderer, fonts and published app assets produced the pixels. BMP output from the SDL renderer was converted losslessly to PNG.
+
+**Mixed gallery, explicitly labelled:** the23 redesigned thumbnails use independently reviewed, locally integrated extracted-package code and versions. Publication and physical-device acceptance remain pending. The other18 thumbnails retain the historical41-app preview unchanged and are not new captures of current canonical code. [Original gallery provenance](docs/app-gallery.md) remains historical; [new redesign provenance and qualifications](docs/app-redesign.md) describe the replacements.
+
+All23 replacement thumbnails are native476×796 portraits. The linked redesign atlas also includes all23 native796×476 landscapes, with the actual two-pixel bezel crop and no screenshot padding. Meaningful gameplay/privacy/clue phases were entered using real inputs; values are dynamic, not copied from PDF examples.
+
+All captures run with app networking disabled and in an isolated Linux network namespace. Weather, Browser, Hacker News and Trivia show their real offline/configuration/startup state—not live forecasts, fetched articles or provider answers. No NYT website, headline or image was fetched or used. Screenshots demonstrate the named state only; they are not exhaustive gameplay, touch, radio, SD, sleep/wake or physical e-ink qualification.
+
+<table>
+  <tr>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/flashcards.png"><img src="docs/images/apps-redesigned/flashcards.png" width="240" alt="Flashcards — real Sticky SDL simulator capture" /></a><br /><strong>Flashcards</strong><br /><sub>0.1.2 · redesign candidate</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/habits.png"><img src="docs/images/apps-redesigned/habits.png" width="240" alt="Habits — real Sticky SDL simulator capture" /></a><br /><strong>Habits</strong><br /><sub>0.1.2 · redesign candidate</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/pomodoro.png"><img src="docs/images/apps-redesigned/pomodoro.png" width="240" alt="Pomodoro — real Sticky SDL simulator capture" /></a><br /><strong>Pomodoro</strong><br /><sub>0.1.1 · redesign candidate</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/weather.png"><img src="docs/images/apps-redesigned/weather.png" width="240" alt="Weather — real Sticky SDL simulator capture" /></a><br /><strong>Weather</strong><br /><sub>0.1.1 · redesign candidate</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/browser.png"><img src="docs/images/apps-redesigned/browser.png" width="240" alt="Browser — real Sticky SDL simulator capture" /></a><br /><strong>Browser</strong><br /><sub>0.3.3 · redesign candidate</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/dice.png"><img src="docs/images/apps-redesigned/dice.png" width="240" alt="Dice Roller — real Sticky SDL simulator capture" /></a><br /><strong>Dice Roller</strong><br /><sub>1.0.2 · redesign candidate</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/lifecounter.png"><img src="docs/images/apps-redesigned/lifecounter.png" width="240" alt="Life Counter — real Sticky SDL simulator capture" /></a><br /><strong>Life Counter</strong><br /><sub>1.0.2 · redesign candidate</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/rosary.png"><img src="docs/images/apps-redesigned/rosary.png" width="240" alt="Holy Rosary — real Sticky SDL simulator capture" /></a><br /><strong>Holy Rosary</strong><br /><sub>1.0.2 · redesign candidate</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/dailyoffice.png"><img src="docs/images/apps-redesigned/dailyoffice.png" width="240" alt="Divine Worship — real Sticky SDL simulator capture" /></a><br /><strong>Divine Worship</strong><br /><sub>1.0.2 · redesign candidate</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/images/apps/wordle.png"><img src="docs/images/apps/wordle.png" width="240" alt="Wordle — real Sticky SDL simulator capture" /></a><br /><strong>Wordle</strong><br /><sub>1.2.1</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/2048.png"><img src="docs/images/apps-redesigned/2048.png" width="240" alt="2048 — real Sticky SDL simulator capture" /></a><br /><strong>2048</strong><br /><sub>1.1.1 · redesign candidate</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps/sudoku.png"><img src="docs/images/apps/sudoku.png" width="240" alt="Sudoku — real Sticky SDL simulator capture" /></a><br /><strong>Sudoku</strong><br /><sub>1.1.2</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/blackjack.png"><img src="docs/images/apps-redesigned/blackjack.png" width="240" alt="Blackjack — real Sticky SDL simulator capture" /></a><br /><strong>Blackjack</strong><br /><sub>1.0.2 · redesign candidate</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/blockdrop.png"><img src="docs/images/apps-redesigned/blockdrop.png" width="240" alt="Block Drop — real Sticky SDL simulator capture" /></a><br /><strong>Block Drop</strong><br /><sub>1.0.3 · redesign candidate</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/codex.png"><img src="docs/images/apps-redesigned/codex.png" width="240" alt="Codex: Ink &amp; Iron — real Sticky SDL simulator capture" /></a><br /><strong>Codex: Ink &amp; Iron</strong><br /><sub>1.0.2 · redesign candidate</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/watertracker.png"><img src="docs/images/apps-redesigned/watertracker.png" width="240" alt="Water Tracker — real Sticky SDL simulator capture" /></a><br /><strong>Water Tracker</strong><br /><sub>1.0.3 · redesign candidate</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/stopwatch.png"><img src="docs/images/apps-redesigned/stopwatch.png" width="240" alt="Stopwatch — real Sticky SDL simulator capture" /></a><br /><strong>Stopwatch</strong><br /><sub>1.0.3 · redesign candidate</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/dashboard.png"><img src="docs/images/apps-redesigned/dashboard.png" width="240" alt="Desk Stand — real Sticky SDL simulator capture" /></a><br /><strong>Desk Stand</strong><br /><sub>1.0.4 · redesign candidate</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/hourglass.png"><img src="docs/images/apps-redesigned/hourglass.png" width="240" alt="Hourglass — real Sticky SDL simulator capture" /></a><br /><strong>Hourglass</strong><br /><sub>1.0.3 · redesign candidate</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps/solitaire.png"><img src="docs/images/apps/solitaire.png" width="240" alt="Solitaire — real Sticky SDL simulator capture" /></a><br /><strong>Solitaire</strong><br /><sub>1.1.1</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps/chess.png"><img src="docs/images/apps/chess.png" width="240" alt="Chess — real Sticky SDL simulator capture" /></a><br /><strong>Chess</strong><br /><sub>1.1.2</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/images/apps/cp-battleship.png"><img src="docs/images/apps/cp-battleship.png" width="240" alt="Battleship — real Sticky SDL simulator capture" /></a><br /><strong>Battleship</strong><br /><sub>0.1.5</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps/cp-calculator.png"><img src="docs/images/apps/cp-calculator.png" width="240" alt="Calculator — real Sticky SDL simulator capture" /></a><br /><strong>Calculator</strong><br /><sub>0.1.4</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps/cp-checkers.png"><img src="docs/images/apps/cp-checkers.png" width="240" alt="Checkers — real Sticky SDL simulator capture" /></a><br /><strong>Checkers</strong><br /><sub>0.1.4</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/images/apps/cp-connectfour.png"><img src="docs/images/apps/cp-connectfour.png" width="240" alt="Connect Four — real Sticky SDL simulator capture" /></a><br /><strong>Connect Four</strong><br /><sub>0.1.4</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/cp-forehead.png"><img src="docs/images/apps-redesigned/cp-forehead.png" width="240" alt="Forehead — real Sticky SDL simulator capture" /></a><br /><strong>Forehead</strong><br /><sub>0.1.5 · redesign candidate</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/cp-hearts.png"><img src="docs/images/apps-redesigned/cp-hearts.png" width="240" alt="Hearts — real Sticky SDL simulator capture" /></a><br /><strong>Hearts</strong><br /><sub>0.1.5 · redesign candidate</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/images/apps/cp-hex.png"><img src="docs/images/apps/cp-hex.png" width="240" alt="Hex — real Sticky SDL simulator capture" /></a><br /><strong>Hex</strong><br /><sub>0.1.5</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps/cp-insider.png"><img src="docs/images/apps/cp-insider.png" width="240" alt="Insider — real Sticky SDL simulator capture" /></a><br /><strong>Insider</strong><br /><sub>0.1.4</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps/cp-knucklebones.png"><img src="docs/images/apps/cp-knucklebones.png" width="240" alt="Knucklebones — real Sticky SDL simulator capture" /></a><br /><strong>Knucklebones</strong><br /><sub>0.1.4</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/images/apps/cp-minesweeper.png"><img src="docs/images/apps/cp-minesweeper.png" width="240" alt="Minesweeper — real Sticky SDL simulator capture" /></a><br /><strong>Minesweeper</strong><br /><sub>0.1.5</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps/cp-notes.png"><img src="docs/images/apps/cp-notes.png" width="240" alt="Notes — real Sticky SDL simulator capture" /></a><br /><strong>Notes</strong><br /><sub>0.1.4</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/cp-wavelength.png"><img src="docs/images/apps-redesigned/cp-wavelength.png" width="240" alt="Wavelength — real Sticky SDL simulator capture" /></a><br /><strong>Wavelength</strong><br /><sub>0.1.5 · redesign candidate</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/images/apps/cp-yahtzee.png"><img src="docs/images/apps/cp-yahtzee.png" width="240" alt="Yahtzee — real Sticky SDL simulator capture" /></a><br /><strong>Yahtzee</strong><br /><sub>0.1.4</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps/cp-jaipur.png"><img src="docs/images/apps/cp-jaipur.png" width="240" alt="Jaipur — real Sticky SDL simulator capture" /></a><br /><strong>Jaipur</strong><br /><sub>0.1.4</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps/cp-seasalt.png"><img src="docs/images/apps/cp-seasalt.png" width="240" alt="Sea Salt — real Sticky SDL simulator capture" /></a><br /><strong>Sea Salt</strong><br /><sub>0.1.4</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/images/apps/cp-toybattle.png"><img src="docs/images/apps/cp-toybattle.png" width="240" alt="Toy Battle — real Sticky SDL simulator capture" /></a><br /><strong>Toy Battle</strong><br /><sub>0.1.5</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/cp-murdle.png"><img src="docs/images/apps-redesigned/cp-murdle.png" width="240" alt="Murdle — real Sticky SDL simulator capture" /></a><br /><strong>Murdle</strong><br /><sub>0.1.5 · redesign candidate</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps/cp-go.png"><img src="docs/images/apps/cp-go.png" width="240" alt="Go — real Sticky SDL simulator capture" /></a><br /><strong>Go</strong><br /><sub>0.1.4</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/cp-hackernews.png"><img src="docs/images/apps-redesigned/cp-hackernews.png" width="240" alt="Hacker News — real Sticky SDL simulator capture" /></a><br /><strong>Hacker News</strong><br /><sub>0.1.4 · redesign candidate</sub></td>
+    <td align="center" width="33%"><a href="docs/images/apps-redesigned/cp-trivia.png"><img src="docs/images/apps-redesigned/cp-trivia.png" width="240" alt="Trivia — real Sticky SDL simulator capture" /></a><br /><strong>Trivia</strong><br /><sub>0.1.4 · redesign candidate</sub></td>
+  </tr>
+</table>
+
+Full-resolution images are linked above. See [capture provenance and coverage](docs/app-gallery.md) and the [machine-readable manifest](docs/images/apps/capture-manifest.json) for each app's state, source hashes, image hash and dimensions.
+
+## Reading and typography
+
+Crosscub preserves the inherited reading experience rather than replacing it with an app launcher:
+
+- Lexend Deca and Bitter reading fonts, Inter UI typography and supplemental/fallback glyphs.
+- Reading statistics, finished-book tracking, progress, bookmarks and configurable sleep screens.
+- EPUB layout enhancements including underlines, rules and simple tables.
+- Focus-reading aids, guide dots and configurable controls.
+- Existing book transfer, OPDS and local synchronization paths, subject to the selected firmware's compatibility and hardware qualification.
+
+Legacy `.crosspoint`, `.crosssmudge` and `.smudge` paths remain intentional compatibility identifiers. They do not indicate a different active product name. Existing custom boot/sleep images and preferences remain supported.
+
+## Firmware installation and updates
+
+The accepted Crosscub firmware is integrated on `main` in [tobiasweissert/Crosscub](https://github.com/tobiasweissert/Crosscub). The previous repository name redirects here. Development continues on separate feature branches. Stable Crosscub 1.6.5.5 is unchanged; this branch is not a replacement release.
+
+For a verified application image, back up the SD card, open **Settings → System → SD Card Firmware Update**, select the supplied `.bin` and confirm. An application update is not a factory image. Do not format SD or NVS: preserve books, settings, progress, apps and saves. Consult the [installation guide](docs/installation.md) before changing firmware; USB/factory procedures depend on the exact artifact and installed version.
+
+OTA remains in Settings, but accepts only the owner's `crosscub-v…` tags, `crosscub-sticky-v….bin` assets, pinned SHA-256 and Crosscub application identity. It does not select upstream product firmware. Only a separately owner-qualified release may be offered as an update; this branch must not become /latest.
+
+## File actions on the development branch
+
+`feat/airdrop-original-names-file-actions` adds native firmware features; an App Store-only update cannot add them to an older host.
+
+- AirDrop saves to `/Inbox/<original filename>` with the original safe UTF-8 spelling, case and extension. No postfix is added. Existing destination files are refused, never silently overwritten.
+- In **Browse Files**, select a regular file and choose **Actions**; the existing long-press/hold route also remains available. **Delete** requires an explicit confirmation, with Cancel initially selected.
+- **Move** opens a destination picker. Navigate to the folder and use **Select folder** (or hardware Right). The original filename and book state are carried; destination collisions are refused. Cancel leaves the file in place. Recursive folder deletion is not offered by this feature.
+- An uncertain SD or metadata operation stops further Files mutations for the session. Checked app-state persistence may remain read-only across reopening until its retained recovery copies are inspected. Stop using the card and preserve it for inspection; restarting is not evidence that an uncertain operation was repaired. Host fault tests are not physical SD power-loss guarantees.
+
+## Develop an app
+
+An app is a folder with a manifest, Lua entry point and optional assets:
 
 ```text
-.crosspoint/
-├── epub_<hash>/         # one directory per book, named by content hash
-│   ├── progress.bin     # reading position (chapter, page, etc.)
-│   ├── cover.bmp        # generated cover image
-│   ├── book.bin         # metadata: title, author, spine, TOC
-│   ├── css_rules.cache  # parsed CSS rule cache
-│   ├── img_*            # rendered image cache files
-│   └── sections/        # per-chapter layout cache
-│       ├── 0.bin
-│       ├── 1.bin
-│       └── ...
-├── settings.json        # device settings
-├── state.json           # resume/runtime state
-└── recent.json          # recent books list
+my_app/
+├── manifest.json
+├── main.lua
+└── icon.raw
 ```
 
-Removing `/.crosspoint` clears all cached metadata and forces a full regeneration on next open. Book deletes, overwrites, and moves done through the firmware or web UI clear or re-key matching caches; manual SD-card edits may leave stale cache directories behind.
+```json
+{
+  "id": "my_app",
+  "name": "My App",
+  "version": "1.0.0",
+  "author": "YourGitHubUsername",
+  "description": "A small e-paper app.",
+  "entry": "main.lua"
+}
+```
 
-For more details on the internal file structures, see the [file formats document](./docs/file-formats.md).
+Use the [application developer guide](apps/README.md) for the actual drawing, lifecycle, input, persistence and network API. `icon.raw` is a 32×32, 128-byte monochrome icon encoded with the production converter; package all nested glyph/sprite files and retain their licenses. Touchscreen controls should share drawing and hit-test geometry.
 
----
+Sticky normally has a **2 MiB per-app Lua heap**. The explicitly declared Browser capability has **4 MiB**, subject to allocator reserve/admission checks. These limits do not guarantee allocation success. `SMUDGE_X3_CONSTRAINTS=1` is an optional legacy 75 KiB simulator stress alias, not Sticky's production budget.
 
-## Contributing
+### Check changes
 
-Contributions are welcome. If you're new to the codebase, start with the [contributing docs](./docs/contributing/README.md). For things to work on, check the [ideas discussion board](https://github.com/crosspoint-reader/crosspoint-reader/discussions/categories/ideas) — leave a comment before starting so we don't duplicate effort.
+```sh
+python3 test/crosscub/test_product.py
+python3 test/crosscub/run_preservation.py --group apps --output /path/to/new-evidence/apps
+# Full host suite also needs the documented existing read-only dependencies:
+python3 test/crosscub/run_all.py --output /path/to/new-evidence/full
+```
 
-Everyone here is a volunteer, so please be respectful and patient. For governance and community expectations, see [GOVERNANCE.md](./GOVERNANCE.md).
+Host tests and simulator captures complement, but do not replace, target compilation and physical-device testing.
 
----
+### Submit and publish separately
 
-## Community forks
+Prepare source changes against `main`, preserving IDs, saves and license notices. Include the complete file list in the source catalog and bump both manifest and catalog versions when publishing an update. A merged source change does not automatically publish an app. Updating the configured owner store requires a separately authorized per-app composition into `integration/sticky-test-all`, preserving all 41 entries and unrelated metadata.
 
-One of the best things about open source is that anyone can take the code in a different direction. If you need something outside CrossPoint's [scope](./SCOPE.md), check out the community forks:
+## Build from source
 
-- [CrossInk](https://github.com/uxjulia/CrossInk) — UX focused with minimal reading stats and broader customizations for the reading experience.
+Use Git with recursive submodules and the PlatformIO toolchain pinned by the selected revision's CI (Core 6.1.19 in this snapshot), not an arbitrary latest replacement.
 
-- [papyrix-reader](https://github.com/bigbag/papyrix-reader) — Adds FB2 and MD format support. Actively maintained with Arabic script support. Custom themes.
+```sh
+git clone https://github.com/tobiasweissert/Crosscub.git
+cd Crosscub
+git submodule update --init --recursive
+pio run -e sticky
+```
 
-- [inx](https://github.com/obijuankenobiii/inx) — Completely reimagines the user interface with tabbed navigation.
+| Environment | Purpose |
+| --- | --- |
+| `sticky` | reTerminal Sticky application firmware |
+| `sticky-simulator` | Native SDL2 Sticky simulator |
+| `simulator` | Compatibility alias for the Sticky simulator |
 
-- [Witch(hunt) Reader](https://github.com/jpirnay/witchhunt-reader) — More faithful CSS styling and background work for slightly snappier interaction. Weather information panel. Markdown support.
+The native simulator needs SDL2 development headers/libraries and OpenSSL development support on Linux. This gallery uses isolated compatibility patches and explicit capture automation; see the provenance document rather than assuming an unchanged checkout has been qualified on every desktop platform. A Nix flake/shell is also provided under `nix/`.
 
-**Note:** Many of these features will make their way into CrossPoint over time. Each project chooses its own priorities and tradeoffs.
+## Repository layout
 
-Want to build your own device? Be sure to check out the [Silkscreen](https://silkscreenreader.com) project or [OnePage Reader](https://github.com/MoveCall/onepage-reader).
+- `src/` — activity manager, reader, application runtime, settings and network UI.
+- `apps/` — source apps, manifests, assets and the source catalog.
+- `lib/` — EPUB, fonts, parsers, filesystem and platform abstractions.
+- `freeink-sdk/` — pinned hardware/display SDK submodule.
+- `web/` — device web portal sources, packaged by `scripts/build_web.py`.
+- `docs/` — architecture, installation, controls and application guides.
+- `scripts/`, `test/` — tooling, product contracts and host regression tests.
 
----
+## Credits and licenses
 
-CrossPoint Reader is **not affiliated with Xteink or any device manufacturer**.
+- [CrossSmudge](https://github.com/Mumfee/CrossSmudge) and [CrossInk](https://github.com/uxjulia/crossink), including Julia (@uxjulia)'s typography, reading statistics and reading aids.
+- [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader) for the original e-reader architecture and EPUB engine.
+- [FreeInk SDK](https://freeink.org/) for hardware drivers and display abstractions.
+- CrossPlay contributors and the individual app authors, font designers and artwork projects credited in each package's license/provenance files.
+
+The root [LICENSE](LICENSE) is **MIT**. Inherited/bundled components retain their own licenses and attribution requirements; this README does not relicense them. App screenshots depict the real packaged artwork and fonts, whose component notices remain applicable.

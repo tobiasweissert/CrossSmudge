@@ -5,6 +5,8 @@
 #include <WebServer.h>
 #include <WebSocketsServer.h>
 
+#include <functional>
+#include <utility>
 #include <memory>
 #include <span>
 #include <string>
@@ -66,6 +68,7 @@ class CrossPointWebServer {
   bool isRunning() const { return running; }
 
   WsUploadStatus getWsUploadStatus() const;
+  uint16_t getPort() const { return port; }
 
   // An HTTP upload holds handleClient() until its body is read, so this is polled on each chunk.
   // Returning true drops the client: the upload aborts and its partial file is removed.
@@ -100,6 +103,8 @@ class CrossPointWebServer {
 
   // Request handlers
   void handleRoot() const;
+  void handleStyleCss() const;
+  void handleLogo() const;
   void handleJszip() const;
   void handleNotFound() const;
   void handleStatus() const;
@@ -143,6 +148,31 @@ class CrossPointWebServer {
     std::unique_ptr<uint8_t[]> buffer;
     size_t bufferPos = 0;
   } fontUpload;
+
+  // Applications management handlers
+  void handleApplicationsPage() const;
+  void handleApplicationsList() const;
+  void handleApplicationsFileList() const;
+  void handleApplicationsFileDownload() const;
+  void handleAppUpload();
+  void handleAppUploadData();
+  void handleAppDelete();
+
+  // App upload state
+  struct AppUploadState {
+    HalFile file;
+    std::string appId;
+    std::string relPath;
+    std::string fullPath;
+    bool valid = false;
+    size_t bytesWritten = 0;
+    static constexpr size_t BUFFER_SIZE = 4096;
+    std::vector<uint8_t> buffer;
+    size_t bufferPos = 0;
+    std::string error;
+
+    AppUploadState() { buffer.resize(BUFFER_SIZE); }
+  } appUpload;
 
   // OPDS server handlers
   void handleGetOpdsServers() const;

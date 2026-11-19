@@ -77,9 +77,21 @@ bool saveTokenToFile(const std::string& file, const std::string& path, const std
 void loadConfigFile(const std::string& file, Headers& out);
 
 // --- bounded transport ---
-// `session` is an optional caller-owned TLS session reused across requests
-// (repeated handshakes permanently fragment the heap); pass nullptr to use a
-// per-call stack client.
+// Public HTTPS, IPv4 only; IPv6 (including mapped literals) is refused, never
+// dialed without vetting. Bundle trust + original-host SNI/name + chain dates,
+// TLS 1.2. 30s shared elapsed budget; 8192 wire header bytes, 64 fields,
+// 256KiB chunk metadata, no trailers/1xx, opaque (not decompressed) payloads,
+// 4096 URL/line bytes, 64KiB upload, 30MiB streamed body ceiling, 3 redirects.
+// DNS is synchronous: cancellation is checked before/after, not during DNS.
+// GET/HEAD redirects revalidate DNS and strip all foreign-origin headers;
+// mutating requests return 3xx without replay. No automatic mutation retries.
+// The optional legacy session parameter is ignored: insecure cached sessions
+// cannot cross into this verified adapter. New ESP TLS connections close on exit.
+// Unqualified builds fail closed unless CROSSCUB_VERIFIED_PLUGIN_TRANSPORT=1.
+// Default network permission is allowed without prompts; parent maps persisted
+// optional opt-out here. Qualification/feature enablement remains parent-owned.
+void setNetworkEnabled(bool enabled);
+bool networkEnabled();
 
 // Collects one checked DRAM buffer, capped at maxResponse. Returns HTTP status
 // (including OAuth polling's 4xx bodies), or -1 on OOM, truncation, or transport failure.
@@ -98,16 +110,20 @@ using StreamStart = std::function<bool(int status, const Headers& headers, long 
 using StreamData = std::function<bool(const uint8_t* data, size_t len)>;
 int requestStream(freeink::SecureHttpClient* session, const std::string& url, const std::string& method,
                   const std::string& body, const Headers& headers, const StreamStart& onStart, const StreamData& onData,
-                  bool& complete, const std::function<bool()>& shouldAbort = nullptr);
+                  bool& complete, const std::function<bool()>& shouldAbort = nullptr,
+                  size_t maxResponse = 30 * 1024 * 1024);
 
-// Same request, body streamed to a file on SD instead of DRAM.
+// Same request, body streamed to a file on SD instead of DRAM. destPath must
+// be caller-owned disposable staging, not a published destination. Sync/close
+// are checked; this is not transactional replacement or FAT recovery.
 int requestToFile(freeink::SecureHttpClient* session, const std::string& url, const std::string& method,
-                  const std::string& body, const Headers& headers, const char* destPath, size_t maxResponse);
+                  const std::string& body, const Headers& headers, const char* destPath, size_t maxResponse,
+                  const std::function<bool()>& shouldAbort = nullptr);
 
 // Password-grant token mint: runs the (already-substituted) auth request and
 // extracts the token at `tokenPath` from a 2xx JSON response.
 bool mintPasswordToken(freeink::SecureHttpClient* session, const std::string& url, const std::string& method,
                        const std::string& body, const Headers& headers, const std::string& tokenPath,
-                       std::string& outToken);
+                       std::string& outToken, const std::function<bool()>& shouldAbort = nullptr);
 
 }  // namespace pluginhttp

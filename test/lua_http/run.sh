@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+TEST_OUT=${LUA_HTTP_TEST_OUT:-${TMPDIR:-/tmp}/lua-http-tests}
+mkdir -p "$TEST_OUT"
+export ASAN_OPTIONS=detect_leaks=0
+FLAGS=(-std=c++20 -O1 -g -Wall -Wextra -fsanitize=address,undefined -fno-omit-frame-pointer -Ilib/LuaHttp -Ilib/Lua/src -Ilib/LuaBrowser -Ilib/Memory -Ilib/miniz/src)
+cc -O1 -g -fsanitize=address,undefined -Ilib/miniz/src -c lib/miniz/src/miniz_impl.c -o "$TEST_OUT/miniz.o"
+CORE=(lib/LuaHttp/HttpCore.cpp lib/LuaHttp/HttpGzip.cpp lib/hal/HalLuaResources.cpp)
+for unit in policy protocol budget; do
+  c++ "${FLAGS[@]}" "test/lua_http/${unit}_test.cpp" "${CORE[@]}" "$TEST_OUT/miniz.o" -o "$TEST_OUT/$unit"
+  "$TEST_OUT/$unit"
+done
+c++ "${FLAGS[@]}" -DBOARD_HAS_PSRAM=1 test/lua_http/protocol_test.cpp "${CORE[@]}" "$TEST_OUT/miniz.o" -o "$TEST_OUT/protocol-psram"
+"$TEST_OUT/protocol-psram"
+c++ "${FLAGS[@]}" -I"${ARDUINOJSON_INCLUDE_DIR:-.pio/libdeps/sticky-owner-test/ArduinoJson/src}" test/lua_http/manifest_test.cpp "${CORE[@]}" "$TEST_OUT/miniz.o" -o "$TEST_OUT/manifest"
+"$TEST_OUT/manifest"
+for source in lib/Lua/src/l*.c; do
+  cc -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Ilib/Lua/src -c "$source" -o "$TEST_OUT/$(basename "${source%.c}").o"
+done
+c++ "${FLAGS[@]}" -pthread test/lua_http/async_test.cpp lib/LuaHttp/LuaHttp.cpp "${CORE[@]}" "$TEST_OUT"/*.o -ldl -lm -o "$TEST_OUT/async"
+SMUDGE_X3_CONSTRAINTS=1 "$TEST_OUT/async"
+printf 'PASS: policy, bounded HTTP parser, allocation budget, production Lua async registration/lifecycle (ASan+UBSan; LSan unavailable under ptrace)\n'
+
+python3 test/lua_http/auto_time_test.py
+python3 test/lua_startup/run_libraries.py

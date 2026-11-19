@@ -1,42 +1,50 @@
 #pragma once
 #include <Epub.h>
+#include <FreeInkApp.h>
+#include <FreeInkUIGfxRenderer.h>
 
+#include <array>
+#include <atomic>
 #include <memory>
 #include <string>
 
-#include "activities/UiListActivity.h"
+#include "activities/Activity.h"
+#include "util/ButtonNavigator.h"
 
-class EpubReaderChapterSelectionActivity final : public UiListActivity {
+class EpubReaderChapterSelectionActivity final : public Activity {
+  using UiApp = freeink::ui::FreeInkApp<20, 4>;
+  static constexpr size_t CHAPTER_WINDOW_SIZE = 20;
+
   std::shared_ptr<Epub> epub;
-  int currentTocIndex = 0;
+  std::string epubPath;
+  ButtonNavigator buttonNavigator;
+  int currentSpineIndex = 0;
+  int selectorIndex = 0;
+  freeink::ui::GfxRendererTarget uiTarget;
+  UiApp app;
+  std::atomic<bool> uiReady{false};
+  int visibleRows = 1;
+  int topIndex = 0;
+  bool initialViewportPending = true;
+  std::array<std::string, CHAPTER_WINDOW_SIZE> labelWindow{};
+  std::array<freeink::ui::ListItem, CHAPTER_WINDOW_SIZE> itemWindow{};
 
-  // Windowed row buffers: TOC entries are SD-backed (BookMetadataCache LUT
-  // reads), so only the rows around the viewport are materialized. A
-  // several-hundred-entry TOC (547 in a large collection) built up front cost
-  // ~60KB of labels + ListItems — starving the CJK glyph arena into
-  // SD-per-repaint — for rows that were never drawn. The window follows
-  // nav.top via itemsWindowFirst (see fui::ListProps); refreshing it also
-  // batch-prewarms the window's fallback glyphs, so each page of the list
-  // pays one bounded SD pass and repaints stay RAM-only.
-  static constexpr int TOC_WINDOW = 24;
-  std::string windowLabels[TOC_WINDOW];
-  freeink::ui::ListItem windowItems[TOC_WINDOW];
-  int windowStart = -1;
-  int windowCount = 0;
-  void refreshTocWindow(int start);
+  static void chapterScreen(UiApp::ScreenType& screen, void* user);
+  static void onRowEvent(const freeink::ui::ActionEvent& event, void* user);
+  void buildChapterScreen(UiApp::ScreenType& screen);
+  void selectChapter();
 
   // Total TOC items count
-  int listCount() const override { return epub ? epub->getTocItemsCount() : 0; }
-  void buildScreen(UiScreen& screen) override;
-  void activateIndex(int index) override;
-  // Back cancels with a result and Confirm activates on RELEASE here, and a
-  // missing epub swallows everything past Back.
-  bool handleButtons() override;
-  // Header is drawn inside the safe area (not full-width like the base).
-  void drawChrome() override;
+  int getTotalItems() const;
 
  public:
-  explicit EpubReaderChapterSelectionActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                              const std::shared_ptr<Epub>& epub, int currentTocIndex);
+  EpubReaderChapterSelectionActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
+                                     const std::shared_ptr<Epub>& epub, const std::string& epubPath,
+                                     int currentSpineIndex);
   void onEnter() override;
+  void onExit() override;
+  void loop() override;
+  void render(RenderLock&&) override;
+  bool isReaderActivity() const override { return true; }
+  bool allowPowerAsConfirmInReaderMode() const override { return true; }
 };

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Arena.h>
+#include <ArenaVector.h>
 #include <BufferedFile.h>
 #include <HalStorage.h>
 
@@ -21,7 +23,7 @@ class BookMetadataCache {
 
   struct SpineEntry {
     std::string href;
-    uint32_t cumulativeSize;
+    uint32_t cumulativeSize;  // cumulative size stored as 32-bit for on-disk format compatibility
     int16_t tocIndex;
 
     SpineEntry() : cumulativeSize(0), tocIndex(-1) {}
@@ -52,6 +54,12 @@ class BookMetadataCache {
   uint16_t tocCount;
   bool loaded;
   bool buildMode;
+  bool cacheCumulativeSizes;
+
+  // Optional reader-session cache. Lightweight metadata-only callers leave this
+  // disabled so Recent Books does not pay steady-state RAM for a few lookups.
+  std::unique_ptr<uint32_t[]> cumulativeSizes;
+  uint16_t cumulativeSizeCount = 0;
 
   HalFile bookFile;
   // Temp file handles during build
@@ -78,9 +86,12 @@ class BookMetadataCache {
     uint16_t hrefLen;   // length for collision reduction
     int16_t spineIndex;
   };
-  std::unique_ptr<std::deque<SpineHrefIndexEntry>> spineHrefIndex;
+  Arena spineHrefIndexArena;
+  ArenaVector<SpineHrefIndexEntry> spineHrefIndex;
+  bool useSpineHrefIndex = false;
+  bool lowMemoryFailure = false;
 
-  static constexpr uint16_t LARGE_SPINE_THRESHOLD = 400;
+  static constexpr uint16_t LARGE_SPINE_THRESHOLD = 300;
 
   // FNV-1a 64-bit hash function
   static uint64_t fnvHash64(const std::string& s) {
@@ -96,12 +107,19 @@ class BookMetadataCache {
   uint32_t writeTocEntry(HalFile& file, const TocEntry& entry) const;
   SpineEntry readSpineEntry(HalFile& file) const;
   TocEntry readTocEntry(HalFile& file) const;
+  void cacheSpineCumulativeSizes();
 
  public:
   BookMetadata coreMetadata;
 
-  explicit BookMetadataCache(std::string cachePath)
-      : cachePath(std::move(cachePath)), lutOffset(0), spineCount(0), tocCount(0), loaded(false), buildMode(false) {}
+  explicit BookMetadataCache(std::string cachePath, const bool cacheCumulativeSizes = false)
+      : cachePath(std::move(cachePath)),
+        lutOffset(0),
+        spineCount(0),
+        tocCount(0),
+        loaded(false),
+        buildMode(false),
+        cacheCumulativeSizes(cacheCumulativeSizes), spineHrefIndex(spineHrefIndexArena) {}
   ~BookMetadataCache() = default;
 
   // Building phase (stream to disk immediately)
@@ -118,9 +136,15 @@ class BookMetadataCache {
   // Post-processing to update mappings and sizes
   bool buildBookBin(const std::string& epubPath, const BookMetadata& metadata);
 
+  // Cheap check (no parsing) for whether a metadata cache exists at cachePath.
+  // Lets callers predict a fast cached open without doing the full load().
+  static bool exists(const std::string& cachePath);
+
   // Reading phase (read mode)
   bool load();
+  bool failedForLowMemory() const { return lowMemoryFailure; }
   SpineEntry getSpineEntry(int index);
+  size_t getSpineCumulativeSize(int index);
   TocEntry getTocEntry(int index);
   // Cumulative byte size up to and including the given spine item (0 if out of range
   // or not loaded).

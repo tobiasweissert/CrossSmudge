@@ -1,0 +1,15 @@
+{
+  "id": "rosary",
+  "name": "Rosary",
+  "version": "1.0.2",
+  "author": "Mumfee",
+  "description": "Interactive Holy Rosary prayer guide with bead tracking and mysteries",
+  "entry": "main.lua",
+  "files": [
+    "icon.raw",
+    "main.lua",
+    "manifest.json",
+    "sprites/crucifix.raw",
+    "unified_ui.lua"
+  ]
+}

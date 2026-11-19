@@ -1,0 +1,44 @@
+--- /dev/null
++++ b/src/simulator/GalleryCapture.cpp
+@@ -0,0 +1,30 @@
++// Capture-only automation: real ActivityManager, LuaRunner and production renderer.
++#ifdef SIMULATOR
++#include <cstdlib>
++#include <cstring>
++#include <memory>
++#include <HalLuaHttp.h>
++#include <Logging.h>
++#include <I18n.h>
++#include "activities/ActivityManager.h"
++#include "activities/apps/lua/LuaAppActivity.h"
++extern ActivityManager activityManager;
++extern GfxRenderer renderer;
++extern MappedInputManager mappedInputManager;
++bool runGalleryTick() {
++  const char* id = std::getenv("CROSSCUB_GALLERY_APP");
++  if (!id || !*id) return false;
++  static bool launched = false;
++  if (!launched) {
++    launched = true;
++    // No Wi-Fi selection or provider calls. The native transport also fails closed.
++    HalLuaHttp::setNetworkEnabled(false);
++    std::srand(42);
++    renderer.setOrientation(GfxRenderer::Orientation::Portrait);
++    const std::string path = std::string("/.crosssmudge/applications/") + id;
++    LOG_INF("GALLERY", "Launching published app %s; networking disabled", id);
++    activityManager.replaceActivity(std::make_unique<LuaAppActivity>(renderer, mappedInputManager, path, id));
++  }
++  return true;
++}
++#endif
+--- a/src/simulator/SimulatorSmokeTest.cpp
++++ b/src/simulator/SimulatorSmokeTest.cpp
+@@ -931,6 +931,7 @@
+ 
+ }  // namespace
+ 
+-void runSimulatorSmokeTestTick() { smokeTest.tick(); }
++extern bool runGalleryTick();
++void runSimulatorSmokeTestTick() { if (!runGalleryTick()) smokeTest.tick(); }
+ 
+ #endif

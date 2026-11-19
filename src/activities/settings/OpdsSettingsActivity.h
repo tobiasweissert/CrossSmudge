@@ -33,12 +33,12 @@ class OpdsSettingsActivity final : public UiListActivity {
   void handleSelection();
   bool saveServer();
 
-  // Row storage: at most 7 rows (Name/URL/Username/Password/2 custom headers
+  // Row storage: at most 8 rows (Name/URL/Username/Password/2 custom headers/filename format
   // + Delete, see BASE_ITEMS in the .cpp), so a fixed-capacity array avoids
   // any heap allocation for the row list. Labels are set once in the
   // constructor (they never change); buildScreen() only refreshes the value
   // pointers.
-  static constexpr int MAX_MENU_ITEMS = 7;
+  static constexpr int MAX_MENU_ITEMS = 8;
   freeink::ui::ListItem fieldRowItems[MAX_MENU_ITEMS]{};
 
   // Masked "Name: ******" display text for the two custom header rows.

@@ -1,25 +1,48 @@
 #pragma once
 
+#include <atomic>
 #include <string>
 #include <vector>
 
-// One StarDict dictionary found under /dictionaries or /.dictionaries: a
-// subfolder holding <stem>.idx plus <stem>.dict or <stem>.dict.dz.
+// One installed StarDict dictionary discovered on the SD card.
 struct DictionaryEntry {
-  std::string name;  // subfolder name (shown to the user, stored in settings)
-  std::string stem;  // index basename without .idx
+  std::string name;      // folder name, e.g. "dict-en-en"
+  std::string stem;      // file stem (".idx"/".ifo" base), e.g. "dict-data"
+  std::string basePath;  // <root>/<name>/<stem>, e.g. "/.dictionaries/dict-en-en/dict-data"
 };
 
-namespace DictionaryRegistry {
+// Discovers installed dictionaries on the SD card. Mirrors SdCardFontRegistry:
+// discover() scans the card and populates entries_; the settings UI enumerates
+// them on both device and web. The persistent selection is not stored here — it
+// lives in dictionary.bin (see Dictionary::readConfiguredDictPath/saveGlobalDictPath).
+class DictionaryRegistry {
+ public:
+  // Scan the SD card, populate entries_ (sorted by folder name). Returns true if any found.
+  bool discover();
+  void clear();
 
-// Scan /dictionaries/*/ and /.dictionaries/*/ for dictionaries. Folders with
-// multiple index stems are ambiguous and skipped. Result is sorted
-// case-insensitively by name.
-void discover(std::vector<DictionaryEntry>& out);
+  const std::vector<DictionaryEntry>& getEntries() const { return entries_; }
+  int count() const { return static_cast<int>(entries_.size()); }
+  const std::string& root() const { return root_; }
 
-// Resolve a folder name to its extensionless base path
-// ("/dictionaries/<folder>/<stem>" or "/.dictionaries/<folder>/<stem>").
-// Returns false if the folder holds no usable dictionary in either root.
-bool resolveBasePath(const char* folderName, std::string& basePathOut);
+  // Index of the entry whose basePath == path, or -1 if not found / path empty.
+  int indexOf(const std::string& basePath) const;
 
-}  // namespace DictionaryRegistry
+  // Mark the registry as needing a re-scan. Thread-safe (callable from the web task).
+  void markDirty() { dirty_.store(true, std::memory_order_release); }
+
+  // Re-scan if marked dirty, then clear the flag. Mirrors SdCardFontSystem::refreshIfDirty().
+  void refreshIfDirty() {
+    if (dirty_.exchange(false, std::memory_order_acquire)) discover();
+  }
+
+ private:
+  void maybeAutoSelectDefaultDictionary() const;
+
+  std::vector<DictionaryEntry> entries_;  // sorted alphabetically by name
+  std::string root_;                      // active dictionary root dir on the SD card
+  std::atomic<bool> dirty_{false};
+};
+
+// Global dictionary registry instance (defined in main.cpp).
+extern DictionaryRegistry dictionaryRegistry;

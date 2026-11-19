@@ -4,40 +4,16 @@
 
 #include <cstring>
 
-// The board name derives from the FREEINK_DEVICE_* build flags so every env
-// (and any fork built from this source) is tagged automatically. The combined
-// X3/X4 ESP32-C3 binary is one compatibility class, tagged "x4".
-#if FREEINK_DEVICE_X4PRO
-#define CROSSPOINT_BOARD_NAME "x4pro"
-#elif FREEINK_DEVICE_X4CLASSIC
-#define CROSSPOINT_BOARD_NAME "x4c"
-#elif FREEINK_DEVICE_METALIO_EINK4
-#define CROSSPOINT_BOARD_NAME "metalio_eink4"
-#elif FREEINK_DEVICE_X4 || FREEINK_DEVICE_X3
-#define CROSSPOINT_BOARD_NAME "x4"
-#elif FREEINK_DEVICE_PAPERMONO
-#define CROSSPOINT_BOARD_NAME "papermono"
-#elif FREEINK_DEVICE_STICKY
-#define CROSSPOINT_BOARD_NAME "sticky"
-#elif FREEINK_DEVICE_M5PAPER
-#define CROSSPOINT_BOARD_NAME "m5paper"
-#elif FREEINK_DEVICE_EEGO_A4
-#define CROSSPOINT_BOARD_NAME "eego_a4"
-#elif FREEINK_DEVICE_PICCO
-#define CROSSPOINT_BOARD_NAME "picco"
-#elif FREEINK_DEVICE_MURPHY_M4
-#define CROSSPOINT_BOARD_NAME "murphy_m4"
-#elif FREEINK_DEVICE_LILYGO
-#define CROSSPOINT_BOARD_NAME "lilygo"
-#elif FREEINK_DEVICE_M5
-#define CROSSPOINT_BOARD_NAME "m5"
-#elif FREEINK_DEVICE_MURPHY
-#define CROSSPOINT_BOARD_NAME "murphy"
-#elif FREEINK_DEVICE_DELINK
-#define CROSSPOINT_BOARD_NAME "delink"
-#else
-#error "FirmwareBoardTag: no FREEINK_DEVICE_* flag set; cannot derive board name"
+// Retain the established Sticky transport/recovery board tag. Include every
+// competing profile normalized by the pinned upstream SDK, including aliases.
+#if !FREEINK_DEVICE_STICKY || FREEINK_DEVICE_X3 || FREEINK_DEVICE_X4 || FREEINK_DEVICE_X4PRO ||               \
+    FREEINK_DEVICE_X4CLASSIC || FREEINK_DEVICE_WS397 || FREEINK_DEVICE_ONEPAGE || FREEINK_DEVICE_PAPERMONO || \
+    FREEINK_DEVICE_EEGO_A4 || FREEINK_DEVICE_M5 || FREEINK_DEVICE_MURPHY_M4 || FREEINK_DEVICE_MURPHY ||       \
+    FREEINK_DEVICE_DELINK || FREEINK_DEVICE_LILYGO || FREEINK_DEVICE_M5PAPER || FREEINK_DEVICE_PAPERS3 ||    \
+    FREEINK_DEVICE_SILKSCREEN || FREEINK_DEVICE_METALIO_EINK4 || FREEINK_DEVICE_PICCO
+#error "Crosscub requires the Sticky board tag exclusively"
 #endif
+#define CROSSPOINT_BOARD_NAME "sticky"
 
 namespace board_tag {
 
@@ -60,14 +36,14 @@ void Scanner::feed(const uint8_t* data, size_t len) {
       if (c == ';') {
         capturing = false;
         captured[nameLen] = '\0';
-        if (nameLen != boardNameLen() || memcmp(captured, boardName(), nameLen) != 0) {
+        if (nameLen != boardNameLen() || std::memcmp(captured, boardName(), nameLen) != 0) {
           mismatchFound = true;
           return;
         }
       } else if (nameLen < MAX_NAME && c > 0x20 && c < 0x7F) {
         captured[nameLen++] = c;
       } else {
-        // Overlong or non-printable: a chance byte-collision, not a real tag.
+        // Overlong or non-printable: a chance byte collision, not a real tag.
         capturing = false;
       }
       continue;

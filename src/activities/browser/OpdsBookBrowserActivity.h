@@ -134,6 +134,8 @@ class OpdsBookBrowserActivity final : public CatalogActivity {
   void navigateToEntry(const OpdsEntry& entry);
   void navigateBack();
   void downloadBook(const OpdsEntry& book);
+  bool admitNewDownload(const std::string& filename);
+  void finishSafeDownload(HttpDownloader::DownloadError result);
   void openPublicationDetail(const OpdsEntry& entry);
   static void fillDetailInfo(const OpdsPublication& publication, DetailsSpec& spec);
   // Download the publication's cover art to an SD temp for the details page.

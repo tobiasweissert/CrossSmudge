@@ -3,11 +3,14 @@
 #include <GfxRenderer.h>
 #include <I18n.h>
 
+#include <cstdio>
+
 #include "CrossPointSettings.h"
 #include "MappedInputManager.h"
+#include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
-
-namespace fui = freeink::ui;
+#include "components/UIThemeTokens.h"
+#include "fontIds.h"
 
 namespace {
 // UI steps correspond to logical roles in order: Back, Confirm, Left, Right.
@@ -16,38 +19,42 @@ constexpr uint8_t kRoleCount = 4;
 constexpr uint8_t kUnassigned = 0xFF;
 // Duration to show temporary error text when reassigning a button.
 constexpr unsigned long kErrorDisplayMs = 1500;
+constexpr int16_t kValueBadgePadding = 8;
 }  // namespace
+
+namespace fui = freeink::ui;
+
+ButtonRemapActivity::ButtonRemapActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
+                                         const bool isReaderMode, const bool headerReaderContext)
+    : Activity("ButtonRemap", renderer, mappedInput),
+      readerMode(isReaderMode),
+      headerReaderContext(headerReaderContext),
+      ui(renderer) {}
 
 void ButtonRemapActivity::onEnter() {
   Activity::onEnter();
 
   // Start with all roles unassigned to avoid duplicate blocking.
   currentStep = 0;
-  exitAction = ExitAction::None;
   tempMapping[0] = kUnassigned;
   tempMapping[1] = kUnassigned;
   tempMapping[2] = kUnassigned;
   tempMapping[3] = kUnassigned;
   errorMessage.clear();
   errorUntil = 0;
-  for (uint8_t i = 0; i < kRoleCount; ++i) {
-    rowItems[i].label = getRoleName(i);
-  }
-  resetUi();
-  app.setScreen(&ButtonRemapActivity::screenTrampoline, this);
+  refreshListItems();
+  ui.reset();
+  ui.app.setScreen(&ButtonRemapActivity::listScreen, this);
   requestUpdate();
 }
 
-void ButtonRemapActivity::loop() {
-  // Remember the first side action even if another button is still held.
-  if (exitAction == ExitAction::None || exitAction == ExitAction::Save) {
-    if (mappedInput.wasReleased(MappedInputManager::Button::Up)) {
-      exitAction = ExitAction::Reset;
-    } else if (mappedInput.wasReleased(MappedInputManager::Button::Down)) {
-      exitAction = ExitAction::Cancel;
-    }
-  }
+void ButtonRemapActivity::onExit() { Activity::onExit(); }
 
+void ButtonRemapActivity::loop() {
+  if (TouchHeaderBackButton::wasTapped(mappedInput, renderer)) {
+    finish();
+    return;
+  }
   // Clear any temporary warning after its timeout.
   if (errorUntil > 0 && millis() > errorUntil) {
     errorMessage.clear();
@@ -56,33 +63,30 @@ void ButtonRemapActivity::loop() {
     return;
   }
 
-  // Finish the entire gesture before returning to Settings or changing the live mapping.
-  if (exitAction != ExitAction::None) {
-    if (mappedInput.isPressed(MappedInputManager::Button::Back) ||
-        mappedInput.isPressed(MappedInputManager::Button::Confirm) ||
-        mappedInput.isPressed(MappedInputManager::Button::Left) ||
-        mappedInput.isPressed(MappedInputManager::Button::Right) ||
-        mappedInput.isPressed(MappedInputManager::Button::Up) ||
-        mappedInput.isPressed(MappedInputManager::Button::Down)) {
-      return;
+  // Side buttons:
+  // - Up: reset mapping to defaults and exit.
+  // - Down: cancel without saving.
+  if (mappedInput.wasPressed(MappedInputManager::Button::Up)) {
+    // Persist default mapping immediately so the user can recover quickly.
+    if (readerMode) {
+      SETTINGS.readerFrontButtonsEnabled = 0;  // Revert to system mapping
+      SETTINGS.readerFrontButtonBack = CrossPointSettings::FRONT_HW_BACK;
+      SETTINGS.readerFrontButtonConfirm = CrossPointSettings::FRONT_HW_CONFIRM;
+      SETTINGS.readerFrontButtonLeft = CrossPointSettings::FRONT_HW_LEFT;
+      SETTINGS.readerFrontButtonRight = CrossPointSettings::FRONT_HW_RIGHT;
+    } else {
+      SETTINGS.frontButtonBack = CrossPointSettings::FRONT_HW_BACK;
+      SETTINGS.frontButtonConfirm = CrossPointSettings::FRONT_HW_CONFIRM;
+      SETTINGS.frontButtonLeft = CrossPointSettings::FRONT_HW_LEFT;
+      SETTINGS.frontButtonRight = CrossPointSettings::FRONT_HW_RIGHT;
     }
-    switch (exitAction) {
-      case ExitAction::None:
-        return;
-      case ExitAction::Save:
-        applyTempMapping();
-        SETTINGS.saveToFile();
-        break;
-      case ExitAction::Reset:
-        SETTINGS.frontButtonBack = CrossPointSettings::FRONT_HW_BACK;
-        SETTINGS.frontButtonConfirm = CrossPointSettings::FRONT_HW_CONFIRM;
-        SETTINGS.frontButtonLeft = CrossPointSettings::FRONT_HW_LEFT;
-        SETTINGS.frontButtonRight = CrossPointSettings::FRONT_HW_RIGHT;
-        SETTINGS.saveToFile();
-        break;
-      case ExitAction::Cancel:
-        break;
-    }
+    SETTINGS.saveToFile();
+    finish();
+    return;
+  }
+
+  if (mappedInput.wasPressed(MappedInputManager::Button::Down)) {
+    // Exit without changing settings.
     finish();
     return;
   }
@@ -108,7 +112,11 @@ void ButtonRemapActivity::loop() {
     currentStep++;
 
     if (currentStep >= kRoleCount) {
-      exitAction = ExitAction::Save;
+      // All roles assigned; save to settings and exit.
+      applyTempMapping();
+      SETTINGS.saveToFile();
+      finish();
+      return;
     }
 
     requestUpdate();
@@ -131,12 +139,21 @@ void ButtonRemapActivity::render(RenderLock&&) {
 
   renderer.clearScreen();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_REMAP_FRONT_BUTTONS));
-  GUI.drawSubHeader(renderer, Rect{0, metrics.topPadding + metrics.headerHeight, pageWidth, metrics.tabBarHeight},
+  const char* header = readerMode ? tr(STR_REMAP_FRONT_BUTTONS_READER) : tr(STR_REMAP_FRONT_BUTTONS);
+  const Rect headerRect = TouchHeaderBackButton::headerRect(renderer, mappedInput);
+  if (mappedInput.hasTouchHardware()) {
+    TouchHeaderBackButton::draw(renderer, headerRect, header, headerReaderContext);
+  } else {
+    GUI.drawHeader(renderer, headerRect, header, nullptr, headerReaderContext);
+  }
+  GUI.drawSubHeader(renderer,
+                    Rect{0, metrics.topPadding + TouchHeaderBackButton::height(metrics, mappedInput), pageWidth,
+                         metrics.tabBarHeight},
                     tr(STR_REMAP_PROMPT));
 
-  int topOffset = metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.verticalSpacing;
-  renderUi();
+  const int topOffset = metrics.topPadding + TouchHeaderBackButton::height(metrics, mappedInput) +
+                        metrics.tabBarHeight + metrics.verticalSpacing;
+  ui.render();
 
   // Temporary warning banner for duplicates.
   if (!errorMessage.empty()) {
@@ -162,44 +179,99 @@ void ButtonRemapActivity::render(RenderLock&&) {
   renderer.displayBuffer();
 }
 
-void ButtonRemapActivity::screenTrampoline(UiScreen& screen, void* user) {
-  static_cast<ButtonRemapActivity*>(user)->buildScreen(screen);
+void ButtonRemapActivity::listScreen(UiApp::ScreenType& screen, void* user) {
+  static_cast<ButtonRemapActivity*>(user)->buildListScreen(screen);
 }
 
-void ButtonRemapActivity::buildScreen(UiScreen& screen) {
+void ButtonRemapActivity::buildListScreen(UiApp::ScreenType& screen) {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  const int topOffset = metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.verticalSpacing;
-  screen.setContentMarginFromScreen(
-      fui::Insets{static_cast<int16_t>(safe.y + topOffset),
-                  static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width) + metrics.verticalSpacing),
-                  static_cast<int16_t>(renderer.getScreenHeight() - (safe.y + safe.height) + metrics.verticalSpacing),
-                  static_cast<int16_t>(safe.x + metrics.verticalSpacing)});
+  const int topOffset = metrics.topPadding + TouchHeaderBackButton::height(metrics, mappedInput) +
+                        metrics.tabBarHeight + metrics.verticalSpacing;
+  screen.setContentMargin(fui::Insets{static_cast<int16_t>(topOffset), 0,
+                                      static_cast<int16_t>(metrics.buttonHintsHeight + metrics.verticalSpacing), 0});
 
-  for (uint8_t i = 0; i < kRoleCount; ++i) {
-    const uint8_t assignedButton = tempMapping[i];
-    rowItems[i].value = assignedButton == kUnassigned ? tr(STR_UNASSIGNED) : getHardwareName(assignedButton);
-  }
+  refreshListItems();
 
   fui::ListProps props;
-  props.items = rowItems;
-  props.count = kRoleCount;
-  props.selectedIndex = currentStep < kRoleCount ? currentStep : -1;
+  props.items = listItems.data();
+  props.count = listItems.size();
+  props.selectedIndex = currentStep;
   props.inputMask = fui::InputNone;
-  props.scrollIndicator = false;
-  // Label at the value's font size: both sides of the row read as one unit.
-  // maxLines=2 also marks the style caller-owned (see textStyleUnset).
-  props.labelText = screen.theme().smallText;
-  props.labelText.maxLines = 2;
+  props.labelText = screen.theme().bodyText;
+  props.valueText = screen.theme().smallText;
+  const fui::Rect listRect = screen.body();
+  configureUiList(props, screen.theme(), listRect);
   screen.list(props);
+  drawSelectedValueBadge(screen, listRect, props);
+}
+
+void ButtonRemapActivity::refreshListItems() {
+  for (uint8_t index = 0; index < kRoleCount; ++index) {
+    const uint8_t assignedButton = tempMapping[index];
+    listItems[index] = fui::ListItem{};
+    listItems[index].label = getRoleName(index);
+    listItems[index].value = assignedButton == kUnassigned ? tr(STR_UNASSIGNED) : getHardwareName(assignedButton);
+  }
+}
+
+bool ButtonRemapActivity::usesLyraValueBadge() const {
+  switch (static_cast<CrossPointSettings::UI_THEME>(SETTINGS.uiTheme)) {
+    case CrossPointSettings::UI_THEME::LYRA:
+    case CrossPointSettings::UI_THEME::LYRA_3_COVERS:
+    case CrossPointSettings::UI_THEME::LYRA_CAROUSEL:
+    case CrossPointSettings::UI_THEME::MINIMAL:
+      return true;
+    default:
+      return false;
+  }
+}
+
+void ButtonRemapActivity::drawSelectedValueBadge(UiApp::ScreenType& screen, const fui::Rect listRect,
+                                                 const fui::ListProps& props) const {
+  if (!usesLyraValueBadge() || currentStep >= listItems.size()) return;
+  const char* value = listItems[currentStep].value;
+  if (value == nullptr || value[0] == '\0') return;
+
+  // The list owns row sizing and hit regions. This only restores Lyra's
+  // selected-value paint using that same row geometry; it adds no interaction.
+  const int16_t rowHeight = props.rowHeight;
+  const int16_t rowGap = props.rowGap < 0 ? 0 : props.rowGap;
+  const int16_t rowInset = props.rowInset < 0 ? screen.theme().listInset : props.rowInset;
+  const int16_t sidePadding = props.sidePadding < 0 ? screen.theme().listSidePadding : props.sidePadding;
+  fui::Rect row = listRect;
+  row.x = static_cast<int16_t>(row.x + rowInset);
+  row.width = static_cast<int16_t>(row.width - rowInset * 2);
+  row.y = static_cast<int16_t>(row.y + currentStep * (rowHeight + rowGap));
+  row.height = rowHeight;
+  if (row.width <= 0 || row.height <= 0 || row.bottom() > listRect.bottom()) return;
+
+  fui::TextStyle valueStyle = fui::textStyleWithForeground(props.valueText, fui::Paint::solid(fui::Color::White));
+  valueStyle.align = fui::TextAlign::Right;
+  const int16_t valueWidth = screen.target().measureText(valueStyle.font, value, valueStyle).width;
+  const int16_t badgeWidth = static_cast<int16_t>(valueWidth + kValueBadgePadding * 2);
+  if (badgeWidth > row.width - sidePadding * 2) return;
+
+  const fui::Rect badge{static_cast<int16_t>(row.right() - badgeWidth), row.y, badgeWidth, row.height};
+  const uint8_t radius = props.rowRadius > 0 ? props.rowRadius : screen.theme().listRowRadius;
+  screen.target().fill(badge, fui::Paint::solid(fui::Color::Black), radius);
+  screen.target().text(fui::Rect{static_cast<int16_t>(badge.x + kValueBadgePadding), badge.y, valueWidth, badge.height},
+                       value, valueStyle);
 }
 
 void ButtonRemapActivity::applyTempMapping() {
   // Commit temporary mapping into settings (logical role -> hardware).
-  SETTINGS.frontButtonBack = tempMapping[0];
-  SETTINGS.frontButtonConfirm = tempMapping[1];
-  SETTINGS.frontButtonLeft = tempMapping[2];
-  SETTINGS.frontButtonRight = tempMapping[3];
+  if (readerMode) {
+    SETTINGS.readerFrontButtonsEnabled = 1;  // Activate reader-specific mapping
+    SETTINGS.readerFrontButtonBack = tempMapping[0];
+    SETTINGS.readerFrontButtonConfirm = tempMapping[1];
+    SETTINGS.readerFrontButtonLeft = tempMapping[2];
+    SETTINGS.readerFrontButtonRight = tempMapping[3];
+  } else {
+    SETTINGS.frontButtonBack = tempMapping[0];
+    SETTINGS.frontButtonConfirm = tempMapping[1];
+    SETTINGS.frontButtonLeft = tempMapping[2];
+    SETTINGS.frontButtonRight = tempMapping[3];
+  }
 }
 
 bool ButtonRemapActivity::validateUnassigned(const uint8_t pressedButton) {
@@ -214,10 +286,12 @@ bool ButtonRemapActivity::validateUnassigned(const uint8_t pressedButton) {
   return true;
 }
 
-const char* ButtonRemapActivity::getRoleName(const uint8_t roleIndex) {
+const char* ButtonRemapActivity::getRoleName(const uint8_t roleIndex) const {
   switch (roleIndex) {
     case 0:
-      return tr(STR_BACK);
+      std::snprintf(roleNameStorage.data(), roleNameStorage.size(), "%s",
+                    mappedInput.resolveLabel(mappedInput.withBackArrow(tr(STR_BACK))));
+      return roleNameStorage.data();
     case 1:
       return tr(STR_CONFIRM);
     case 2:

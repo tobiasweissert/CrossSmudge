@@ -1,744 +1,1707 @@
 #include "DictionaryDefinitionActivity.h"
 
 #include <BidiUtils.h>
+#include <DictHtmlRenderer.h>
 #include <FontCacheManager.h>
 #include <GfxRenderer.h>
-#include <HalMemory.h>
+#include <HalStorage.h>
 #include <I18n.h>
-#include <Logging.h>
-#include <Memory.h>
+#include <MemoryBudget.h>
 #include <Utf8.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include <algorithm>
-#include <atomic>
-#include <cstdint>
-#include <cstdio>
-#include <utility>
+#include <cstring>
+#include <memory>
+#include <numeric>
+#include <optional>
 
+#include "../settings/DictionarySelectActivity.h"
 #include "CrossPointSettings.h"
-#include "HapticFeedback.h"
-#include "ReaderUtils.h"
-#include "components/HeaderBackTapTarget.h"
+#include "MappedInputManager.h"
+#include "Memory.h"
+#include "SdCardFontSystem.h"
 #include "components/UITheme.h"
-#include "util/DictHtmlPages.h"
-#include "util/HtmlToPlainText.h"
+#include "fontIds.h"
+#include "util/Dictionary.h"
+#include "util/DictionaryActivityUtils.h"
+#include "util/IpaUtils.h"
+#include "util/LookupHistory.h"
+#include "util/TextPool.h"
 
-namespace {
+static constexpr char kBullet[] = "- ";
+static constexpr const char kEtymologyTreeMarker[] = "Etymology tree";
+static constexpr int kDictionarySwitchTouchHeight = 56;
+#if CROSSINK_APP_CAP_TOUCH
+static constexpr unsigned long kTouchDefinitionLookupHoldMs = 1000;
+#endif
 
-// Longest measurable/drawable span. Wrapped lines stay under the screen width
-// (far below this); only pathological unbreakable tokens are split at this cap.
-constexpr size_t MAX_LINE_BYTES = 191;
-constexpr float PLAIN_TEXT_LINE_SPACING = 2.0f;
-constexpr size_t HEAP_HEADROOM = 8 * 1024;
-constexpr unsigned long MESSAGE_DURATION_MS = 1500;
-constexpr size_t SELECTION_PAGE_WINDOW = 3;
-// ASCII tokens need separators; Han/Kana tokens take at least three bytes.
-constexpr size_t MAX_PLAIN_WORDS = (MAX_LINE_BYTES + 1) / 2;
+class DictionaryDefinitionActivity;
 
-// Styled-path ceiling: the laid-out Pages keep the whole definition resident
-// (TextBlock arenas ≈ text + ~7 bytes/word plus per-line objects), roughly
-// doubling the string's footprint while this activity is stacked over the
-// reader and word-select. Bigger definitions take the span-based plain-text
-// path, which holds no per-page copies.
-constexpr size_t MAX_STYLED_HTML_BYTES = 16 * 1024;
+static std::string dictionaryNameFromPath(const std::string& path) {
+  const size_t stemSlash = path.rfind('/');
+  if (stemSlash == std::string::npos) return path;
 
-}  // namespace
+  const size_t nameSlash = stemSlash == 0 ? std::string::npos : path.rfind('/', stemSlash - 1);
+  const size_t nameStart = nameSlash == std::string::npos ? 0 : nameSlash + 1;
+  return path.substr(nameStart, stemSlash - nameStart);
+}
 
-// Heap-owned only while preparing plain selection pages; keep the loop task's stack small.
-struct DictionaryDefinitionActivity::PlainSelectionLine {
-  std::string text;
-  std::vector<std::string> words;
-  std::vector<int16_t> positions;
-  std::vector<EpdFontFamily::Style> styles;
-  std::vector<TextBlock::SourceRange> ranges;
-  std::vector<uint16_t> visualOrder;
-  std::vector<std::string> visualWords;
-  std::vector<TextBlock::SourceRange> visualRanges;
-  BlockStyle style;
-
-  void layout(const DictionaryDefinitionActivity& owner, const int fontId, const uint32_t offset) {
-    const char* bytes = text.c_str();
-    const size_t length = text.size();
-    words.clear();
-    positions.clear();
-    styles.clear();
-    ranges.clear();
-    size_t i = 0;
-    while (i < length) {
-      // The headword label marker is a control byte, not text: it must not
-      // end up inside a selected word.
-      if (bytes[i] == ' ' || bytes[i] == '\t' || bytes[i] == '\r' || bytes[i] == DICTIONARY_PLAIN_HEADWORD_MARKER) {
-        ++i;
-        continue;
-      }
-      const size_t start = i;
-      auto* ptr = reinterpret_cast<const unsigned char*>(bytes + i);
-      uint32_t previous = utf8NextCodepoint(&ptr);
-      i = ptr - reinterpret_cast<const unsigned char*>(bytes);
-      while (i < length && bytes[i] != ' ' && bytes[i] != '\t' && bytes[i] != '\r' &&
-             bytes[i] != DICTIONARY_PLAIN_HEADWORD_MARKER) {
-        ptr = reinterpret_cast<const unsigned char*>(bytes + i);
-        const uint32_t cp = utf8NextCodepoint(&ptr);
-        if (!utf8IsHangul(previous) && !utf8IsHangul(cp) && (utf8IsCjkBreakable(previous) || utf8IsCjkBreakable(cp)) &&
-            !utf8IsCombiningMark(cp))
-          break;
-        previous = cp;
-        i = ptr - reinterpret_cast<const unsigned char*>(bytes);
-      }
-      words.emplace_back(bytes + start, i - start);
-      styles.push_back(EpdFontFamily::REGULAR);
-      ranges.push_back({static_cast<uint32_t>(offset + start), static_cast<uint32_t>(offset + i)});
-    }
-    style.isRtl = BidiUtils::detectParagraphLevel(bytes) == 1;
-    const bool reordered = BidiUtils::computeVisualWordOrder(words, style.isRtl, visualOrder);
-    int x = 0;
-    for (size_t n = 0; n < words.size(); ++n) {
-      const size_t index = reordered ? visualOrder[n] : n;
-      if (n > 0) {
-        const size_t previous = reordered ? visualOrder[n - 1] : n - 1;
-        const size_t left = std::min(previous, index);
-        const size_t right = std::max(previous, index);
-        x += right == left + 1 ? owner.measureSpan(fontId, text.c_str() + ranges[left].end - offset,
-                                                   ranges[right].start - ranges[left].end)
-                               : owner.renderer.getSpaceWidth(fontId, EpdFontFamily::REGULAR);
-      }
-      positions.push_back(x);
-      x += owner.renderer.getTextAdvanceX(fontId, words[index].c_str(), EpdFontFamily::REGULAR);
-    }
-    if (reordered) {
-      visualWords.clear();
-      visualRanges.clear();
-      for (const auto index : visualOrder) {
-        visualWords.push_back(std::move(words[index]));
-        visualRanges.push_back(ranges[index]);
-      }
-      words.swap(visualWords);
-      ranges.swap(visualRanges);
-    }
-  }
-
-  std::unique_ptr<TextBlock> pack() const {
-    return makeUniqueNoThrow<TextBlock>(words, positions, styles, std::vector<uint8_t>{}, std::vector<uint16_t>{},
-                                        style, std::vector<std::string>{}, std::vector<TextBlock::LinkSpan>{}, ranges);
-  }
+struct DefinitionSpanFeedContext {
+  DictionaryDefinitionActivity* activity = nullptr;
+  DictLayout::Wrapper* wrapper = nullptr;
+  char lastVisibleChar = '\0';
+  bool sawEtymologyTree = false;
 };
 
-// cppcheck-suppress constParameterReference // the lookup state holds the dictionary by non-const reference
-bool DictionaryDefinitionActivity::enableLookup(Dictionary& dictionary, std::string&& query) {
-  lookup = makeUniqueNoThrow<LookupState>(dictionary);
-  if (!lookup) LOG_ERR("DICT", "OOM: lookup history (%u bytes)", static_cast<unsigned>(sizeof(LookupState)));
-  if (lookup) lookup->query = std::move(query);
-  return lookup != nullptr;
+static bool isAsciiWordChar(char c) {
+  return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+}
+
+static bool isGreekCodepoint(uint32_t cp) { return (cp >= 0x0370 && cp <= 0x03FF) || (cp >= 0x1F00 && cp <= 0x1FFF); }
+
+static bool startsWithAt(const std::string& text, size_t pos, const char* needle) {
+  const size_t len = std::char_traits<char>::length(needle);
+  return pos + len <= text.size() && text.compare(pos, len, needle) == 0;
+}
+
+static bool startsWithAt(const char* text, const char* needle) {
+  if (!text) return false;
+  const size_t len = std::char_traits<char>::length(needle);
+  return strncmp(text, needle, len) == 0;
+}
+
+static bool isAsciiUpper(char c) { return c >= 'A' && c <= 'Z'; }
+
+static bool startsWithEtymologyTreeMarker(const char* text) { return startsWithAt(text, kEtymologyTreeMarker); }
+
+static bool definitionTextHasEtymologySpacingArtifact(const char* text, bool inEtymologyTree) {
+  if (!text || !text[0]) return false;
+  for (const char* p = text; *p; ++p) {
+    if (startsWithEtymologyTreeMarker(p)) {
+      const char* afterMarker = p + sizeof(kEtymologyTreeMarker) - 1;
+      if (*afterMarker != '\0' && *afterMarker != ' ') return true;
+    }
+    if (inEtymologyTree && *p == '.' && isAsciiUpper(*(p + 1))) return true;
+  }
+  return false;
+}
+
+static void fixEtymologySpacingArtifacts(std::string& text, bool inEtymologyTree) {
+  if (text.size() < 2) return;
+
+  std::string out;
+  out.reserve(text.size() + 8);
+  for (size_t i = 0; i < text.size();) {
+    if (startsWithAt(text, i, kEtymologyTreeMarker)) {
+      const size_t markerLen = sizeof(kEtymologyTreeMarker) - 1;
+      out.append(text, i, markerLen);
+      i += markerLen;
+      if (i < text.size() && text[i] != ' ') out += ' ';
+      inEtymologyTree = true;
+      continue;
+    }
+
+    if (inEtymologyTree && text[i] == '.' && i + 1 < text.size() && isAsciiUpper(text[i + 1])) {
+      out += ". ";
+      ++i;
+      continue;
+    }
+
+    out += text[i++];
+  }
+  text = std::move(out);
+}
+
+static char lastVisibleAsciiChar(const char* text) {
+  if (!text) return '\0';
+  char last = '\0';
+  while (*text) {
+    if (*text != ' ' && *text != '\t' && *text != '\r' && *text != '\n') last = *text;
+    ++text;
+  }
+  return last;
+}
+
+static bool shouldSanitizeDefinitionCodepoint(uint32_t cp) {
+  switch (cp) {
+    case 0x00A0:
+    case 0x2013:
+    case 0x2014:
+    case 0x2212:
+    case 0x2018:
+    case 0x2019:
+    case 0x201C:
+    case 0x201D:
+    case 0x2026:
+      return true;
+    default:
+      return isIpaCodepoint(cp) || isGreekCodepoint(cp) || utf8IsCombiningMark(cp) || cp == REPLACEMENT_GLYPH;
+  }
+}
+
+// Every Lexend Deca/Bitter reader font header (all sizes and styles) has the
+// same direct coverage among the codepoints above. Keep that coverage beside
+// the approximation policy instead of probing the font map for every definition.
+// The Greek entries below are the renderer's fixed synthetic fallbacks; U+02BB
+// is its fixed alias for the left single quotation mark.
+static constexpr bool builtinDefinitionFontSupportsCandidate(const uint32_t cp) {
+  switch (cp) {
+    case 0x00A0:
+    case 0x00E6:
+    case 0x00F0:
+    case 0x00F8:
+    case 0x0127:
+    case 0x014B:
+    case 0x0153:
+    case 0x02BB:
+    case 0x0393:
+    case 0x03B5:
+    case 0x03C9:
+    case 0x2013:
+    case 0x2014:
+    case 0x2018:
+    case 0x2019:
+    case 0x201C:
+    case 0x201D:
+    case 0x2026:
+    case 0x2212:
+      return true;
+    default:
+      return (cp >= 0x0300 && cp <= 0x0304) || (cp >= 0x0306 && cp <= 0x030C) || cp == 0x030F ||
+             (cp >= 0x0311 && cp <= 0x0312) || cp == 0x031B || (cp >= 0x0323 && cp <= 0x0324) ||
+             (cp >= 0x0326 && cp <= 0x0328) || cp == 0x032E || cp == 0x0331 || cp == 0x0335 || cp == 0x034F ||
+             cp == 0x03BB;
+  }
+}
+
+static void appendDictionaryApproximation(uint32_t cp, std::string& out) {
+  switch (cp) {
+    case 0x00A0:
+      out += ' ';
+      break;  // nbsp
+    case 0x00E6:
+      out += "ae";
+      break;  // ae
+    case 0x00F0:
+      out += "th";
+      break;  // eth
+    case 0x00F8:
+      out += 'o';
+      break;  // o slash
+    case 0x0127:
+      out += 'h';
+      break;  // h stroke
+    case 0x014B:
+      out += "ng";
+      break;  // eng
+    case 0x0153:
+      out += "oe";
+      break;      // oe
+    case 0x0251:  // script a
+    case 0x0252:
+      out += 'a';
+      break;  // turned alpha
+    case 0x0254:
+      out += 'o';
+      break;  // open o
+    case 0x0259:
+      out += 'e';
+      break;      // schwa
+    case 0x025A:  // rhotacized schwa
+    case 0x025D:
+      out += "er";
+      break;  // reversed epsilon hook
+    case 0x025B:
+      out += 'e';
+      break;  // open e
+    case 0x0261:
+      out += 'g';
+      break;  // script g
+    case 0x026A:
+      out += 'i';
+      break;  // small capital i
+    case 0x026B:
+      out += 'l';
+      break;  // velarized l
+    case 0x0272:
+      out += "ny";
+      break;  // n hook
+    case 0x0273:
+      out += 'n';
+      break;      // retroflex n
+    case 0x0279:  // turned r
+    case 0x027B:  // turned r hook
+    case 0x027D:  // r tail
+    case 0x027E:
+      out += 'r';
+      break;  // tap r
+    case 0x0280:
+      out += 'R';
+      break;  // small capital r
+    case 0x0283:
+      out += "sh";
+      break;  // esh
+    case 0x028A:
+      out += 'u';
+      break;  // upsilon
+    case 0x028C:
+      out += 'u';
+      break;  // turned v
+    case 0x0292:
+      out += "zh";
+      break;  // ezh
+    case 0x0294:
+      out += '\'';
+      break;  // glottal stop
+    case 0x02A4:
+      out += 'j';
+      break;  // dezh digraph
+    case 0x02A7:
+      out += "ch";
+      break;  // tesh digraph
+    case 0x02B0:
+      out += 'h';
+      break;  // modifier h
+    case 0x02B2:
+      out += 'y';
+      break;  // modifier j
+    case 0x02B7:
+      out += 'w';
+      break;  // modifier w
+    case 0x02BC:
+      out += '\'';
+      break;      // modifier apostrophe
+    case 0x02C8:  // primary stress
+    case 0x02CC:
+      break;  // secondary stress
+    case 0x02D0:
+      out += ':';
+      break;  // length mark
+    case 0x03B2:
+      out += 'b';
+      break;  // beta
+    case 0x03B8:
+      out += "th";
+      break;  // theta
+    case 0x03C7:
+      out += "kh";
+      break;      // chi
+    case 0x2013:  // en dash
+    case 0x2014:  // em dash
+    case 0x2212:
+      out += '-';
+      break;      // minus
+    case 0x2018:  // left single quote
+    case 0x2019:
+      out += '\'';
+      break;      // right single quote
+    case 0x201C:  // left double quote
+    case 0x201D:
+      out += '"';
+      break;  // right double quote
+    case 0x2026:
+      out += "...";
+      break;  // ellipsis
+    default:
+      if (!isIpaCodepoint(cp) && !isGreekCodepoint(cp) && !utf8IsCombiningMark(cp) && cp != REPLACEMENT_GLYPH) {
+        utf8AppendCodepoint(cp, out);
+      }
+      break;
+  }
+}
+
+static bool startsWithCapitalizedToken(const char* text) { return text && isAsciiUpper(text[0]); }
+
+static bool definitionTextMayNeedBidi(const char* text) {
+  if (!text) return false;
+  while (*text) {
+    const auto b = static_cast<unsigned char>(*text++);
+    if (b >= 0xD6 && b <= 0xDB) return true;  // Hebrew and Arabic UTF-8 lead bytes
+  }
+  return false;
+}
+
+static EpdFontFamily::Style styleForSpan(const StyledSpan& span) {
+  if (span.bold && span.italic) return EpdFontFamily::BOLD_ITALIC;
+  if (span.bold) return EpdFontFamily::BOLD;
+  if (span.italic) return EpdFontFamily::ITALIC;
+  return EpdFontFamily::REGULAR;
 }
 
 void DictionaryDefinitionActivity::onEnter() {
   Activity::onEnter();
-  initialLayoutFailed = !prepareDefinition(content);
-  if (initialLayoutFailed) {
-    content.lines.clear();
-    showMessage(StrId::STR_DICT_LOW_MEMORY);
+  const DictionaryFontActivation activation =
+      sdFontSystem.activateDictionaryFont(renderer, dictionaryFontFamilyName_, dictionaryFontPointSize_);
+  definitionFontId_ = activation.fontId;
+  definitionFontSource_ =
+      activation.usingDictionaryFont ? DefinitionFontSource::Dictionary : DefinitionFontSource::Reader;
+  if (renderer.isSdCardFont(definitionFontId_)) {
+    // Dictionary preparation retains advances but deliberately starts without
+    // reader kerning/page caches; the lean policy below reloads ligatures and
+    // exact visible glyph/style data only.
+    renderer.releaseSdCardFontForLowMemory(definitionFontId_, /*preserveAdvanceTable=*/true);
   }
+  wrapText();
   requestUpdate();
-}
+  // SD write overlaps the e-ink refresh kicked by requestUpdate() on the render task.
+  LookupHistory::addWordIf(cachePath, historyWord, historyStatus, recordHistory);
 
-bool DictionaryDefinitionActivity::prepareDefinition(Definition& next, const bool forcePlain) {
-  std::replace(next.text.begin(), next.text.end(), '\0', '\n');
-  if (htmlDefinition && !forcePlain && next.text.size() <= MAX_STYLED_HTML_BYTES && layoutHtmlPages(next)) return true;
-  if (htmlDefinition) {
-    if (auto* fcm = renderer.getFontCacheManager()) fcm->releaseSdFontCaches();
-    next.text = htmlToPlainText(std::move(next.text), DICTIONARY_PLAIN_HEADWORD_MARKER);
-  }
-  return wrapText(next);
+  // Seed the back-nav chain. The initial word is the newest history entry iff it
+  // was just logged (same condition addWordIf applies internally).
+  chain_.reset(LookupHistory::MAX_VISIBLE_ENTRIES);
+  const bool initialLogged = recordHistory && !historyWord.empty() && !cachePath.empty();
+  chain_.setCurrentHistIndex(initialLogged ? 0 : -1);
 }
 
 void DictionaryDefinitionActivity::onExit() {
+  controller.onExit();
+  Dictionary::clearLookupDictPathOverride();
+  if (renderer.isSdCardFont(definitionFontId_)) {
+    // The dictionary can reuse the reader's family and size, in which case
+    // restoreReaderFont() does not switch IDs. Release the definition caches
+    // explicitly so that path does not retain dictionary-only glyph data.
+    renderer.releaseSdCardFontForLowMemory(definitionFontId_);
+  }
+  sdFontSystem.restoreReaderFont(renderer);
   Activity::onExit();
-  if (auto* fcm = renderer.getFontCacheManager()) {
-    fcm->releaseSdFontCaches();
-  }
 }
 
-DictionaryDefinitionActivity::BodyArea DictionaryDefinitionActivity::bodyArea() const {
-  const auto& metrics = UITheme::getInstance().getMetrics();
-  const auto orientation = renderer.getOrientation();
-  const bool isLandscape = orientation == GfxRenderer::Orientation::LandscapeClockwise ||
-                           orientation == GfxRenderer::Orientation::LandscapeCounterClockwise;
-  const bool isInverted = orientation == GfxRenderer::Orientation::PortraitInverted;
-  const int hintGutterWidth = isLandscape ? metrics.sideButtonHintsWidth : 0;
-  int top, right, bottom, left;
-  renderer.getOrientedViewableTRBL(&top, &right, &bottom, &left);
-  const int contentLeft =
-      std::max(left, orientation == GfxRenderer::Orientation::LandscapeClockwise ? hintGutterWidth : 0);
-  const int contentRight =
-      std::max(right, orientation == GfxRenderer::Orientation::LandscapeCounterClockwise ? hintGutterWidth : 0);
-  const int x = contentLeft + metrics.contentSidePadding;
-  const int y = std::max(top, isInverted ? metrics.buttonHintsHeight : 0) + metrics.topPadding + metrics.headerHeight +
-                metrics.verticalSpacing;
-  const int bottomArea = std::max(bottom, metrics.buttonHintsHeight) + metrics.verticalSpacing;
-  return {x, y, renderer.getScreenWidth() - contentLeft - contentRight - 2 * metrics.contentSidePadding,
-          renderer.getScreenHeight() - y - bottomArea};
+int DictionaryDefinitionActivity::getDefinitionFontId(bool) const {
+  return definitionFontId_ != 0 ? definitionFontId_ : SETTINGS.getReaderFontId();
 }
 
-// Styled path: lay the HTML definition out through the EPUB chapter parser
-// into reader-identical Pages. Frees `definition` on success (the page arenas
-// own the text); any failure leaves state untouched for the plain-text path.
-bool DictionaryDefinitionActivity::layoutHtmlPages(Definition& next) {
-  auto& definition = next.text;
-  auto& pages = next.pages;
-  const BodyArea body = bodyArea();
-  if (body.width <= 0 || body.height <= 0) {
-    LOG_ERR("DHTML", "Invalid definition viewport: %dx%d", body.width, body.height);
-    return false;
-  }
-  if (!buildDictionaryHtmlPages(renderer, definition, static_cast<uint16_t>(body.width),
-                                static_cast<uint16_t>(body.height), pages)) {
-    return false;
-  }
-  definition.clear();
-  definition.shrink_to_fit();
-  next.totalPages = static_cast<int>(pages.size());
-  next.currentPage = 0;
-  return true;
-}
-
-int DictionaryDefinitionActivity::measureSpan(const int fontId, const char* text, size_t len,
-                                              const EpdFontFamily::Style family) const {
-  char buf[MAX_LINE_BYTES + 1];
-  len = std::min(len, MAX_LINE_BYTES);
-  memcpy(buf, text, len);
-  buf[len] = '\0';
-  return renderer.getTextAdvanceX(fontId, buf, family);
-}
-
-bool DictionaryDefinitionActivity::reserveLines(Definition& next, const size_t count) {
-  if (next.lines.capacity() >= count) return true;
-  const size_t bytes = count * sizeof(Line);
-  const auto heap = HalMemory::getDefaultHeap();
-  if (heap.largestBlockBytes < bytes || heap.freeBytes < bytes + HEAP_HEADROOM) {
-    LOG_ERR("DICT", "Low heap for wrapped lines (%u bytes)", static_cast<unsigned>(bytes));
-    return false;
-  }
-  next.lines.reserve(count);
-  return true;
-}
-
-bool DictionaryDefinitionActivity::prepareFont(std::string& definition, const int fontId) {
-  if (!renderer.isSdCardFont(fontId)) return true;
-  const bool hasRtl =
-      std::any_of(definition.begin(), definition.end(), [](unsigned char c) { return c >= 0xD6 && c <= 0xDB; });
-  if (!hasRtl) {
-    renderer.ensureSdCardFontReady(fontId, definition.c_str(), 0x03 /* REGULAR + BOLD */);
+void DictionaryDefinitionActivity::useBuiltInDefinitionFontFallback() {
+  const int failedFontId = getDefinitionFontId();
+  if (definitionFontSource_ == DefinitionFontSource::Dictionary) {
+    definitionFontId_ = sdFontSystem.restoreReaderFont(renderer);
+    definitionFontSource_ = DefinitionFontSource::Reader;
+    LOG_ERR("DICT", "Dictionary SD font %d failed to prepare; retrying with reader font %d", failedFontId,
+            definitionFontId_);
+  } else if (definitionFontSource_ == DefinitionFontSource::Reader) {
+    definitionFontId_ = SETTINGS.getBuiltInReaderFontId();
+    definitionFontSource_ = DefinitionFontSource::BuiltIn;
+    LOG_ERR("DICT", "Reader SD font %d failed to prepare dictionary glyphs; using built-in font %d", failedFontId,
+            definitionFontId_);
   } else {
-    // Font preparation builds shaped RTL text; bound it to the measured span size.
-    for (size_t start = 0; start < definition.size();) {
-      if (HalMemory::getDefaultHeap().largestBlockBytes < HEAP_HEADROOM) {
-        LOG_ERR("DICT", "Low heap for definition font preparation");
-        return false;
-      }
-      size_t end = std::min(start + MAX_LINE_BYTES, definition.size());
-      while (end > start + 1 && end < definition.size() && (definition[end] & 0xC0) == 0x80) end--;
-      const char saved = definition[end];
-      definition[end] = '\0';
-      renderer.ensureSdCardFontReady(fontId, definition.c_str() + start, 0x03 /* REGULAR + BOLD */);
-      definition[end] = saved;
-      start = end;
+    return;
+  }
+  reflowForDefinitionFontChange();
+  // The failed font was the active owner of the definition bitmap cache. Its
+  // family may also have replaced the reader family while the modal background
+  // was prepared, so redraw the page with the restored reader font before the
+  // fallback definition is rendered. This reuses the existing framebuffer;
+  // retaining the old pixels produces replacement diamonds behind a blank
+  // modal after a large dictionary-font prewarm fails.
+  if (hasModalBackground()) {
+    modalBackgroundNeedsRedraw_ = true;
+    modalCleanRefreshNeeded_ = true;
+  }
+}
+
+void DictionaryDefinitionActivity::reflowForDefinitionFontChange() {
+  const int requestedPage = currentPage;
+  wrapText();
+  currentPage = std::min(requestedPage, std::max(0, totalPages - 1));
+  if (currentPage > 0) loadPage(currentPage);
+  if (hasModalBackground()) sizeModalForCurrentPage();
+}
+
+void DictionaryDefinitionActivity::redrawModalBackground() {
+  if (!hasModalBackground() || !modalBackgroundNeedsRedraw_) return;
+
+  if (definitionFontSource_ == DefinitionFontSource::Dictionary) {
+    sdFontSystem.restoreReaderFont(renderer);
+    backgroundRender_(backgroundContext_);
+    const DictionaryFontActivation activation =
+        sdFontSystem.activateDictionaryFont(renderer, dictionaryFontFamilyName_, dictionaryFontPointSize_);
+    definitionFontId_ = activation.fontId;
+    definitionFontSource_ =
+        activation.usingDictionaryFont ? DefinitionFontSource::Dictionary : DefinitionFontSource::Reader;
+    if (renderer.isSdCardFont(definitionFontId_)) {
+      renderer.releaseSdCardFontForLowMemory(definitionFontId_, /*preserveAdvanceTable=*/true);
+    }
+    // SD font IDs are deterministic, so reloading the same family returns the
+    // same ID even though its advance table was discarded with the old font.
+    // Reflow every restored dictionary font to rebuild those metrics before
+    // drawing; otherwise lines wrapped with stale/narrow widths can overflow.
+    reflowForDefinitionFontChange();
+  } else {
+    backgroundRender_(backgroundContext_);
+  }
+  modalBackgroundNeedsRedraw_ = false;
+}
+
+void DictionaryDefinitionActivity::displayModalBuffer() {
+  renderer.displayBuffer(modalCleanRefreshNeeded_ ? HalDisplay::HALF_REFRESH : HalDisplay::FAST_REFRESH);
+  modalCleanRefreshNeeded_ = false;
+}
+
+bool DictionaryDefinitionActivity::shouldApproximateDefinitionCodepoint(const uint32_t cp) const {
+  if (!shouldSanitizeDefinitionCodepoint(cp)) return false;
+
+  const int fontId = getDefinitionFontId();
+  // SD fonts own their coverage. Do not replace pronunciation, Greek, or combining
+  // characters before the active .cpfont gets a chance to draw them.
+  if (renderer.isSdCardFont(fontId)) return false;
+
+  return !builtinDefinitionFontSupportsCandidate(cp);
+}
+
+bool DictionaryDefinitionActivity::definitionTextNeedsApproximation(const char* text) const {
+  if (!text) return false;
+  const auto* p = reinterpret_cast<const unsigned char*>(text);
+  uint32_t cp = 0;
+  while ((cp = utf8NextCodepoint(&p))) {
+    if (shouldApproximateDefinitionCodepoint(cp)) return true;
+  }
+  return false;
+}
+
+std::string DictionaryDefinitionActivity::approximateDefinitionText(const char* text,
+                                                                    const bool inEtymologyTree) const {
+  std::string out;
+  if (!text) return out;
+  out.reserve(std::char_traits<char>::length(text));
+
+  const auto* p = reinterpret_cast<const unsigned char*>(text);
+  uint32_t cp = 0;
+  while ((cp = utf8NextCodepoint(&p))) {
+    if (shouldApproximateDefinitionCodepoint(cp)) {
+      appendDictionaryApproximation(cp, out);
+    } else {
+      utf8AppendCodepoint(cp, out);
     }
   }
-  if (HalMemory::getDefaultHeap().largestBlockBytes < HEAP_HEADROOM) {
-    LOG_ERR("DICT", "Low heap after definition font preparation");
-    return false;
-  }
-  return true;
+  fixEtymologySpacingArtifacts(out, inEtymologyTree);
+  return out;
 }
 
-bool DictionaryDefinitionActivity::wrapText(Definition& next) {
-  auto& definition = next.text;
-  auto& lines = next.lines;
-  lines.clear();
-  if (!reserveLines(next, definition.size() / 32 + 8)) return false;
+int DictionaryDefinitionActivity::getLineHeight() const {
+  return static_cast<int>(renderer.getLineHeight(getDefinitionFontId()) * SETTINGS.getReaderLineCompression());
+}
 
-  const int fontId = SETTINGS.getReaderFontId();
-  if (!prepareFont(definition, fontId)) return false;
+#if CROSSSMUDGE_APP_CAP_TOUCH
+bool DictionaryDefinitionActivity::showTouchDictionarySwitch() const {
+  return hasModalBackground() && showLookupButton && mappedInput.hasTouch();
+}
+#endif
 
-  const BodyArea body = bodyArea();
-  const int maxWidth = body.width;
-  const int spaceWidth = renderer.getSpaceWidth(fontId, EpdFontFamily::REGULAR);
-  const int lineHeight = renderer.getLineHeight(fontId, PLAIN_TEXT_LINE_SPACING);
-  next.linesPerPage = std::max(1, body.height / lineHeight);
+int DictionaryDefinitionActivity::dictionaryFooterHeight() const {
+  if (!hasModalBackground()) return 0;
 
-  const char* text = definition.c_str();
-  const uint32_t n = static_cast<uint32_t>(definition.size());
-  uint32_t lineStart = 0;
-  uint32_t lineEnd = 0;  // one past the last token byte on the current line
-  int lineWidth = 0;
-  bool lineBold = false;
+  const auto metrics = UITheme::getInstance().getMetrics();
+  const int dictionaryNameHeight = renderer.getLineHeight(UI_10_FONT_ID) + metrics.optionPopupTitleGap;
+#if CROSSSMUDGE_APP_CAP_TOUCH || CROSSINK_APP_CAP_TOUCH
+  return dictionaryNameHeight +
+         (showTouchDictionarySwitch() ? kDictionarySwitchTouchHeight * (hasClippingRequest_ ? 2 : 1) : 0);
+#else
+  return dictionaryNameHeight;
+#endif
+}
 
-  const auto flushLine = [&](uint32_t nextStart) {
-    if (lines.size() == lines.capacity() && !reserveLines(next, lines.capacity() * 2)) return false;
-    lines.push_back({lineStart, static_cast<uint16_t>(lineEnd - lineStart), lineBold});
-    lineStart = nextStart;
-    lineEnd = nextStart;
-    lineWidth = 0;
-    lineBold = false;
-    return true;
+#if CROSSSMUDGE_APP_CAP_TOUCH
+bool DictionaryDefinitionActivity::dictionarySwitchButtonContains(const int x, const int y) const {
+  const int buttonY = modalY_ + modalHeight_ - kDictionarySwitchTouchHeight * (hasClippingRequest_ ? 2 : 1);
+  return x >= modalX_ && x < modalX_ + modalWidth_ && y >= buttonY && y < buttonY + kDictionarySwitchTouchHeight;
+}
+
+bool DictionaryDefinitionActivity::dictionaryCreateClippingButtonContains(const int x, const int y) const {
+  const int buttonY = modalY_ + modalHeight_ - kDictionarySwitchTouchHeight;
+  return hasClippingRequest_ && x >= modalX_ && x < modalX_ + modalWidth_ && y >= buttonY &&
+         y < buttonY + kDictionarySwitchTouchHeight;
+}
+
+bool DictionaryDefinitionActivity::modalContains(const int x, const int y) const {
+  const int frameThickness = UITheme::getInstance().getMetrics().popupFrameThickness;
+  return x >= modalX_ - frameThickness && x < modalX_ + modalWidth_ + frameThickness && y >= modalY_ - frameThickness &&
+         y < modalY_ + modalHeight_ + frameThickness;
+}
+#endif
+
+// ---------------------------------------------------------------------------
+// Layout helpers — shared setup
+// ---------------------------------------------------------------------------
+
+void DictionaryDefinitionActivity::wrapText() {
+  isWordSelectMode = false;
+  navigator.reset();
+  currentPage = 0;  // new definition always starts at page 0
+  // The initial reader page is already present when opened from word-select.
+  // Chained definitions keep the existing modal covered by growing its frame,
+  // so they do not need to swap back to the reader font for a background draw.
+  if (hasModalBackground()) {
+    if (skipInitialModalBackgroundRedraw_) {
+      modalBackgroundNeedsRedraw_ = false;
+      skipInitialModalBackgroundRedraw_ = false;
+    }
+  }
+
+  // Match the folder-name label shown by DictionarySelectActivity.
+  dictionaryName_ = dictionaryNameFromPath(foundLocation.folderPath);
+
+  const auto orient = renderer.getOrientation();
+  const auto metrics = UITheme::getInstance().getMetrics();
+  const bool isLandscapeCw = orient == GfxRenderer::Orientation::LandscapeClockwise;
+  const bool isLandscapeCcw = orient == GfxRenderer::Orientation::LandscapeCounterClockwise;
+  const bool isInverted = orient == GfxRenderer::Orientation::PortraitInverted;
+  hintGutterWidth = (isLandscapeCw || isLandscapeCcw) ? metrics.buttonHintsHeight : 0;
+  hintGutterHeight = isInverted ? (metrics.buttonHintsHeight + metrics.verticalSpacing) : 0;
+  contentX = isLandscapeCw ? hintGutterWidth : 0;
+  const int bottomArea = metrics.buttonHintsHeight + metrics.verticalSpacing;
+
+  if (hasModalBackground()) {
+    const int dialogMargin = metrics.optionPopupDialogSideMargin;
+    // Reserve the orientation hint gutter on both sides. The controls only
+    // occupy one side, but symmetrical gutters keep the modal centered.
+    modalX_ = hintGutterWidth + dialogMargin;
+    modalWidth_ = renderer.getScreenWidth() - modalX_ * 2;
+    modalHeight_ = renderer.getScreenHeight() - bottomArea - dialogMargin * 2;
+    modalY_ = (renderer.getScreenHeight() - modalHeight_) / 2;
+
+    const int innerPadding = metrics.optionPopupInnerPadding;
+    leftPadding = modalX_ + innerPadding;
+    rightPadding = renderer.getScreenWidth() - (modalX_ + modalWidth_ - innerPadding);
+    bodyStartY = modalY_ + innerPadding + renderer.getLineHeight(getDefinitionFontId()) + metrics.optionPopupTitleGap;
+  } else {
+    const int sidePadding = metrics.contentSidePadding + SETTINGS.screenMarginHorizontal;
+    leftPadding = contentX + sidePadding;
+    rightPadding = (isLandscapeCcw ? hintGutterWidth : 0) + sidePadding;
+    bodyStartY = hintGutterHeight + metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  }
+
+  const int footerHeight = dictionaryFooterHeight();
+  const int bodyBottom = hasModalBackground() ? modalY_ + modalHeight_ - metrics.optionPopupInnerPadding - footerHeight
+                                              : renderer.getScreenHeight() - bottomArea;
+  linesPerPage = (bodyBottom - bodyStartY) / getLineHeight();
+  if (linesPerPage < 1) linesPerPage = 1;
+
+  // Resolve the immutable definition slice once. Page turns reuse it instead
+  // of reopening the dictionary metadata files before every layout pass.
+  const DictInfo info = Dictionary::readInfo(foundLocation.folderPath.c_str());
+  const DictDefinitionSlice slice = Dictionary::resolveDefinitionSlice(foundLocation, info);
+  definitionReadFailed_ = !slice.found;
+  if (definitionReadFailed_) {
+    LOG_ERR("DICT", "Failed to resolve definition slice for %s", foundLocation.folderPath.c_str());
+  }
+  definitionOffset_ = slice.offset;
+  definitionSize_ = slice.size;
+  definitionIsHtml_ = slice.isHtml;
+  definitionHtmlNeedsPlainFallback_ = false;
+
+  prepareDefinitionFontAdvances();
+  loadPage(currentPage);
+  // Pick the modal height once per definition. Page turns re-fill the content
+  // without moving the frame, so the last (usually shorter) page feels like
+  // part of the same lookup rather than a different modal.
+  if (hasModalBackground()) sizeModalForCurrentPage();
+}
+
+void DictionaryDefinitionActivity::drawModalFrame() const {
+  const auto metrics = UITheme::getInstance().getMetrics();
+  const int frameThickness = metrics.popupFrameThickness;
+  const int frameRadius = metrics.popupCornerRadius;
+
+  if (frameRadius > 0) {
+    renderer.fillRoundedRect(modalX_ - frameThickness, modalY_ - frameThickness, modalWidth_ + frameThickness * 2,
+                             modalHeight_ + frameThickness * 2, frameRadius + frameThickness, Color::White);
+    renderer.fillRoundedRect(modalX_, modalY_, modalWidth_, modalHeight_, frameRadius, Color::Black);
+    renderer.fillRoundedRect(modalX_ + frameThickness, modalY_ + frameThickness, modalWidth_ - frameThickness * 2,
+                             modalHeight_ - frameThickness * 2, std::max(0, frameRadius - frameThickness),
+                             Color::White);
+  } else {
+    renderer.fillRect(modalX_ - frameThickness, modalY_ - frameThickness, modalWidth_ + frameThickness * 2,
+                      modalHeight_ + frameThickness * 2, true);
+    renderer.fillRect(modalX_, modalY_, modalWidth_, modalHeight_, false);
+  }
+}
+
+// Re-parse the definition and lay out ONLY `page` into layoutLines. The wrap
+// produces every line, but collectLineSink keeps only this page's lines (the
+// rest are produced then dropped, so peak RAM is one page, not the whole
+// definition) and counts all lines to recompute totalPages. Called on entry and
+// on every page turn (Stage 2a: re-parse every turn, both directions).
+void DictionaryDefinitionActivity::loadPage(int page) {
+  MemoryBudget::logHeapShape("dict.page_before");
+  layoutLines.clear();
+  layoutLines.reserve(static_cast<size_t>(linesPerPage) + 1);
+  layoutSegments.clear();
+  layoutSegments.reserve(static_cast<size_t>(linesPerPage) * 4);
+  pagePool_.clear();
+  collectTargetPage_ = page;
+  collectLineCount_ = 0;
+
+  if (definitionReadFailed_) {
+    totalPages = 1;
+    return;
+  }
+
+  if (definitionIsHtml_) {
+    wrapHtml();
+  } else {
+    wrapPlain();
+  }
+
+  totalPages = DictLayout::paginate(collectLineCount_, linesPerPage);
+  MemoryBudget::logHeapShape("dict.page_after");
+}
+
+void DictionaryDefinitionActivity::collectDefinitionAdvanceText(const char* text, const EpdFontFamily::Style style) {
+  if (!text || *text == '\0') return;
+
+  const uint8_t baseStyle = static_cast<uint8_t>(style) & 0x03;
+  definitionAdvanceStyleMask_ |= static_cast<uint8_t>(1u << baseStyle);
+
+  const auto collect = [this](const char* utf8) {
+    const auto* p = reinterpret_cast<const unsigned char*>(utf8);
+    uint32_t cp = 0;
+    while ((cp = utf8NextCodepoint(&p))) {
+      const auto begin = definitionAdvanceCodepoints_.begin();
+      const auto end = begin + definitionAdvanceCodepointCount_;
+      if (std::find(begin, end, cp) != end) continue;
+      if (definitionAdvanceCodepointCount_ >= definitionAdvanceCodepoints_.size()) {
+        definitionAdvanceCodepointsTruncated_ = true;
+        continue;
+      }
+      definitionAdvanceCodepoints_[definitionAdvanceCodepointCount_++] = cp;
+    }
   };
 
-  uint32_t i = 0;
-  while (i < n) {
-    // A marker at the start of a line makes that whole line bold. It stands
-    // for a <h2> in the HTML path, and for a synonym's headword label in the
-    // plain-text path.
-    if (lineEnd == lineStart && i == lineStart && text[i] == DICTIONARY_PLAIN_HEADWORD_MARKER) {
-      lineStart = ++i;
-      lineEnd = lineStart;
-      lineBold = true;
-      continue;
+  collect(text);
+  if (definitionTextMayNeedBidi(text) &&
+      BidiUtils::applyBidiVisual(text, definitionAdvanceVisualText_, static_cast<int>(BidiUtils::BidiBaseDir::AUTO))) {
+    collect(definitionAdvanceVisualText_.c_str());
+  }
+}
+
+void DictionaryDefinitionActivity::collectSpanForAdvances(void* ctx, const StyledSpan& span) {
+  auto* self = static_cast<DictionaryDefinitionActivity*>(ctx);
+  self->collectDefinitionAdvanceText(span.text, styleForSpan(span));
+}
+
+void DictionaryDefinitionActivity::prepareDefinitionFontAdvances() {
+  const int fontId = getDefinitionFontId();
+  if (!renderer.isSdCardFont(fontId) || definitionSize_ == 0) return;
+
+  definitionAdvanceCodepointCount_ = 0;
+  definitionAdvanceStyleMask_ = 0;
+  definitionAdvanceCodepointsTruncated_ = false;
+  definitionAdvanceVisualText_.clear();
+
+  // The title is measured before the bitmap prewarm scan, so include it in the
+  // same batched advance read as the definition body.
+  collectDefinitionAdvanceText(headword.c_str(), EpdFontFamily::BOLD);
+  collectDefinitionAdvanceText(kBullet, EpdFontFamily::REGULAR);
+
+  const std::string dictPath = foundLocation.folderPath + ".dict";
+  if (definitionIsHtml_) {
+    const DictHtmlRenderer::SpanSink sink{this, &DictionaryDefinitionActivity::collectSpanForAdvances};
+    if (!htmlRenderer_.renderFromFileStreaming(dictPath.c_str(), definitionOffset_, definitionSize_, sink)) {
+      definitionHtmlNeedsPlainFallback_ = true;
+      LOG_ERR("DICT", "Malformed HTML definition; collecting SD-font advances from plain text");
+      if (!htmlRenderer_.renderPlainTextFromFileStreaming(dictPath.c_str(), definitionOffset_, definitionSize_, sink)) {
+        LOG_ERR("DICT", "Failed to collect SD-font advances from definition fallback");
+        return;
+      }
     }
-    const char c = text[i];
-    if (c == '\n' || c == '\0') {
-      if (!flushLine(i + 1)) return false;
-      i++;
-      continue;
+  } else {
+    HalFile dictFile;
+    if (!Storage.openFileForRead("DICT", dictPath.c_str(), dictFile)) {
+      LOG_ERR("DICT", "Failed to open definition for SD-font advance preparation");
+      return;
     }
-    if (c == ' ' || c == '\t' || c == '\r') {
-      i++;
-      continue;
+    if (!dictFile.seekSet(definitionOffset_)) {
+      LOG_ERR("DICT", "Failed to seek definition for SD-font advance preparation");
+      dictFile.close();
+      return;
     }
 
-    // Token: run of non-whitespace bytes, capped at the measure buffer.
-    const uint32_t tokenStart = i;
-    while (i < n && text[i] != ' ' && text[i] != '\t' && text[i] != '\r' && text[i] != '\n' && text[i] != '\0' &&
-           i - tokenStart < MAX_LINE_BYTES) {
-      i++;
-    }
-    // If the byte cap cut the token mid-UTF-8-sequence, back off to the last
-    // complete codepoint so measure/draw never see a partial sequence. A
-    // natural stop lands on whitespace or the terminating NUL, never on a
-    // continuation byte, so this is a no-op there.
-    while (i - tokenStart > 1 && (text[i] & 0xC0) == 0x80) i--;
-    const uint32_t tokenLen = i - tokenStart;
-    const int tokenWidth =
-        measureSpan(fontId, text + tokenStart, tokenLen, lineBold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
-
-    if (lineEnd == lineStart) {
-      lineStart = tokenStart;
-      lineEnd = tokenStart + tokenLen;
-      lineWidth = tokenWidth;
-    } else if (lineWidth + spaceWidth + tokenWidth <= maxWidth &&
-               tokenStart + tokenLen - lineStart <= UINT16_MAX) {  // span len must fit Line::len
-      lineEnd = tokenStart + tokenLen;
-      lineWidth += spaceWidth + tokenWidth;
-    } else {
-      if (!flushLine(tokenStart)) return false;
-      lineEnd = tokenStart + tokenLen;
-      lineWidth = tokenWidth;
-    }
-
-    // An unbreakable token wider than the screen is now alone on the line
-    // (any previous content was flushed above): split it at the widest
-    // fitting UTF-8 boundary and carry the remainder forward.
-    while (lineWidth > maxWidth && lineEnd - lineStart > 1) {
-      const uint32_t len = lineEnd - lineStart;
-      uint32_t lastFit = 0;
-      for (uint32_t f = 1; f <= len; f++) {
-        if (f == len || (text[lineStart + f] & 0xC0) != 0x80) {  // codepoint boundary
-          if (measureSpan(fontId, text + lineStart, f, lineBold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR) >
-              maxWidth)
-            break;
-          lastFit = f;
+    // Keep only one word while streaming so UTF-8 sequences split across file
+    // chunks remain intact without retaining the full definition.
+    std::string word;
+    word.reserve(64);
+    uint32_t remaining = definitionSize_;
+    char chunk[512];
+    while (remaining > 0) {
+      const uint32_t toRead = std::min<uint32_t>(remaining, sizeof(chunk));
+      const int n = dictFile.read(reinterpret_cast<uint8_t*>(chunk), static_cast<int>(toRead));
+      if (n <= 0) break;
+      remaining -= static_cast<uint32_t>(n);
+      for (int i = 0; i < n; i++) {
+        const char c = chunk[i];
+        if (c == '\0' || c == '\n' || c == ' ') {
+          collectDefinitionAdvanceText(word.c_str(), EpdFontFamily::REGULAR);
+          word.clear();
+        } else {
+          word += c;
         }
       }
-      if (lastFit == 0) {
-        // Even a single over-wide glyph must make progress; consume its whole
-        // UTF-8 sequence rather than splitting it into invalid fragments.
-        lastFit = 1;
-        while (lastFit < len && (text[lineStart + lastFit] & 0xC0) == 0x80) lastFit++;
-      }
-      const uint32_t rest = lineStart + lastFit;
-      lineEnd = rest;
-      if (!flushLine(rest)) return false;
-      lineEnd = rest + (len - lastFit);
-      lineWidth = measureSpan(fontId, text + lineStart, lineEnd - lineStart,
-                              lineBold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
     }
+    collectDefinitionAdvanceText(word.c_str(), EpdFontFamily::REGULAR);
+    dictFile.close();
   }
-  if (lineEnd > lineStart && !flushLine(n)) return false;
 
-  // Trim trailing blank lines so the last page is not empty padding.
-  while (!lines.empty() && lines.back().len == 0) lines.pop_back();
+  if (definitionAdvanceCodepointCount_ == 0) return;
+  if (definitionAdvanceCodepointsTruncated_) {
+    LOG_DBG("DICT", "SD-font advance preparation capped at %u unique codepoints", kDefinitionAdvanceCodepointCapacity);
+  }
 
-  next.totalPages = std::max(1, (static_cast<int>(lines.size()) + next.linesPerPage - 1) / next.linesPerPage);
-  next.currentPage = 0;
-  return true;
+  // The .dict reader is closed above. Batch the sorted font reads now so the
+  // wrapping pass below performs RAM lookups instead of opening .cpfont once
+  // per character while streaming the dictionary.
+  LOG_DBG("DICT", "Preparing %u SD-font advance codepoints (styles=0x%02X)", definitionAdvanceCodepointCount_,
+          definitionAdvanceStyleMask_);
+  renderer.ensureSdCardFontReady(fontId, definitionAdvanceCodepoints_.data(), definitionAdvanceCodepointCount_,
+                                 /*includeSpace=*/true, /*includeHyphen=*/false, definitionAdvanceStyleMask_);
 }
 
-void DictionaryDefinitionActivity::showMessage(const StrId nextMessage) {
-  message = nextMessage;
-  messageTime = millis();
-  messageVisible = true;
-  requestUpdate();
+void DictionaryDefinitionActivity::sizeModalForCurrentPage() {
+  const auto metrics = UITheme::getInstance().getMetrics();
+  const int dialogMargin = metrics.optionPopupDialogSideMargin;
+  const int maxHeight =
+      renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing - dialogMargin * 2;
+  const int visibleLines = std::max(1, static_cast<int>(layoutLines.size()));
+  const int titleLineHeight = renderer.getLineHeight(getDefinitionFontId());
+  const int footerHeight = dictionaryFooterHeight();
+  const int contentHeight = metrics.optionPopupInnerPadding * 2 + titleLineHeight + metrics.optionPopupTitleGap +
+                            visibleLines * getLineHeight() + footerHeight;
+
+  const int desiredHeight = std::min(maxHeight, contentHeight);
+  const int retainedHeight = modalSessionHeight_;
+  if (retainedHeight > 0 && desiredHeight > retainedHeight) {
+    // The new outer frame erases the old black border. A clean waveform keeps
+    // that erased border from appearing as a second modal on the physical panel.
+    modalCleanRefreshNeeded_ = true;
+  }
+  modalSessionHeight_ = std::max(retainedHeight, desiredHeight);
+  modalHeight_ = modalSessionHeight_;
+  modalY_ = (renderer.getScreenHeight() - modalHeight_) / 2;
+  bodyStartY = modalY_ + metrics.optionPopupInnerPadding + titleLineHeight + metrics.optionPopupTitleGap;
+  LOG_DBG("DICT", "Modal height desired=%d retained=%d final=%d", desiredHeight, retainedHeight, modalHeight_);
 }
 
-bool DictionaryDefinitionActivity::restoreCurrentDefinition(const bool styled) {
-  const int page = content.currentPage;
-  auto result = Dictionary::LookupResult::Found;
-  if (!lookup->dictionary.lookup(lookup->query.c_str(), content.text, content.headword, &result) ||
-      !prepareDefinition(content, !styled) || styled != !content.pages.empty() || page >= content.totalPages) {
-    LOG_ERR("DICT", "Cannot recover current definition after failed lookup");
-    finish();
-    return false;
+void DictionaryDefinitionActivity::collectLineSink(void* ctx, const DictLayout::LayoutLineView& line) {
+  auto* self = static_cast<DictionaryDefinitionActivity*>(ctx);
+  const int idx = self->collectLineCount_++;
+  const int start = self->collectTargetPage_ * self->linesPerPage;
+  if (idx < start || idx >= start + self->linesPerPage) return;  // not on this page — discard
+
+  // Pool the kept line's text: each (already same-style-merged) segment becomes
+  // one null-terminated pool entry referenced by {offset, len}.
+  PooledLine pooled;
+  pooled.indentLevel = line.indentLevel;
+  pooled.isListItem = line.isListItem;
+  pooled.firstSegment = static_cast<uint16_t>(self->layoutSegments.size());
+  pooled.segmentCount = line.segmentCount;
+  for (uint16_t i = 0; i < line.segmentCount; ++i) {
+    const auto& seg = line.segments[i];
+    PooledSegment ps;
+    ps.offset = TextPool::append(self->pagePool_, line.textPool + seg.offset, seg.length);
+    ps.len = seg.length;
+    ps.style = seg.style;
+    ps.isIpa = seg.isIpa;
+    self->layoutSegments.push_back(ps);
   }
-  content.currentPage = page;
-  return true;
+  self->layoutLines.push_back(std::move(pooled));
 }
 
-void DictionaryDefinitionActivity::navigateDefinition(const bool back) {
-  {
-    RenderLock lock;
-    showMessage(StrId::STR_DICT_LOOKING_UP);
-  }
-  requestUpdateAndWait();
+// ---------------------------------------------------------------------------
+// Shared helper: measure text width accounting for mixed IPA/non-IPA runs
+// ---------------------------------------------------------------------------
 
-  RenderLock lock;
-  messageVisible = false;
-  const bool styled = !content.pages.empty();
-  // Keep only navigation metadata while inflating and laying out another entry.
-  content.releasePayload();
-  if (auto* fcm = renderer.getFontCacheManager()) fcm->releaseSdFontCaches();
-#if defined(ENABLE_SERIAL_LOG) && LOG_LEVEL >= 2
-  const auto heap = HalMemory::getInternalHeap();
-  LOG_DBG("DICT", "Navigation after release: free=%u largest=%u", static_cast<unsigned>(heap.freeBytes),
-          static_cast<unsigned>(heap.largestBlockBytes));
-#endif
-  Definition next;
-  auto result = Dictionary::LookupResult::Found;
-  const char* word = back ? lookup->history[lookup->depth - 1].query.c_str() : lookup->pendingWord.c_str();
-  const bool found = lookup->dictionary.lookup(word, next.text, next.headword, &result);
-  const auto recover = [this, back, styled, &next](const StrId error) {
-    lookup->pendingWord.clear();
-    next.releasePayload();
-    std::string{}.swap(next.headword);
-    if (auto* fcm = renderer.getFontCacheManager()) fcm->releaseSdFontCaches();
-    if (back) {
-      LOG_ERR("DICT", "Cannot restore previous definition; leaving lookup");
-      finish();
-    } else if (restoreCurrentDefinition(styled)) {
-      showMessage(error);
-    }
-  };
-  if (!found) {
-    switch (result) {
-      case Dictionary::LookupResult::Found:
-      case Dictionary::LookupResult::ReadError:
-        recover(StrId::STR_DICT_READ_FAILED);
-        break;
-      case Dictionary::LookupResult::NotFound:
-        recover(StrId::STR_DICT_NOT_FOUND);
-        break;
-      case Dictionary::LookupResult::LowMemory:
-        recover(StrId::STR_DICT_LOW_MEMORY);
-        break;
-      case Dictionary::LookupResult::Decompress:
-        recover(StrId::STR_DICT_DECOMPRESS_ERROR);
-        break;
-    }
-    return;
-  }
-  const bool forcePlain = back && !lookup->history[lookup->depth - 1].styled;
-  if (!prepareDefinition(next, forcePlain)) {
-    recover(StrId::STR_DICT_LOW_MEMORY);
-    return;
-  }
-  if (back) {
-    auto& previous = lookup->history[lookup->depth - 1];
-    if (previous.styled != !next.pages.empty() || previous.page >= next.totalPages) {
-      LOG_ERR("DICT", "Cannot restore definition layout");
-      recover(StrId::STR_DICT_RESTORE_FAILED);
-      return;
-    }
-    lookup->query = std::move(previous.query);
-    next.currentPage = previous.page;
-    next.selectionPage = previous.selectionPage;
-    next.selection = previous.selection;
-    --lookup->depth;
-  } else {
-    auto& previous = lookup->history[lookup->depth++];
-    previous.query = std::move(lookup->query);
-    lookup->query = std::move(lookup->pendingWord);
-    previous.page = content.currentPage;
-    previous.selectionPage = content.selectionPage;
-    previous.selection = content.selection;
-    previous.styled = styled;
-  }
-  lookup->pendingWord.clear();
-  content = std::move(next);
-  requestUpdate();
-}
-
-bool DictionaryDefinitionActivity::buildPlainSelectionPages() {
-  // Only the selection window gets packed word arenas; the definition keeps its cheap line spans.
-  const int fontId = SETTINGS.getReaderFontId();
-  const int lineHeight = renderer.getLineHeight(fontId, PLAIN_TEXT_LINE_SPACING);
-  const int pageCount = std::min<int>(SELECTION_PAGE_WINDOW, content.totalPages - content.selectionPage);
-  const size_t scratchBytes =
-      sizeof(PlainSelectionLine) + MAX_LINE_BYTES + 1 +
-      MAX_PLAIN_WORDS * (2 * sizeof(std::string) + sizeof(int16_t) + sizeof(EpdFontFamily::Style) +
-                         2 * sizeof(TextBlock::SourceRange) + sizeof(uint16_t) + 4);
-  auto heap = HalMemory::getDefaultHeap();
-  if (heap.freeBytes < scratchBytes + HEAP_HEADROOM || heap.largestBlockBytes < scratchBytes) return false;
-  auto scratch = makeUniqueNoThrow<PlainSelectionLine>();
-  if (!scratch) {
-    LOG_ERR("DICT", "OOM: selection scratch (%u bytes)", static_cast<unsigned>(sizeof(PlainSelectionLine)));
-    return false;
-  }
-  scratch->text.reserve(MAX_LINE_BYTES);
-  scratch->words.reserve(MAX_PLAIN_WORDS);
-  scratch->positions.reserve(MAX_PLAIN_WORDS);
-  scratch->styles.reserve(MAX_PLAIN_WORDS);
-  scratch->ranges.reserve(MAX_PLAIN_WORDS);
-  scratch->visualOrder.reserve(MAX_PLAIN_WORDS);
-  scratch->visualWords.reserve(MAX_PLAIN_WORDS);
-  scratch->visualRanges.reserve(MAX_PLAIN_WORDS);
-  lookup->selectionPages.reserve(SELECTION_PAGE_WINDOW);
-  for (int p = 0; p < pageCount; ++p) {
-    auto page = makeUniqueNoThrow<Page>();
-    if (!page) {
-      LOG_ERR("DICT", "OOM: selection page (%u bytes)", static_cast<unsigned>(sizeof(Page)));
-      return false;
-    }
-    const int firstLine = (content.selectionPage + p) * content.linesPerPage;
-    const int lastLine = std::min(firstLine + content.linesPerPage, static_cast<int>(content.lines.size()));
-    heap = HalMemory::getDefaultHeap();
-    const size_t pageBytes = (lastLine - firstLine) * (sizeof(PageLine) + sizeof(std::unique_ptr<PageElement>));
-    if (heap.freeBytes < pageBytes + HEAP_HEADROOM || heap.largestBlockBytes < pageBytes) return false;
-    page->elements.reserve(lastLine - firstLine);
-    for (int row = firstLine; row < lastLine; ++row) {
-      const auto& line = content.lines[row];
-      if (!line.len) continue;
-      const size_t length =
-          utf8SafeTruncateBuffer(content.text.c_str() + line.start, std::min<size_t>(line.len, MAX_LINE_BYTES));
-      scratch->text.assign(content.text.c_str() + line.start, length);
-      heap = HalMemory::getDefaultHeap();
-      const size_t lineBytes = length * (sizeof(TextBlock::SourceRange) + 12) + sizeof(TextBlock) + 1024;
-      if (heap.freeBytes < lineBytes + HEAP_HEADROOM || heap.largestBlockBytes < lineBytes) return false;
-      scratch->layout(*this, fontId, line.start);
-      auto block = scratch->pack();
-      if (!block || !block->valid()) {
-        LOG_ERR("DICT", "OOM: selection line (%u byte budget)", static_cast<unsigned>(lineBytes));
-        return false;
-      }
-      auto element = makeUniqueNoThrow<PageLine>(std::move(block), 0, (row - firstLine) * lineHeight);
-      if (!element) {
-        LOG_ERR("DICT", "OOM: selection element (%u bytes)", static_cast<unsigned>(sizeof(PageLine)));
-        return false;
-      }
-      page->elements.push_back(std::move(element));
-    }
-    lookup->selectionPages.push_back(std::move(page));
-  }
-  return true;
-}
-
-void DictionaryDefinitionActivity::startSelection(const int x, const int y) {
-  RenderLock lock;
-  if (!content.selection.valid || x >= 0) {
-    content.selectionPage = content.currentPage;
-    content.selection.valid = false;
-  }
-  std::span<const std::unique_ptr<Page>> pages;
-  if (content.pages.empty()) {
-    if (!buildPlainSelectionPages()) {
-      LOG_ERR("DICT", "Cannot allocate plain definition selection");
-      lookup->selectionPages.clear();
-      showMessage(StrId::STR_DICT_LOW_MEMORY);
-      return;
-    }
-    pages = lookup->selectionPages;
-  } else {
-    pages = std::span(content.pages)
-                .subspan(content.selectionPage,
-                         std::min<size_t>(SELECTION_PAGE_WINDOW, content.pages.size() - content.selectionPage));
-  }
-  const auto body = bodyArea();
-  auto selection =
-      makeUniqueNoThrow<ClipSelectionActivity>(renderer, mappedInput, pages, body.x, body.y, content.selection, x, y);
-  if (!selection) {
-    LOG_ERR("DICT", "OOM: definition selection (%u bytes)", static_cast<unsigned>(sizeof(ClipSelectionActivity)));
-    lookup->selectionPages.clear();
-    showMessage(StrId::STR_DICT_LOW_MEMORY);
-    return;
-  }
-  startActivityForResult(std::move(selection), [this](const ActivityResult& result) {
-    RenderLock lock;
-    lookup->selectionPages.clear();
-    if (result.isCancelled) return;
-    const auto& selected = std::get<ClippingResult>(result.data);
-    content.currentPage = content.selectionPage + selected.endPageOffset;
-    content.selection = {selected.startPageOffset, selected.endPageOffset, selected.startWordIndex,
-                         selected.endWordIndex, true};
-    if (lookup->depth == lookup->history.size()) {
-      showMessage(StrId::STR_DICT_HISTORY_FULL);
-      return;
-    }
-    const auto heap = HalMemory::getDefaultHeap();
-    if (heap.largestBlockBytes < selected.text.size() + 1 || heap.freeBytes < selected.text.size() + HEAP_HEADROOM) {
-      LOG_ERR("DICT", "Low heap for lookup text (%u bytes)", static_cast<unsigned>(selected.text.size() + 1));
-      showMessage(StrId::STR_DICT_LOW_MEMORY);
-      return;
-    }
-    lookup->pendingWord = selected.text;
+int DictionaryDefinitionActivity::getMixedWidth(std::vector<IpaTextSpan>& ipaRuns, const char* text,
+                                                EpdFontFamily::Style style) {
+  ipaRuns.clear();
+  splitIpaRuns(text, ipaRuns);
+  return std::accumulate(ipaRuns.begin(), ipaRuns.end(), 0, [&](int sum, const IpaTextSpan& run) {
+    return sum + renderer.getTextWidth(getDefinitionFontId(run.isIpa), run.text.c_str(), style);
   });
 }
 
+// ---------------------------------------------------------------------------
+// HTML path: run DictHtmlRenderer, lay out spans into LayoutLines
+// ---------------------------------------------------------------------------
+
+int DictionaryDefinitionActivity::measureWidthAdapter(void* ctx, const char* text, EpdFontFamily::Style style,
+                                                      bool isIpa) {
+  auto* self = static_cast<DictionaryDefinitionActivity*>(ctx);
+  const int fontId = self->getDefinitionFontId(isIpa);
+  if (!isIpa && text[0] == ' ' && text[1] == '\0') return self->renderer.getSpaceWidth(fontId, style);
+  return self->renderer.getTextWidth(fontId, text, style);
+}
+
+void DictionaryDefinitionActivity::wrapHtml() {
+  const int maxWidth = renderer.getScreenWidth() - leftPadding - rightPadding;
+  // Indent step: 3 spaces worth of pixels at regular weight.
+  const int bodyFontId = getDefinitionFontId();
+  const int indentStep = renderer.getTextWidth(bodyFontId, "   ");
+  const int bulletWidth = renderer.getTextWidth(bodyFontId, kBullet);
+
+  // Fully streamed: the renderer delivers spans one at a time to the Wrapper, the
+  // Wrapper emits completed lines to the page collector, and the collector keeps
+  // only the current page. Neither the whole-definition span/textBuf (renderer)
+  // nor all pages of lines (here) is ever materialized.
+  const std::string dictPath = foundLocation.folderPath + ".dict";
+  const auto streamIntoLayout = [&](const bool plainTextFallback) {
+    DictLayout::Measurer measure{this, &DictionaryDefinitionActivity::measureWidthAdapter};
+    DictLayout::LineSink lineSink{this, &DictionaryDefinitionActivity::collectLineSink};
+    DictLayout::Wrapper wrapper(DictLayout::WrapMetrics{maxWidth, indentStep, bulletWidth}, measure, lineSink);
+    DefinitionSpanFeedContext feedCtx{this, &wrapper};
+    const DictHtmlRenderer::SpanSink spanSink{&feedCtx, &DictionaryDefinitionActivity::feedSpanToWrapper};
+    const bool ok = plainTextFallback ? htmlRenderer_.renderPlainTextFromFileStreaming(
+                                            dictPath.c_str(), definitionOffset_, definitionSize_, spanSink)
+                                      : htmlRenderer_.renderFromFileStreaming(dictPath.c_str(), definitionOffset_,
+                                                                              definitionSize_, spanSink);
+    wrapper.finish();
+    return ok;
+  };
+
+  // Both paths reset and stream one span at a time, so recovery never
+  // materializes the full definition. Once strict parsing fails, page turns
+  // reuse the known-good fallback without repeating the failed parse.
+  if (!definitionHtmlNeedsPlainFallback_ && !streamIntoLayout(false)) {
+    definitionHtmlNeedsPlainFallback_ = true;
+    LOG_ERR("DICT", "Malformed HTML definition; displaying plain text");
+  }
+  if (definitionHtmlNeedsPlainFallback_) {
+    // The strict pass may already have emitted the valid prefix. Reset the page
+    // collector before replaying the complete definition as plain text.
+    layoutLines.clear();
+    layoutSegments.clear();
+    pagePool_.clear();
+    collectLineCount_ = 0;
+    if (!streamIntoLayout(true)) {
+      LOG_ERR("DICT", "Failed to read definition plain-text fallback");
+      definitionReadFailed_ = true;
+    }
+  }
+  // Only the kept page's span text was ever copied into layoutLines.
+}
+
+void DictionaryDefinitionActivity::feedSpanToWrapper(void* ctx, const StyledSpan& span) {
+  auto* feedCtx = static_cast<DefinitionSpanFeedContext*>(ctx);
+  const bool hasMarker = span.text && strstr(span.text, kEtymologyTreeMarker) != nullptr;
+  const bool needsBoundarySpace = feedCtx->sawEtymologyTree && feedCtx->lastVisibleChar != '\0' &&
+                                  (isAsciiWordChar(feedCtx->lastVisibleChar) || feedCtx->lastVisibleChar == '.') &&
+                                  startsWithCapitalizedToken(span.text);
+  const bool needsCleanup = needsBoundarySpace || feedCtx->activity->definitionTextNeedsApproximation(span.text) ||
+                            definitionTextHasEtymologySpacingArtifact(span.text, feedCtx->sawEtymologyTree);
+  if (!needsCleanup) {
+    feedCtx->wrapper->onSpan(span);
+    feedCtx->lastVisibleChar = lastVisibleAsciiChar(span.text);
+    feedCtx->sawEtymologyTree = feedCtx->sawEtymologyTree || hasMarker;
+    return;
+  }
+
+  std::string cleaned = feedCtx->activity->approximateDefinitionText(span.text, feedCtx->sawEtymologyTree);
+  if (needsBoundarySpace && !cleaned.empty() && cleaned[0] != ' ') {
+    cleaned.insert(cleaned.begin(), ' ');
+  }
+  if (cleaned.empty()) return;
+
+  StyledSpan cleanedSpan = span;
+  cleanedSpan.text = cleaned.c_str();
+  feedCtx->wrapper->onSpan(cleanedSpan);
+  feedCtx->lastVisibleChar = lastVisibleAsciiChar(cleaned.c_str());
+  feedCtx->sawEtymologyTree = feedCtx->sawEtymologyTree || hasMarker;
+}
+
+// ---------------------------------------------------------------------------
+// Plain text path: word-wrap into single-segment REGULAR lines
+// ---------------------------------------------------------------------------
+
+void DictionaryDefinitionActivity::wrapPlain() {
+  const int screenWidth = renderer.getScreenWidth();
+  const int maxWidth = screenWidth - leftPadding - rightPadding;
+  std::string currentWord;
+  currentWord.reserve(64);
+
+  DictLayout::Measurer measure{this, &DictionaryDefinitionActivity::measureWidthAdapter};
+  DictLayout::LineSink sink{this, &DictionaryDefinitionActivity::collectLineSink};
+  DictLayout::Wrapper wrapper(DictLayout::WrapMetrics{maxWidth, 0, 0}, measure, sink);
+
+  auto feedWord = [&]() {
+    if (currentWord.empty()) return;
+    std::string word = (definitionTextNeedsApproximation(currentWord.c_str()) ||
+                        definitionTextHasEtymologySpacingArtifact(currentWord.c_str(), false))
+                           ? approximateDefinitionText(currentWord.c_str(), false)
+                           : std::move(currentWord);
+    currentWord.clear();
+    if (word.empty()) return;
+
+    const StyledSpan span{.text = word.c_str()};
+    wrapper.onSpan(span);
+  };
+
+  const StyledSpan space{.text = " "};
+
+  // Stream from .dict file — the full definition is never held in RAM.
+  const std::string dictPath = foundLocation.folderPath + ".dict";
+  HalFile dictFile;
+  if (!Storage.openFileForRead("DICT", dictPath.c_str(), dictFile)) {
+    LOG_ERR("DICT", "Failed to open definition %s", dictPath.c_str());
+    definitionReadFailed_ = true;
+    return;
+  }
+  if (!dictFile.seekSet(definitionOffset_)) {
+    LOG_ERR("DICT", "Failed to seek definition %s", dictPath.c_str());
+    definitionReadFailed_ = true;
+    dictFile.close();
+    return;
+  }
+
+  uint32_t remaining = definitionSize_;
+  char chunk[512];
+
+  while (remaining > 0) {
+    uint32_t toRead = remaining < sizeof(chunk) ? remaining : static_cast<uint32_t>(sizeof(chunk));
+    int n = dictFile.read(reinterpret_cast<uint8_t*>(chunk), static_cast<int>(toRead));
+    if (n <= 0) {
+      LOG_ERR("DICT", "Failed reading definition %s", dictPath.c_str());
+      definitionReadFailed_ = true;
+      break;
+    }
+    remaining -= static_cast<uint32_t>(n);
+
+    for (int ci = 0; ci < n; ci++) {
+      char c = chunk[ci];
+      if (c == '\0') {
+        feedWord();
+        wrapper.onSpan(space);
+      } else if (c == '\n') {
+        feedWord();
+        wrapper.lineBreak();
+      } else if (c == ' ') {
+        feedWord();
+        wrapper.onSpan(space);
+      } else {
+        currentWord += c;
+      }
+    }
+  }
+
+  feedWord();
+  wrapper.finish();
+  dictFile.close();
+}
+
+// ---------------------------------------------------------------------------
+// Word-select: extract words from the currently visible page
+// ---------------------------------------------------------------------------
+
+void DictionaryDefinitionActivity::extractWordsFromLayout() {
+  const int bodyFontId = getDefinitionFontId();
+  const int indentStep = renderer.getTextWidth(bodyFontId, "   ");
+
+  std::vector<WordSelectNavigator::WordInfo> words;
+  words.reserve(64);
+  std::vector<WordSelectNavigator::Row> rows;
+  rows.reserve(16);
+  std::string textPool;
+  textPool.reserve(512);
+
+  const int lineHeight = getLineHeight();  // cached for loop
+  for (int i = 0; i < linesPerPage && i < static_cast<int>(layoutLines.size()); i++) {
+    const PooledLine& line = layoutLines[i];
+    const int16_t lineY = static_cast<int16_t>(bodyStartY + i * lineHeight);
+    int x = leftPadding + line.indentLevel * indentStep;
+
+    if (line.isListItem) {
+      x += renderer.getTextWidth(bodyFontId, kBullet);
+    }
+
+    for (uint16_t segmentIdx = 0; segmentIdx < line.segmentCount; ++segmentIdx) {
+      const PooledSegment& seg = layoutSegments[line.firstSegment + segmentIdx];
+      const int segFontId = getDefinitionFontId(seg.isIpa);
+      const int spaceWidth = renderer.getSpaceWidth(segFontId, seg.style);
+      const char* p = pagePool_.data() + seg.offset;
+      while (*p) {
+        while (*p == ' ') {
+          x += spaceWidth;
+          ++p;
+        }
+        if (!*p) break;
+
+        const char* tokStart = p;
+        while (*p && *p != ' ') ++p;
+        const size_t tokLen = static_cast<size_t>(p - tokStart);
+        std::string tok(tokStart, tokLen);
+
+        const int tokAdvanceX = renderer.getTextAdvanceX(segFontId, tok.c_str(), seg.style);
+        std::string cleaned = Dictionary::cleanWord(tok);
+        if (!cleaned.empty()) {
+          uint16_t tokOff = WordSelectNavigator::poolAppend(textPool, tok.c_str(), tok.size());
+          uint16_t cleanedOff = WordSelectNavigator::poolAppend(textPool, cleaned.c_str(), cleaned.size());
+          WordSelectNavigator::WordInfo wi;
+          wi.textOffset = tokOff;
+          wi.textLen = static_cast<uint16_t>(tok.size());
+          wi.lookupOffset = cleanedOff;
+          wi.lookupLen = static_cast<uint16_t>(cleaned.size());
+          wi.screenX = static_cast<int16_t>(x);
+          wi.screenY = lineY;
+          wi.width = static_cast<int16_t>(tokAdvanceX);
+          wi.style = seg.style;
+          wi.isIpa = seg.isIpa;
+          wi.fontId = segFontId;
+          words.push_back(wi);
+        }
+        x += tokAdvanceX;
+      }
+    }
+  }
+
+  WordSelectNavigator::organizeIntoRows(words, rows);
+  navigator.load(std::move(words), std::move(rows), std::move(textPool));
+}
+
+void DictionaryDefinitionActivity::openDictionarySwitch() {
+  if (hasModalBackground()) {
+    // Capture the exact frame currently on the panel before the picker covers
+    // it. This is the hard lower bound for every replacement definition, even
+    // if its content or active font would naturally produce a shorter dialog.
+    modalSessionHeight_ = std::max(modalSessionHeight_, modalHeight_);
+    LOG_DBG("DICT", "Dictionary switch retaining modal height=%d", modalSessionHeight_);
+  }
+  auto picker = makeUniqueNoThrow<DictionarySelectActivity>(renderer, mappedInput, cachePath, true, true);
+  if (!picker) {
+    LOG_ERR("DICT", "OOM: DictionarySelectActivity");
+    return;
+  }
+
+  startActivityForResult(std::move(picker), [this](const ActivityResult& result) {
+    // The picker replaced the full framebuffer. Its result handler runs before
+    // this activity is queued for repaint, so restore the reader background on
+    // that next frame whether the selection changed or was cancelled.
+    modalBackgroundNeedsRedraw_ = true;
+    modalCleanRefreshNeeded_ = true;
+    if (result.isCancelled) {
+      requestUpdate();
+      return;
+    }
+    const auto* selection = std::get_if<FilePathResult>(&result.data);
+    if (!selection) {
+      LOG_ERR("DICT", "Dictionary switch returned no path");
+      requestUpdate();
+      return;
+    }
+    Dictionary::setLookupDictPathOverride(selection->path.c_str());
+    dictionaryName_ = dictionaryNameFromPath(selection->path);
+    dictionarySwitchLookupInProgress = true;
+    controller.startLookup(headword, false);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Input loop
+// ---------------------------------------------------------------------------
+
+bool DictionaryDefinitionActivity::handleLongPressExitAll(bool enabled) {
+  if (exitAllOnBackRelease_) {
+    if (mappedInput.wasReleased(MappedInputManager::Button::Back) ||
+        !mappedInput.isPressed(MappedInputManager::Button::Back)) {
+      setResult(ActivityResult{});
+      finish();
+    }
+    return true;
+  }
+
+  if (enabled && mappedInput.isPressed(MappedInputManager::Button::Back) &&
+      mappedInput.getHeldTime() >= Dictionary::LONG_PRESS_MS) {
+    exitAllOnBackRelease_ = true;
+    return true;
+  }
+  return false;
+}
+
+bool DictionaryDefinitionActivity::enterWordSelectMode() {
+  if (!hasSharedHighlightSnapshotStorage_ && !ownedHighlightSnapshotStorage_) {
+    // Fixed 4 KB activity-lifetime buffer: too large for the task stack and
+    // only needed when history-launched definitions enter word selection.
+    ownedHighlightSnapshotStorage_ = makeUniqueNoThrow<WordSelectNavigator::HighlightSnapshotStorage>();
+    if (!ownedHighlightSnapshotStorage_) {
+      LOG_ERR("DICT", "OOM allocating definition highlight snapshot (%u bytes)",
+              static_cast<unsigned>(sizeof(WordSelectNavigator::HighlightSnapshotStorage)));
+    } else {
+      navigator.setHighlightSnapshotStorage(ownedHighlightSnapshotStorage_.get());
+    }
+  }
+  extractWordsFromLayout();
+  if (navigator.isEmpty()) return false;
+
+#if CROSSINK_APP_CAP_TOUCH
+  navigator.setTouchDragCursorVisible(mappedInput.hasTouch());
+#endif
+  isWordSelectMode = true;
+  return true;
+}
+
+#if CROSSINK_APP_CAP_TOUCH
+bool DictionaryDefinitionActivity::handleTouchDictionaryLookup() {
+  if (!showLookupButton || !mappedInput.hasTouch() || RenderLock::peek()) return false;
+
+  int touchX = 0;
+  int touchY = 0;
+  unsigned long heldMs = 0;
+  if (!mappedInput.isScreenTouchTapCandidate(touchX, touchY, heldMs)) {
+    touchDictionaryLookupHandled_ = false;
+    return false;
+  }
+  if (touchDictionaryLookupHandled_ || heldMs < kTouchDefinitionLookupHoldMs) {
+    return false;
+  }
+  touchDictionaryLookupHandled_ = true;
+
+  if (!enterWordSelectMode()) return false;
+
+  bool touchedWord = false;
+  navigator.selectWordAtPoint(touchX, touchY, getLineHeight(), &touchedWord);
+  if (!touchedWord || !navigator.beginTouchMultiSelect()) {
+    isWordSelectMode = false;
+    return false;
+  }
+
+  touchDragLookup_ = true;
+  // Keep the word visibly selected before a release starts the background
+  // lookup, matching the reader-page touch-and-hold flow.
+  requestUpdateAndWait();
+  return true;
+}
+#endif
+
 void DictionaryDefinitionActivity::loop() {
-  if (initialLayoutFailed) {
-    if (millis() - messageTime >= MESSAGE_DURATION_MS) finish();
+  // Own the complete long-press gesture. Returning to the reader while Back is
+  // still held would let the reader fire its configured long-press shortcut.
+  if (handleLongPressExitAll(showLookupButton)) return;
+
+#if CROSSINK_APP_CAP_TOUCH
+  int modalTouchX = 0;
+  int modalTouchY = 0;
+  if (hasModalBackground() && mappedInput.hasTouch() && !controller.requiresBackgroundRedrawAfterOverlay() &&
+      mappedInput.wasScreenTapped(modalTouchX, modalTouchY) && !modalContains(modalTouchX, modalTouchY)) {
+    DictUtils::cancelAndFinish(*this);
     return;
   }
-  if (lookup && !lookup->pendingWord.empty()) {
-    navigateDefinition(false);
+#endif
+
+  // --- Controller active (LookingUp / AltFormPrompt / NotFound) ---
+  if (controller.isActive()) {
+#if CROSSSMUDGE_APP_CAP_TOUCH
+    int failureTouchX = 0;
+    int failureTouchY = 0;
+    if (hasModalBackground() && controller.hasFailureFeedback() && showTouchDictionarySwitch() &&
+        mappedInput.wasScreenTapped(failureTouchX, failureTouchY) &&
+        dictionarySwitchButtonContains(failureTouchX, failureTouchY) &&
+        controller.dismissFailureForDictionarySwitch()) {
+      openDictionarySwitch();
+      return;
+    }
+#endif
+    switch (controller.handleInput()) {
+      case DictionaryLookupController::LookupEvent::FoundDefinition: {
+        const bool wasBackNav = chainBackNavInProgress;
+        const bool wasDictionarySwitch = dictionarySwitchLookupInProgress;
+        const bool willLog = !wasBackNav && controller.getRecordHistory();
+        {
+          // A dictionary-picker return queues a background repaint while the
+          // lookup worker can finish immediately. Serialize reflow with that
+          // repaint: it temporarily unloads the dictionary font, and measuring
+          // against the missing font otherwise collapses pagination to one line.
+          RenderLock lock(*this);
+          if (!wasBackNav && !wasDictionarySwitch) {
+            // Forward: push a back-entry for the word being left (current headword,
+            // on currentPage), referencing its history position.
+            chain_.onForward(static_cast<uint16_t>(currentPage), willLog);
+          }
+          chainBackNavInProgress = false;
+          dictionarySwitchLookupInProgress = false;
+          headword = controller.getFoundWord();
+          foundLocation = controller.getFoundLocation();
+          wrapText();  // resets currentPage to 0 and loads page 0
+          if (wasBackNav) {
+            // Re-derive the now-current word's history position and restore its page.
+            chain_.setCurrentHistIndex(pendingBack_.histIndex);
+            currentPage = (pendingBack_.page < totalPages) ? pendingBack_.page : (totalPages - 1);
+            if (currentPage < 0) currentPage = 0;
+            if (currentPage > 0) loadPage(currentPage);
+          }
+          isWordSelectMode = false;
+        }
+        requestUpdate();
+        // Chain-forward records; chain-back-nav does not.
+        LookupHistory::addWordIf(cachePath, controller.getLookupWord(),
+                                 DictionaryLookupController::toHistStatus(controller.getFoundStatus()), willLog);
+        break;
+      }
+      case DictionaryLookupController::LookupEvent::NotFoundDismissedBack:
+        dictionarySwitchLookupInProgress = false;
+        requestUpdate();
+        break;
+      case DictionaryLookupController::LookupEvent::NotFoundDismissedDone:
+        dictionarySwitchLookupInProgress = false;
+        setResult(ActivityResult{});
+        finish();
+        break;
+      case DictionaryLookupController::LookupEvent::SwitchDictionary:
+        openDictionarySwitch();
+        break;
+      case DictionaryLookupController::LookupEvent::Cancelled:
+        dictionarySwitchLookupInProgress = false;
+        isWordSelectMode = false;
+        navigator.reset();
+        requestUpdate();
+        break;
+      default:
+        break;
+    }
     return;
   }
-  if (messageVisible && millis() - messageTime >= MESSAGE_DURATION_MS) {
-    RenderLock lock(RenderLock::Mode::Try);
-    if (lock.ownsLock()) {
-      messageVisible = false;
+
+  // --- Word-select mode ---
+  if (isWordSelectMode) {
+    if (navigator.handleNavigation(mappedInput, renderer)) {
       requestUpdate();
     }
-  }
-  const int totalPages = content.totalPages;
-  int sx = 0;
-  int sy = 0;
-  const bool longPress = lookup && mappedInput.wasScreenLongPress(sx, sy);
-  const bool headerLongPress = longPress && HeaderBackTapTarget::containsUnpadded(sx, sy);
-  if (headerLongPress || mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-    if (lookup && (headerLongPress || mappedInput.getHeldTime() >= ReaderUtils::GO_BACK_OR_HOME_MS)) {
-      ActivityResult result;
-      result.isCancelled = true;
-      setResult(std::move(result));
-      finish();
-    } else if (lookup && lookup->depth > 0)
-      navigateDefinition(true);
-    else
-      finish();
-    return;
-  }
-  if (longPress && SETTINGS.touchReaderControls) {
-    startSelection(sx, sy);
-    return;
-  }
-  if (lookup && mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    startSelection();
-    return;
-  }
 
-  // Page navigation must keep polling input while the render task refreshes the display.
-  auto currentPage = std::atomic_ref(content.currentPage);
-  // Definitions have no reader menu, so center taps remain page turns.
-  const auto touch = ReaderUtils::detectTouchPageTurn(renderer, mappedInput, false, /*reserveReaderMenuTap=*/false);
-  if (touch.prev || touch.next) {
-    const bool canTurn = touch.prev ? currentPage > 0 : currentPage + 1 < totalPages;
-    if (canTurn) {
-      haptic_feedback::touchAction();
-      if (touch.prev)
-        currentPage--;
-      else
-        currentPage++;
-      content.selection.valid = false;
-      requestUpdate();
+#if CROSSSMUDGE_APP_CAP_TOUCH
+    if (touchDragLookup_) {
+      int dragX = 0;
+      int dragY = 0;
+      if (mappedInput.isScreenTouchHeld(dragX, dragY)) {
+        if (navigator.selectWordAtPoint(dragX, dragY, getLineHeight())) {
+          requestUpdate();
+        }
+        return;
+      }
+
+      touchDragLookup_ = false;
+      controller.lookupOrPopup(navigator.finishTouchMultiSelect(), navigator.getLookupSelectionWordCount());
+      return;
+    }
+
+    int touchX = 0;
+    int touchY = 0;
+    if (mappedInput.wasScreenTouchDown(touchX, touchY)) {
+      bool touchedWord = false;
+      navigator.selectWordAtPoint(touchX, touchY, getLineHeight(), &touchedWord);
+      if (touchedWord && navigator.beginTouchMultiSelect()) {
+        touchDragLookup_ = true;
+        // Finish this fast refresh before lookup can replace the definition,
+        // so the touched word always provides visible press feedback on e-ink.
+        requestUpdateAndWait();
+      }
+      return;
+    }
+#endif
+
+    if (controller.handleMultiSelect(navigator)) return;
+
+    if (!navigator.isMultiSelecting()) {
+      if (controller.handleConfirmLookup(navigator)) return;
+
+      // Short press Back: exit word-select mode.
+      if (mappedInput.wasReleased(MappedInputManager::Button::Back) &&
+          mappedInput.getHeldTime() < Dictionary::LONG_PRESS_MS) {
+        isWordSelectMode = false;
+        navigator.reset();
+        requestUpdate();
+      }
     }
     return;
   }
 
-  // Page buttons follow the side-button layout; front buttons use the reader's orientation mapping.
-  const auto frontButtons = ReaderUtils::getFrontPageTurnButtons(mappedInput);
-  buttonNavigator.onPressAndContinuous({MappedInputManager::Button::PageForward, frontButtons.next},
-                                       [this, &currentPage] {
-                                         if (currentPage + 1 < content.totalPages) {
-                                           currentPage++;
-                                           content.selection.valid = false;
-                                           requestUpdate();
-                                         }
-                                       });
-
-  buttonNavigator.onPressAndContinuous({MappedInputManager::Button::PageBack, frontButtons.previous},
-                                       [this, &currentPage] {
-                                         if (currentPage > 0) {
-                                           currentPage--;
-                                           content.selection.valid = false;
-                                           requestUpdate();
-                                         }
-                                       });
-}
-
-// Draws the current page: a styled Page when the HTML layout succeeded,
-// otherwise the wrapped line spans (copied into a stack buffer for NUL
-// termination). Called twice per render: once in font-cache scan mode, once
-// for the real paint.
-void DictionaryDefinitionActivity::drawBody(const int fontId, const int x, const int startY,
-                                            const int currentPage) const {
-  const auto& pages = content.pages;
-  const auto& lines = content.lines;
-  const auto& definition = content.text;
-  const int linesPerPage = content.linesPerPage;
-  if (!pages.empty()) {
-    pages[currentPage]->render(renderer, fontId, x, startY);
+  // --- View mode ---
+#if CROSSSMUDGE_APP_CAP_TOUCH
+  int touchX = 0;
+  int touchY = 0;
+  if (showTouchDictionarySwitch() && hasClippingRequest_ && mappedInput.wasScreenTapped(touchX, touchY) &&
+      dictionaryCreateClippingButtonContains(touchX, touchY)) {
+    setResult(ActivityResult{clippingRequest_});
+    finish();
     return;
   }
-  const int lineHeight = renderer.getLineHeight(fontId, PLAIN_TEXT_LINE_SPACING);
-  char buf[MAX_LINE_BYTES + 1];
-  const int firstLine = currentPage * linesPerPage;
-  const int lastLine = std::min(firstLine + linesPerPage, static_cast<int>(lines.size()));
-  for (int i = firstLine; i < lastLine; i++) {
-    if (lines[i].len == 0) continue;
-    const size_t len = utf8SafeTruncateBuffer(definition.c_str() + lines[i].start,
-                                              std::min(static_cast<size_t>(lines[i].len), MAX_LINE_BYTES));
-    memcpy(buf, definition.c_str() + lines[i].start, len);
-    buf[len] = '\0';
-    renderer.drawText(fontId, x, startY + (i - firstLine) * lineHeight, buf, true,
-                      lines[i].bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+  if (showTouchDictionarySwitch() && mappedInput.wasScreenTapped(touchX, touchY) &&
+      dictionarySwitchButtonContains(touchX, touchY)) {
+    openDictionarySwitch();
+    return;
+  }
+#endif
+
+  if (showLookupButton && mappedInput.wasReleased(MappedInputManager::Button::Left)) {
+    openDictionarySwitch();
+    return;
+  }
+
+#if CROSSSMUDGE_APP_CAP_TOUCH
+  if (showLookupButton && mappedInput.hasTouch() && mappedInput.wasLeftEdgeGesture()) {
+    setResult(ActivityResult{});
+    finish();
+    return;
+  }
+#endif
+
+#if CROSSINK_APP_CAP_TOUCH
+  if (handleTouchDictionaryLookup()) return;
+#endif
+
+  const auto swipe = mappedInput.wasSwipe();
+  const bool prevPage =
+      DictUtils::dictionaryPageButtonTriggered(mappedInput, true) || swipe == MappedInputManager::SwipeDir::Down;
+  const bool nextPage =
+      DictUtils::dictionaryPageButtonTriggered(mappedInput, false) || swipe == MappedInputManager::SwipeDir::Up;
+
+  if (prevPage && currentPage > 0) {
+    currentPage--;
+    loadPage(currentPage);
+    requestUpdate();
+  }
+
+  if (nextPage && currentPage < totalPages - 1) {
+    currentPage++;
+    loadPage(currentPage);
+    requestUpdate();
+  }
+
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+    if (showLookupButton) {
+      if (enterWordSelectMode()) requestUpdate();
+    } else {
+      DictUtils::cancelAndFinish(*this);
+    }
+    return;
+  }
+
+  if (mappedInput.wasReleased(MappedInputManager::Button::Back) &&
+      (!showLookupButton || mappedInput.getHeldTime() < Dictionary::LONG_PRESS_MS)) {
+    if (!cachePath.empty() && !chain_.empty()) {
+      pendingBack_ = chain_.pop();
+      // Resolve the prior headword from the persisted history by distance-from-newest.
+      const auto hist = LookupHistory::load(cachePath);  // newest-first
+      if (pendingBack_.histIndex < hist.size()) {
+        chainBackNavInProgress = true;
+        controller.startLookup(hist[pendingBack_.histIndex].word, false);
+        return;
+      }
+      // Unresolvable (should not happen under the depth cap) — fall through to exit.
+    }
+    DictUtils::cancelAndFinish(*this);
+    return;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Render
+// ---------------------------------------------------------------------------
 
 void DictionaryDefinitionActivity::render(RenderLock&&) {
-  const int currentPage = std::atomic_ref(content.currentPage).load();
-  const int totalPages = content.totalPages;
-  renderer.clearScreen();
-
-  const auto& metrics = UITheme::getInstance().getMetrics();
-  const auto orientation = renderer.getOrientation();
-  const bool isLandscapeCw = orientation == GfxRenderer::Orientation::LandscapeClockwise;
-  const bool isLandscapeCcw = orientation == GfxRenderer::Orientation::LandscapeCounterClockwise;
-  const bool isInverted = orientation == GfxRenderer::Orientation::PortraitInverted;
-  const int hintGutterWidth = (isLandscapeCw || isLandscapeCcw) ? metrics.sideButtonHintsWidth : 0;
-  const int contentX = isLandscapeCw ? hintGutterWidth : 0;
-  const int contentWidth = renderer.getScreenWidth() - hintGutterWidth;
-  const int contentY = isInverted ? metrics.buttonHintsHeight : 0;
-
-  char counter[16] = {};
-  if (totalPages > 1) {
-    snprintf(counter, sizeof(counter), "%d/%d", currentPage + 1, totalPages);
+  if (hasModalBackground() && controller.consumeFullScreenChildDisturbance()) {
+    modalBackgroundNeedsRedraw_ = true;
+    modalCleanRefreshNeeded_ = true;
   }
-  GUI.drawHeader(renderer, Rect{contentX, contentY + metrics.topPadding, contentWidth, metrics.headerHeight},
-                 content.headword.c_str(), counter[0] ? counter : nullptr);
+  // Differential fast path: only when we're already in word-select mode AND
+  // we set it up on the previous frame AND the controller has nothing pending.
+  if (isWordSelectMode && nextRenderMode_ == RenderMode::Differential && !controller.isActive()) {
+    const int currIdx = navigator.getCurrentFlatIndex();
+    if (currIdx >= 0) {
+      if (const auto* word = navigator.getWordAt(currIdx); word && renderer.isSdCardFont(word->fontId)) {
+        if (auto* fcm = renderer.getFontCacheManager()) {
+          const uint8_t styleMask = static_cast<uint8_t>(1u << (static_cast<uint8_t>(word->style) & 0x03));
+          fcm->prewarmCache(word->fontId, navigator.getDisplay(*word), styleMask,
+                            FontCacheManager::PreparationPolicy::DictionaryLean);
+        }
+      }
+      const int lineHeight = getLineHeight();
+      auto dirty = navigator.renderHighlightDifferential(renderer, lineHeight, prevHighlightIdx_, currIdx, true);
+      if (dirty.has_value()) {
+        // Full panel push — matches DictionaryWordSelectActivity. Windowed refresh is not
+        // wired up because the SDK's experimental path produces alternating black→white
+        // failures on consecutive partial refreshes. Savings come from skipping page->render.
+        renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+        prevHighlightIdx_ = currIdx;
+        return;
+      }
+      // fall through to full repaint path
+    }
+  }
 
-  // Body: two-pass draw inside a prewarm scope (same pattern as the reader's
-  // renderContents) so SD-card font glyphs load from SD in one batch instead
-  // of one on-demand overflow read per character on every page turn.
-  const int fontId = SETTINGS.getReaderFontId();
-  const BodyArea body = bodyArea();
-  auto* fcm = renderer.getFontCacheManager();
-  auto scope = fcm->createPrewarmScope();
-  drawBody(fontId, body.x, body.y, currentPage);  // scan pass: records codepoints only
-  scope.endScanAndPrewarm();
-  drawBody(fontId, body.x, body.y, currentPage);
-
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), lookup ? tr(STR_LOOKUP) : "", (currentPage > 0 ? "<" : ""),
-                                            (currentPage + 1 < totalPages ? ">" : ""));
-  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-  if (messageVisible) {
-    GUI.drawPopup(renderer, I18N.get(message));
+  // Alt-form confirmation intentionally owns the full screen. Leave the reader
+  // font unloaded while it is visible, then rebuild the background once after
+  // the controller returns to the modal flow.
+  if (hasModalBackground() && controller.requiresBackgroundRedrawAfterOverlay()) {
+    controller.render();
+    modalBackgroundNeedsRedraw_ = true;
+    modalCleanRefreshNeeded_ = true;
+    nextRenderMode_ = RenderMode::FullPage;
+    prevHighlightIdx_ = -1;
     return;
   }
-  renderer.displayBuffer();
+
+  // Full repaint path. The framebuffer retains the book pixels outside the
+  // opaque, stable modal, so ordinary definition page turns only repaint the
+  // modal. Rebuild the book after another screen or overlay disturbed it.
+  if (hasModalBackground() && !isWordSelectMode && wordSelectHintsVisible_) {
+    modalBackgroundNeedsRedraw_ = true;
+  }
+  if (hasModalBackground()) {
+    redrawModalBackground();
+  } else {
+    renderer.clearScreen();
+  }
+
+  // After the picker closes, rebuild the reader once but do not redraw stale
+  // definition glyphs. Keep lookup feedback inside the modal; the successful
+  // replacement can then reuse this background without another font swap.
+  if (dictionarySwitchLookupInProgress && controller.isLookingUp()) {
+    if (hasModalBackground()) {
+      drawModalFrame();
+      const int messageY = modalY_ + (modalHeight_ - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
+      renderer.drawCenteredText(UI_10_FONT_ID, messageY, tr(STR_DICT_LOOKING_UP));
+      displayModalBuffer();
+    } else {
+      GUI.drawPopup(renderer, tr(STR_DICT_LOOKING_UP));
+    }
+    nextRenderMode_ = RenderMode::FullPage;
+    prevHighlightIdx_ = -1;
+    return;
+  }
+  const bool inlineFailureFeedback = hasModalBackground() && controller.hasFailureFeedback();
+  if (!inlineFailureFeedback && controller.render()) {
+    // Controller drew an overlay; framebuffer state is unknown.
+    if (hasModalBackground() && controller.requiresBackgroundRedrawAfterOverlay()) {
+      modalBackgroundNeedsRedraw_ = true;
+    }
+    nextRenderMode_ = RenderMode::FullPage;
+    prevHighlightIdx_ = -1;
+    return;
+  }
+
+  const auto metrics = UITheme::getInstance().getMetrics();
+  const int bodyFontId = getDefinitionFontId();
+  const int titleFontId = bodyFontId;
+  const int titleLineHeight = renderer.getLineHeight(titleFontId);
+  const int indentStep = renderer.getTextWidth(bodyFontId, "   ");
+
+  // Header chrome stays in the built-in UI font; the looked-up word uses the
+  // active reader font and is drawn with the definition body after prewarming.
+  Rect headerRect{contentX, hintGutterHeight + metrics.topPadding, renderer.getScreenWidth() - hintGutterWidth,
+                  metrics.headerHeight};
+  if (hasModalBackground()) {
+    drawModalFrame();
+    const int innerPadding = metrics.optionPopupInnerPadding;
+    headerRect = Rect{modalX_ + innerPadding, modalY_ + innerPadding, modalWidth_ - innerPadding * 2, titleLineHeight};
+    if (metrics.optionPopupTitleSeparator) {
+      const int separatorY = headerRect.y + headerRect.height + metrics.optionPopupTitleGap / 2;
+      renderer.drawLine(headerRect.x, separatorY, headerRect.x + headerRect.width, separatorY, true);
+    }
+  } else {
+    GUI.drawHeader(renderer, headerRect, "");
+  }
+
+  int titleRight = headerRect.x + headerRect.width;
+  if (!isWordSelectMode && totalPages > 1) {
+    char pageInfo[16];
+    snprintf(pageInfo, sizeof(pageInfo), "%d/%d", currentPage + 1, totalPages);
+    const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, pageInfo);
+    const int pageInfoY =
+        hasModalBackground()
+            ? headerRect.y + (headerRect.height - renderer.getLineHeight(SMALL_FONT_ID)) / 2
+            : headerRect.y + headerRect.height - renderer.getLineHeight(SMALL_FONT_ID) - metrics.verticalSpacing / 2;
+    const int pageInfoX = hasModalBackground() ? headerRect.x + headerRect.width - textWidth
+                                               : renderer.getScreenWidth() - rightPadding - textWidth;
+    renderer.drawText(SMALL_FONT_ID, pageInfoX, pageInfoY, pageInfo);
+    titleRight = pageInfoX - metrics.optionPopupInnerPadding;
+  }
+
+  const int titleX = hasModalBackground() ? headerRect.x : headerRect.x + metrics.contentSidePadding;
+  const int titleY = hasModalBackground() ? headerRect.y : headerRect.y + (headerRect.height - titleLineHeight) / 2;
+  const int titleMaxWidth = std::max(0, titleRight - titleX);
+  const std::string visibleHeadword =
+      renderer.truncatedText(titleFontId, headword.c_str(), titleMaxWidth, EpdFontFamily::BOLD);
+  auto renderTitle = [&]() {
+    renderer.drawText(titleFontId, titleX, titleY, visibleHeadword.c_str(), true, EpdFontFamily::BOLD);
+  };
+
+  // Body: draw layout lines for the current page (BW pass). layoutLines holds
+  // only the current page (Stage 2a streaming), so it is indexed from 0.
+  const int lineHeight = getLineHeight();  // cached for loop + renderHighlight
+  auto renderBody = [&]() {
+    for (int i = 0; i < linesPerPage && i < static_cast<int>(layoutLines.size()); i++) {
+      const PooledLine& line = layoutLines[i];
+      const int y = bodyStartY + i * lineHeight;
+      int x = leftPadding + line.indentLevel * indentStep;
+
+      if (line.isListItem) {
+        renderer.drawText(bodyFontId, x, y, kBullet);
+        x += renderer.getTextWidth(bodyFontId, kBullet);
+      }
+
+      for (uint16_t segmentIdx = 0; segmentIdx < line.segmentCount; ++segmentIdx) {
+        const PooledSegment& seg = layoutSegments[line.firstSegment + segmentIdx];
+        const int segFontId = getDefinitionFontId(seg.isIpa);
+        const char* segText = pagePool_.data() + seg.offset;
+        renderer.drawText(segFontId, x, y, segText, true, seg.style);
+        if ((seg.style & EpdFontFamily::UNDERLINE) != 0) {
+          const int segWidth = renderer.getTextWidth(segFontId, segText, seg.style);
+          const int underlineY = y + renderer.getFontAscenderSize(segFontId) + 2;
+          renderer.drawLine(x, underlineY, x + segWidth, underlineY, true);
+        }
+        x += renderer.getTextAdvanceX(segFontId, segText, seg.style);
+      }
+    }
+  };
+
+  // SD fonts retain bitmaps for only the most recently prepared page. The
+  // reader background above may have replaced that cache, so scan the visible
+  // title and definition page before drawing them. The .dict reader was closed
+  // by loadPage(), keeping font and dictionary SD access serialized.
+  bool definitionTextRendered = false;
+  if (renderer.isSdCardFont(bodyFontId)) {
+    if (auto* fcm = renderer.getFontCacheManager()) {
+      // Keep this alive through the word-select overlay below. Its destructor
+      // clears SD glyph bitmaps, and that overlay redraws the selected word.
+      std::optional<FontCacheManager::PrewarmScope> definitionRenderScope;
+      const auto prewarmAndRender = [&]() {
+        definitionRenderScope.emplace(*fcm, FontCacheManager::PreparationPolicy::DictionaryLean);
+        renderTitle();
+        renderBody();  // scan pass
+        if (!definitionRenderScope->endScanAndPrewarm()) {
+          definitionRenderScope.reset();
+          return false;
+        }
+        renderTitle();
+        renderBody();  // prepared render
+        return true;
+      };
+
+      definitionTextRendered = prewarmAndRender();
+      if (!definitionTextRendered) {
+        // A switched definition can require a different glyph/style set.
+        // Release optional bitmap/kern caches, retain the advance table used by
+        // layout, and retry once with the exact visible page glyphs.
+        LOG_ERR("DICT", "SD-font definition prewarm failed; releasing caches and retrying");
+        renderer.releaseSdCardFontForLowMemory(bodyFontId, /*preserveAdvanceTable=*/true);
+        definitionTextRendered = prewarmAndRender();
+        if (!definitionTextRendered) {
+          useBuiltInDefinitionFontFallback();
+          requestUpdate();
+          return;
+        }
+      }
+    }
+  }
+  if (!definitionTextRendered) {
+    renderTitle();
+    renderBody();
+  }
+
+  const char* inlineStatusMessage = nullptr;
+  if (hasModalBackground() && controller.isLookingUp()) {
+    inlineStatusMessage = tr(STR_DICT_LOOKING_UP);
+  } else if (inlineFailureFeedback) {
+    inlineStatusMessage = controller.getFailureMessage();
+  } else if (hasModalBackground() && definitionReadFailed_) {
+    inlineStatusMessage = tr(STR_DICT_READ_FAILED);
+  }
+  if (inlineStatusMessage) {
+    const int messageHeight = renderer.getLineHeight(UI_10_FONT_ID) + metrics.optionPopupInnerPadding * 2;
+    const int messageY = modalY_ + (modalHeight_ - messageHeight) / 2;
+    renderer.fillRect(modalX_ + metrics.optionPopupInnerPadding, messageY,
+                      modalWidth_ - metrics.optionPopupInnerPadding * 2, messageHeight, false);
+    renderer.drawCenteredText(UI_10_FONT_ID, messageY + metrics.optionPopupInnerPadding, inlineStatusMessage);
+  }
+
+  if (!hasModalBackground() && definitionReadFailed_) GUI.drawPopup(renderer, tr(STR_DICT_READ_FAILED));
+
+  if (hasModalBackground() && !dictionaryName_.empty()) {
+    const int innerPadding = metrics.optionPopupInnerPadding;
+    const int footerLineHeight = renderer.getLineHeight(UI_10_FONT_ID);
+#if CROSSSMUDGE_APP_CAP_TOUCH || CROSSINK_APP_CAP_TOUCH
+    const int switchButtonHeight =
+        showTouchDictionarySwitch() ? kDictionarySwitchTouchHeight * (hasClippingRequest_ ? 2 : 1) : 0;
+#else
+    constexpr int switchButtonHeight = 0;
+#endif
+    const int footerY = modalY_ + modalHeight_ - switchButtonHeight - innerPadding - footerLineHeight;
+    const int separatorY = footerY - metrics.optionPopupTitleGap / 2;
+    const int footerBottom = modalY_ + modalHeight_ - switchButtonHeight;
+    const int dictionaryNameY = separatorY + (footerBottom - separatorY - footerLineHeight) / 2;
+    renderer.drawLine(modalX_, separatorY, modalX_ + modalWidth_, separatorY, true);
+    const auto visibleName =
+        renderer.truncatedText(UI_10_FONT_ID, dictionaryName_.c_str(), modalWidth_ - innerPadding * 2);
+    renderer.drawText(UI_10_FONT_ID, modalX_ + innerPadding, dictionaryNameY, visibleName.c_str());
+  }
+
+#if CROSSSMUDGE_APP_CAP_TOUCH
+  if (!isWordSelectMode && showTouchDictionarySwitch()) {
+    const Rect buttonRect{modalX_,
+                          modalY_ + modalHeight_ - kDictionarySwitchTouchHeight * (hasClippingRequest_ ? 2 : 1),
+                          modalWidth_, kDictionarySwitchTouchHeight};
+    renderer.drawLine(buttonRect.x, buttonRect.y, buttonRect.x + buttonRect.width, buttonRect.y, true);
+    const char* label = tr(STR_SWITCH_DICTIONARY);
+    const int labelX =
+        buttonRect.x + (buttonRect.width - renderer.getTextWidth(UI_10_FONT_ID, label, EpdFontFamily::BOLD)) / 2;
+    const int labelY = buttonRect.y + (buttonRect.height - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
+    renderer.drawText(UI_10_FONT_ID, labelX, labelY, label, true, EpdFontFamily::BOLD);
+    if (hasClippingRequest_) {
+      const Rect clippingRect{modalX_, modalY_ + modalHeight_ - kDictionarySwitchTouchHeight, modalWidth_,
+                              kDictionarySwitchTouchHeight};
+      renderer.drawLine(clippingRect.x, clippingRect.y, clippingRect.x + clippingRect.width, clippingRect.y, true);
+      const char* clippingLabel = tr(STR_SAVE_CLIPPING);
+      const int clippingLabelX =
+          clippingRect.x +
+          (clippingRect.width - renderer.getTextWidth(UI_10_FONT_ID, clippingLabel, EpdFontFamily::BOLD)) / 2;
+      const int clippingLabelY = clippingRect.y + (clippingRect.height - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
+      renderer.drawText(UI_10_FONT_ID, clippingLabelX, clippingLabelY, clippingLabel, true, EpdFontFamily::BOLD);
+    }
+  }
+#endif
+
+  // Word-select mode: overlay highlighted word(s) and prime snapshot for next frame.
+  // The -1 prevWordIdx literal is load-bearing: renderHighlightDifferential uses
+  // prevWordIdx < 0 as the signal "framebuffer was just redrawn from scratch,
+  // discard any stale snapshot rather than restoring it on top of fresh pixels."
+  // This is the only path that disturbs the framebuffer outside the differential
+  // cycle, so it's also the only call site that must pass -1.
+  if (isWordSelectMode) {
+    const int currIdx = navigator.getCurrentFlatIndex();
+    bool snapshotPrimed = false;
+    if (currIdx >= 0) {
+      auto setup = navigator.renderHighlightDifferential(renderer, lineHeight, /*prevWordIdx=*/-1, currIdx, true);
+      snapshotPrimed = setup.has_value();
+    }
+    if (!snapshotPrimed) {
+      navigator.renderHighlight(renderer, lineHeight, true);
+    }
+
+    DictUtils::drawWordSelectButtonHints(renderer, mappedInput, navigator);
+    wordSelectHintsVisible_ = true;
+    displayModalBuffer();
+
+    prevHighlightIdx_ = currIdx;
+    nextRenderMode_ = snapshotPrimed ? RenderMode::Differential : RenderMode::FullPage;
+    return;
+  }
+
+  // View mode: differential state is irrelevant — reset so that the next entry
+  // into word-select starts cleanly with a full repaint.
+  nextRenderMode_ = RenderMode::FullPage;
+  prevHighlightIdx_ = -1;
+
+  // Button hints
+  const char* btn2 = inlineFailureFeedback ? tr(STR_DONE) : (showLookupButton ? tr(STR_LOOKUP_SHORT) : "");
+  const char* btn3 = showLookupButton ? tr(STR_DICT_SWITCH) : "";
+  const char* btn4 = nullptr;
+  const auto labels = mappedInput.mapLabels(mappedInput.withBackArrow(tr(STR_BACK)), btn2, btn3, btn4);
+  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  wordSelectHintsVisible_ = false;
+
+  if (hasModalBackground()) {
+    displayModalBuffer();
+  } else {
+    renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+  }
+
+  // Skip the full-screen grayscale anti-aliasing overlay here. This modal is
+  // short-lived, and the 48KB BW backup it needs can fragment the heap enough
+  // that the reader's largest free block does not recover after returning.
 }

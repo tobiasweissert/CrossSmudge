@@ -2,42 +2,79 @@
 
 #include <Arduino.h>
 #include <Rtc.h>
+#include <time.h>
+
+#include <atomic>
 
 class HalClock;
 extern HalClock halClock;  // Singleton
 
 class HalClock {
   bool _available = false;
+  std::atomic<bool> _systemTimeSynchronized{false};
   mutable Rtc _sdkRtc;
-  // The RTC keeps UTC; local time comes from newlib's localtime_r under the
-  // POSIX TZ rule set via setTimezone(), so zones with DST are correct
-  // year-round. Cached as a UTC epoch to keep the RTC bus quiet.
-  mutable time_t _cachedUtc = 0;
+  mutable uint8_t _cachedHour = 0;
+  mutable uint8_t _cachedMinute = 0;
+  mutable uint16_t _cachedYear = 2000;
+  mutable uint8_t _cachedMonth = 1;
+  mutable uint8_t _cachedDay = 1;
   mutable bool _hasCachedTime = false;
+  mutable bool _hasCachedDate = false;
   mutable unsigned long _lastPollMs = 0;
 
   static constexpr unsigned long CLOCK_POLL_MS = 10000;  // 10 seconds
 
  public:
+  enum DateFormat : uint8_t {
+    MONTH_DAY_YEAR_LONG = 0,
+    DAY_MONTH_YEAR_LONG = 1,
+    MONTH_DAY_YEAR_NUMERIC = 2,
+    DAY_MONTH_YEAR_NUMERIC = 3,
+    YEAR_MONTH_DAY_NUMERIC = 4,
+    MONTH_DAY_NUMERIC = 5,
+    DAY_MONTH_NUMERIC = 6,
+    MONTH_DAY_LONG = 7,
+    DAY_MONTH_LONG = 8,
+    DATE_FORMAT_COUNT
+  };
+
   // Call after BoardConfig has selected the active device.
   void begin();
 
   // True if an RTC is present on this device
   bool isAvailable() const { return _available; }
 
-  // Set the POSIX TZ rule (e.g. "CET-1CEST,M3.5.0,M10.5.0/3") applied to every
-  // read. nullptr/empty falls back to UTC. Drops the read cache so the change
-  // shows immediately.
-  void setTimezone(const char* posixTz);
-
-  // Current wall-clock time in the configured timezone.
+  // Get current hour (0-23) and minute (0-59).
   // Returns false if RTC is not available.
-  bool localTime(struct tm& out) const;
+  bool getTime(uint8_t& hour, uint8_t& minute) const;
 
-  // Format the local time into a caller-provided buffer.
+  // Format time into a caller-provided buffer.
   // 24h mode produces "HH:MM" (needs >=6 bytes); 12h mode produces "H:MM AM"/"HH:MM PM" (needs >=9 bytes).
+  // utcOffsetQuarterHoursBiased: biased quarter-hour offset (48 = UTC+0, 0 = UTC-12, 104 = UTC+14).
+  // use12Hour: when true, format as 12-hour clock with AM/PM suffix.
   // Returns false if RTC is not available.
+  bool formatTime(char* buf, size_t bufSize, uint8_t utcOffsetQuarterHoursBiased, bool use12Hour = false) const;
+
+  // Returns the raw RTC date/time before any user-configured timezone offset is applied.
+  // The RTC is synced in UTC, so callers that need wall-clock local time should apply SETTINGS.clockUtcOffsetQ.
+  bool getDateTime(uint16_t& year, uint8_t& month, uint8_t& day, uint8_t& hour, uint8_t& minute) const {
+    return getDate(year, month, day, hour, minute);
+  }
+
+  // Format date into a caller-provided buffer using the requested display format.
+  // utcOffsetQuarterHoursBiased matches formatTime so the date rolls over at local midnight.
+  // Returns false if RTC is not available or the RTC date is invalid.
+  bool formatDate(char* buf, size_t bufSize, uint8_t utcOffsetQuarterHoursBiased = 48,
+                  DateFormat dateFormat = MONTH_DAY_YEAR_LONG, char numericSeparator = '/') const;
+
+  // POSIX display timezone; the RTC and TLS system clock always remain UTC.
+  void setTimezone(const char* posixTz);
+  bool localTime(struct tm& out) const;
   bool formatTime(char* buf, size_t bufSize, bool use12Hour = false) const;
+  // Integer literals retain the legacy offset meaning rather than converting to bool.
+  bool formatTime(char* buf, size_t bufSize, int offsetQ, bool use12Hour = false) const {
+    return formatTime(buf, bufSize, static_cast<uint8_t>(offsetQ < 0 ? 0 : (offsetQ > 104 ? 104 : offsetQ)), use12Hour);
+  }
 
   // Sync the RTC from an NTP server. Requires WiFi to be connected.
   // Blocks for up to ~5s while waiting for SNTP response.
@@ -46,4 +83,13 @@ class HalClock {
   // Debouncing (skip if already synced once) is enforced by the caller, not here,
   // so the HAL stays free of any app-layer settings dependency.
   bool syncFromNTP();
+
+  // Sync the ESP32 system clock without requiring an external RTC.
+  bool syncSystemTimeFromNTP();
+  bool hasSynchronizedSystemTime() const { return _systemTimeSynchronized.load(); }
+
+ private:
+  bool getDate(uint16_t& year, uint8_t& month, uint8_t& day, uint8_t& hour, uint8_t& minute) const;
+  bool writeDateTimeToRTC(uint16_t year, uint8_t month, uint8_t day, uint8_t weekday, uint8_t hour, uint8_t minute,
+                          uint8_t second);
 };

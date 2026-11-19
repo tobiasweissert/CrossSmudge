@@ -1,38 +1,68 @@
 #pragma once
+#include <HalDisplay.h>
+
+#include <array>
 #include <functional>
+#include <optional>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "./FileBrowserActivity.h"
-#include "RecentBooksStore.h"
+#include "QuickActions.h"
 #include "activities/Activity.h"
-#include "components/CoverGridHomeUi.h"
+#include "activities/reader/BookReadingStats.h"
+#include "activities/reader/GlobalReadingStats.h"
+#include "components/OptionPopup.h"
 #include "util/ButtonNavigator.h"
 
+struct RecentBook;
 struct Rect;
 
 class HomeActivity final : public Activity {
-  std::unique_ptr<CoverGridHomeUi> coverGridUi;
+ public:
+  // Keep one rendered carousel frame in RAM. Additional frames remain available
+  // through the SD snapshot cache and are paged in on demand.
+  static constexpr int kCarouselFrameCount = 1;
+  // Must be >= LyraCarouselMetrics::values.homeRecentBooksCount (asserted in .cpp)
+  static constexpr int kMaxCachedBooks = 3;
+
+ private:
   ButtonNavigator buttonNavigator;
   int selectorIndex = 0;
+  int lastCarouselBookIndex = 0;  // remembered position when leaving carousel row
+  int carouselCoverTouchDownIndex = -1;
+  bool carouselCoverTouchDownWasSelected = false;
+  // Touch menus use a momentary pressed state. Keep it separate from the
+  // keyboard selection so a returned Home screen cannot retain an icon tint.
+  int carouselMenuTouchDownIndex = -1;
   bool recentsLoading = false;
   bool recentsLoaded = false;
   bool firstRenderDone = false;
+  // Silent restarts keep the panel's previous frame. The first Home paint may
+  // need a clean waveform so the panel does not diff against a WiFi screen.
+  HalDisplay::RefreshMode initialRefreshMode = HalDisplay::FAST_REFRESH;
+  bool hasReadingStats = false;
+  bool hasBookmarks = false;
+  bool hasClippings = false;
   bool hasOpdsServers = false;
-  bool hasPlugins = false;
-  // The home "library" slot (index 2) shows Plugins while the plugin system is
-  // enabled, otherwise OPDS when a server is configured. NONE hides the slot.
-  // NetworkModeSelectionActivity lists OPDS in exactly the other cases.
-  HomeMenuItem slotItem() const {
-    if (hasPlugins) return HomeMenuItem::PLUGINS;
-    return hasOpdsServers ? HomeMenuItem::OPDS_BROWSER : HomeMenuItem::NONE;
-  }
-  bool hasContinueReading = false;
+  bool minimalMenuOpen = false;
+  bool minimalSuppressInitialFrontRelease = false;
+  bool homeBookSwapLongPressHandled = false;
+  bool quickActionsLongPowerHandled = false;
+  int minimalMenuIndex = 0;
+  int minimalHomeNavIndex = -1;
   bool coverRendered = false;      // Track if cover has been rendered once
   bool coverBufferStored = false;  // Track if cover buffer is stored
+  // Cached cover pixels already include Dark Mode's image-polarity correction.
+  // They must be redrawn rather than reused when the output polarity changes.
+  bool coverBufferInverted = false;
+  // Home can be entered while Back is still held (e.g. leaving Settings with
+  // Back): ignore that stale release until a fresh press is seen here.
+  bool backPressSeen = false;
+  OptionPopup quickActionsPopup;
   uint8_t* coverBuffer = nullptr;  // HomeActivity's own buffer for cover image
   size_t coverBufferSize = 0;      // Bytes allocated to coverBuffer
-  // Output polarity the snapshot was taken in (night mode stores images pre-inverted).
-  bool coverBufferInverted = false;
   // Logical rect last passed to drawRecentBookCover. The cover snapshot only
   // needs to cover this region, not the entire framebuffer, so we cache the
   // tile instead of all 48 KB. Set in render() before the call.
@@ -40,64 +70,85 @@ class HomeActivity final : public Activity {
   int coverRectY = 0;
   int coverRectW = 0;
   int coverRectH = 0;
+  float currentBookProgressPercent = -1.0f;
+  std::string currentBookChapterTitle;
+  BookReadingStats currentBookStats;
+  GlobalReadingStats globalStats;
+  GlobalReadingStats allDevicesGlobalStats;
+  bool showAllDevicesStats = false;
+
+  // Per-book stats and progress cached at onEnter() to avoid SD reads during navigation.
+  std::array<BookReadingStats, kMaxCachedBooks> cachedBookStats{};
+  std::array<float, kMaxCachedBooks> cachedBookProgress{};
+  bool bookStatsCached = false;
+
+  uint8_t* carouselFrames[kCarouselFrameCount] = {};
+  bool carouselFramesReady = false;
+  bool carouselFramesInverted = false;
+  bool carouselWarmupPending = false;
+
   std::vector<RecentBook> recentBooks;
   const HomeMenuItem initialMenuItem;
-  const bool cleanInitialRefresh;
+  std::string initialBookPath;
 
-  // Convert HomeMenuItem to menu index (used in onEnter)
-  static int menuItemToIndex(HomeMenuItem item, HomeMenuItem slot) {
-    int i = 0;
-    if (item == HomeMenuItem::FILE_BROWSER) return i;
-    ++i;
-    if (item == HomeMenuItem::LIBRARY) return i;
-    ++i;
-    if (slot != HomeMenuItem::NONE && item == slot) return i;
-    if (item == HomeMenuItem::PLUGINS) return 0;
-    if (slot != HomeMenuItem::NONE) ++i;
-    // File Transfer also opens the OPDS browser, so it returns there without its slot.
-    if (item == HomeMenuItem::FILE_TRANSFER || item == HomeMenuItem::OPDS_BROWSER) return i;
-    ++i;
-    if (item == HomeMenuItem::SETTINGS_MENU) return i;
-    return 0;
-  }
-
-  // Convert menu index to HomeMenuItem (used in loop)
-  static HomeMenuItem indexToMenuItem(int idx, HomeMenuItem slot) {
-    int i = 0;
-    if (idx == i++) return HomeMenuItem::FILE_BROWSER;
-    if (idx == i++) return HomeMenuItem::LIBRARY;
-    if (slot != HomeMenuItem::NONE && idx == i++) return slot;
-    if (idx == i++) return HomeMenuItem::FILE_TRANSFER;
-    if (idx == i) return HomeMenuItem::SETTINGS_MENU;
-    return HomeMenuItem::NONE;
-  }
-  void onRecentBookSelected(const std::string& path);
+  void onSelectBook(const std::string& path);
   void onFileBrowserOpen();
-  void onLibraryOpen();
+  void onContinueReading();
+  void onRecentsOpen();
   void onSettingsOpen();
   void onFileTransferOpen();
   void onOpdsBrowserOpen();
-  void onPluginsOpen();
+  void onReadingStatsOpen();
+  void onSavedItemsOpen();
+  void onApplicationsOpen();
 
   int getMenuItemCount() const;
   bool storeCoverBuffer();    // Store frame buffer for cover image
   bool restoreCoverBuffer();  // Restore frame buffer from stored cover
   void freeCoverBuffer();     // Free the stored cover buffer
+  void invalidateCoverCache();
+  void invalidatePolarityMismatchedCaches();
+  bool preRenderCarouselFrames(bool showProgressPopup = false);
+  void freeCarouselFrames();
+  bool allocateCarouselFrameSlots(int targetFrameCount);
+  bool buildCarouselCacheFile(const std::string& cacheKey, uint64_t cacheKeyHash, int bookCount,
+                              bool showProgressPopup = false);
+  bool loadCarouselFrameFromDisk(uint64_t cacheKeyHash, int bookCount, int bookIdx, int slotIdx);
+  int chooseCarouselEvictionSlot(int centerIdx, int bookCount,
+                                 std::optional<int> protectedBookIdx = std::nullopt) const;
+  void renderCarouselFrameToCurrentBuffer(int bookIdx, BookReadingStats* outStats, float* outProgressPercent,
+                                          bool* outUsedCachedStats);
+  void renderCarouselFrame(int bookIdx, int slotIdx);
+  void updateSlidingWindowCache(int centerIdx, int bookCount);
+  int getHighlightedBookIndex() const;
+  int getVisibleRecentBookCount() const;
+  bool canSwapHomeBook() const;
+  void showNextRecentBookOnHome();
+  void updateHighlightedBookContext(bool allowEpubLoad = true);
   void loadRecentBooks(int maxBooks);
+  void loadAllBookStats();
   void loadRecentCovers(int coverHeight);
-  void fillCoverGridFromLibrary();
-  void resolveGridCoverPaths();
-  void loadGridCover(RecentBook& book, int height, bool& showingLoading, Rect& popupRect);
 
  public:
   explicit HomeActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                        HomeMenuItem initialMenuItemValue = HomeMenuItem::NONE, bool cleanInitialRefresh = false)
+                        HomeMenuItem initialMenuItemValue = HomeMenuItem::NONE,
+                        HalDisplay::RefreshMode initialRefreshModeValue = HalDisplay::FAST_REFRESH,
+                        std::string initialBookPathValue = {})
       : Activity("Home", renderer, mappedInput),
+        initialRefreshMode(initialRefreshModeValue),
         initialMenuItem(initialMenuItemValue),
-        cleanInitialRefresh(cleanInitialRefresh) {}
+        initialBookPath(std::move(initialBookPathValue)) {}
   void onEnter() override;
   void onExit() override;
   void loop() override;
   void render(RenderLock&&) override;
   bool isHomeActivity() const override { return true; }
+  bool allowPowerAsConfirmInReaderMode() const override { return quickActionsPopup.isActive(); }
+  bool blocksGlobalInput() const override { return quickActionsPopup.isActive(); }
+  bool handleShortcutAction(CrossPointSettings::SHORT_PWRBTN action) override;
+  std::string getCurrentBookPath() const override;
+  std::string getCurrentBookTitle() const override;
+  std::unique_ptr<Activity> createFrontlightReadingStatsActivity() override;
+  void onFrontlightPanelClosed() override;
+  bool handleFrontlightPanelResult(const FrontlightPanelResult& result) override;
 };

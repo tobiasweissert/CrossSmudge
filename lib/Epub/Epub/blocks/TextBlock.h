@@ -74,6 +74,9 @@ class TextBlock final : public Block {
   const uint16_t* focusSplitXArr = nullptr;  // null when !focusPresent
   const uint8_t* stylesArr = nullptr;
   const uint8_t* focusBoundaryArr = nullptr;  // null when !focusPresent
+  const uint16_t* guideDots = nullptr;
+  const uint8_t* flags = nullptr;
+  const uint8_t* spaces = nullptr;
   const char* textArr = nullptr;
   std::vector<std::string> rubyTexts;
   // Words sized apart from the line (CSS font-size spans): MAX_WORD_FONTS int32 font ids,
@@ -97,7 +100,13 @@ class TextBlock final : public Block {
                      const std::vector<uint16_t>& focusSplitX, const BlockStyle& blockStyle = BlockStyle(),
                      std::vector<std::string> rubyTexts = {}, std::vector<LinkSpan> linkSpans = {},
                      const std::vector<SourceRange>& ranges = {}, uint16_t paragraphStartWord = UINT16_MAX);
+  TextBlock(const std::vector<std::string>& words, const std::vector<int16_t>& positions,
+            const std::vector<EpdFontFamily::Style>& styles, const std::vector<uint8_t>& boundaries,
+            const std::vector<uint16_t>& splits, const std::vector<uint16_t>& dots, const std::vector<uint8_t>& flags,
+            const std::vector<bool>& spaces, const BlockStyle& style = BlockStyle(),
+            std::vector<std::string> ruby = {});
   ~TextBlock() override = default;
+  TextBlock(TextBlock&&) noexcept = default;
   TextBlock(const TextBlock&) = delete;
   TextBlock& operator=(const TextBlock&) = delete;
 
@@ -131,6 +140,12 @@ class TextBlock final : public Block {
     const uint16_t end = (i + 1 < numWords) ? textOffArr[i + 1] : textBytes;
     return end - textOffArr[i] - 1;  // exclude the NUL
   }
+  // Layout-only normalized reference coordinate; Section persists its page index separately.
+  uint32_t layoutReferenceOffset = 0;
+  void setWordSourceRange(uint16_t i, SourceRange range) {
+    if (i < numWords) const_cast<SourceRange*>(sourceRanges)[i] = range;
+  }
+  void setParagraphStartWord(uint16_t i) { paragraphStartWord = i; }
   SourceRange wordSourceRange(const uint16_t i) const { return sourceRanges[i]; }
   bool wordStartsParagraph(const uint16_t i) const { return i == paragraphStartWord; }
   int16_t wordXpos(const uint16_t i) const { return xposArr[i]; }
@@ -145,7 +160,18 @@ class TextBlock final : public Block {
   const std::vector<std::string>& getRubyTexts() const { return rubyTexts; }
   std::vector<LinkSpan> takeLinkSpans() { return std::move(linkSpans); }
 
-  void render(const GfxRenderer& renderer, int fontId, int x, int y) const;
+  static constexpr uint8_t WORD_FLAG_BACKGROUND_BLACK = 1;
+  static constexpr uint8_t WORD_FLAG_INSERTED_HYPHEN = 2;
+  static constexpr uint8_t WORD_FLAG_LINK_ID_SHIFT = 2;
+  static constexpr uint8_t WORD_FLAG_LINK_ID_MASK = 0xfc;
+  void setWordPresentation(uint16_t i, uint16_t dot, uint8_t flag, bool space);
+  uint16_t guideDotXOffset(uint16_t i) const { return guideDots[i]; }
+  uint16_t focusRunOffset(uint16_t i) const { return focusPresent ? focusSplitXArr[i] : 0; }
+  uint8_t wordFlags(uint16_t i) const { return flags[i]; }
+  uint8_t wordLinkId(uint16_t i) const { return flags[i] >> WORD_FLAG_LINK_ID_SHIFT; }
+  bool wordHasSpaceBefore(uint16_t i) const { return spaces[i] != 0; }
+  bool wordEndsWithInsertedHyphen(uint16_t i) const { return wordHasDiscretionaryHyphen(i); }
+  void render(const GfxRenderer& renderer, int fontId, int x, int y, bool foregroundBlack = true) const;
   BlockType getType() override { return TEXT_BLOCK; }
   bool serialize(HalFile& file) const;
   static std::unique_ptr<TextBlock> deserialize(HalFile& file);

@@ -1,0 +1,202 @@
+{
+  "baseline": "2a477dea03a6db5ed4b5ccd33772c04cf19f8767",
+  "source_vs_live": {
+    "baseline_main": "2a477dea03a6db5ed4b5ccd33772c04cf19f8767",
+    "baseline_apps": 37,
+    "live_owner_store_apps": 41,
+    "live_only_ids": [
+      "flashcards",
+      "habits",
+      "pomodoro",
+      "weather"
+    ],
+    "source_only_ids": [],
+    "live_store_url": "https://raw.githubusercontent.com/tobiasweissert/CrossSmudge/integration/sticky-test-all/apps/catalog.json",
+    "note": "Do not overwrite live41 catalog with source37; defaultAppStoreURL still loads all41 independently of source tree."
+  },
+  "catalog_policy": "Local source37 is not live41. Keep live root; no catalog publication. Stopwatch 1.0.1 is local candidate only until separately authorized app publication. All other source versions and IDs retained.",
+  "allowed_app_delta": {
+    "stopwatch": [
+      "main.lua landscape-fit repair; save schema unchanged",
+      "manifest and catalog patch 1.0.0 -> 1.0.1"
+    ],
+    "dailyoffice": "catalog closure adds existing lessons/2026-09-30.txt"
+  },
+  "source_delta": {
+    "path": "audit/source-delta.json",
+    "sha256": "729cdb587b92eb012b0586108c69dedb3b23618e75ec4adb46c9d1247867ad96"
+  },
+  "source_carry": {
+    "path": "audit/source-carry.json",
+    "sha256": "c4aeb85f43799d41404b7d47d0656bd89c18ed61603165f7563123811d5d54fc"
+  },
+  "critical_byte_identical_seams": [
+    {
+      "path": "src/activities/apps/AppStoreActivity.h",
+      "sha256": "955209459d11dcb1ebdd597553efb434a2b8b7105233b3f56e7146f5f7c9eb13",
+      "baseline_sha256": "955209459d11dcb1ebdd597553efb434a2b8b7105233b3f56e7146f5f7c9eb13",
+      "baseline_bytes_identical": true
+    },
+    {
+      "path": "src/activities/apps/lua/AppPackage.h",
+      "sha256": "03959df1f557f0697fede67e21a1aabe902b9f212d8c130011129650e97d4e82",
+      "baseline_sha256": "03959df1f557f0697fede67e21a1aabe902b9f212d8c130011129650e97d4e82",
+      "baseline_bytes_identical": true
+    },
+    {
+      "path": "src/CrossPointState.cpp",
+      "sha256": "ab1316298ec506518fa6278f88f868253ab028dc1b2a9f3efe3933dd686f968c",
+      "baseline_sha256": "ab1316298ec506518fa6278f88f868253ab028dc1b2a9f3efe3933dd686f968c",
+      "baseline_bytes_identical": true
+    },
+    {
+      "path": "src/activities/ActivityManager.cpp",
+      "sha256": "067c93850bf80d7082cd5ac23dce2b267da3853ac21f4e7ae5faa6b704a819e4",
+      "baseline_sha256": "067c93850bf80d7082cd5ac23dce2b267da3853ac21f4e7ae5faa6b704a819e4",
+      "baseline_bytes_identical": true
+    },
+    {
+      "path": "src/activities/apps/lua/LuaTouchDispatch.h",
+      "sha256": "c1300367ff8b60260f540382cd307f40fd511e9503f588dc8b4a52f033eddd2f",
+      "baseline_sha256": "c1300367ff8b60260f540382cd307f40fd511e9503f588dc8b4a52f033eddd2f",
+      "baseline_bytes_identical": true
+    },
+    {
+      "path": "lib/hal/HalAirDropRadio.cpp",
+      "sha256": "98ea9b41e18f142c0e1c62d9b690e0690df20ea60fd63aabb9113bc0f4b7bb72",
+      "baseline_sha256": "98ea9b41e18f142c0e1c62d9b690e0690df20ea60fd63aabb9113bc0f4b7bb72",
+      "baseline_bytes_identical": true
+    },
+    {
+      "path": "lib/hal/HalBrowserBackend.cpp",
+      "sha256": "6f9997c78c2c8bb9ca7284fe21972e65cf11a9ee3b94966d7f692f7cae2469b5",
+      "baseline_sha256": "6f9997c78c2c8bb9ca7284fe21972e65cf11a9ee3b94966d7f692f7cae2469b5",
+      "baseline_bytes_identical": true
+    },
+    {
+      "path": "lib/hal/HalLuaHttp.cpp",
+      "sha256": "4d570e406dd757be86b8a8265501498cd0df76582d0b3868b48d51490ab60015",
+      "baseline_sha256": "4d570e406dd757be86b8a8265501498cd0df76582d0b3868b48d51490ab60015",
+      "baseline_bytes_identical": true
+    },
+    {
+      "path": "lib/LuaHttp/HttpCore.cpp",
+      "sha256": "1599979234c1ece8c51244f53704fc99258a24547ff2253215c653464f1e984c",
+      "baseline_sha256": "1599979234c1ece8c51244f53704fc99258a24547ff2253215c653464f1e984c",
+      "baseline_bytes_identical": true
+    }
+  ],
+  "architectural_preservation_seams": [
+    {
+      "id": "board-capability-not-product-name",
+      "preservation_requirement": "Remove owned non-Sticky profiles and branches by evaluating current Sticky conditions. Retain or consistently alias all app/SDK macros; preserve Sticky S3R8, pins, DIO, PSRAM, partition and board tag. USB MSC is explicitly 0 on Sticky; do not enable it just because SDK supports it.",
+      "qualification": "source-delta/carry inventory plus named host suites in ui-coverage.json; architectural minimum coverage is not claimed completely measured"
+    },
+    {
+      "id": "runtime-api-identity-and-loader",
+      "preservation_requirement": "Keep smudge and ink globals, API7 and sticky hardware token; optional new alias is additive. Remove non-Sticky branches without changing active enhanced/sticky modules, save IDs or memory policy. Explicitly exercise simulator visual routes with production Sticky identity injection rather than assuming simulator means Sticky.",
+      "qualification": "source-delta/carry inventory plus named host suites in ui-coverage.json; architectural minimum coverage is not claimed completely measured"
+    },
+    {
+      "id": "persistent-namespaces-are-not-branding",
+      "preservation_requirement": "Prefer keeping all existing paths and namespaces. If an added Crosscub path is necessary, explicit import/precedence and atomic migration with fallback; never reset/format. Preserve app IDs including cp-* and serialized enum/storage ordering.",
+      "qualification": "source-delta/carry inventory plus named host suites in ui-coverage.json; architectural minimum coverage is not claimed completely measured"
+    },
+    {
+      "id": "original-logo-polarity-and-rotation",
+      "preservation_requirement": "Integrate parent-authored asset at current default-logo call sites only; decode bytes under actual renderer semantics and check both logical orientations. Do not globally alter shared image/font blitting to correct one logo.",
+      "qualification": "source-delta/carry inventory plus named host suites in ui-coverage.json; architectural minimum coverage is not claimed completely measured"
+    },
+    {
+      "id": "custom-boot-sleep-precedence",
+      "preservation_requirement": "Replace fallback logo/name only. Preserve customBootscreenEnabled, favoriteBootImagePath, boot folder index/history, corrupt BMP fallback, all sleep modes and /sleep.bmp.",
+      "qualification": "source-delta/carry inventory plus named host suites in ui-coverage.json; architectural minimum coverage is not claimed completely measured"
+    },
+    {
+      "id": "airdrop-no-reboot-radio-consent",
+      "preservation_requirement": "Preserve AirDrop activity/receiver/coordinator/AWDL/TLS/framing/publication recovery, capability gate and receiver stop/reclaim sequencing. Change only advertised product text. Do not generalize AirDrop no-reboot contract into unrelated transfer redesign.",
+      "qualification": "source-delta/carry inventory plus named host suites in ui-coverage.json; architectural minimum coverage is not claimed completely measured"
+    },
+    {
+      "id": "backend-feature-not-version-only",
+      "preservation_requirement": "Preserve browser_backend_public_v1 and browser_backend_v1 aliases, browser_v5/v6, fixed origin sticky.tobiasweissert.ch, browser-only capability admission and public credential-free shims. BackendAccess read/import fields are retired, random is live.",
+      "qualification": "source-delta/carry inventory plus named host suites in ui-coverage.json; architectural minimum coverage is not claimed completely measured"
+    },
+    {
+      "id": "transport-security-is-independent",
+      "preservation_requirement": "Keep Lua transport, public backend restrictions and TLS allocation/radio ownership policy unchanged. Treat existing insecure legacy download lanes separately; no wholesale network refactor in cleanup.",
+      "qualification": "source-delta/carry inventory plus named host suites in ui-coverage.json; architectural minimum coverage is not claimed completely measured"
+    },
+    {
+      "id": "default-store-must-change-as-unit",
+      "preservation_requirement": "Make standard Sticky select owner-approved root and consistent branch/catalog. Preserve all 37 IDs and actual runtime closure/assets/licenses. Retire only demonstrably inactive non-Sticky members, updating package file lists. Do not silently remove cp-trivia because historical owner overlay omitted it.",
+      "qualification": "source-delta/carry inventory plus named host suites in ui-coverage.json; architectural minimum coverage is not claimed completely measured"
+    },
+    {
+      "id": "ota-product-and-board-are-different",
+      "preservation_requirement": "Owner-controlled explicit Crosscub feed/metadata plus product-safe validation; unpublished feed must show unavailable honestly. Preserve manual SD updater and staging/hash/chip/board/partition safety. Do not pretend branch creation publishes an own-product release.",
+      "qualification": "source-delta/carry inventory plus named host suites in ui-coverage.json; architectural minimum coverage is not claimed completely measured"
+    },
+    {
+      "id": "shared-geometry-repaint-and-touch",
+      "preservation_requirement": "Keep UI themes/fonts/navigation. Prefer existing configureUiList/listNav/shared layout over per-screen constants; patch only demonstrated clipping/hit failures. Keep UiAppHost ready-after-render and raw-release/swipe cancellation.",
+      "qualification": "source-delta/carry inventory plus named host suites in ui-coverage.json; architectural minimum coverage is not claimed completely measured"
+    },
+    {
+      "id": "keep-all-theme-and-reader-subroutes",
+      "preservation_requirement": "Retain all themes and routes; keep cache version/key/polarity invalidation, classic menu-space clamp, drawer dynamic row sizing and dual-slider landscape sheet. Do not flatten menus or substitute redesigned controls.",
+      "qualification": "source-delta/carry inventory plus named host suites in ui-coverage.json; architectural minimum coverage is not claimed completely measured"
+    },
+    {
+      "id": "stale-test-freezes-not-proof-of-regression",
+      "preservation_requirement": "Reconcile existing suites against immutable current catalog and active Sticky entrypoints, retain production preservation cases, retire obsolete board-only assertions explicitly. Do not spend bounded cleanup fixing unrelated historical oracle assumptions.",
+      "qualification": "source-delta/carry inventory plus named host suites in ui-coverage.json; architectural minimum coverage is not claimed completely measured"
+    }
+  ],
+  "approved_bear": {
+    "path": "src/images/CrosscubBear120.h",
+    "sha256": "dc812cfb672ae9bda1de2bc3edb211caf07f1028c27e58f308731d60a8666ad2",
+    "dimensions": [
+      120,
+      120
+    ],
+    "packed_bytes": 1800,
+    "polarity": "MSB-first 1 white 0 black",
+    "source": "owner-selected original generated PNG, no SVG claimed"
+  },
+  "changes_in_this_finalization": [
+    "Default store corrected from candidate source37 URL back to approved live41 root after executable RED",
+    "Stopwatch manifest/local catalog patch bump after executable RED",
+    "Hacker News historical manifest pin aligned to exact selected foundation; unchanged runtime and pixel pins retained",
+    "Owned stale other-board explanatory comments cleaned; legal/serialized/SDK/negative guards preserved"
+  ],
+  "not_claimed": [
+    "firmware compilation",
+    "independent source approval",
+    "physical acceptance",
+    "live-only apps individually executed from unavailable source",
+    "live store/release/backend publication"
+  ],
+  "repair_round1": {
+    "findings": [
+      "CC-RUNTIME-OTA-001",
+      "CC-RUNTIME-BOARD-001",
+      "UI-DOC-001",
+      "UI-DOC-002",
+      "UI-SUG-001",
+      "CC-BUILD-001"
+    ],
+    "evidence_carry": {
+      "path": "repair-round1/evidence-carry.json",
+      "sha256": "08fd9436167c5c4671585560c2ac63900ea3c780f4401bb6bf3349050a6c9436"
+    },
+    "current_affected_tests": {
+      "path": "repair-round1/results.json",
+      "sha256": "46b3439fa0c5f970a497001bcda57e637bfecb25cbf1b11a43e33284c78dc89e"
+    },
+    "current_source_freeze": "repair-round1/source-freeze.json (authoritative exact source; legacy source_delta/source_carry/host_results receipts above are pre-repair)",
+    "historical_scope": "Original full host routine 16/16 and raster242/stock16 remain pre-repair evidence ONLY for listed byte-identical UI/app inputs. No full raster replay or fresh full-routine claim.",
+    "pending": "Parent independent re-review and NEW real target build; prior actual target build FAILED exit1. No physical/publication qualification.",
+    "production_contract": "Stable OTA descriptor CROSSCUB_APP_VERSION equals numeric release suffix V in crosscub-vV (1-4 components, <=9 digits/component, NUL within 32 bytes); actual embedded V must compare newer before erase. Manual SD recovery unchanged. All 15 other supported SDK flags rejected at both app and board-tag boundaries; seven valid profiles/aliases compile."
+  }
+}

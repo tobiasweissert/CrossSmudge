@@ -11,6 +11,7 @@ class TtfEpdFont;
 
 class FontCacheManager {
  public:
+  enum class PreparationPolicy : uint8_t { Normal, DictionaryLean };
   FontCacheManager(const std::map<int, EpdFontFamily>& fontMap, const std::map<int, SdCardFont*>& sdCardFonts,
                    const std::map<int, TtfEpdFont*>& ttfFonts);
 
@@ -34,6 +35,7 @@ class FontCacheManager {
   // Recommended lookahead depth for idle prewarming. TTF fonts on PSRAM
   // accumulate glyphs across multiple pages; single-page SD fonts use 1.
   int getIdleLookaheadPages(int fontId) const;
+  bool prewarmCache(int id, const char* text, uint8_t mask, PreparationPolicy policy, bool accumulate = true);
   void resetStats();
 
   // Scan-mode API: called by GfxRenderer::drawText() during scan pass
@@ -47,6 +49,7 @@ class FontCacheManager {
   class PrewarmScope {
    public:
     explicit PrewarmScope(FontCacheManager& manager, bool accumulate = false);
+    explicit PrewarmScope(FontCacheManager& manager, PreparationPolicy policy);
     ~PrewarmScope();
     bool endScanAndPrewarm();
     PrewarmScope(PrewarmScope&& other) noexcept;
@@ -58,8 +61,10 @@ class FontCacheManager {
     FontCacheManager* manager_;
     bool active_ = true;
     bool accumulate_ = false;
+    PreparationPolicy policy_ = PreparationPolicy::Normal;
   };
   PrewarmScope createPrewarmScope(bool accumulate = false);
+  PrewarmScope createPrewarmScope(PreparationPolicy policy);
 
  private:
   ReleaseCallback releaseCb_ = nullptr;

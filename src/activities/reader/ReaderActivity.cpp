@@ -15,14 +15,17 @@
 #include "CrossPointState.h"
 #include "EpubReaderActivity.h"
 #include "ReaderUtils.h"
+#include "HapticFeedback.h"
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
 #include "XtcReaderActivity.h"
+#include "TxtReaderActivity.h"
 #include "util/PluginEvents.h"
 
 ReaderActivity::ReaderActivity(const char* name, GfxRenderer& renderer, MappedInputManager& mappedInput,
                                std::string bookPath, const bool allowFastInitialRefresh)
-    : Activity(name, renderer, mappedInput), bookPath(std::move(bookPath)) {
+    : Activity(name, renderer, mappedInput), bookPath(std::move(bookPath)),
+      recentUpdateOnRender(!allowFastInitialRefresh) {
   if (allowFastInitialRefresh) {
     const int refreshFrequency = SETTINGS.getRefreshFrequency();
     pagesUntilFullRefresh = refreshFrequency > 1 ? refreshFrequency : 2;
@@ -35,6 +38,9 @@ std::unique_ptr<ReaderActivity> ReaderActivity::create(GfxRenderer& renderer, Ma
   std::unique_ptr<ReaderActivity> activity;
   if (FsHelpers::hasXtcExtension(path)) {
     activity = makeUniqueNoThrow<XtcReaderActivity>(renderer, mappedInput, std::move(path), allowFastInitialRefresh);
+  } else if (FsHelpers::hasTxtExtension(path)) {
+    // Legacy TXT offsets are durable. Never reinterpret progress.bin as EPUB spines.
+    activity = makeUniqueNoThrow<TxtReaderActivity>(renderer, mappedInput, std::move(path), allowFastInitialRefresh);
   } else {
     activity = makeUniqueNoThrow<EpubReaderActivity>(renderer, mappedInput, std::move(path), allowFastInitialRefresh);
   }
@@ -50,8 +56,9 @@ void ReaderActivity::applyInitialOrientation() { ReaderUtils::applyOrientation(r
 void ReaderActivity::disableFastInitialRefresh() { pagesUntilFullRefresh = 0; }
 
 void ReaderActivity::notePageTurn(const bool forward, const bool succeeded) {
-  RenderLock lock(*this);
-  readerSession.noteTurn(forward, succeeded);
+  // Main-task turns may run inside the owner's RenderLock. Publish scalar intent;
+  // only the render task touches ReaderSession until exit/sleep has quiesced it.
+  pendingSessionTurn.store(forward && succeeded ? 1 : -1, std::memory_order_release);
 }
 
 void ReaderActivity::onEnter() {
@@ -89,7 +96,11 @@ void ReaderActivity::rememberBookOnceRendered() {
   bookRemembered = true;
   APP_STATE.openEpubPath = bookPath;
   APP_STATE.saveToFile();
-  RECENT_BOOKS.addBook(bookPath, getBookTitle(), getBookAuthor(), getBookThumbBmpPath());
+  if (recentUpdateOnRender) {
+    const auto thumb = getBookThumbBmpPath();
+    RECENT_BOOKS.addOrUpdateBook(bookPath, getBookTitle(), getBookAuthor(), thumb,
+        thumb.empty() ? RecentBook::CoverState::Missing : RecentBook::CoverState::Unknown);
+  }
   const pluginevents::Var openVars[] = {{"book", bookPath.c_str()}};
   pluginevents::emit(pluginevents::Event::ReaderOpen, openVars, 1);
 }
@@ -163,8 +174,11 @@ void ReaderActivity::flushReaderSession() {
 }
 
 bool ReaderActivity::handleBackNavigation() {
-  return ReaderUtils::handleBackNavigation(mappedInput, activityManager, bookPath.c_str(),
-                                           {this, [](void* ctx) { static_cast<ReaderActivity*>(ctx)->onGoHome(); }});
+  if (!mappedInput.wasReleased(MappedInputManager::Button::Back)) return false;
+  if ((mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) != SETTINGS.backShortToFileBrowser)
+    activityManager.goToFileBrowser(bookPath);
+  else onGoHome();
+  return true;
 }
 
 void ReaderActivity::clearEndOfBookOptionsIfNeeded() {
@@ -229,7 +243,7 @@ void ReaderActivity::loop() {
   if (handleBackNavigation()) return;
 
   const auto touch = ReaderUtils::detectTouchPageTurn(renderer, mappedInput);
-  auto [prevTriggered, nextTriggered, fromTilt] = ReaderUtils::detectPageTurn(mappedInput);
+  auto [prevTriggered, nextTriggered, fromSideBtn, fromTilt] = ReaderUtils::detectPageTurn(mappedInput);
   prevTriggered = prevTriggered || touch.prev;
   nextTriggered = nextTriggered || touch.next;
   if (!prevTriggered && !nextTriggered) return;
@@ -239,6 +253,7 @@ void ReaderActivity::loop() {
   const bool skip =
       !fromTilt && SETTINGS.longPressButtonBehavior == SETTINGS.CHAPTER_SKIP && heldMs >= ReaderUtils::SKIP_HOLD_MS;
 
+  (void)fromSideBtn;
   const bool changed = skip ? skipPages(prevTriggered ? -10 : 10) : pageTurn(!prevTriggered);
   // A skip is navigation, not reading: it never counts toward session dwell.
   notePageTurn(!skip && !prevTriggered, changed);
@@ -246,37 +261,28 @@ void ReaderActivity::loop() {
   requestUpdate();
 }
 
-void ReaderActivity::render(RenderLock&&) {
-  if (isAtEndOfBook()) {
-    if (!endOfBookOptions) {
-      endOfBookOptions = makeUniqueNoThrow<EndOfBookOptions>(renderer);
-      if (!endOfBookOptions) LOG_ERR("READER", "OOM: EndOfBookOptions");
-    }
-    renderer.clearScreen();
-    if (endOfBookOptions) {
-      endOfBookOptions->loadOnce(bookPath);
-      // Release-publish AFTER loadOnce() so the main task's acquire load can't
-      // observe an object whose names/selector are still being populated.
-      endOfBookOptionsReady.store(true, std::memory_order_release);
-      endOfBookOptions->render(renderer, mappedInput);
-    }
-    renderer.displayBuffer();
-    onEndOfBookRendered();
-    markPageRendered();
-    readerSession.onRenderComplete(millis(), trustedtime::trustedNow(), getProgressBasisPoints());
-    return;
-  }
-
-  renderBook();
+void ReaderActivity::noteRenderedPage() {
+  const auto turn = pendingSessionTurn.exchange(0, std::memory_order_acq_rel);
+  if (turn != 0) readerSession.noteTurn(turn > 0, turn > 0);
+  markPageRendered();
   readerSession.onRenderComplete(millis(), trustedtime::trustedNow(), getProgressBasisPoints());
 }
 
 bool ReaderActivity::handleForcedRefresh() {
-  {
-    RenderLock lock(*this);
-    pagesUntilFullRefresh = 1;
-    forcedRefreshPending = true;
-  }
+  { RenderLock lock(*this); if (!prepareManualRefresh()) return false; }
   requestUpdate();
   return true;
+}
+
+bool ReaderActivity::routeIndependentSideShortcuts() {
+  if (inputOverPage()) return false;
+  return ReaderUtils::routeSideShortcuts(mappedInput, sideShortcutState,
+                                         [this](const uint8_t action) { return handleSideShortcut(action); });
+}
+bool ReaderActivity::handleSideShortcut(const uint8_t action) {
+  if (action == CrossPointSettings::LIBRARY) { activityManager.goToLibrary(); return true; }
+  if (action == CrossPointSettings::PWR_READER_MENU) return remoteShortcut(true);
+  if (action == CrossPointSettings::SIDE_PREVIOUS_CHAPTER) return skipPages(-10);
+  if (action == CrossPointSettings::SIDE_NEXT_CHAPTER) return skipPages(10);
+  return handleShortcutAction(action);
 }

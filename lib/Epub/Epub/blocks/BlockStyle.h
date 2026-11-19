@@ -33,6 +33,10 @@ struct BlockStyle {
   bool textAlignDefined = false;   // true if text-align was explicitly set in CSS
   bool isRtl = false;              // true if resolved direction is RTL
   bool directionDefined = false;   // true if direction was explicitly set in CSS/HTML
+  // Set when this block was created by a <br> element. Used by startNewTextBlock to inject
+  // a full line-height gap when the <br> block stays empty (section-break use case).
+  // NOT propagated through getCombinedBlockStyle so it can't leak into sibling blocks.
+  bool fromBrElement = false;
 
   // Computed CSS font size relative to the reader's body size. Layout-time only.
   float fontScale = 1.0f;
@@ -108,8 +112,10 @@ struct BlockStyle {
       // A container's break lands on its first child when they share the empty block.
       result.pageBreakBefore = child.pageBreakBefore || pageBreakBefore;
     }
+    // fromBrElement is consumed by startNewTextBlock and should not leak through ancestor style merging.
+    result.fromBrElement = false;
 
-    // Direction is not axis-specific. Inherit from parent when child doesn't define it.
+    // Direction is inherited independently of the horizontal/vertical box model.
     if (!child.directionDefined && directionDefined) {
       result.isRtl = isRtl;
       result.directionDefined = true;
@@ -158,8 +164,14 @@ struct BlockStyle {
     blockStyle.pageBreakAfter = cssStyle.hasPageBreakAfter() && cssStyle.pageBreakAfter;
     // RTL direction from CSS/HTML
     if (cssStyle.hasDirection()) {
-      blockStyle.isRtl = (cssStyle.direction == CssTextDirection::Rtl);
+      blockStyle.isRtl = cssStyle.direction == CssTextDirection::Rtl;
       blockStyle.directionDefined = true;
+    }
+    if (cssStyle.hasPageBreakBefore()) {
+      blockStyle.pageBreakBefore = cssStyle.pageBreakBefore;
+    }
+    if (cssStyle.hasPageBreakAfter()) {
+      blockStyle.pageBreakAfter = cssStyle.pageBreakAfter;
     }
     return blockStyle;
   }

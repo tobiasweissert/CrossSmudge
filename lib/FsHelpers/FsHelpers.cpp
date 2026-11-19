@@ -5,11 +5,123 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <HalStorage.h>
+#include <Logging.h>
+
+#include <algorithm>
+#include <cctype>
+#include <cstdio>
 #include <cstring>
 #include <string_view>
 #include <vector>
 
 namespace FsHelpers {
+
+bool directoryIterationFailed(const HalFile& directory) {
+#ifdef SIMULATOR
+  // The host filesystem adapter cannot surface an SdFat read error.
+  return directory.allocationFailed();
+#else
+  return directory.allocationFailed() || directory.iterationFailed();
+#endif
+}
+
+bool directoryCanBeEnumerated(const char* path) {
+  HalFile directory = Storage.open(path);
+  if (!directory || !directory.isDirectory()) {
+    directory.close();
+    return false;
+  }
+
+  for (HalFile entry = directory.openNextFile(); entry; entry = directory.openNextFile()) {
+    entry.close();
+    yield();
+  }
+
+  const bool complete = !directoryIterationFailed(directory);
+  if (!complete) {
+    LOG_ERR("FS", "Directory listing failed before EOF: %s", path);
+  }
+  directory.close();
+  return complete;
+}
+
+DirectoryEntryVisibility directoryEntryVisibility(const char* directoryPath, const char* entryPath) {
+  if (!directoryPath || !entryPath || entryPath[0] == '\0') return DirectoryEntryVisibility::Missing;
+
+  HalFile expectedEntry = Storage.open(entryPath);
+  if (!expectedEntry) {
+    return expectedEntry.allocationFailed() ? DirectoryEntryVisibility::IterationFailed
+                                            : DirectoryEntryVisibility::Missing;
+  }
+
+  char expectedName[256] = {};  // FAT long filenames are at most 255 bytes.
+  expectedEntry.getName(expectedName, sizeof(expectedName));
+  expectedEntry.close();
+  if (expectedName[0] == '\0') return DirectoryEntryVisibility::IterationFailed;
+
+  HalFile directory = Storage.open(directoryPath);
+  if (!directory || !directory.isDirectory()) {
+    directory.close();
+    return DirectoryEntryVisibility::IterationFailed;
+  }
+
+  char name[256];  // FAT long filenames are at most 255 bytes.
+  for (HalFile entry = directory.openNextFile(); entry; entry = directory.openNextFile()) {
+    entry.getName(name, sizeof(name));
+    entry.close();
+    if (strcmp(name, expectedName) == 0) {
+      directory.close();
+      return DirectoryEntryVisibility::Visible;
+    }
+    yield();
+  }
+
+  if (directoryIterationFailed(directory)) {
+    LOG_ERR("FS", "Directory listing failed before finding %s in %s", expectedName, directoryPath);
+    directory.close();
+    return DirectoryEntryVisibility::IterationFailed;
+  }
+  directory.close();
+  return DirectoryEntryVisibility::Missing;
+}
+
+bool resolveRootDirectoryIgnoreCase(const char* expectedPath, char* resolvedPath, const size_t resolvedPathSize) {
+  if (!expectedPath || expectedPath[0] != '/' || expectedPath[1] == '\0' || strchr(expectedPath + 1, '/') ||
+      !resolvedPath || resolvedPathSize == 0) {
+    return false;
+  }
+
+  HalFile exact = Storage.open(expectedPath);
+  if (exact && exact.isDirectory()) {
+    const int written = snprintf(resolvedPath, resolvedPathSize, "%s", expectedPath);
+    exact.close();
+    return written > 0 && static_cast<size_t>(written) < resolvedPathSize;
+  }
+  exact.close();
+
+  HalFile root = Storage.open("/");
+  if (!root || !root.isDirectory()) {
+    root.close();
+    return false;
+  }
+
+  char name[256];  // FAT long filenames are at most 255 bytes.
+  const char* expectedName = expectedPath + 1;
+  for (HalFile entry = root.openNextFile(); entry; entry = root.openNextFile()) {
+    const bool isDirectory = entry.isDirectory();
+    entry.getName(name, sizeof(name));
+    entry.close();
+    if (!isDirectory || strcasecmp(name, expectedName) != 0) continue;
+
+    const int written = snprintf(resolvedPath, resolvedPathSize, "/%s", name);
+    root.close();
+    return written > 0 && static_cast<size_t>(written) < resolvedPathSize;
+  }
+
+  root.close();
+  return false;
+}
 
 namespace {
 bool isHexDigit(const char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'); }
@@ -83,57 +195,13 @@ std::string normalisePath(const std::string& path) {
 }
 
 bool naturalLess(const std::string& str1, const std::string& str2) {
-  // Naive natural sort: numeric-aware, case-insensitive
-  const char* s1 = str1.c_str();
-  const char* s2 = str2.c_str();
-
-  // ctype functions require unsigned char values: passing a negative char (UTF-8
-  // bytes above 0x7f with signed char) is undefined behavior
-  const auto isDigit = [](const char c) { return isdigit(static_cast<unsigned char>(c)) != 0; };
-
-  // Iterate while both strings have characters
-  while (*s1 && *s2) {
-    // Check if both are at the start of a number
-    if (isDigit(*s1) && isDigit(*s2)) {
-      // Skip leading zeros and track them
-      while (*s1 == '0') s1++;
-      while (*s2 == '0') s2++;
-
-      // Count digits to compare lengths first
-      int len1 = 0, len2 = 0;
-      while (isDigit(s1[len1])) len1++;
-      while (isDigit(s2[len2])) len2++;
-
-      // Different length so return smaller integer value
-      if (len1 != len2) return len1 < len2;
-
-      // Same length so compare digit by digit
-      for (int i = 0; i < len1; i++) {
-        if (s1[i] != s2[i]) return s1[i] < s2[i];
-      }
-
-      // Numbers equal so advance pointers
-      s1 += len1;
-      s2 += len2;
-    } else {
-      // Regular case-insensitive character comparison
-      const int c1 = tolower(static_cast<unsigned char>(*s1));
-      const int c2 = tolower(static_cast<unsigned char>(*s2));
-      if (c1 != c2) return c1 < c2;
-      s1++;
-      s2++;
-    }
-  }
-
-  // One string is prefix of other
-  return *s1 == '\0' && *s2 != '\0';
+  return naturalCompare(str1.c_str(), str2.c_str()) < 0;
 }
 
 void sortFileList(std::vector<std::string>& strs) {
   std::sort(begin(strs), end(strs), [](const std::string& str1, const std::string& str2) {
-    // Directories first
-    bool isDir1 = str1.back() == '/';
-    bool isDir2 = str2.back() == '/';
+    const bool isDir1 = str1.back() == '/';
+    const bool isDir2 = str2.back() == '/';
     if (isDir1 != isDir2) return isDir1;
 
     return naturalLess(str1, str2);

@@ -6,12 +6,30 @@
 #include <LibraryBuilder.h>
 #include <Logging.h>
 
-#include "ClippingStore.h"
+#include "activities/home/BookActions.h"
+#include "util/BookMoveUtils.h"
 #include "ProtectedPaths.h"
 #include "util/BookCacheUtils.h"
 #include "util/TaskWatchdog.h"
 
 namespace {
+// Extend upstream credential families without weakening its FAT alias and
+// canonical-path checks. Prefix matching also protects temp/backup siblings.
+bool networkCredentialPath(const char* path) {
+  std::string mapped(path);
+  for (char& c : mapped) if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+  const auto mapFamily = [&](const char* from, const char* to) {
+    size_t at = 0;
+    while ((at = mapped.find(from, at)) != std::string::npos) {
+      mapped.replace(at, strlen(from), to);
+      at += strlen(to);
+    }
+  };
+  mapFamily("opds_tokens.json", "opds.json");
+  mapFamily("lcp_passphrases.json", "koreader.json");
+  return protectedpaths::isSensitivePath(mapped.c_str());
+}
+
 // RFC 1123 date format helper: "Sun, 06 Nov 1994 08:49:37 GMT"
 // ESP32 doesn't have real-time clock set by default, so we use a fixed epoch date
 // as a fallback. The date is not critical for WebDAV Class 1 operations.
@@ -67,20 +85,15 @@ void WebDAVHandler::raw(WebServer& server, const String& uri, HTTPRaw& raw) {
 
     if (_putFile) _putFile.close();
     _putExisted = Storage.exists(_putPath.c_str());
-
-    if (_putExisted) {
-      HalFile existing = Storage.open(_putPath.c_str());
-      if (existing && existing.isDirectory()) {
-        existing.close();
-        _putOk = false;
-        return;
-      }
-      if (existing) existing.close();
+    if (_putExisted || Storage.exists("/.crosspoint/book-move.pending") ||
+        Storage.exists("/.crosspoint/clippings/move.pending")) {
+      _putOk = false;
+      return;
     }
 
     // Write to a temp file to avoid destroying the original on failed upload
     String tempPath = _putPath + ".davtmp";
-    Storage.remove(tempPath.c_str());
+    if (Storage.exists(tempPath.c_str())) { _putOk = false; return; }
     _putOk = Storage.openFileForWrite("DAV", tempPath, _putFile);
     LOG_DBG("DAV", "PUT START: %s", _putPath.c_str());
 
@@ -95,17 +108,19 @@ void WebDAVHandler::raw(WebServer& server, const String& uri, HTTPRaw& raw) {
 
   } else if (raw.status == RAW_END) {
     // close() writes the final size: a failed close must not replace the original.
-    if (_putFile && !_putFile.close()) _putOk = false;
+    if (_putFile) {
+      if (!_putFile.sync()) _putOk = false;
+      if (!_putFile.close()) _putOk = false;
+    }
     if (_putOk) {
       String tempPath = _putPath + ".davtmp";
-      _putOk = Storage.replaceFile(tempPath.c_str(), _putPath.c_str());
+      _putOk = !Storage.exists(_putPath.c_str()) && Storage.rename(tempPath.c_str(), _putPath.c_str());
     }
     LOG_DBG("DAV", "PUT END: %u bytes, ok=%d", raw.totalSize, _putOk);
 
   } else if (raw.status == RAW_ABORTED) {
     if (_putFile) _putFile.close();
-    String tempPath = _putPath + ".davtmp";
-    Storage.remove(tempPath.c_str());
+    // Retain staging: a negative publication acknowledgement may have mutated FAT.
     _putOk = false;
   }
 }
@@ -396,9 +411,7 @@ void WebDAVHandler::handlePut(WebServer& s) {
   }
 
   if (!_putOk) {
-    String tempPath = path + ".davtmp";
-    // A failed replace may already have removed the original; the temp is then the only copy.
-    if (!_putExisted || Storage.exists(path.c_str())) Storage.remove(tempPath.c_str());
+    // Retain every candidate; existence cannot disambiguate a negative FAT ack.
     s.send(500, "text/plain", "Write failed - incomplete upload or disk full");
     return;
   }
@@ -437,6 +450,11 @@ void WebDAVHandler::handleDelete(WebServer& s) {
   }
 
   if (file.isDirectory()) {
+    if (Storage.exists("/.crosspoint/book-move.pending") || Storage.exists("/.crosspoint/clippings/move.pending")) {
+      file.close();
+      s.send(409, "text/plain", "Move recovery pending; retain directory");
+      return;
+    }
     // Check if directory is empty
     HalFile entry = file.openNextFile();
     if (entry) {
@@ -445,15 +463,22 @@ void WebDAVHandler::handleDelete(WebServer& s) {
       s.send(409, "text/plain", "Directory not empty");
       return;
     }
-    file.close();
+    if (!file.close()) {
+      s.send(409, "text/plain", "Directory close uncertain; retain candidates");
+      return;
+    }
     if (Storage.rmdir(path.c_str())) {
+      library::markLibraryIndexDirty();
       s.send(204);
     } else {
       s.send(500, "text/plain", "Failed to remove directory");
     }
   } else {
-    file.close();
-    if (removeBookFile(path.c_str())) {
+    if (!file.close()) {
+      s.send(409, "text/plain", "Source close uncertain; retain file and metadata");
+      return;
+    }
+    if (BookActions::deleteFile(path.c_str())) {
       s.send(204);
     } else {
       s.send(500, "text/plain", "Failed to delete file");
@@ -551,8 +576,10 @@ void WebDAVHandler::handleMove(WebServer& s) {
     return;
   }
 
-  if (dstExists && !removeBookFile(dstPath.c_str())) {
-    s.send(500, "text/plain", "Failed to remove destination");
+  // Overwrite is a request, not consent to destroy the existing destination.
+  // The encompassing owner transaction admits only collision-free moves.
+  if (dstExists) {
+    s.send(409, "text/plain", "Destination exists; move refuses overwrite");
     return;
   }
 
@@ -562,14 +589,27 @@ void WebDAVHandler::handleMove(WebServer& s) {
     return;
   }
 
-  clearBookCache(srcPath.c_str());
-  file.close();
-  const bool success = ClippingStore::moveBook(srcPath.c_str(), dstPath.c_str());
-
-  if (success) {
-    s.send(dstExists ? 204 : 201);
+  const bool isDir = file.isDirectory();
+  if (!file.close()) {
+    s.send(409, "text/plain", "Source close uncertain; retain candidates and do not retry");
+    return;
+  }
+  // moveFile is file-only: no complete recursive metadata transaction exists.
+  // Refuse collection moves instead of stranding descendant progress/references.
+  if (isDir) {
+    s.send(409, "text/plain", "Collection move requires recovery-aware metadata orchestration");
+    return;
+  }
+  const auto result = BookMoveUtils::moveFile(srcPath.c_str(), dstPath.c_str());
+  if (result == BookMoveUtils::RenameMigrationResult::Success) {
+    if (library::isLibraryBookFile(srcPath.c_str()) || library::isLibraryBookFile(dstPath.c_str()))
+      library::markLibraryIndexDirty();
+    s.send(201);
+  } else if (result == BookMoveUtils::RenameMigrationResult::Uncertain ||
+             result == BookMoveUtils::RenameMigrationResult::KeepRenamed) {
+    s.send(409, "text/plain", "Move uncertain; retain files/metadata and do not retry; recovery required");
   } else {
-    s.send(500, "text/plain", "Move failed");
+    s.send(409, "text/plain", "Move refused; source retained");
   }
 }
 
@@ -632,12 +672,16 @@ void WebDAVHandler::handleCopy(WebServer& s) {
     return;
   }
 
-  if (dstExists) {
-    Storage.remove(dstPath.c_str());
+  if (dstExists || Storage.exists("/.crosspoint/book-move.pending") ||
+      Storage.exists("/.crosspoint/clippings/move.pending")) {
+    srcFile.close();
+    s.send(409, "text/plain", "Copy refuses overwrite or pending recovery");
+    return;
   }
 
+  const String tempPath = dstPath + ".davcopytmp";
   HalFile dstFile;
-  if (!Storage.openFileForWrite("DAV", dstPath, dstFile)) {
+  if (Storage.exists(tempPath.c_str()) || !Storage.openFileForWrite("DAV", tempPath, dstFile)) {
     srcFile.close();
     s.send(500, "text/plain", "Failed to create destination");
     return;
@@ -646,13 +690,16 @@ void WebDAVHandler::handleCopy(WebServer& s) {
   // Streaming copy with 4KB buffer on stack
   uint8_t buf[4096];
   bool copyOk = true;
+  const size_t expectedBytes = srcFile.size();
+  size_t copiedBytes = 0;
   while (srcFile.available()) {
     resetTaskWatchdogIfSubscribed();
     int bytesRead = srcFile.read(buf, sizeof(buf));
     if (bytesRead <= 0) {
-      copyOk = bytesRead == 0;
+      copyOk = false;
       break;
     }
+    copiedBytes += static_cast<size_t>(bytesRead);
     size_t written = dstFile.write(buf, bytesRead);
     if (written != (size_t)bytesRead) {
       copyOk = false;
@@ -660,16 +707,19 @@ void WebDAVHandler::handleCopy(WebServer& s) {
     }
   }
 
-  srcFile.close();
-  dstFile.close();
+  if (copiedBytes != expectedBytes) copyOk = false;
+  if (!dstFile.sync()) copyOk = false;
+  if (!srcFile.close()) copyOk = false;
+  if (!dstFile.close()) copyOk = false;
+  if (copyOk) copyOk = !Storage.exists(dstPath.c_str()) && Storage.rename(tempPath.c_str(), dstPath.c_str());
 
   if (copyOk) {
     if (dstExists) clearBookCache(dstPath.c_str());  // the old book's cache does not match the new content
     if (library::isLibraryBookFile(dstPath.c_str())) library::markLibraryIndexDirty();
     s.send(dstExists ? 204 : 201);
   } else {
-    Storage.remove(dstPath.c_str());
-    s.send(500, "text/plain", "Copy failed - disk full?");
+    // No cleanup after uncertain rename/write: retain staging and destination.
+    s.send(409, "text/plain", "Copy incomplete or uncertain; retain candidates; recovery required");
   }
 }
 
@@ -784,7 +834,7 @@ void WebDAVHandler::urlEncodePath(const String& path, String& out) const {
 
 bool WebDAVHandler::isProtectedPath(const String& path) const {
   // Covers the credential stores' 8.3 aliases, which no segment check can map.
-  if (protectedpaths::isSensitivePath(path.c_str())) return true;
+  if (networkCredentialPath(path.c_str())) return true;
 
   // Check every segment of the path, not just the last one.
   // This prevents access to e.g. /.hidden/somefile or /System Volume Information/foo

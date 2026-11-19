@@ -13,7 +13,8 @@
 namespace protectedpaths {
 
 inline constexpr const char* SENSITIVE_FILES[] = {"/.crosspoint/wifi.json", "/.crosspoint/opds.json",
-                                                  "/.crosspoint/koreader.json"};
+                                                  "/.crosspoint/koreader.json",
+                                                  "/.crosspoint/opds_tokens.json", "/.crosspoint/lcp_passphrases.json"};
 
 // SdFat also opens a name by its generated 8.3 alias (".crosspoint" is
 // CROSSP~1), which no spelling check can map back to the long name.
@@ -27,6 +28,10 @@ inline bool isShortAlias(const char* first, const char* last) {
 }
 
 inline bool isSensitivePath(const char* path) {
+  if (!path) return true;
+  // Reject ambiguous alternate separators rather than relying on each caller's
+  // decoder or filesystem adapter to agree about their meaning.
+  if (strchr(path, '\\')) return true;
   // Canonicalise first ("//", "/./" and ".." would otherwise dodge the prefix
   // match while still opening the same file).
   std::string canon;

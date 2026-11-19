@@ -12,7 +12,10 @@ class SdCardFont {
   };
 
   void clearCache() {}
-  void releaseResidentCaches() {}
+  void releaseResidentCaches() { ++releaseResidentCachesCallCount; }
+  int releaseResidentCachesCallCount = 0;
+  void releaseForLowMemory(bool preserveAdvanceTable) { ++releaseForLowMemoryCallCount; lastPreserveAdvanceTable = preserveAdvanceTable; }
+  bool lastPrewarmFailed() const { return false; }
   int prewarm(const char* text, uint8_t styleMask, bool, bool, bool accumulate) {
     auto& call = prewarmCalls[prewarmCallCount++];
     std::snprintf(call.text, sizeof(call.text), "%s", text);
@@ -26,5 +29,7 @@ class SdCardFont {
 
   PrewarmCall prewarmCalls[4] = {};
   int prewarmCallCount = 0;
+  int releaseForLowMemoryCallCount = 0;
+  bool lastPreserveAdvanceTable = true;
   uint8_t resolvedStyles[4] = {0, 1, 2, 3};
 };

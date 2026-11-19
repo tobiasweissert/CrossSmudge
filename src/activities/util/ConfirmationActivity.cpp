@@ -2,51 +2,71 @@
 
 #include <I18n.h>
 
-#include "HalDisplay.h"
 #include "components/UITheme.h"
+#include "fontIds.h"
 
 ConfirmationActivity::ConfirmationActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
                                            const std::string& heading, const std::string& body,
-                                           const std::string& cancelLabel, const std::string& confirmLabel)
+                                           bool ignoreInitialConfirmRelease, bool overrideDisabledReaderTouchscreen)
     : Activity("Confirmation", renderer, mappedInput),
-      heading(heading),
-      body(body),
-      cancelLabel(cancelLabel),
-      confirmLabel(confirmLabel) {}
+      ignoreConfirmRelease(ignoreInitialConfirmRelease),
+      overrideDisabledReaderTouchscreen(overrideDisabledReaderTouchscreen) {
+  popupTitle.reserve(heading.size() + body.size() + 1);
+  popupTitle = heading;
+  if (!heading.empty() && !body.empty()) {
+    popupTitle += ' ';
+  }
+  popupTitle += body;
+}
+
+ConfirmationActivity::ConfirmationActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
+                                           const std::string& heading, const std::string& body,
+                                           const std::string& cancelText, const std::string& confirmText)
+    : ConfirmationActivity(renderer, mappedInput, heading, body, false, false) {
+  cancelLabel = cancelText;
+  confirmLabel = confirmText;
+}
 
 void ConfirmationActivity::onEnter() {
   Activity::onEnter();
+  if (overrideDisabledReaderTouchscreen) {
+    mappedInput.setReaderTouchscreenOverride(true);
+  }
 
-  // Both texts live inside the dialog: the heading as its caption and the
-  // subject (a book title) as the wrapping headline beneath it. No
-  // pre-truncation — the dialog wraps both to its own width.
-  const char* options[] = {
-      cancelLabel.empty() ? I18N.get(StrId::STR_CANCEL) : cancelLabel.c_str(),
-      confirmLabel.empty() ? I18N.get(StrId::STR_CONFIRM) : confirmLabel.c_str(),
-  };
-  confirmPopup.show(heading.c_str(), body.c_str(), options, 2, 0, [this](int idx) {
+  const char* options[] = {cancelLabel.empty() ? I18N.get(StrId::STR_CANCEL) : cancelLabel.c_str(),
+                           confirmLabel.empty() ? I18N.get(StrId::STR_CONFIRM) : confirmLabel.c_str()};
+  confirmPopup.show(popupTitle.c_str(), options, 2, 0, [this](int idx) {
     ActivityResult res;
     res.isCancelled = (idx != 1);
     setResult(std::move(res));
     finish();
   });
+  confirmPopup.setPrimaryOptionIndex(1);
 
   requestUpdate(true);
 }
 
-void ConfirmationActivity::render(RenderLock&& lock) {
-  renderer.clearScreen();
+void ConfirmationActivity::onExit() {
+  if (overrideDisabledReaderTouchscreen) {
+    mappedInput.setReaderTouchscreenOverride(false);
+  }
+  Activity::onExit();
+}
 
+void ConfirmationActivity::render(RenderLock&&) {
   if (confirmPopup.processRender(renderer, mappedInput)) return;
-
-  renderer.displayBuffer(HalDisplay::RefreshMode::FAST_REFRESH);
 }
 
 void ConfirmationActivity::loop() {
-  if (confirmPopup.handleInput(mappedInput, [this] {
-        if (confirmPopup.isActive()) requestUpdate();
-      }))
-    return;
+  if (ignoreConfirmRelease) {
+    const bool confirmReleased = mappedInput.wasReleased(MappedInputManager::Button::Confirm);
+    if (confirmReleased || !mappedInput.isPressed(MappedInputManager::Button::Confirm)) {
+      ignoreConfirmRelease = false;
+      return;
+    }
+  }
+
+  if (confirmPopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
 
   // Popup dismissed without a selection (Back button or tap outside): cancel.
   ActivityResult res;

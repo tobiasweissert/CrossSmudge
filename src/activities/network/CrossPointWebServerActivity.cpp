@@ -2,24 +2,27 @@
 
 #include <DNSServer.h>
 #include <ESPmDNS.h>
-#include <FontCacheManager.h>
 #include <GfxRenderer.h>
-#include <HalGPIO.h>
 #include <I18n.h>
+#include <Memory.h>
 #include <WiFi.h>
 
 #include <cstddef>
 
+#include "AppCapabilities.h"
 #include "MappedInputManager.h"
 #include "NetworkModeSelectionActivity.h"
+#include "SdCardFontSystem.h"
 #include "SilentRestart.h"
 #include "WifiSelectionActivity.h"
+#include "activities/ActivityManager.h"
 #include "activities/network/CalibreConnectActivity.h"
+#include "components/CompactHeader.h"
+#include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "util/PluginEvents.h"
 #include "util/QrUtils.h"
-#include "util/TaskWatchdog.h"
+#include "util/PluginEvents.h"
 
 namespace {
 // AP Mode configuration
@@ -65,42 +68,33 @@ int barsForRssi(int rssi, int currentBars) {
 
 void CrossPointWebServerActivity::onEnter() {
   Activity::onEnter();
+  // Build or refresh the compact on-disk font index before Wi-Fi starts. The
+  // C3 has substantially more contiguous heap here than while serving HTTP.
+  sdFontSystem.ensureRegistry();
+  sdFontSystem.releaseForNetwork(renderer);
 
   LOG_DBG("WEBACT", "Free heap at onEnter: %d bytes", ESP.getFreeHeap());
-
-  // Heap-critical transition: WiFi (~45KB) plus the web server have to fit in
-  // what's left of the ~380KB parts. SD-font caches retained for the CJK UI
-  // fallback (mini glyph/kern arenas, ligature tables) are rebuildable on
-  // demand — release them up front instead of aborting in startWebServer()
-  // when the heap comes up short (observed on X3 with a Korean SD font).
-  if (auto* fcm = renderer.getFontCacheManager()) {
-    fcm->releaseSdFontCaches();
-    LOG_DBG("WEBACT", "Free heap after SD font cache release: %d bytes", ESP.getFreeHeap());
-  }
 
   // Reset state
   state = WebServerActivityState::MODE_SELECTION;
   networkMode = NetworkMode::JOIN_NETWORK;
+  airDropHandoff = false;
   isApMode = false;
   connectedIP.clear();
   connectedSSID.clear();
   lastHandleClientTime = 0;
   requestUpdate();
 
-  if (startInJoinNetwork) {
-    // Came back from the heap-defrag reboot on a pristine heap: skip the mode
-    // picker and go straight into Join Network (onNetworkModeSelected won't
-    // reboot again while this flag is set).
-    onNetworkModeSelected(NetworkMode::JOIN_NETWORK);
+  if (hasInitialNetworkMode) {
+    onNetworkModeSelected(initialNetworkMode);
     return;
   }
 
   // Launch network mode selection subactivity
-  LOG_DBG("WEBACT", "Launching NetworkModeSelectionActivity...");
   startActivityForResult(std::make_unique<NetworkModeSelectionActivity>(renderer, mappedInput),
                          [this](const ActivityResult& result) {
                            if (result.isCancelled) {
-                             onGoHome();
+                             exitToOrigin();
                            } else {
                              onNetworkModeSelected(std::get<NetworkModeResult>(result.data).mode);
                            }
@@ -110,18 +104,49 @@ void CrossPointWebServerActivity::onEnter() {
 void CrossPointWebServerActivity::onExit() {
   Activity::onExit();
 
-  LOG_DBG("WEBACT", "Free heap at onExit start: %d bytes", ESP.getFreeHeap());
-
   state = WebServerActivityState::SHUTTING_DOWN;
+
+  // AirDrop owns a separate in-process radio session. This parent is replaced BEFORE
+  // the receiver starts, so its legacy reboot/disconnect policy must not run later
+  // beneath Browser or modify the native receiver's radio ownership.
+  if (airDropHandoff) {
+    stopDnsServer();
+    MDNS.end();
+    stopWebServer();
+    return;
+  }
+
+  // Reload newly installed plugin event subscriptions before any ordinary exit.
+  pluginevents::refreshSubscriptions();
+
+  // Every active WiFi exit already reboots to clear network heap
+  // fragmentation. Restart before graceful socket teardown: a stalled browser
+  // can otherwise keep WebSocketsServer::close() retrying writes for seconds.
+  // silentRestart() returns only when deep sleep is already in progress; that
+  // path still needs the explicit cleanup below.
+  if (WiFi.getMode() != WIFI_MODE_NULL) {
+    if (returnBookPath.empty()) {
+      silentRestart();
+    } else {
+      silentRestartToReader();
+    }
+  }
+
   stopDnsServer();
   MDNS.end();
 
-  // Web uploads may have installed or removed plugins. Non-touch devices
-  // reboot below (setup() re-reads everything), but touch devices end the
-  // session in place, so re-read event subscriptions here.
-  pluginevents::refreshSubscriptions();
+  // Stop local services before disconnecting/restarting WiFi.
+  stopWebServer();
+  MDNS.end();
+  if (dnsServer) {
+    dnsServer->stop();
+    delete dnsServer;
+    dnsServer = nullptr;
+  }
+  delay(50);
 
-  // Skip reboot if WiFi was never activated (e.g. user backed out of mode selection).
+  // On the deep-sleep path silentRestart() returns without rebooting, so shut
+  // WiFi down after local services have released their sockets.
   if (WiFi.getMode() != WIFI_MODE_NULL) {
     if (isApMode) {
       WiFi.softAPdisconnect(true);
@@ -129,20 +154,37 @@ void CrossPointWebServerActivity::onExit() {
       WiFi.disconnect(false);
     }
     delay(30);
-    silentRestart();
   }
 
   LOG_DBG("WEBACT", "Free heap at onExit end: %d bytes", ESP.getFreeHeap());
 }
 
+bool CrossPointWebServerActivity::handoffAirDrop(const NetworkMode mode) {
+  if (mode != NetworkMode::AIRDROP_RECEIVE) return false;
+  airDropHandoff = true;
+#if CROSSINK_APP_CAP_AIRDROP
+  if (!activityManager.goToAirDropReceive(returnBookPath)) {
+    LOG_ERR("WEBACT", "AirDrop activity allocation rejected");
+    activityManager.returnFromAirDrop(returnBookPath, false);
+  }
+#else
+  // A stale/internal result must never reinterpret an unsupported native mode as AP.
+  LOG_ERR("WEBACT", "AirDrop is not available on this device");
+  activityManager.returnFromAirDrop(returnBookPath, false);
+#endif
+  return true;
+}
+
 void CrossPointWebServerActivity::onNetworkModeSelected(const NetworkMode mode) {
-  // Join Network brings up WiFi + the web server + TLS relays, whose working set
-  // needs a large *contiguous* block. After reading/browsing the heap is
-  // fragmented enough that tight boards (X3) abort mid-activation. Reboot once
-  // into a pristine heap and land straight back here; the flag prevents a second
-  // reboot on that return. No-op on touch boards, which fall through.
-  if (mode == NetworkMode::JOIN_NETWORK && !startInJoinNetwork) {
-    silentRestartToJoinNetwork();  // does not return on non-touch boards
+  if (handoffAirDrop(mode)) return;
+  airDropHandoff = false;
+  if (mode == NetworkMode::OPDS_BROWSER) {
+    // Preserve in-process handoff: this parent must not later restart or tear
+    // down a child's radio session. OPDS owns its own saved-network entry.
+    airDropHandoff = true;
+    stopWebServer(); stopDnsServer(); MDNS.end();
+    activityManager.goToBrowser();
+    return;
   }
 
   const char* modeName = "Join Network";
@@ -150,60 +192,88 @@ void CrossPointWebServerActivity::onNetworkModeSelected(const NetworkMode mode) 
     modeName = "Connect to Calibre";
   } else if (mode == NetworkMode::CREATE_HOTSPOT) {
     modeName = "Create Hotspot";
-  } else if (mode == NetworkMode::OPDS_BROWSER) {
-    modeName = "OPDS Browser";
-#if FREEINK_CAP_USB_MSC
-  } else if (mode == NetworkMode::USB_DRIVE) {
-    modeName = "USB Drive";
-#endif
+  } else if (mode == NetworkMode::NEARBY_STATS_SYNC) {
+    modeName = "Sync Stats";
+  } else if (mode == NetworkMode::NEARBY_BOOK_RECEIVE) {
+    modeName = "Receive File";
   }
   LOG_DBG("WEBACT", "Network mode selected: %s", modeName);
 
-  // The OPDS browser joins Wi-Fi itself. Wi-Fi is still on if the user backed
-  // out of Join Network; turn it off so onExit does not restart to Home.
-  if (mode == NetworkMode::OPDS_BROWSER) {
-    if (WiFi.getMode() != WIFI_MODE_NULL) {
-      WiFi.disconnect(false);
-      WiFi.mode(WIFI_OFF);
-    }
-    activityManager.goToBrowser();
-    return;
-  }
-
-#if FREEINK_CAP_USB_MSC
   if (mode == NetworkMode::USB_DRIVE) {
     activityManager.goToUsbDrive();
     return;
   }
-#endif
 
   networkMode = mode;
   isApMode = (mode == NetworkMode::CREATE_HOTSPOT);
 
-  if (mode == NetworkMode::CONNECT_CALIBRE) {
-    startActivityForResult(
-        std::make_unique<CalibreConnectActivity>(renderer, mappedInput), [this](const ActivityResult& result) {
-          state = WebServerActivityState::MODE_SELECTION;
+  if (mode == NetworkMode::NEARBY_STATS_SYNC) {
+    activityManager.goToNearbyStatsSync();
+    return;
+  }
+  if (mode == NetworkMode::NEARBY_BOOK_RECEIVE) {
+    activityManager.goToNearbyBookReceive();
+    return;
+  }
 
-          startActivityForResult(std::make_unique<NetworkModeSelectionActivity>(renderer, mappedInput),
-                                 [this](const ActivityResult& result) {
-                                   if (result.isCancelled) {
-                                     onGoHome();
-                                   } else {
-                                     onNetworkModeSelected(std::get<NetworkModeResult>(result.data).mode);
-                                   }
-                                 });
-        });
+  if (!networkBootReady) {
+    switch (mode) {
+      case NetworkMode::JOIN_NETWORK:
+        activityManager.goToJoinNetworkFileTransfer(returnBookPath);
+        break;
+      case NetworkMode::CONNECT_CALIBRE:
+        activityManager.goToCalibreWireless(returnBookPath);
+        break;
+      case NetworkMode::CREATE_HOTSPOT:
+        activityManager.goToHotspotFileTransfer(returnBookPath);
+        break;
+      case NetworkMode::USB_DRIVE:
+        activityManager.goToUsbDrive();
+        break;
+      case NetworkMode::NEARBY_STATS_SYNC:
+      case NetworkMode::NEARBY_BOOK_RECEIVE:
+      case NetworkMode::AIRDROP_RECEIVE:
+      case NetworkMode::OPDS_BROWSER:
+        break;
+    }
+    return;
+  }
+
+  if (mode == NetworkMode::CONNECT_CALIBRE) {
+    // The child activity must survive this callback; allocate only its small control object on the heap.
+    auto calibreActivity = makeUniqueNoThrow<CalibreConnectActivity>(renderer, mappedInput, !returnBookPath.empty());
+    if (!calibreActivity) {
+      LOG_ERR("WEBACT", "OOM: Calibre activity (size=%u free=%u maxAlloc=%u)",
+              static_cast<unsigned>(sizeof(CalibreConnectActivity)), ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+      exitToOrigin();
+      return;
+    }
+
+    startActivityForResult(std::move(calibreActivity), [this](const ActivityResult& result) {
+      state = WebServerActivityState::MODE_SELECTION;
+
+      if (networkBootReady) {
+        exitToOrigin();
+        return;
+      }
+
+      startActivityForResult(std::make_unique<NetworkModeSelectionActivity>(renderer, mappedInput),
+                             [this](const ActivityResult& result) {
+                               if (result.isCancelled) {
+                                 exitToOrigin();
+                               } else {
+                                 onNetworkModeSelected(std::get<NetworkModeResult>(result.data).mode);
+                               }
+                             });
+    });
     return;
   }
 
   if (mode == NetworkMode::JOIN_NETWORK) {
     // STA mode - launch WiFi selection
-    LOG_DBG("WEBACT", "Turning on WiFi (STA mode)...");
     WiFi.mode(WIFI_STA);
 
     state = WebServerActivityState::WIFI_SELECTION;
-    LOG_DBG("WEBACT", "Launching WifiSelectionActivity...");
     startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput),
                            [this](const ActivityResult& result) {
                              if (!result.isCancelled) {
@@ -222,8 +292,6 @@ void CrossPointWebServerActivity::onNetworkModeSelected(const NetworkMode mode) 
 }
 
 void CrossPointWebServerActivity::onWifiSelectionComplete(const bool connected) {
-  LOG_DBG("WEBACT", "WifiSelectionActivity completed, connected=%d", connected);
-
   if (connected) {
     // Get connection info before exiting subactivity
     isApMode = false;
@@ -240,7 +308,7 @@ void CrossPointWebServerActivity::onWifiSelectionComplete(const bool connected) 
     startActivityForResult(std::make_unique<NetworkModeSelectionActivity>(renderer, mappedInput),
                            [this](const ActivityResult& result) {
                              if (result.isCancelled) {
-                               onGoHome();
+                               exitToOrigin();
                              } else {
                                onNetworkModeSelected(std::get<NetworkModeResult>(result.data).mode);
                              }
@@ -249,7 +317,6 @@ void CrossPointWebServerActivity::onWifiSelectionComplete(const bool connected) 
 }
 
 void CrossPointWebServerActivity::startAccessPoint() {
-  LOG_DBG("WEBACT", "Starting Access Point mode...");
   LOG_DBG("WEBACT", "Free heap before AP start: %d bytes", ESP.getFreeHeap());
 
   // Configure and start the AP
@@ -267,7 +334,7 @@ void CrossPointWebServerActivity::startAccessPoint() {
 
   if (!apStarted) {
     LOG_ERR("WEBACT", "ERROR: Failed to start Access Point!");
-    onGoHome();
+    exitToOrigin();
     return;
   }
 
@@ -280,10 +347,6 @@ void CrossPointWebServerActivity::startAccessPoint() {
   connectedIP = ipStr;
   connectedSSID = AP_SSID;
 
-  LOG_DBG("WEBACT", "Access Point started!");
-  LOG_DBG("WEBACT", "SSID: %s", AP_SSID);
-  LOG_DBG("WEBACT", "IP: %s", connectedIP.c_str());
-
   // Start mDNS for hostname resolution
   restartMdns(AP_HOSTNAME, "WEBACT");
 
@@ -293,7 +356,6 @@ void CrossPointWebServerActivity::startAccessPoint() {
   dnsServer = new DNSServer();
   dnsServer->setErrorReplyCode(DNSReplyCode::NoError);
   dnsServer->start(DNS_PORT, "*", apIP);
-  LOG_DBG("WEBACT", "DNS server started for captive portal");
 
   LOG_DBG("WEBACT", "Free heap after AP start: %d bytes", ESP.getFreeHeap());
 
@@ -302,43 +364,13 @@ void CrossPointWebServerActivity::startAccessPoint() {
 }
 
 void CrossPointWebServerActivity::startWebServer() {
-  LOG_DBG("WEBACT", "Starting web server...");
-
-  // Repeat the release right before the allocation: the WiFi selection screen
-  // rendered since onEnter(), and a CJK SSID repopulates the SD-font caches.
-  if (auto* fcm = renderer.getFontCacheManager()) {
-    LOG_DBG("WEBACT", "Free heap before SD font cache release: %d bytes", ESP.getFreeHeap());
-    fcm->releaseSdFontCaches();
-    LOG_DBG("WEBACT", "Free heap before server alloc: %d bytes", ESP.getFreeHeap());
-  }
-
   // Create the web server instance
   webServer.reset(new CrossPointWebServer());
-  // An upload holds loop() inside handleClient(), so input is sampled on each received chunk instead. On a slow
-  // link chunks come ~0.5 s apart, so a button found down gets a second sample past the SDK's 5 ms debounce.
-  webServer->setUploadCancelCheck([this] {
-    mappedInput.update(true);
-    if (gpio.rawInputActive()) {
-      delay(6);
-      mappedInput.update(true);
-    }
-    leaveRequested = leaveRequested || mappedInput.isPressed(MappedInputManager::Button::Back) ||
-                     mappedInput.wasPressed(MappedInputManager::Button::Back) || mappedInput.wasHomeGesture();
-    return leaveRequested;
-  });
   webServer->begin();
 
   if (webServer->isRunning()) {
     state = WebServerActivityState::SERVER_RUNNING;
-    LOG_DBG("WEBACT", "Web server started successfully");
     lastWifiBars = isApMode ? 0 : barsForRssi(WiFi.RSSI(), 0);
-
-    // The device is online: deliver queued plugin events through their
-    // manifest handlers. STA only (AP mode has no internet route); bounded by
-    // the drain's per-call event budget so serving is not noticeably delayed.
-    if (!isApMode) {
-      pluginevents::drain(&renderer);
-    }
 
     // Force an immediate render since we're transitioning from a subactivity
     // that had its own rendering task. We need to make sure our display is shown.
@@ -347,11 +379,42 @@ void CrossPointWebServerActivity::startWebServer() {
     LOG_ERR("WEBACT", "ERROR: Failed to start web server!");
     webServer.reset();
     // Go back on error
-    onGoHome();
+    exitToOrigin();
   }
 }
 
+void CrossPointWebServerActivity::exitToOrigin() {
+  if (networkBootReady) {
+    if (returnBookPath.empty()) {
+      silentRestart();
+    } else {
+      silentRestartToReader();
+    }
+    return;
+  }
+
+  if (returnBookPath.empty()) {
+    onGoHome();
+    return;
+  }
+
+  activityManager.goToReader(returnBookPath, true);
+}
+
+void CrossPointWebServerActivity::stopWebServer() {
+  if (webServer && webServer->isRunning()) {
+    webServer->stop();
+  }
+  webServer.reset();
+}
+
 void CrossPointWebServerActivity::loop() {
+  if ((state == WebServerActivityState::SERVER_RUNNING || state == WebServerActivityState::AP_STARTING) &&
+      exitRequested()) {
+    exitToOrigin();
+    return;
+  }
+
   // Handle different states
   if (state == WebServerActivityState::SERVER_RUNNING) {
     // Handle DNS requests for captive portal (AP mode only)
@@ -404,7 +467,7 @@ void CrossPointWebServerActivity::loop() {
       }
     }
 
-    // Handle web server requests - maximize throughput with watchdog safety
+    // Handle web server requests while keeping input responsive.
     if (webServer && webServer->isRunning()) {
       const unsigned long timeSinceLastHandleClient = millis() - lastHandleClientTime;
 
@@ -413,42 +476,26 @@ void CrossPointWebServerActivity::loop() {
         LOG_DBG("WEBACT", "WARNING: %lu ms gap since last handleClient", timeSinceLastHandleClient);
       }
 
-      // Reset watchdog BEFORE processing - HTTP header parsing can be slow
-      resetTaskWatchdogIfSubscribed();
-
       // Process HTTP requests in tight loop for maximum throughput
       // More iterations = more data processed per main loop cycle
       constexpr int MAX_ITERATIONS = 500;
       for (int i = 0; i < MAX_ITERATIONS && webServer->isRunning(); i++) {
         webServer->handleClient();
-        if (leaveRequested) {
-          onGoHome();
-          return;
-        }
-        // Reset watchdog every 32 iterations
-        if ((i & 0x1F) == 0x1F) {
-          resetTaskWatchdogIfSubscribed();
-        }
         // Yield and check for exit button every 64 iterations
         if ((i & 0x3F) == 0x3F) {
           yield();
-          // Pump input inside this blocking loop so exit events remain responsive.
-          mappedInput.update(true);
-          // Home remains available now; other configured actions are deferred
-          // to the next main-loop pass.
-          if (mappedInput.wasReleased(MappedInputManager::Button::Back) || mappedInput.wasHomeGesture()) {
-            onGoHome();
+          // Force trigger an update of which buttons are being pressed so be have accurate state
+          // for back button checking
+          mappedInput.update();
+          // This local update can consume one-shot exit events before the
+          // ActivityManager sees them, so honor every exit route here.
+          if (exitRequested()) {
+            exitToOrigin();
             return;
           }
         }
       }
       lastHandleClientTime = millis();
-    }
-
-    // Also check outside the request-processing loop.
-    if (mappedInput.wasReleased(MappedInputManager::Button::Back) || mappedInput.wasHomeGesture()) {
-      onGoHome();
-      return;
     }
   }
 }
@@ -458,35 +505,47 @@ void CrossPointWebServerActivity::render(RenderLock&&) {
   // Subactivities handle their own rendering
   if (state == WebServerActivityState::SERVER_RUNNING || state == WebServerActivityState::AP_STARTING) {
     renderer.clearScreen();
-    const auto& metrics = UITheme::getInstance().getMetrics();
-    const auto pageWidth = renderer.getScreenWidth();
     const auto pageHeight = renderer.getScreenHeight();
 
-    GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight},
-                   isApMode ? tr(STR_HOTSPOT_MODE) : tr(STR_FILE_TRANSFER), nullptr);
-
     if (state == WebServerActivityState::SERVER_RUNNING) {
-      GUI.drawSubHeader(renderer, Rect{0, metrics.topPadding + metrics.headerHeight, pageWidth, metrics.tabBarHeight},
-                        connectedSSID.c_str());
       renderServerRunning();
     } else {
+      renderHeader();
       const auto height = renderer.getLineHeight(UI_10_FONT_ID);
       const auto top = (pageHeight - height) / 2;
       renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_STARTING_HOTSPOT));
     }
-    renderer.displayBuffer();
+    renderer.displayBuffer(screenTransitionRefresh.modeFor(static_cast<uint8_t>(state)));
   }
+}
+
+void CrossPointWebServerActivity::renderHeader() const {
+  const char* title = isApMode ? tr(STR_HOTSPOT_MODE) : tr(STR_FILE_TRANSFER);
+  if (mappedInput.hasTouchHardware()) {
+    TouchHeaderBackButton::drawCompact(renderer, title);
+  } else {
+    CompactHeader::drawTitle(renderer, title);
+  }
+}
+
+bool CrossPointWebServerActivity::exitRequested() const {
+  return TouchHeaderBackButton::wasTapped(mappedInput, renderer) ||
+         mappedInput.wasPressed(MappedInputManager::Button::Back) || mappedInput.wasHomeGesture();
 }
 
 void CrossPointWebServerActivity::renderServerRunning() const {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
 
+  renderHeader();
+  const int subHeaderTop = CompactHeader::contentTop(metrics);
+  GUI.drawSubHeader(renderer, Rect{0, subHeaderTop, pageWidth, metrics.tabBarHeight}, connectedSSID.c_str());
+
   if (!isApMode) {
-    renderWifiIndicator(metrics.topPadding + metrics.headerHeight);
+    renderWifiIndicator(subHeaderTop);
   }
 
-  int startY = metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.verticalSpacing * 2;
+  int startY = subHeaderTop + metrics.tabBarHeight + metrics.verticalSpacing * 2;
   int height10 = renderer.getLineHeight(UI_10_FONT_ID);
   if (isApMode) {
     // AP mode display
@@ -548,7 +607,7 @@ void CrossPointWebServerActivity::renderServerRunning() const {
     renderer.drawCenteredText(SMALL_FONT_ID, startY, hostnameUrl.c_str(), true);
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_EXIT), "", "", "");
+  const auto labels = mappedInput.mapLabels(mappedInput.withBackArrow(tr(STR_EXIT)), "", "", "");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 }
 

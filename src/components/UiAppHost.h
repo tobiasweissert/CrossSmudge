@@ -28,6 +28,15 @@ class UiAppHost {
   // per live host, bounded by the activity stack depth.
   using UiApp = freeink::ui::FreeInkApp<24, 6>;
   using UiScreen = UiApp::ScreenType;
+  using App = UiApp;
+  using Screen = UiScreen;
+  void reset() { resetUi(); }
+  void render() { renderUi(); }
+  bool routeTouch(const MappedInputManager& input, freeink::ui::ActionEvent& event) {
+    const auto routed = routeTouch(input, true, true);
+    event = routed.event;
+    return routed.routed;
+  }
 
   explicit UiAppHost(const GfxRenderer& renderer);
 
@@ -70,9 +79,14 @@ class UiAppHost {
 
   freeink::ui::GfxRendererTarget uiTarget;  // must precede `app`: the app holds a reference to it
   UiApp app;
+  freeink::ui::GfxRendererTarget& target = uiTarget;
 
  private:
   // Opened by the render task after publication and closed on lifecycle/state
   // resets; read by the loop task (route*).
   std::atomic<bool> uiReady{false};
 };
+
+// Source compatibility for named legacy hosts; callers replace UiAppHost<N,M> with this alias or UiAppHost.
+template <size_t MaxInteractions, size_t MaxHandlers>
+using LegacyUiAppHost = UiAppHost;

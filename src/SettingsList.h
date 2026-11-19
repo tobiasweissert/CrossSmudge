@@ -1,8 +1,8 @@
 #pragma once
 
-#include <BoardConfig.h>
+#include <CrossInkHalFrontlight.h>
 #include <HalClock.h>
-#include <HalFrontlight.h>
+#include <HalGPIO.h>
 #include <HalTiltSensor.h>
 #include <I18n.h>
 #include <SdCardFontRegistry.h>
@@ -11,49 +11,184 @@
 #include <cstring>
 #include <iterator>
 #include <string>
+#include <utility>
+#include <type_traits>
 #include <vector>
 
 #include "CrossPointSettings.h"
-#include "HomeButtonSettings.h"
+#include "DeviceCapabilities.h"
 #include "KOReaderCredentialStore.h"
-#include "ReaderFontSizes.h"
-#include "ReaderLineSpacing.h"
+#include "QuickActions.h"
 #include "activities/settings/SettingsActivity.h"
-#include "components/UITheme.h"
+#include "util/Dictionary.h"
 #include "util/DictionaryRegistry.h"
-#include "util/SlideSwitch.h"
+#include "util/FontFamilyLabel.h"
+#include "util/FrontlightSchedule.h"
+
+inline std::string fontSizePointLabel(const uint8_t pointSize) { return std::to_string(pointSize) + " pt"; }
+
+inline void appendBuiltinFontSizeOption(SettingInfo& setting, const CrossPointSettings::FONT_SIZE size) {
+  const uint8_t pointSize = CrossPointSettings::getReaderFontPointSize(size);
+  setting.enumStringValues.push_back(fontSizePointLabel(pointSize));
+  setting.enumRawValues.push_back(pointSize);
+}
+
+inline SettingInfo buildBuiltinFontSizeSetting() {
+  SettingInfo s;
+  s.nameId = StrId::STR_FONT_SIZE;
+  s.type = SettingType::ENUM;
+  s.valuePtr = &CrossPointSettings::readerFontPointSize;
+  s.key = "fontSize";
+  s.category = StrId::STR_CAT_READER;
+  s.enumStringValues.reserve(CrossPointSettings::FONT_SIZE_COUNT);
+  s.enumRawValues.reserve(CrossPointSettings::FONT_SIZE_COUNT);
+
+  appendBuiltinFontSizeOption(s, CrossPointSettings::TINY);
+  appendBuiltinFontSizeOption(s, CrossPointSettings::SMALL);
+  appendBuiltinFontSizeOption(s, CrossPointSettings::MEDIUM);
+  appendBuiltinFontSizeOption(s, CrossPointSettings::LARGE);
+
+  return s;
+}
+
+inline SettingInfo buildSdFontSizeSetting(const SdCardFontFamilyInfo& family) {
+  SettingInfo s;
+  s.nameId = StrId::STR_FONT_SIZE;
+  s.type = SettingType::ENUM;
+  s.valuePtr = &CrossPointSettings::readerFontPointSize;
+  s.key = "fontSize";
+  s.category = StrId::STR_CAT_READER;
+
+  const std::vector<uint8_t> sizes = family.availableSizes();
+  s.enumStringValues.reserve(sizes.size());
+  s.enumRawValues.reserve(sizes.size());
+  for (size_t i = 0; i < sizes.size(); i++) {
+    s.enumStringValues.push_back(fontSizePointLabel(sizes[i]));
+    s.enumRawValues.push_back(sizes[i]);
+  }
+  return s;
+}
+
+inline void removeEnumRawValue(SettingInfo& setting, const uint8_t rawValue) {
+  const auto it = std::find(setting.enumRawValues.begin(), setting.enumRawValues.end(), rawValue);
+  if (it == setting.enumRawValues.end()) {
+    return;
+  }
+
+  const size_t index = static_cast<size_t>(std::distance(setting.enumRawValues.begin(), it));
+  setting.enumRawValues.erase(it);
+  if (index < setting.enumValues.size()) {
+    setting.enumValues.erase(setting.enumValues.begin() + index);
+  }
+}
+
+inline bool settingKeyIs(const SettingInfo& setting, const char* key) {
+  return setting.key && std::strcmp(setting.key, key) == 0;
+}
+
+inline SettingInfo buildFontSizeSetting(const SdCardFontRegistry* registry) {
+  if (registry && SETTINGS.sdFontFamilyName[0] != '\0') {
+    const SdCardFontFamilyInfo* family = registry->findFamily(SETTINGS.sdFontFamilyName);
+    if (family && !family->files.empty()) {
+      return buildSdFontSizeSetting(*family);
+    }
+  }
+  return buildBuiltinFontSizeSetting();
+}
+
+inline uint8_t closestPointSizeIndex(const std::vector<uint8_t>& sizes, const uint8_t targetPointSize) {
+  if (sizes.empty()) return 0;
+
+  uint8_t bestIndex = 0;
+  uint8_t bestDiff = UINT8_MAX;
+  for (size_t i = 0; i < sizes.size(); i++) {
+    const uint8_t size = sizes[i];
+    const uint8_t diff = size > targetPointSize ? size - targetPointSize : targetPointSize - size;
+    if (diff < bestDiff || (diff == bestDiff && size < sizes[bestIndex])) {
+      bestIndex = static_cast<uint8_t>(i);
+      bestDiff = diff;
+    }
+  }
+  return bestIndex;
+}
+
+inline uint8_t closestBuiltinFontSizeIndex(const uint8_t targetPointSize) {
+  uint8_t bestStored = 0;
+  uint8_t bestPointSize = 0;
+  uint8_t bestDiff = UINT8_MAX;
+
+  for (uint8_t i = 0; i < CrossPointSettings::FONT_SIZE_COUNT; i++) {
+    const auto size = static_cast<CrossPointSettings::FONT_SIZE>(i);
+    const uint8_t stored = CrossPointSettings::getStoredReaderFontSize(size);
+    if (stored == UINT8_MAX) continue;
+
+    const uint8_t pointSize = CrossPointSettings::getReaderFontPointSize(size);
+    const uint8_t diff = pointSize > targetPointSize ? pointSize - targetPointSize : targetPointSize - pointSize;
+    if (diff < bestDiff || (diff == bestDiff && pointSize < bestPointSize)) {
+      bestStored = stored;
+      bestPointSize = pointSize;
+      bestDiff = diff;
+    }
+  }
+  return bestStored;
+}
 
 // Build the font family setting dynamically. When registry is non-null, SD card fonts
 // are appended after the built-in fonts. Otherwise only built-in fonts are listed.
 inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
-  // The render code checks enumStringValues first, then enumValues, so with SD
-  // fonts present every option (built-in first) is listed as a string.
-  std::vector<std::string> allStringValues;
-  if (registry && registry->getFamilyCount() > 0) {
+  // Built-in font labels (StrId)
+  std::vector<StrId> enumValues = {StrId::STR_LEXEND_DECA, StrId::STR_BITTER, StrId::STR_NOTO_SANS};
+  // Runtime string labels for SD card fonts
+  std::vector<std::string> enumStringValues;
+
+  // Reserve: first CrossPointSettings::BUILTIN_FONT_COUNT entries use StrId, rest use strings
+  if (registry) {
     const auto& families = registry->getFamilies();
-    allStringValues.reserve(CrossPointSettings::BUILTIN_FONT_COUNT + families.size());
-    allStringValues.push_back(I18N.get(StrId::STR_NOTO_SANS));
-    std::transform(families.begin(), families.end(), std::back_inserter(allStringValues),
-                   [](const SdCardFontFamilyInfo& f) { return f.name; });
+    enumStringValues.reserve(families.size());
+    std::transform(families.begin(), families.end(), std::back_inserter(enumStringValues),
+                   [](const SdCardFontFamilyInfo& f) { return fontFamilyLabel(f.name, fontFamilyPointSizeRange(f)); });
+  }
+
+  // Capture the SD font count for the lambdas
+  const int sdFontCount = static_cast<int>(enumStringValues.size());
+
+  // Total option count = built-in + SD card families
+  // For the combined enumStringValues: we need all entries as strings (built-in names + SD names)
+  // The render code checks enumStringValues first, then enumValues. So we build enumStringValues
+  // with all options when SD fonts are present.
+  std::vector<std::string> allStringValues;
+  if (sdFontCount > 0) {
+    constexpr FontFamilyPointSizeRange builtinRange{10, 16};
+    allStringValues.push_back(fontFamilyLabel(I18N.get(StrId::STR_LEXEND_DECA), builtinRange));
+    allStringValues.push_back(fontFamilyLabel(I18N.get(StrId::STR_BITTER), builtinRange));
+    allStringValues.push_back(fontFamilyLabel(I18N.get(StrId::STR_NOTO_SANS), {12,18}));
+    allStringValues.insert(allStringValues.end(), enumStringValues.begin(), enumStringValues.end());
   }
 
   SettingInfo s;
   s.nameId = StrId::STR_FONT_FAMILY;
   s.type = SettingType::ENUM;
-  s.enumValues = {StrId::STR_NOTO_SANS};
+  s.enumValues = std::move(enumValues);
   s.enumStringValues = std::move(allStringValues);
   s.key = "fontFamily";
   s.category = StrId::STR_CAT_READER;
-  s.inTextSettings = true;  // matches the static font-family entry it replaces
 
-  // The lambdas read the registry instead of copying the names: it is only
-  // rescanned while no list built from it is in use, so the indexes match.
-  s.valueGetter = [registry]() -> uint8_t {
+  // Capture registry families by copy for the lambdas
+  std::vector<std::string> sdFamilyNames;
+
+  if (registry) {
+    const auto& families = registry->getFamilies();
+    sdFamilyNames.reserve(families.size());
+
+    std::transform(families.begin(), families.end(), std::back_inserter(sdFamilyNames),
+                   [](const SdCardFontFamilyInfo& f) { return f.name; });
+  }
+
+  s.valueGetter = [sdFamilyNames]() -> uint8_t {
     // If an SD card font is selected, find its index
-    if (registry && SETTINGS.sdFontFamilyName[0] != '\0') {
-      const auto& families = registry->getFamilies();
-      for (size_t i = 0; i < families.size(); i++) {
-        if (families[i].name == SETTINGS.sdFontFamilyName) {
+    if (SETTINGS.sdFontFamilyName[0] != '\0') {
+      for (int i = 0; i < static_cast<int>(sdFamilyNames.size()); i++) {
+        if (sdFamilyNames[i] == SETTINGS.sdFontFamilyName) {
           return static_cast<uint8_t>(CrossPointSettings::BUILTIN_FONT_COUNT + i);
         }
       }
@@ -62,15 +197,22 @@ inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
     return SETTINGS.fontFamily < CrossPointSettings::BUILTIN_FONT_COUNT ? SETTINGS.fontFamily : 0;
   };
 
-  s.valueSetter = [registry](uint8_t v) {
+  s.valueSetter = [sdFamilyNames, registry](uint8_t v) {
+    const uint8_t targetPointSize = SETTINGS.readerFontPointSize;
+
     if (v < CrossPointSettings::BUILTIN_FONT_COUNT) {
       SETTINGS.fontFamily = v;
       SETTINGS.sdFontFamilyName[0] = '\0';
-    } else if (registry) {
-      const size_t sdIdx = v - CrossPointSettings::BUILTIN_FONT_COUNT;
-      const auto& families = registry->getFamilies();
-      if (sdIdx < families.size()) {
-        strncpy(SETTINGS.sdFontFamilyName, families[sdIdx].name.c_str(), sizeof(SETTINGS.sdFontFamilyName) - 1);
+      SETTINGS.readerFontPointSize = CrossPointSettings::getReaderFontPointSize(
+          static_cast<CrossPointSettings::FONT_SIZE>(closestBuiltinFontSizeIndex(targetPointSize)));
+    } else {
+      int sdIdx = v - CrossPointSettings::BUILTIN_FONT_COUNT;
+      if (sdIdx < static_cast<int>(sdFamilyNames.size())) {
+        const auto* family = registry ? registry->findFamily(sdFamilyNames[sdIdx]) : nullptr;
+        const auto sizes = family ? family->availableSizes() : std::vector<uint8_t>{};
+        if (sizes.empty()) return;
+        SETTINGS.readerFontPointSize = sizes[closestPointSizeIndex(sizes, targetPointSize)];
+        strncpy(SETTINGS.sdFontFamilyName, sdFamilyNames[sdIdx].c_str(), sizeof(SETTINGS.sdFontFamilyName) - 1);
         SETTINGS.sdFontFamilyName[sizeof(SETTINGS.sdFontFamilyName) - 1] = '\0';
       }
     }
@@ -79,308 +221,861 @@ inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
   return s;
 }
 
-// Build the font size setting dynamically: the options are the point sizes the
-// active family actually ships, so an SD family built at 10/12/14 offers three
-// sizes and a family built at 8..18 offers six. The selected point size persists
-// in SETTINGS.fontPointSize (saved/loaded manually in CrossPointSettings::
-// toJson/fromJson — the generic loop skips dynamic entries), while the ENUM
-// contract shared with the web UI stays index-based.
-inline SettingInfo buildFontSizeSetting(const SdCardFontRegistry* registry) {
-  // Captured by copy so the indexes keep matching the option labels built here,
-  // even if the family changes later.
-  const std::vector<uint8_t> sizes = readerFontPointSizes(registry, SETTINGS.sdFontFamilyName);
+inline SettingInfo buildDictionaryFontFamilySetting(const SdCardFontRegistry* registry) {
+  SettingInfo s;
+  s.nameId = StrId::STR_DICTIONARY_FONT;
+  s.type = SettingType::ENUM;
+  s.key = "dictionaryFont";
+  s.category = StrId::STR_CAT_READER;
+  s.enumStringValues.push_back(I18N.get(StrId::STR_USE_READER_FONT));
 
-  // "pt" is deliberately not translated — see the matching note in
-  // TextSettingsActivity::rebuildSizeList().
-  std::vector<std::string> labels;
-  labels.reserve(sizes.size());
-  for (const uint8_t pt : sizes) {
-    labels.push_back(std::to_string(pt) + " pt");
+  std::vector<std::string> familyNames;
+  if (registry) {
+    const auto& families = registry->getFamilies();
+    familyNames.reserve(families.size());
+    s.enumStringValues.reserve(families.size() + 1);
+    for (const auto& family : families) {
+      familyNames.push_back(family.name);
+      s.enumStringValues.push_back(family.name);
+    }
   }
 
-  SettingInfo s;
-  s.nameId = StrId::STR_FONT_SIZE;
-  s.type = SettingType::ENUM;
-  s.enumStringValues = std::move(labels);
-  s.key = "fontSize";
-  s.category = StrId::STR_CAT_READER;
-  s.inTextSettings = true;  // matches the static font-size entry it replaces
+  s.valueGetter = [familyNames]() -> uint8_t {
+    for (size_t i = 0; i < familyNames.size(); ++i) {
+      if (familyNames[i] == SETTINGS.dictionarySdFontFamilyName) return static_cast<uint8_t>(i + 1);
+    }
+    return 0;
+  };
+  s.valueSetter = [familyNames](const uint8_t value) {
+    if (value == 0 || value > familyNames.size()) {
+      SETTINGS.dictionarySdFontFamilyName[0] = '\0';
+      SETTINGS.dictionaryFontPointSize = 0;
+      return;
+    }
+    strncpy(SETTINGS.dictionarySdFontFamilyName, familyNames[value - 1].c_str(),
+            sizeof(SETTINGS.dictionarySdFontFamilyName) - 1);
+    SETTINGS.dictionarySdFontFamilyName[sizeof(SETTINGS.dictionarySdFontFamilyName) - 1] = '\0';
+  };
+  return s;
+}
 
-  s.valueGetter = [sizes]() -> uint8_t {
-    const uint8_t pt = snapToNearestPointSize(sizes, SETTINGS.fontPointSize);
-    for (int i = 0; i < static_cast<int>(sizes.size()); i++) {
-      if (sizes[i] == pt) return static_cast<uint8_t>(i);
+inline SettingInfo buildDictionaryFontSizeSetting(const SdCardFontRegistry* registry) {
+  SettingInfo s;
+  s.nameId = StrId::STR_DICTIONARY_FONT_SIZE;
+  s.type = SettingType::ENUM;
+  s.valuePtr = &CrossPointSettings::dictionaryFontPointSize;
+  s.key = "dictionaryFontSize";
+  s.category = StrId::STR_CAT_READER;
+  s.enumStringValues.push_back(I18N.get(StrId::STR_USE_READER_FONT_SIZE));
+  s.enumRawValues.push_back(0);
+
+  if (!registry) return s;
+  // With no dedicated dictionary family, a non-zero dictionary size applies
+  // to the reader's SD-card family. Built-in reader fonts have no selectable
+  // files, so they deliberately retain just the "use reader size" entry.
+  const char* familyName =
+      SETTINGS.dictionarySdFontFamilyName[0] != '\0' ? SETTINGS.dictionarySdFontFamilyName : SETTINGS.sdFontFamilyName;
+  if (familyName[0] == '\0') return s;
+  const auto* family = registry->findFamily(familyName);
+  if (!family) return s;
+
+  const auto sizes = family->availableSizes();
+  s.enumStringValues.reserve(sizes.size() + 1);
+  s.enumRawValues.reserve(sizes.size() + 1);
+  for (const uint8_t pointSize : sizes) {
+    s.enumStringValues.push_back(fontSizePointLabel(pointSize));
+    s.enumRawValues.push_back(pointSize);
+  }
+  return s;
+}
+
+SettingInfo buildDictionarySetting(const std::vector<DictionaryEntry>& dictionaries);
+
+inline SettingInfo buildDictionarySetting(const DictionaryRegistry* dictRegistry) {
+  SettingInfo s;
+  s.nameId = StrId::STR_DICTIONARY;
+  s.type = SettingType::ENUM;
+  s.key = "dictionary";
+  s.category = StrId::STR_CAT_READER;
+  s.enumStringValues.push_back(I18N.get(StrId::STR_DICT_NONE));
+
+  std::vector<DictionaryEntry> entries;
+  if (dictRegistry) {
+    entries = dictRegistry->getEntries();
+    s.enumStringValues.reserve(entries.size() + 1);
+    for (const auto& entry : entries) {
+      s.enumStringValues.push_back(entry.name);
+    }
+  }
+
+  s.valueGetter = [entries]() -> uint8_t {
+    const std::string activePath = Dictionary::readDictPath();
+    if (activePath.empty()) {
+      return 0;
+    }
+    for (size_t i = 0; i < entries.size(); i++) {
+      if (entries[i].basePath == activePath) {
+        return static_cast<uint8_t>(i + 1);
+      }
     }
     return 0;
   };
 
-  s.valueSetter = [sizes](uint8_t v) {
-    if (v < sizes.size()) SETTINGS.fontPointSize = sizes[v];
-  };
-
-  return s;
-}
-
-inline constexpr char DICTIONARY_SETTING_KEY[] = "dictionaryName";
-
-// Build the dictionary selection setting dynamically from the folders discovered
-// under /dictionaries. "None" plus one option per dictionary; the selected folder
-// name persists in SETTINGS.dictionaryName (saved/loaded manually in
-// CrossPointSettings::toJson/fromJson — the generic loop skips dynamic entries).
-inline SettingInfo buildDictionarySetting(const std::vector<DictionaryEntry>& dictionaries) {
-  std::vector<std::string> folderNames;
-  folderNames.reserve(dictionaries.size());
-  std::transform(dictionaries.begin(), dictionaries.end(), std::back_inserter(folderNames),
-                 [](const DictionaryEntry& d) { return d.name; });
-
-  SettingInfo s;
-  s.nameId = StrId::STR_DICTIONARY;
-  s.key = DICTIONARY_SETTING_KEY;  // web settings API; persisted by name, not by the generic loop
-  s.type = SettingType::ENUM;
-  s.enumStringValues.reserve(folderNames.size() + 1);
-  s.enumStringValues.push_back(I18N.get(StrId::STR_NONE_OPT));
-  s.enumStringValues.insert(s.enumStringValues.end(), folderNames.begin(), folderNames.end());
-  s.category = StrId::STR_CAT_READER;
-
-  s.valueGetter = [folderNames]() -> uint8_t {
-    for (size_t i = 0; i < folderNames.size(); i++) {
-      // Compare within the settings field capacity: an over-long folder name is
-      // stored truncated, and must still match its list entry.
-      if (strncmp(folderNames[i].c_str(), SETTINGS.dictionaryName, sizeof(SETTINGS.dictionaryName) - 1) == 0) {
-        return static_cast<uint8_t>(i + 1);
-      }
-    }
-    return 0;  // "None", also when the stored folder no longer exists
-  };
-
-  s.valueSetter = [folderNames](uint8_t v) {
-    if (v == 0 || v > folderNames.size()) {
-      SETTINGS.dictionaryName[0] = '\0';
+  s.valueSetter = [entries](uint8_t v) {
+    if (v == 0) {
+      Dictionary::saveGlobalDictPath("");
       return;
     }
-    strncpy(SETTINGS.dictionaryName, folderNames[v - 1].c_str(), sizeof(SETTINGS.dictionaryName) - 1);
-    SETTINGS.dictionaryName[sizeof(SETTINGS.dictionaryName) - 1] = '\0';
+    const size_t entryIndex = static_cast<size_t>(v - 1);
+    if (entryIndex < entries.size()) {
+      Dictionary::saveGlobalDictPath(entries[entryIndex].basePath.c_str());
+    }
   };
 
   return s;
 }
 
-inline std::vector<StrId> buildLongPressMenuValues() {
-  std::vector<StrId> values = {StrId::STR_KOSYNC, StrId::STR_DISABLED, StrId::STR_BOOKMARK_OPTION,
-                               StrId::STR_DICTIONARY};
-  values.reserve(CrossPointSettings::LONG_PRESS_MENU_FUNCTION_COUNT);
-  if (BoardConfig::hasHomeKey()) values.push_back(StrId::STR_READER_MENU);
-  values.push_back(StrId::STR_SAVE_CLIPPING);
-  values.push_back(StrId::STR_FOOTNOTES);
-  return values;
+inline SettingInfo buildSleepScreenSetting() {
+  SettingInfo s = SettingInfo::Enum(
+      StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen,
+      {StrId::STR_NONE_OPT, StrId::STR_DARK, StrId::STR_LIGHT, StrId::STR_CUSTOM, StrId::STR_COVER,
+       StrId::STR_COVER_CUSTOM, StrId::STR_PAGE_OVERLAY, StrId::STR_READING_STATS, StrId::STR_THEME_MINIMAL,
+       StrId::STR_THEME_MINIMAL_STATS, StrId::STR_THEME_DASHBOARD, StrId::STR_QUICK_RESUME},
+      "sleepScreen", StrId::STR_CAT_DISPLAY);
+  s.withEnumRawValues({
+      static_cast<uint8_t>(CrossPointSettings::BLANK),
+      static_cast<uint8_t>(CrossPointSettings::DARK),
+      static_cast<uint8_t>(CrossPointSettings::LIGHT),
+      static_cast<uint8_t>(CrossPointSettings::CUSTOM),
+      static_cast<uint8_t>(CrossPointSettings::COVER),
+      static_cast<uint8_t>(CrossPointSettings::COVER_CUSTOM),
+      static_cast<uint8_t>(CrossPointSettings::OVERLAY),
+      static_cast<uint8_t>(CrossPointSettings::READING_STATS_SLEEP),
+      static_cast<uint8_t>(CrossPointSettings::MINIMAL_SLEEP),
+      static_cast<uint8_t>(CrossPointSettings::MINIMAL_STATS_SLEEP),
+      static_cast<uint8_t>(CrossPointSettings::DASHBOARD_SLEEP),
+      static_cast<uint8_t>(CrossPointSettings::QUICK_RESUME),
+  });
+  return s;
 }
 
-inline uint8_t longPressMenuDisplayValue() {
-  const uint8_t raw = SETTINGS.longPressMenuFunction;
-  if (raw <= CrossPointSettings::LP_MENU_DICTIONARY) return raw;
-  if (raw == CrossPointSettings::LP_MENU_READER_MENU) {
-    return BoardConfig::hasHomeKey() ? CrossPointSettings::LP_MENU_READER_MENU : CrossPointSettings::LP_MENU_DISABLED;
+enum class ShortcutOptionCatalog { PowerButton, ButtonChord, LongPress, HomeButton };
+
+constexpr uint8_t SHORTCUT_OPTION_UNAVAILABLE = UINT8_MAX;
+
+inline uint8_t shortcutRawValue(const ShortcutOptionCatalog catalog, const CrossPointSettings::SHORT_PWRBTN action) {
+  using Action = CrossPointSettings::SHORT_PWRBTN;
+  using LongPress = CrossPointSettings::LONG_PRESS_MENU_ACTION;
+  using Chord = CrossPointSettings::POWER_CHORD_ACTION;
+
+  switch (catalog) {
+    case ShortcutOptionCatalog::PowerButton:
+      return static_cast<uint8_t>(action);
+    case ShortcutOptionCatalog::ButtonChord:
+      switch (action) {
+        case Action::IGNORE:
+          return Chord::CHORD_DISABLED;
+        // Deep sleep wakes from the Power GPIO alone. A chord cannot be used
+        // as the matching wake gesture, so do not offer a misleading action.
+        case Action::SLEEP:
+          return SHORTCUT_OPTION_UNAVAILABLE;
+        case Action::PAGE_TURN:
+          return Chord::CHORD_PAGE_TURN;
+        case Action::PREVIOUS_PAGE:
+          return Chord::CHORD_PREVIOUS_PAGE;
+        case Action::TOGGLE_BOOKMARK:
+          return Chord::CHORD_TOGGLE_BOOKMARK;
+        case Action::READING_STATS:
+          return Chord::CHORD_READING_STATS;
+        case Action::MARK_FINISHED:
+          return Chord::CHORD_MARK_FINISHED;
+        case Action::FORCE_REFRESH:
+          return Chord::CHORD_FORCE_REFRESH;
+        case Action::TOGGLE_FONT:
+          return Chord::CHORD_TOGGLE_FONT;
+        case Action::TOGGLE_GUIDE_DOTS:
+          return Chord::CHORD_TOGGLE_GUIDE_DOTS;
+        case Action::TOGGLE_FOCUS_READING:
+          return Chord::CHORD_TOGGLE_FOCUS_READING;
+        case Action::CYCLE_PAGE_TURN:
+          return Chord::CHORD_CYCLE_PAGE_TURN;
+        case Action::SYNC_PROGRESS:
+          return Chord::CHORD_SYNC_PROGRESS;
+        case Action::NEARBY_POSITION_SYNC:
+          return Chord::CHORD_NEARBY_POSITION_SYNC;
+        case Action::FILE_TRANSFER:
+          return Chord::CHORD_FILE_TRANSFER;
+        case Action::CALIBRE_WIRELESS:
+          return Chord::CHORD_CALIBRE_WIRELESS;
+        case Action::JOIN_NETWORK:
+          return Chord::CHORD_JOIN_NETWORK;
+        case Action::CREATE_HOTSPOT:
+          return Chord::CHORD_CREATE_HOTSPOT;
+        case Action::SCREENSHOT:
+          return Chord::CHORD_SCREENSHOT;
+        case Action::TOGGLE_DARK_MODE:
+          return Chord::CHORD_TOGGLE_DARK_MODE;
+        case Action::FOOTNOTES:
+          return Chord::CHORD_FOOTNOTES;
+        case Action::FILE_BROWSER:
+          return Chord::CHORD_FILE_BROWSER;
+        case Action::CREATE_CLIPPING:
+          return Chord::CHORD_CREATE_CLIPPING;
+        case Action::LOOKUP_WORD:
+          return Chord::CHORD_LOOKUP_WORD;
+        case Action::TOGGLE_HOME_BUTTON_IN_READER:
+          return Chord::CHORD_TOGGLE_HOME_BUTTON;
+        case Action::QUICK_ACTIONS:
+          return Chord::CHORD_QUICK_ACTIONS;
+        case Action::TOGGLE_FRONTLIGHT:
+          return Chord::CHORD_TOGGLE_FRONTLIGHT;
+        case Action::TOGGLE_TOUCHSCREEN:
+          return Chord::CHORD_TOGGLE_TOUCHSCREEN;
+        case Action::QUICK_LOCK:
+          return Chord::CHORD_QUICK_LOCK;
+        case Action::TOGGLE_TILT_PAGE_TURN:
+          return SHORTCUT_OPTION_UNAVAILABLE;
+        default:
+          return SHORTCUT_OPTION_UNAVAILABLE;
+      }
+      break;
+    case ShortcutOptionCatalog::LongPress:
+      switch (action) {
+        case Action::IGNORE:
+          return LongPress::LONG_MENU_OFF;
+        case Action::SLEEP:
+          return LongPress::LONG_MENU_SLEEP;
+        case Action::TOGGLE_BOOKMARK:
+          return LongPress::LONG_MENU_TOGGLE_BOOKMARK;
+        case Action::READING_STATS:
+          return LongPress::LONG_MENU_READING_STATS;
+        case Action::MARK_FINISHED:
+          return LongPress::LONG_MENU_MARK_FINISHED;
+        case Action::FORCE_REFRESH:
+          return LongPress::LONG_MENU_REFRESH_SCREEN;
+        case Action::TOGGLE_FONT:
+          return LongPress::LONG_MENU_CHANGE_FONT;
+        case Action::TOGGLE_GUIDE_DOTS:
+          return LongPress::LONG_MENU_TOGGLE_GUIDE_DOTS;
+        case Action::TOGGLE_FOCUS_READING:
+          return LongPress::LONG_MENU_TOGGLE_FOCUS;
+        case Action::CYCLE_PAGE_TURN:
+          return LongPress::LONG_MENU_CYCLE_PAGE_TURN;
+        case Action::TOGGLE_TILT_PAGE_TURN:
+          return LongPress::LONG_MENU_TOGGLE_TILT_PAGE_TURN;
+        case Action::SYNC_PROGRESS:
+          return LongPress::LONG_MENU_SYNC_PROGRESS;
+        case Action::FILE_TRANSFER:
+          return LongPress::LONG_MENU_FILE_TRANSFER;
+        case Action::CALIBRE_WIRELESS:
+          return LongPress::LONG_MENU_CALIBRE_WIRELESS;
+        case Action::JOIN_NETWORK:
+          return LongPress::LONG_MENU_JOIN_NETWORK;
+        case Action::CREATE_HOTSPOT:
+          return LongPress::LONG_MENU_CREATE_HOTSPOT;
+        case Action::SCREENSHOT:
+          return LongPress::LONG_MENU_SCREENSHOT;
+        case Action::TOGGLE_DARK_MODE:
+          return LongPress::LONG_MENU_TOGGLE_DARK_MODE;
+        case Action::FOOTNOTES:
+          return LongPress::LONG_MENU_FOOTNOTES;
+        case Action::FILE_BROWSER:
+          return LongPress::LONG_MENU_FILE_BROWSER;
+        case Action::CREATE_CLIPPING:
+          return LongPress::LONG_MENU_CREATE_CLIPPING;
+        case Action::LOOKUP_WORD:
+          return LongPress::LONG_MENU_LOOKUP_WORD;
+        case Action::QUICK_ACTIONS:
+          return LongPress::LONG_MENU_QUICK_ACTIONS;
+        case Action::QUICK_LOCK:
+          return LongPress::LONG_MENU_QUICK_LOCK;
+        case Action::PAGE_TURN:
+        case Action::PREVIOUS_PAGE:
+        case Action::NEARBY_POSITION_SYNC:
+        case Action::TOGGLE_HOME_BUTTON_IN_READER:
+        case Action::TOGGLE_FRONTLIGHT:
+        case Action::TOGGLE_TOUCHSCREEN:
+          return SHORTCUT_OPTION_UNAVAILABLE;
+        default:
+          return SHORTCUT_OPTION_UNAVAILABLE;
+      }
+      break;
+    case ShortcutOptionCatalog::HomeButton:
+      switch (action) {
+        case Action::SLEEP:
+        case Action::TOGGLE_TILT_PAGE_TURN:
+        case Action::TOGGLE_HOME_BUTTON_IN_READER:
+        case Action::TOGGLE_FRONTLIGHT:
+          return SHORTCUT_OPTION_UNAVAILABLE;
+        default:
+          return static_cast<uint8_t>(action);
+      }
   }
-  if (raw < CrossPointSettings::LONG_PRESS_MENU_FUNCTION_COUNT) return BoardConfig::hasHomeKey() ? raw : raw - 1;
-  return CrossPointSettings::LP_MENU_DISABLED;
+
+  return SHORTCUT_OPTION_UNAVAILABLE;
 }
 
-inline void setLongPressMenuFromDisplayValue(const uint8_t displayValue) {
-  if (displayValue <= CrossPointSettings::LP_MENU_DICTIONARY) {
-    SETTINGS.longPressMenuFunction = displayValue;
-  } else {
-    SETTINGS.longPressMenuFunction = BoardConfig::hasHomeKey() ? displayValue : displayValue + 1;
-  }
-}
+inline void appendShortcutOptions(SettingInfo& setting, const ShortcutOptionCatalog catalog) {
+  setting.enumValues.reserve(QuickActions::shortcutActionOrder.size() + 3);
+  setting.enumRawValues.reserve(QuickActions::shortcutActionOrder.size() + 3);
 
-inline SettingInfo buildLongPressMenuSetting() {
-  return SettingInfo::DynamicEnum(StrId::STR_LONG_PRESS_MENU, buildLongPressMenuValues(), longPressMenuDisplayValue,
-                                  setLongPressMenuFromDisplayValue, "longPressMenuFunction", StrId::STR_CAT_CONTROLS);
-}
-
-struct ShortPowerButtonOption {
-  StrId label;
-  uint8_t value;
-};
-
-// Menu order differs from the persisted enum order, so map by value.
-inline std::vector<ShortPowerButtonOption> shortPowerButtonOptions() {
-  std::vector<ShortPowerButtonOption> options = {{StrId::STR_IGNORE, CrossPointSettings::IGNORE},
-                                                 {StrId::STR_SLEEP, CrossPointSettings::SLEEP},
-                                                 {StrId::STR_PAGE_TURN, CrossPointSettings::PAGE_TURN},
-                                                 {StrId::STR_FORCE_REFRESH, CrossPointSettings::FORCE_REFRESH},
-                                                 {StrId::STR_FOOTNOTES, CrossPointSettings::FOOTNOTES}};
-  options.reserve(CrossPointSettings::SHORT_PWRBTN_COUNT);
-  if (BoardConfig::hasTouch()) {
-    options.push_back({StrId::STR_CONFIRM, CrossPointSettings::PWR_CONFIRM});
-  } else {
-    options.push_back({StrId::STR_SAVE_CLIPPING, CrossPointSettings::CREATE_CLIPPING});
-  }
-  // Touch boards without a home key have no button for these shortcuts; the
-  // EEGO A4 offers them on the power button as well.
-  if (BoardConfig::hasTouch() && (!BoardConfig::hasHomeKey() || BoardConfig::isEegoA4())) {
-    options.push_back({StrId::STR_BOOKMARK_OPTION, CrossPointSettings::PWR_BOOKMARK});
-    options.push_back({StrId::STR_KOSYNC, CrossPointSettings::PWR_SYNC});
-    options.push_back({StrId::STR_READER_MENU, CrossPointSettings::PWR_READER_MENU});
-  }
-  return options;
-}
-
-inline std::vector<StrId> buildShortPowerButtonValues() {
-  std::vector<StrId> values;
-  for (const auto& option : shortPowerButtonOptions()) values.push_back(option.label);
-  return values;
-}
-
-inline uint8_t shortPowerButtonDisplayValue() {
-  const auto options = shortPowerButtonOptions();
-  for (size_t i = 0; i < options.size(); i++) {
-    if (options[i].value == SETTINGS.shortPwrBtn) return static_cast<uint8_t>(i);
-  }
-  return CrossPointSettings::IGNORE;
-}
-
-inline void setShortPowerButtonFromDisplayValue(const uint8_t displayValue) {
-  const auto options = shortPowerButtonOptions();
-  SETTINGS.shortPwrBtn = displayValue < options.size() ? options[displayValue].value : CrossPointSettings::IGNORE;
-}
-
-inline SettingInfo buildShortPowerButtonSetting() {
-  return SettingInfo::DynamicEnum(StrId::STR_SHORT_PWR_BTN, buildShortPowerButtonValues(), shortPowerButtonDisplayValue,
-                                  setShortPowerButtonFromDisplayValue, "shortPwrBtn", StrId::STR_CAT_CONTROLS);
-}
-
-inline std::vector<ShortPowerButtonOption> doublePowerButtonOptions() {
-  auto options = shortPowerButtonOptions();
-  if (Frontlight.present()) options.push_back({StrId::STR_FRONTLIGHT, CrossPointSettings::PWR_FRONTLIGHT});
-  return options;
-}
-
-inline SettingInfo buildDoublePowerButtonSetting() {
-  std::vector<StrId> labels;
-  labels.reserve(CrossPointSettings::SHORT_PWRBTN_COUNT);
-  for (const auto& option : doublePowerButtonOptions()) labels.push_back(option.label);
-  return SettingInfo::DynamicEnum(
-      StrId::STR_POWER_DOUBLE_CLICK, std::move(labels),
-      []() -> uint8_t {
-        const auto options = doublePowerButtonOptions();
-        for (size_t i = 0; i < options.size(); ++i) {
-          if (options[i].value == SETTINGS.doublePwrBtn) return static_cast<uint8_t>(i);
-        }
-        return 0;
-      },
-      [](uint8_t value) {
-        const auto options = doublePowerButtonOptions();
-        SETTINGS.doublePwrBtn = value < options.size() ? options[value].value : CrossPointSettings::IGNORE;
-      },
-      "doublePwrBtn", StrId::STR_CAT_CONTROLS);
-}
-
-inline std::vector<StrId> homeThemeValues() {
-  static constexpr StrId VALUES[] = {StrId::STR_THEME_CLASSIC, StrId::STR_THEME_LYRA, StrId::STR_THEME_LYRA_EXTENDED,
-                                     StrId::STR_THEME_ROUNDEDRAFF, StrId::STR_THEME_COVER_GRID};
-  const size_t count = UITheme::supportsCoverGrid() ? std::size(VALUES) : std::size(VALUES) - 1;
-  return {VALUES, VALUES + count};
-}
-
-using SettingVisitor = void (*)(void* context, SettingInfo& info);
-
-// Visits synchronously in list order. Borrowed references are valid only during
-// the callback; move from the descriptor to retain ownership. Its board conditions
-// must be fixed before settings load, or load and save would see different keys.
-void forEachBaseSetting(SettingVisitor visit, void* context);
-
-template <typename Fn>
-void forEachBaseSetting(Fn& fn) {
-  forEachBaseSetting([](void* context, SettingInfo& info) { (*static_cast<Fn*>(context))(info); }, &fn);
-}
-
-// Number of entries forEachBaseSetting() visits.
-size_t countBaseSettings();
-
-// True if this board hides the setting at runtime. UI-only: the probes have not
-// run at load time, so the base list keeps these keys persisted.
-inline bool isHiddenOnDevice(const SettingInfo& s) {
-  switch (s.nameId) {
-    // Frontlit and lightless variants of a board share one binary (EEGO A4);
-    // presence is the I2C probe result from Frontlight.begin(). The slide
-    // switch's position owns its bound function (the light at boot too).
-    case StrId::STR_RESTORE_LIGHT_ON_WAKE:
-      return !Frontlight.present() || slideSwitchOwnsLight();
-    case StrId::STR_NIGHT_MODE:
-      return slideSwitchOwns(CrossPointSettings::SLIDE_SWITCH_NIGHT_MODE);
-    case StrId::STR_TOUCH_READER_CONTROLS:
-      return slideSwitchOwns(CrossPointSettings::SLIDE_SWITCH_TOUCH_CONTROLS);
-    // Tilt page turn needs an IMU with a gyroscope. A failed probe on one boot
-    // must not drop the saved value.
-    case StrId::STR_TILT_PAGE_TURN:
-      return !halTiltSensor.isAvailable();
-    // Clock settings need the RTC, as on the device (ClockSettingsActivity).
-    case StrId::STR_CLOCK:
-    case StrId::STR_CLOCK_FORMAT:
-    case StrId::STR_TIMEZONE:
-    case StrId::STR_CLOCK_DST:
-    case StrId::STR_CLOCK_IN_HEADER:
-    case StrId::STR_CLOCK_SYNCED:
-      return !halClock.isAvailable();
-    // Hidden on touch boards: the Home button actions (X4 Pro) or the short
-    // power click (other touch boards) cover these shortcuts.
-    case StrId::STR_LONG_PRESS_MENU:
-      return BoardConfig::hasTouch();
-    default:
-      return false;
-  }
-}
-
-// Replaces the font family and size entries with options built from the fonts
-// present; other entries are left unchanged.
-inline void buildFontOptions(SettingInfo& s, const SdCardFontRegistry* registry) {
-  if (s.nameId == StrId::STR_FONT_FAMILY && registry && registry->getFamilyCount() > 0) {
-    s = buildFontFamilySetting(registry);
-  } else if (s.nameId == StrId::STR_FONT_SIZE) {
-    // Unconditional: even with no SD fonts installed the sizes come from the
-    // built-in family rather than a fixed Small/Medium/Large/XL enum.
-    s = buildFontSizeSetting(registry);
-  }
-}
-
-// Visits the settings shown on this device in list order, one at a time, for
-// callers that need not hold the whole list in memory. Entries whose key
-// wants(key) rejects are skipped before their options are built; wants gets
-// nullptr for entries without a key (actions). The visited entry is valid only
-// during the callback; move from it to keep it.
-template <typename Wants, typename Visit>
-void forEachSetting(const SdCardFontRegistry* registry, const std::vector<DictionaryEntry>* dictionaries, Wants wants,
-                    Visit visit) {
-  bool dictionaryPending = dictionaries && !dictionaries->empty();
-  const auto visitDictionary = [&] {
-    dictionaryPending = false;
-    if (!wants(DICTIONARY_SETTING_KEY)) return;
-    SettingInfo s = buildDictionarySetting(*dictionaries);
-    visit(s);
-  };
-  auto each = [&](SettingInfo& s) {
-    if (isHiddenOnDevice(s)) return;
-    if (s.valuePtr == &CrossPointSettings::vocabularyHistoryEnabled) {
-      if (!dictionaryPending) return;
-      visitDictionary();
+  if (catalog == ShortcutOptionCatalog::HomeButton) {
+    setting.enumValues.push_back(StrId::STR_BACK_HOME);
+    setting.enumRawValues.push_back(CrossPointSettings::HOME_BUTTON_BACK_HOME);
+    if (Frontlight.present()) {
+      setting.enumValues.push_back(StrId::STR_TOGGLE_FRONTLIGHT);
+      setting.enumRawValues.push_back(CrossPointSettings::HOME_BUTTON_TOGGLE_FRONTLIGHT);
     }
-    if (dictionaryPending && s.category == StrId::STR_CAT_CONTROLS) visitDictionary();
-    if (!wants(s.key)) return;
-    buildFontOptions(s, registry);
-    visit(s);
+    setting.enumValues.push_back(StrId::STR_READER_MENU);
+    setting.enumRawValues.push_back(CrossPointSettings::HOME_BUTTON_READER_MENU);
+  }
+
+  for (const auto action : QuickActions::shortcutActionOrder) {
+    if (!QuickActions::isActionAvailable(static_cast<uint8_t>(action))) continue;
+    const uint8_t rawValue = shortcutRawValue(catalog, action);
+    if (rawValue == SHORTCUT_OPTION_UNAVAILABLE) continue;
+    setting.enumValues.push_back(QuickActions::actionLabel(static_cast<uint8_t>(action)));
+    setting.enumRawValues.push_back(rawValue);
+  }
+}
+
+inline SettingInfo buildShortcutSetting(const StrId nameId, uint8_t CrossPointSettings::* const valuePtr,
+                                        const char* const key, const ShortcutOptionCatalog catalog) {
+  SettingInfo setting = SettingInfo::Enum(nameId, valuePtr, std::vector<StrId>{}, key, StrId::STR_CAT_CONTROLS);
+  appendShortcutOptions(setting, catalog);
+  return setting;
+}
+
+inline SettingInfo buildHomeButtonActionSetting(const StrId nameId, uint8_t CrossPointSettings::* const valuePtr,
+                                                const char* const key) {
+  return buildShortcutSetting(nameId, valuePtr, key, ShortcutOptionCatalog::HomeButton);
+}
+
+// Shared settings list used by both the device settings UI and the web settings API.
+// Each entry has a key (for JSON API) and category (for grouping).
+// ACTION-type entries and entries without a key are device-only.
+//
+// The static list is constructed exactly once (master's optimization, #1086 +
+// #1636) so the per-entry SettingInfo cost is paid once. Read-only consumers
+// can use it directly; mutable device UI lists use getSettingsList(), which
+// returns an owned copy and can add SD-card font and dictionary options.
+inline constexpr size_t BASE_SETTINGS_CAPACITY = 102;  // 100 regular entries plus two optional tilt entries.
+
+using SettingVisitor = void (*)(void*, SettingInfo&);
+void forEachBaseSetting(SettingVisitor visit, void* context);
+size_t countBaseSettings();
+inline const std::vector<SettingInfo>& getBaseSettingsList() {
+  static const std::vector<SettingInfo> list = [] {
+    std::vector<SettingInfo> result;
+    result.reserve(countBaseSettings());
+    forEachBaseSetting([](void* p, SettingInfo& info) {
+      static_cast<std::vector<SettingInfo>*>(p)->push_back(info);
+    }, &result);
+    return result;
+  }();
+  return list;
+}
+
+inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* registry = nullptr,
+                                                const DictionaryRegistry* dictRegistry = nullptr) {
+  std::vector<SettingInfo> v = getBaseSettingsList();
+  const bool hasTouch = gpio.hasTouch();
+  if (!hasTouch) {
+    v.erase(std::remove_if(v.begin(), v.end(),
+                           [](const SettingInfo& s) {
+                             return s.nameId == StrId::STR_TOUCH_READER_CONTROLS ||
+                                    s.nameId == StrId::STR_DISABLE_TOUCHSCREEN || s.nameId == StrId::STR_NEXT_PAGE ||
+                                    s.nameId == StrId::STR_PREV_PAGE || s.nameId == StrId::STR_TAP_HIDE_STATUS_BAR ||
+                                    s.nameId == StrId::STR_PINCH_FONT_RESIZE ||
+                                    s.nameId == StrId::STR_TWO_FINGER_ROTATION ||
+                                    s.nameId == StrId::STR_TWO_FINGER_SWIPE_UP ||
+                                    s.nameId == StrId::STR_TWO_FINGER_SWIPE_DOWN ||
+                                    s.nameId == StrId::STR_TWO_FINGER_SWIPE_LEFT ||
+                                    s.nameId == StrId::STR_TWO_FINGER_SWIPE_RIGHT;
+                           }),
+            v.end());
+  }
+  if (!gpio.supportsMultiTouch()) {
+    v.erase(std::remove_if(v.begin(), v.end(),
+                           [](const SettingInfo& s) {
+                             return s.nameId == StrId::STR_PINCH_FONT_RESIZE ||
+                                    s.nameId == StrId::STR_TWO_FINGER_ROTATION ||
+                                    s.nameId == StrId::STR_TWO_FINGER_SWIPE_UP ||
+                                    s.nameId == StrId::STR_TWO_FINGER_SWIPE_DOWN ||
+                                    s.nameId == StrId::STR_TWO_FINGER_SWIPE_LEFT ||
+                                    s.nameId == StrId::STR_TWO_FINGER_SWIPE_RIGHT;
+                           }),
+            v.end());
+  }
+  for (auto& setting : v) {
+    const bool isTwoFingerSwipe =
+        setting.nameId == StrId::STR_TWO_FINGER_SWIPE_UP || setting.nameId == StrId::STR_TWO_FINGER_SWIPE_DOWN ||
+        setting.nameId == StrId::STR_TWO_FINGER_SWIPE_LEFT || setting.nameId == StrId::STR_TWO_FINGER_SWIPE_RIGHT;
+    if (!isTwoFingerSwipe) continue;
+    if (!Frontlight.present()) {
+      removeEnumRawValue(setting, CrossPointSettings::TWO_FINGER_SWIPE_INCREASE_BRIGHTNESS);
+      removeEnumRawValue(setting, CrossPointSettings::TWO_FINGER_SWIPE_DECREASE_BRIGHTNESS);
+      removeEnumRawValue(setting, CrossPointSettings::TWO_FINGER_SWIPE_INCREASE_WARMTH);
+      removeEnumRawValue(setting, CrossPointSettings::TWO_FINGER_SWIPE_DECREASE_WARMTH);
+    } else if (!Frontlight.hasColorTemperature()) {
+      removeEnumRawValue(setting, CrossPointSettings::TWO_FINGER_SWIPE_INCREASE_WARMTH);
+      removeEnumRawValue(setting, CrossPointSettings::TWO_FINGER_SWIPE_DECREASE_WARMTH);
+    }
+  }
+  if (hasTouch) {
+    v.erase(std::remove_if(v.begin(), v.end(),
+                           [](const SettingInfo& s) {
+                             return s.nameId == StrId::STR_FRONT_BTN_FOLLOW_ORIENTATION ||
+                                    s.nameId == StrId::STR_SUNLIGHT_FADING_FIX;
+                           }),
+            v.end());
+
+    const auto themeIt =
+        std::find_if(v.begin(), v.end(), [](const SettingInfo& s) { return s.nameId == StrId::STR_UI_THEME; });
+    if (themeIt != v.end()) {
+      removeEnumRawValue(*themeIt, static_cast<uint8_t>(CrossPointSettings::UI_THEME::CLASSIC));
+      removeEnumRawValue(*themeIt, static_cast<uint8_t>(CrossPointSettings::UI_THEME::ROUNDEDRAFF));
+    }
+  }
+  if (!gpio.hasHomeKey()) {
+    v.erase(std::remove_if(v.begin(), v.end(),
+                           [](const SettingInfo& s) {
+                             return s.nameId == StrId::STR_IN_READER || s.nameId == StrId::STR_HOME_BUTTON_TAP ||
+                                    s.nameId == StrId::STR_HOME_BUTTON_DOUBLE_TAP ||
+                                    settingKeyIs(s, "homeButtonLongPressAction");
+                           }),
+            v.end());
+    for (auto& setting : v) {
+      if (setting.nameId == StrId::STR_SHORT_PWR_BTN || settingKeyIs(setting, "longPwrBtn")) {
+        removeEnumRawValue(setting, CrossPointSettings::TOGGLE_HOME_BUTTON_IN_READER);
+      } else if (settingKeyIs(setting, "powerChordAction") || settingKeyIs(setting, "sideButtonChordAction")) {
+        removeEnumRawValue(setting, shortcutRawValue(ShortcutOptionCatalog::ButtonChord,
+                                                     CrossPointSettings::TOGGLE_HOME_BUTTON_IN_READER));
+      }
+    }
+  }
+  if (!Frontlight.present() || !gpio.hasTouch()) {
+    for (auto& setting : v) {
+      if (setting.nameId != StrId::STR_SHORT_PWR_BTN && !settingKeyIs(setting, "longPwrBtn") &&
+          !settingKeyIs(setting, "powerChordAction") && !settingKeyIs(setting, "sideButtonChordAction")) {
+        continue;
+      }
+      const auto catalog = settingKeyIs(setting, "powerChordAction") || settingKeyIs(setting, "sideButtonChordAction")
+                               ? ShortcutOptionCatalog::ButtonChord
+                               : ShortcutOptionCatalog::PowerButton;
+      if (!Frontlight.present()) {
+        removeEnumRawValue(setting, shortcutRawValue(catalog, CrossPointSettings::TOGGLE_FRONTLIGHT));
+      }
+      if (!gpio.hasTouch()) {
+        removeEnumRawValue(setting, shortcutRawValue(catalog, CrossPointSettings::TOGGLE_TOUCHSCREEN));
+      }
+    }
+  }
+  if (!Frontlight.present()) {
+    for (auto& setting : v) {
+      if (setting.nameId == StrId::STR_REFRESH_FREQ) {
+        removeEnumRawValue(setting, CrossPointSettings::REFRESH_NEVER);
+      }
+    }
+  }
+  if (registry && registry->getFamilyCount() > 0) {
+    auto it = std::find_if(v.begin(), v.end(), [](const SettingInfo& s) { return s.nameId == StrId::STR_FONT_FAMILY; });
+    if (it != v.end()) {
+      *it = buildFontFamilySetting(registry);
+    }
+    auto fontSizeIt =
+        std::find_if(v.begin(), v.end(), [](const SettingInfo& s) { return s.nameId == StrId::STR_FONT_SIZE; });
+    if (fontSizeIt != v.end()) {
+      *fontSizeIt = buildFontSizeSetting(registry);
+    }
+  }
+  if (dictRegistry) {
+    if (dictRegistry->count() > 0) {
+      auto fontSizeIt =
+          std::find_if(v.begin(), v.end(), [](const SettingInfo& s) { return s.nameId == StrId::STR_FONT_SIZE; });
+      const size_t insertIndex =
+          fontSizeIt == v.end() ? v.size() : static_cast<size_t>(std::distance(v.begin(), fontSizeIt) + 1);
+      v.insert(v.begin() + insertIndex, buildDictionaryFontFamilySetting(registry));
+      v.insert(v.begin() + insertIndex + 1, buildDictionaryFontSizeSetting(registry));
+    }
+    auto guideIt =
+        std::find_if(v.begin(), v.end(), [](const SettingInfo& s) { return s.nameId == StrId::STR_GUIDE_READING; });
+    const auto insertPos = guideIt == v.end() ? v.end() : guideIt + 1;
+    v.insert(insertPos, buildDictionarySetting(dictRegistry));
+  }
+  return v;
+}
+
+inline void addSettingByName(std::vector<SettingInfo>& target, const std::vector<SettingInfo>& allSettings,
+                             StrId nameId) {
+  const auto it = std::find_if(allSettings.begin(), allSettings.end(),
+                               [nameId](const auto& setting) { return setting.nameId == nameId; });
+  if (it != allSettings.end()) {
+    target.push_back(*it);
+  }
+}
+
+inline std::vector<SettingInfo> buildReaderSettingsParentList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> readerSettings;
+  readerSettings.reserve(12);
+  readerSettings.push_back(SettingInfo::Submenu(StrId::STR_READER_FONT_OPTIONS, SettingAction::ReaderFontOptions));
+  readerSettings.push_back(SettingInfo::Submenu(StrId::STR_READER_PAGE_LAYOUT, SettingAction::ReaderPageLayout));
+  readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
+  addSettingByName(readerSettings, allSettings, StrId::STR_PUBLISHER_PAGE_NUMBERS);
+  addSettingByName(readerSettings, allSettings, StrId::STR_DISABLE_TOUCHSCREEN);
+  addSettingByName(readerSettings, allSettings, StrId::STR_EMBEDDED_STYLE);
+  addSettingByName(readerSettings, allSettings, StrId::STR_IMAGES);
+  addSettingByName(readerSettings, allSettings, StrId::STR_FOCUS_READING);
+  addSettingByName(readerSettings, allSettings, StrId::STR_GUIDE_READING);
+  addSettingByName(readerSettings, allSettings, StrId::STR_DICTIONARY);
+  addSettingByName(readerSettings, allSettings, StrId::STR_INDEXING_METHOD);
+  return readerSettings;
+}
+
+inline std::vector<SettingInfo> buildBookReaderSettingsParentList(const std::vector<SettingInfo>& allSettings) {
+  auto settings = buildReaderSettingsParentList(allSettings);
+  settings.erase(
+      std::remove_if(settings.begin(), settings.end(),
+                     [](const SettingInfo& setting) { return setting.nameId == StrId::STR_DISABLE_TOUCHSCREEN; }),
+      settings.end());
+  return settings;
+}
+
+inline std::vector<SettingInfo> buildReaderFontSettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> settings;
+  settings.reserve(10);
+  addSettingByName(settings, allSettings, StrId::STR_FONT_FAMILY);
+  addSettingByName(settings, allSettings, StrId::STR_FONT_SIZE);
+  addSettingByName(settings, allSettings, StrId::STR_DICTIONARY_FONT);
+  addSettingByName(settings, allSettings, StrId::STR_DICTIONARY_FONT_SIZE);
+  addSettingByName(settings, allSettings, StrId::STR_LINE_SPACING);
+  addSettingByName(settings, allSettings, StrId::STR_WORD_SPACING);
+  addSettingByName(settings, allSettings, StrId::STR_TEXT_AA);
+  settings.push_back(SettingInfo::Action(StrId::STR_DOWNLOAD_FONTS, SettingAction::DownloadFonts));
+  addSettingByName(settings, allSettings, StrId::STR_SD_FONT_SIZE_RANGE);
+  return settings;
+}
+
+inline std::vector<SettingInfo> buildReaderPageLayoutSettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> settings;
+  settings.reserve(6);
+  addSettingByName(settings, allSettings, StrId::STR_ORIENTATION);
+  addSettingByName(settings, allSettings, StrId::STR_SCREEN_MARGIN);
+  addSettingByName(settings, allSettings, StrId::STR_PARA_ALIGNMENT);
+  addSettingByName(settings, allSettings, StrId::STR_HYPHENATION);
+  addSettingByName(settings, allSettings, StrId::STR_EXTRA_SPACING);
+  addSettingByName(settings, allSettings, StrId::STR_FORCE_PARAGRAPH_INDENTS);
+  return settings;
+}
+
+inline std::vector<SettingInfo> buildReaderScreenMarginSettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> settings;
+  settings.reserve(2);
+  addSettingByName(settings, allSettings, StrId::STR_TOP_BOTTOM);
+  addSettingByName(settings, allSettings, StrId::STR_LEFT_RIGHT);
+  return settings;
+}
+
+inline void addSettingByKey(std::vector<SettingInfo>& target, const std::vector<SettingInfo>& allSettings,
+                            const char* key) {
+  const auto it = std::find_if(allSettings.begin(), allSettings.end(),
+                               [key](const auto& setting) { return settingKeyIs(setting, key); });
+  if (it != allSettings.end()) {
+    target.push_back(*it);
+  }
+}
+
+inline bool hasSettingByName(const std::vector<SettingInfo>& allSettings, StrId nameId) {
+  return std::any_of(allSettings.begin(), allSettings.end(),
+                     [nameId](const auto& setting) { return setting.nameId == nameId; });
+}
+
+inline bool hasSideButtonChordSetting(const std::vector<SettingInfo>& allSettings) {
+  return deviceSupportsSideButtonChord(gpio) && hasSettingByName(allSettings, StrId::STR_SIDE_BUTTON_CHORD);
+}
+
+inline std::vector<SettingInfo> buildControlsSettingsParentList(const std::vector<SettingInfo>& allSettings) {
+  const bool hasTiltPageTurnSetting = hasSettingByName(allSettings, StrId::STR_TILT_PAGE_TURN);
+  const bool hasTiltPageTurnDirectionSetting = hasSettingByName(allSettings, StrId::STR_TILT_PAGE_TURN_DIRECTION);
+  const bool hasTapsGestures = hasSettingByName(allSettings, StrId::STR_NEXT_PAGE);
+  const bool hasFrontButtons = !gpio.hasTouch();
+  const bool hasHomeKey = gpio.hasHomeKey();
+
+  std::vector<SettingInfo> settings;
+  settings.reserve(3 + (hasHomeKey ? 1u : 0u) + (hasFrontButtons ? 1u : 0u) + (hasTiltPageTurnSetting ? 1u : 0u) +
+                   (hasTiltPageTurnDirectionSetting ? 1u : 0u) + (hasTapsGestures ? 1u : 0u));
+  if (hasHomeKey) {
+    settings.push_back(SettingInfo::Submenu(StrId::STR_HOME_BUTTON, SettingAction::ControlsHomeButton));
+  }
+  settings.push_back(SettingInfo::Submenu(StrId::STR_POWER_BUTTON, SettingAction::ControlsPowerButton));
+  if (hasFrontButtons) {
+    settings.push_back(SettingInfo::Submenu(StrId::STR_FRONT_BUTTONS, SettingAction::ControlsFrontButtons));
+  }
+  settings.push_back(SettingInfo::Submenu(StrId::STR_SIDE_BUTTONS, SettingAction::ControlsSideButtons));
+  settings.push_back(SettingInfo::Action(StrId::STR_QUICK_ACTIONS, SettingAction::QuickActions));
+  if (hasTapsGestures) {
+    settings.push_back(SettingInfo::Submenu(StrId::STR_TAPS_AND_GESTURES, SettingAction::ControlsTapsGestures));
+  }
+  if (hasTiltPageTurnSetting) addSettingByName(settings, allSettings, StrId::STR_TILT_PAGE_TURN);
+  if (hasTiltPageTurnDirectionSetting) addSettingByName(settings, allSettings, StrId::STR_TILT_PAGE_TURN_DIRECTION);
+  return settings;
+}
+
+inline std::vector<SettingInfo> buildControlsTapsGesturesSettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> settings;
+  const bool hasPinch = hasSettingByName(allSettings, StrId::STR_PINCH_FONT_RESIZE);
+  const bool hasRotation = hasSettingByName(allSettings, StrId::STR_TWO_FINGER_ROTATION);
+  const bool hasTwoFingerSwipe = hasSettingByName(allSettings, StrId::STR_TWO_FINGER_SWIPE_UP);
+  settings.reserve(3 + (hasPinch ? 1u : 0u) + (hasRotation ? 1u : 0u) + (hasTwoFingerSwipe ? 1u : 0u));
+  addSettingByName(settings, allSettings, StrId::STR_NEXT_PAGE);
+  addSettingByName(settings, allSettings, StrId::STR_PREV_PAGE);
+  if (hasPinch) addSettingByName(settings, allSettings, StrId::STR_PINCH_FONT_RESIZE);
+  if (hasRotation) addSettingByName(settings, allSettings, StrId::STR_TWO_FINGER_ROTATION);
+  addSettingByName(settings, allSettings, StrId::STR_TAP_HIDE_STATUS_BAR);
+  if (hasTwoFingerSwipe) {
+    settings.push_back(SettingInfo::Submenu(StrId::STR_TWO_FINGER_SWIPE, SettingAction::ControlsTwoFingerSwipe));
+  }
+  return settings;
+}
+
+inline std::vector<SettingInfo> buildControlsTwoFingerSwipeSettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> settings;
+  settings.reserve(4);
+  addSettingByName(settings, allSettings, StrId::STR_TWO_FINGER_SWIPE_UP);
+  addSettingByName(settings, allSettings, StrId::STR_TWO_FINGER_SWIPE_DOWN);
+  addSettingByName(settings, allSettings, StrId::STR_TWO_FINGER_SWIPE_LEFT);
+  addSettingByName(settings, allSettings, StrId::STR_TWO_FINGER_SWIPE_RIGHT);
+  return settings;
+}
+
+inline std::vector<SettingInfo> buildControlsHomeButtonSettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> settings;
+  settings.reserve(4);
+  addSettingByName(settings, allSettings, StrId::STR_IN_READER);
+  addSettingByName(settings, allSettings, StrId::STR_HOME_BUTTON_TAP);
+  addSettingByName(settings, allSettings, StrId::STR_HOME_BUTTON_DOUBLE_TAP);
+  addSettingByKey(settings, allSettings, "homeButtonLongPressAction");
+  return settings;
+}
+
+inline std::vector<SettingInfo> buildControlsPowerSettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> settings;
+  settings.reserve(4);
+  addSettingByName(settings, allSettings, StrId::STR_SHORT_PWR_BTN);
+  addSettingByKey(settings, allSettings, "longPwrBtn");
+  if (SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::FOOTNOTES ||
+      SETTINGS.longPwrBtn == CrossPointSettings::SHORT_PWRBTN::FOOTNOTES ||
+      SETTINGS.longPressMenuAction == CrossPointSettings::LONG_PRESS_MENU_ACTION::LONG_MENU_FOOTNOTES ||
+      SETTINGS.longPressBackAction == CrossPointSettings::LONG_PRESS_MENU_ACTION::LONG_MENU_FOOTNOTES) {
+    addSettingByName(settings, allSettings, StrId::STR_PWR_BTN_FOOTNOTE_BACK);
+  }
+  addSettingByName(settings, allSettings, StrId::STR_POWER_BUTTON_CHORD);
+  return settings;
+}
+
+inline std::vector<SettingInfo> buildControlsFrontButtonSettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> settings;
+  settings.reserve(6);
+  settings.push_back(SettingInfo::Action(StrId::STR_REMAP_FRONT_BUTTONS, SettingAction::RemapFrontButtons));
+  settings.push_back(
+      SettingInfo::Action(StrId::STR_REMAP_FRONT_BUTTONS_READER, SettingAction::RemapFrontButtonsReader));
+  addSettingByKey(settings, allSettings, "frontButtonOrientationAware");
+  addSettingByKey(settings, allSettings, "longPressButtonBehavior");
+  addSettingByName(settings, allSettings, StrId::STR_LONG_PRESS_BACK_ACTION);
+  addSettingByName(settings, allSettings, StrId::STR_LONG_PRESS_MENU_ACTION);
+  return settings;
+}
+
+inline std::vector<SettingInfo> buildControlsSideButtonSettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> settings;
+  const bool hasChord = hasSideButtonChordSetting(allSettings);
+  settings.reserve(3 + (hasChord ? 1u : 0u));
+  addSettingByName(settings, allSettings, StrId::STR_SIDE_BTN_LAYOUT);
+  addSettingByKey(settings, allSettings, "sideButtonOrientationAware");
+  addSettingByKey(settings, allSettings, "sideButtonLongPress");
+  if (hasChord) {
+    addSettingByName(settings, allSettings, StrId::STR_SIDE_BUTTON_CHORD);
+  }
+  return settings;
+}
+
+inline std::vector<SettingInfo> buildGroupedDisplaySettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> displaySettings;
+  displaySettings.reserve(9);
+
+  auto addDisplaySetting = [&](StrId nameId) {
+    const auto it = std::find_if(allSettings.begin(), allSettings.end(),
+                                 [nameId](const auto& setting) { return setting.nameId == nameId; });
+    if (it != allSettings.end()) {
+      displaySettings.push_back(*it);
+    }
+  };
+
+  displaySettings.push_back(SettingInfo::Submenu(StrId::STR_DISPLAY_SLEEP_SCREEN, SettingAction::DisplaySleepScreen));
+  if (Frontlight.present()) {
+    displaySettings.push_back(SettingInfo::Submenu(StrId::STR_FRONTLIGHT, SettingAction::DisplayFrontlight));
+  }
+  addDisplaySetting(StrId::STR_HIDE_BATTERY);
+  if (halClock.isAvailable()) {
+    addDisplaySetting(StrId::STR_HIDE_CLOCK);
+  }
+  addDisplaySetting(StrId::STR_REFRESH_FREQ);
+  addDisplaySetting(StrId::STR_NIGHT_MODE);
+  addDisplaySetting(StrId::STR_UI_THEME);
+  addDisplaySetting(StrId::STR_UI_SCALE);
+  addDisplaySetting(StrId::STR_RECENT_BOOKS_VIEW);
+  addDisplaySetting(StrId::STR_SUNLIGHT_FADING_FIX);
+
+  return displaySettings;
+}
+
+inline std::vector<SettingInfo> buildDisplayFrontlightSettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> settings;
+  settings.reserve(4);
+
+  auto addDisplaySetting = [&](const StrId nameId) {
+    const auto it = std::find_if(allSettings.begin(), allSettings.end(),
+                                 [nameId](const auto& setting) { return setting.nameId == nameId; });
+    if (it != allSettings.end()) settings.push_back(*it);
+  };
+
+  addDisplaySetting(StrId::STR_RESTORE_LIGHT_ON_WAKE);
+  if (halClock.isAvailable()) {
+    addDisplaySetting(StrId::STR_FRONTLIGHT_SCHEDULE);
+    addDisplaySetting(StrId::STR_START);
+    addDisplaySetting(StrId::STR_END);
+  }
+  return settings;
+}
+
+inline std::vector<SettingInfo> buildDisplaySleepSettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> sleepSettings;
+  sleepSettings.reserve(4);
+
+  auto addSleepSetting = [&](StrId nameId, StrId displayNameId) {
+    const auto it = std::find_if(allSettings.begin(), allSettings.end(),
+                                 [nameId](const auto& setting) { return setting.nameId == nameId; });
+    if (it != allSettings.end()) {
+      sleepSettings.push_back(*it);
+      sleepSettings.back().nameId = displayNameId;
+    }
+  };
+
+  addSleepSetting(StrId::STR_SLEEP_SCREEN, StrId::STR_SLEEP_SCREEN_WALLPAPER);
+  addSleepSetting(StrId::STR_SLEEP_COVER_MODE, StrId::STR_SLEEP_COVER_MODE_SHORT);
+  addSleepSetting(StrId::STR_SLEEP_COVER_FILTER, StrId::STR_SLEEP_COVER_FILTER_SHORT);
+  addSleepSetting(StrId::STR_QUICK_RESUME_TIMEOUT, StrId::STR_QUICK_RESUME_TIMEOUT);
+
+  return sleepSettings;
+}
+
+inline std::vector<SettingInfo> buildSystemSettingsParentList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> systemSettings;
+  systemSettings.reserve(8);
+  systemSettings.push_back(SettingInfo::Submenu(StrId::STR_SYSTEM_DEVICE, SettingAction::SystemDevice));
+  systemSettings.push_back(SettingInfo::Submenu(StrId::STR_SYSTEM_FILES_CACHE, SettingAction::SystemFilesCache));
+  systemSettings.push_back(SettingInfo::Submenu(StrId::STR_READING_STATS, SettingAction::SystemReadingStats));
+  systemSettings.push_back(SettingInfo::Action(StrId::STR_WIFI_NETWORKS, SettingAction::Network));
+  systemSettings.push_back(SettingInfo::Action(StrId::STR_KOREADER_SYNC, SettingAction::KOReaderSync));
+  systemSettings.push_back(SettingInfo::Action(StrId::STR_OPDS_SERVERS, SettingAction::OPDSBrowser));
+  systemSettings.push_back(SettingInfo::Action(StrId::STR_CHECK_UPDATES, SettingAction::CheckForUpdates));
+  systemSettings.push_back(SettingInfo::Action(StrId::STR_SD_FIRMWARE_UPDATE, SettingAction::SdFirmwareUpdate));
+  return systemSettings;
+}
+
+inline std::vector<SettingInfo> buildSystemDeviceSettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> settings;
+  settings.reserve(10);
+  addSettingByName(settings, allSettings, StrId::STR_DEVICE_NAME);
+  addSettingByName(settings, allSettings, StrId::STR_TIME_TO_SLEEP);
+  addSettingByName(settings, allSettings, StrId::STR_CUSTOM_BOOTSCREEN);
+  settings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
+  settings.push_back(SettingInfo::Action(StrId::STR_KEYBOARD_LAYOUTS, SettingAction::KeyboardLayouts));
+  if (halClock.isAvailable()) {
+    addSettingByName(settings, allSettings, StrId::STR_CLOCK_FORMAT);
+    addSettingByName(settings, allSettings, StrId::STR_CLOCK_UTC_OFFSET);
+    addSettingByName(settings, allSettings, StrId::STR_DATE_FORMAT);
+    addSettingByName(settings, allSettings, StrId::STR_DATE_SEPARATOR);
+    settings.push_back(SettingInfo::Action(StrId::STR_CLOCK_SYNC_NOW, SettingAction::ClockSync));
+  }
+  return settings;
+}
+
+inline std::vector<SettingInfo> buildSystemFilesCacheSettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> settings;
+  settings.reserve(6);
+  addSettingByName(settings, allSettings, StrId::STR_SHOW_HIDDEN_FILES);
+  addSettingByName(settings, allSettings, StrId::STR_HIDE_FILE_EXTENSION);
+  addSettingByName(settings, allSettings, StrId::STR_FILE_BROWSER_DISPLAY);
+  addSettingByName(settings, allSettings, StrId::STR_REMOVE_READ_FROM_RECENTS);
+  addSettingByName(settings, allSettings, StrId::STR_MOVE_FINISHED_TO_READ);
+  settings.push_back(SettingInfo::Action(StrId::STR_CLEAR_READING_CACHE, SettingAction::ClearCache));
+  return settings;
+}
+
+inline std::vector<SettingInfo> buildFileBrowserSettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> settings;
+  settings.reserve(3);
+  addSettingByName(settings, allSettings, StrId::STR_SHOW_HIDDEN_FILES);
+  addSettingByName(settings, allSettings, StrId::STR_HIDE_FILE_EXTENSION);
+  addSettingByName(settings, allSettings, StrId::STR_FILE_BROWSER_DISPLAY);
+  return settings;
+}
+
+inline std::vector<SettingInfo> buildSystemReadingStatsSettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> settings;
+  settings.reserve(3);
+  addSettingByName(settings, allSettings, StrId::STR_TRACK_READING_STATS);
+  settings.push_back(SettingInfo::Submenu(StrId::STR_ALL_TIME_STATS, SettingAction::SystemGlobalStats));
+  addSettingByName(settings, allSettings, StrId::STR_IDLE_TIME_THRESHOLD);
+  return settings;
+}
+
+inline std::vector<SettingInfo> buildSystemGlobalStatsSettingsList(const std::vector<SettingInfo>& allSettings) {
+  std::vector<SettingInfo> settings;
+  settings.reserve(3);
+  if (halClock.isAvailable()) {
+    addSettingByName(settings, allSettings, StrId::STR_AUTO_BACKUP_STATS);
+  }
+  settings.push_back(SettingInfo::Action(StrId::STR_BACKUP_NOW, SettingAction::BackupStats));
+  settings.push_back(SettingInfo::Action(StrId::STR_RESET_ALL_TIME_STATS, SettingAction::ResetGlobalStats));
+  return settings;
+}
+
+// One temporary SettingInfo at a time: persistence does not allocate the UI list.
+template <typename Visitor>
+inline void forEachBaseSetting(Visitor&& visitor) {
+  using T = std::remove_reference_t<Visitor>;
+  forEachBaseSetting([](void* p, SettingInfo& info) { (*static_cast<T*>(p))(info); }, &visitor);
+}
+
+// Modern network callers pass a discovered entry vector; retain the registry
+// overload above for owner device callers. Filtering precedes expensive fonts.
+template <typename Wants, typename Visit>
+inline void forEachSetting(const SdCardFontRegistry* registry,
+                           const std::vector<DictionaryEntry>* dictionaries, Wants wants, Visit visit) {
+  bool pending = dictionaries && !dictionaries->empty();
+  const auto dictionary = [&] {
+    pending = false;
+    if (wants("dictionary")) { auto info = buildDictionarySetting(*dictionaries); visit(info); }
+  };
+  auto each = [&](SettingInfo& info) {
+    if (pending && (info.category == StrId::STR_CAT_CONTROLS ||
+                    info.valuePtr == &CrossPointSettings::vocabularyHistoryEnabled)) dictionary();
+    if (!wants(info.key)) return;
+    if (info.nameId == StrId::STR_FONT_FAMILY) info = buildFontFamilySetting(registry);
+    else if (info.nameId == StrId::STR_FONT_SIZE) info = buildFontSizeSetting(registry);
+    visit(info);
   };
   forEachBaseSetting(each);
-  if (dictionaryPending) visitDictionary();
+  if (pending) dictionary();
 }
 
-// UI callers own the list for runtime filtering and font/dictionary options.
-inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* registry = nullptr,
-                                                const std::vector<DictionaryEntry>* dictionaries = nullptr) {
-  std::vector<SettingInfo> v;
-  // Room for every base entry and the dictionary, so the list never reallocates.
-  v.reserve(countBaseSettings() + (dictionaries && !dictionaries->empty() ? 1 : 0));
-  forEachSetting(
-      registry, dictionaries, [](const char*) { return true; }, [&v](SettingInfo& s) { v.push_back(std::move(s)); });
-  return v;
+inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* registry,
+                                               const std::vector<DictionaryEntry>* dictionaries) {
+  std::vector<SettingInfo> result;
+  result.reserve(countBaseSettings() + (dictionaries && !dictionaries->empty() ? 1 : 0));
+  forEachSetting(registry, dictionaries, [](const char*) { return true; },
+                 [&](SettingInfo& info) { result.push_back(std::move(info)); });
+  return result;
 }

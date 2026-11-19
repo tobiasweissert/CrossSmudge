@@ -396,6 +396,31 @@ bool interpretShade(const std::string_view value) {
   return luminance >= 128 && luminance < 240;
 }
 
+// Owner image-background policy: only opaque black is special. Do not treat
+// transparent rgba(0,0,0,0) as black merely because its RGB luminance is zero.
+bool interpretOwnerBackgroundBlack(const std::string_view value, bool& out) {
+  bool explicitNonBlack = false;
+  bool black = false;
+  forEachDelimitedToken(value, isAsciiWhitespace, [&](std::string_view token) {
+    black = black || iequalsAscii(token, "black") || token == "#000" || token == "#000000";
+    explicitNonBlack = explicitNonBlack || iequalsAscii(token, "white") || iequalsAscii(token, "#fff") ||
+                       iequalsAscii(token, "#ffffff") || iequalsAscii(token, "transparent") || iequalsAscii(token, "none");
+  });
+  if (black) { out = true; return true; }
+  char compact[256];
+  size_t length = 0;
+  for (char c : value) {
+    if (isAsciiWhitespace(c)) continue;
+    if (length == sizeof(compact)) return false;
+    compact[length++] = asciiToLower(c);
+  }
+  const std::string_view text(compact, length);
+  if (text.find("rgb(0,0,0)") != text.npos || text.find("rgba(0,0,0,1)") != text.npos ||
+      text.find("rgba(0,0,0,1.0)") != text.npos) { out = true; return true; }
+  if (explicitNonBlack) { out = false; return true; }
+  return false;
+}
+
 std::string_view stripTrailingImportant(std::string_view value) {
   constexpr std::string_view IMPORTANT = "!important";
 
@@ -426,8 +451,8 @@ constexpr std::array STYLE_LENGTH_FIELDS = {
 };
 constexpr size_t STYLE_LENGTH_FIELD_COUNT = STYLE_LENGTH_FIELDS.size();
 constexpr size_t STYLE_WIRE_BYTES =
-    5 + STYLE_LENGTH_FIELD_COUNT * (sizeof(decltype(CssLength::value)) + 1) + 6 + 13 + sizeof(uint32_t);
-constexpr uint32_t CSS_DEFINED_BITS_MASK = (1u << 31) - 1;
+    5 + STYLE_LENGTH_FIELD_COUNT * (sizeof(decltype(CssLength::value)) + 1) + 6 + 14 + sizeof(uint32_t);
+constexpr uint32_t CSS_DEFINED_BITS_MASK = UINT32_MAX;
 constexpr uint8_t MAX_INITIAL_LETTER = 6;
 
 void encodeStyleWire(const CssStyle& style, uint8_t (&out)[STYLE_WIRE_BYTES]) {
@@ -461,6 +486,7 @@ void encodeStyleWire(const CssStyle& style, uint8_t (&out)[STYLE_WIRE_BYTES]) {
   out[offset++] = style.floatLeft ? 1 : 0;
   out[offset++] = style.initialLetter;
   out[offset++] = style.preserveWhitespace ? 1 : 0;
+  out[offset++] = style.backgroundBlack ? 1 : 0;
 
   uint32_t definedBits = 0;
   if (style.defined.textAlign) definedBits |= 1 << 0;
@@ -494,6 +520,7 @@ void encodeStyleWire(const CssStyle& style, uint8_t (&out)[STYLE_WIRE_BYTES]) {
   if (style.defined.floatLeft) definedBits |= 1 << 28;
   if (style.defined.initialLetter) definedBits |= 1 << 29;
   if (style.defined.whiteSpace) definedBits |= 1u << 30;
+  if (style.defined.backgroundBlack) definedBits |= 1u << 31;
   memcpy(out + offset, &definedBits, sizeof(definedBits));
 }
 
@@ -567,6 +594,9 @@ bool decodeStyleWire(const uint8_t (&in)[STYLE_WIRE_BYTES], CssStyle& style) {
   const uint8_t preserveWhitespace = in[offset++];
   if (preserveWhitespace > 1) return false;
   style.preserveWhitespace = preserveWhitespace != 0;
+  const uint8_t backgroundBlack = in[offset++];
+  if (backgroundBlack > 1) return false;
+  style.backgroundBlack = backgroundBlack != 0;
 
   uint32_t definedBits = 0;
   memcpy(&definedBits, in + offset, sizeof(definedBits));
@@ -602,6 +632,7 @@ bool decodeStyleWire(const uint8_t (&in)[STYLE_WIRE_BYTES], CssStyle& style) {
   style.defined.floatLeft = (definedBits & 1 << 28) != 0;
   style.defined.initialLetter = (definedBits & 1 << 29) != 0;
   style.defined.whiteSpace = (definedBits & 1u << 30) != 0;
+  style.defined.backgroundBlack = (definedBits & 1u << 31) != 0;
   return true;
 }
 
@@ -1067,6 +1098,11 @@ void CssParser::parseDeclarationIntoStyle(std::string_view decl, CssStyle& style
     parseBorderDeclaration(name, value, style);
   } else if (iequalsAscii(name, "background-color") || iequalsAscii(name, "background")) {
     style.shaded = interpretShade(value);
+    bool backgroundBlack = false;
+    if (interpretOwnerBackgroundBlack(value, backgroundBlack)) {
+      style.backgroundBlack = backgroundBlack;
+      style.defined.backgroundBlack = 1;
+    }
     style.defined.shaded = 1;
   } else if (iequalsAscii(name, "float")) {
     style.floatLeft = iequalsAscii(value, "left");
@@ -1349,8 +1385,10 @@ CssParser::ParseResult CssParser::loadFromStream(HalFile& source) {
 
   char buffer[READ_BUFFER_SIZE];
   while (source.available()) {
-    int bytesRead = source.read(buffer, sizeof(buffer));
-    if (bytesRead <= 0) break;
+    if (totalRead >= maxSourceBytes()) { inputTruncated = true; break; }
+    const size_t wanted = std::min(sizeof(buffer), maxSourceBytes() - totalRead);
+    int bytesRead = source.read(buffer, wanted);
+    if (bytesRead <= 0) return ParseResult::Error;
 
     totalRead += static_cast<size_t>(bytesRead);
 

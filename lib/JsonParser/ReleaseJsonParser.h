@@ -1,13 +1,15 @@
 #pragma once
 
-#include <StreamingJsonParser.h>
-
 #include <cstddef>
 #include <cstdint>
 
+#include <StreamingJsonParser.h>
+
 class ReleaseJsonParser {
  public:
-  ReleaseJsonParser();
+  using AssetMatcher = bool (*)(const char* assetName);
+
+  explicit ReleaseJsonParser(AssetMatcher assetMatcher = nullptr);
 
   ReleaseJsonParser(const ReleaseJsonParser&) = delete;
   ReleaseJsonParser& operator=(const ReleaseJsonParser&) = delete;
@@ -15,7 +17,7 @@ class ReleaseJsonParser {
   void reset();
   void feed(const char* data, size_t len);
 
-  // Release-asset filename to match (default "firmware.bin").
+  // Exact configured name takes precedence over the optional matcher.
   void setFirmwareAssetName(const char* name);
 
   bool foundTag() const;
@@ -23,6 +25,7 @@ class ReleaseJsonParser {
   const char* getTagName() const;
   const char* getFirmwareUrl() const;
   size_t getFirmwareSize() const;
+  const char* getFirmwareSha256() const;
 
  private:
   enum class Position : uint8_t {
@@ -38,6 +41,8 @@ class ReleaseJsonParser {
     ASSET_NAME,
     ASSET_URL,
     ASSET_SIZE,
+    ASSET_SHA256,
+    ASSET_DIGEST,
   };
 
   static void sOnKey(void* ctx, const char* key, size_t len);
@@ -53,6 +58,9 @@ class ReleaseJsonParser {
   void commitAsset();
 
   StreamingJsonParser parser;
+  AssetMatcher assetMatcher;
+  char firmwareAssetName[96] = {};
+  bool exactAssetName = false;
 
   Position position;
   LastKey lastKey;
@@ -61,13 +69,15 @@ class ReleaseJsonParser {
 
   char tagName[32];
   char firmwareUrl[512];
+  char firmwareSha256[65];
   size_t firmwareSize;
   bool tagFound;
   bool firmwareFound;
+  bool documentComplete = false;
+  bool invalidAsset = false;
 
-  char currentAssetName[48];
+  char currentAssetName[96];
   char currentAssetUrl[512];
+  char currentAssetSha256[65];
   size_t currentAssetSize;
-
-  char firmwareAssetName[48];
 };

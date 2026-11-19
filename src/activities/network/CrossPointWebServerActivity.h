@@ -3,9 +3,11 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "NetworkModeSelectionActivity.h"
 #include "activities/Activity.h"
+#include "activities/ScreenTransitionRefresh.h"
 #include "network/CrossPointWebServer.h"
 
 // Web server activity states
@@ -20,8 +22,7 @@ enum class WebServerActivityState {
 /**
  * CrossPointWebServerActivity is the entry point for file transfer functionality.
  * It:
- * - First presents a choice between "Join a Network" (STA), "Calibre Wireless", "Create Hotspot" (AP), and
- *   "OPDS Browser" (which hands off to the browser before Wi-Fi starts)
+ * - First presents a choice between "Join a Network" (STA), "Connect to Calibre", and "Create Hotspot" (AP)
  * - For STA mode: Launches WifiSelectionActivity to connect to an existing network
  * - For AP mode: Creates an Access Point that clients can connect to
  * - Starts the CrossPointWebServer when connected
@@ -30,13 +31,15 @@ enum class WebServerActivityState {
  */
 class CrossPointWebServerActivity final : public Activity {
   WebServerActivityState state = WebServerActivityState::MODE_SELECTION;
+  std::string returnBookPath;
+  bool hasInitialNetworkMode = false;
+  NetworkMode initialNetworkMode = NetworkMode::JOIN_NETWORK;
+  bool networkBootReady = false;
+  bool airDropHandoff = false;  // The native receiver replaces this inactive menu parent.
 
   // Network mode
   NetworkMode networkMode = NetworkMode::JOIN_NETWORK;
   bool isApMode = false;
-  // Set when re-entered after the heap-defrag reboot: skip mode selection, go
-  // straight to Join Network, and don't reboot again.
-  bool startInJoinNetwork = false;
 
   // Web server - owned by this activity
   std::unique_ptr<CrossPointWebServer> webServer;
@@ -48,9 +51,6 @@ class CrossPointWebServerActivity final : public Activity {
   // Performance monitoring
   unsigned long lastHandleClientTime = 0;
 
-  // Set when Back or Home is seen while an upload holds handleClient().
-  bool leaveRequested = false;
-
   // Sustained WiFi-loss tracking; abandon only after WIFI_ABANDON_MS.
   int consecutiveDisconnects = 0;
   unsigned long firstDisconnectAt = 0;
@@ -58,19 +58,32 @@ class CrossPointWebServerActivity final : public Activity {
 
   // Cached signal-strength bracket (0..4) for the WiFi indicator.
   int lastWifiBars = 0;
+  ScreenTransitionRefresh screenTransitionRefresh;
 
   void renderServerRunning() const;
+  void renderHeader() const;
   void renderWifiIndicator(int subHeaderTop) const;
+  bool exitRequested() const;
 
+  bool handoffAirDrop(NetworkMode mode);
   void onNetworkModeSelected(NetworkMode mode);
   void onWifiSelectionComplete(bool connected);
   void startAccessPoint();
   void startWebServer();
+  void stopWebServer();
+  void exitToOrigin();
 
  public:
   explicit CrossPointWebServerActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                       bool startInJoinNetwork = false)
-      : Activity("CrossPointWebServer", renderer, mappedInput), startInJoinNetwork(startInJoinNetwork) {}
+                                       std::string returnBookPath = {})
+      : Activity("CrossPointWebServer", renderer, mappedInput), returnBookPath(std::move(returnBookPath)) {}
+  CrossPointWebServerActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, NetworkMode initialNetworkMode,
+                              std::string returnBookPath = {}, bool networkBootReady = false)
+      : Activity("CrossPointWebServer", renderer, mappedInput),
+        returnBookPath(std::move(returnBookPath)),
+        hasInitialNetworkMode(true),
+        initialNetworkMode(initialNetworkMode),
+        networkBootReady(networkBootReady) {}
   void onEnter() override;
   void onExit() override;
   void loop() override;

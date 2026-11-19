@@ -12,8 +12,8 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
-#include <string>
 
 namespace xtc {
 
@@ -99,8 +99,10 @@ struct PageInfo {
   uint8_t padding;   // Alignment padding
 };
 
+constexpr size_t XTC_CHAPTER_NAME_MAX = 80;
+
 struct ChapterInfo {
-  std::string name;
+  char name[XTC_CHAPTER_NAME_MAX + 1];
   uint16_t startPage;
   uint16_t endPage;
 };

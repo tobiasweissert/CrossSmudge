@@ -8,45 +8,44 @@
 
 class ImageBlock final : public Block {
  public:
-  ImageBlock(const std::string& imagePath, const std::string& srcPath, int16_t width, int16_t height);
+  ImageBlock(std::string imagePath, std::string sourcePath, int16_t width, int16_t height);
   ~ImageBlock() override = default;
 
+  const std::string& getImagePath() const { return imagePath; }
   int16_t getWidth() const { return width; }
   int16_t getHeight() const { return height; }
 
+  void prepareCache() const;
   bool hasValidCache() const;
   bool needsDecode() const;
-  void renderPlaceholder(GfxRenderer& renderer, int x, int y) const;
-  static void clearRenderFailures();
+  void renderPlaceholder(GfxRenderer& renderer, int x, int y, bool foregroundBlack) const;
+  static void clearSessionRenderFailures();
+  static void clearRenderFailures() { clearSessionRenderFailures(); }
+  static void releaseSessionPixelCache();
+  static void releaseRenderCache() { releaseSessionPixelCache(); }
 
-  // A page render draws its image up to ~13 times (BW double-refresh plus every
-  // grayscale band pass), and each draw streams the whole .pxc off SD. The
-  // first draw caches the pixel payload in RAM (chunked, heap-gated, falls back
-  // to streaming when it doesn't fit); the reader calls this when the page
-  // render completes so nothing stays resident between pages.
-  static void releaseRenderCache();
-
-  // Lazy extraction hook: the section build only header-probes images for their
-  // dimensions; the file at imagePath is extracted out of the book on first
-  // render, via this callback (function pointer + context, not std::function —
-  // this is render-loop code). Registered by the reader activity that owns the
-  // Epub, cleared on its exit.
-  using ExtractFn = bool (*)(void* ctx, const char* srcPath, const char* destPath);
-  static void setExtractor(void* ctx, ExtractFn fn);
+  // The section builder only reads image headers. The reader supplies this
+  // allocation-free callback pair to seed a bundled pixel cache or extract the
+  // original image on its first render.
+  using ExtractFn = bool (*)(void* context, const char* sourcePath, const char* destinationPath);
+  using SeedCacheFn = bool (*)(void* context, const char* sourcePath, int width, int height,
+                               const char* destinationPath);
+  static void setExtractor(void* context, ExtractFn extract, SeedCacheFn seedCache = nullptr);
 
   BlockType getType() override { return IMAGE_BLOCK; }
   bool isEmpty() override { return false; }
 
-  void render(GfxRenderer& renderer, const int x, const int y);
+  void render(GfxRenderer& renderer, const int x, const int y, const bool foregroundBlack);
   bool serialize(HalFile& file);
   static std::unique_ptr<ImageBlock> deserialize(HalFile& file);
 
  private:
   std::string imagePath;
-  std::string srcPath;  // book-internal source href; empty once known-extracted
+  std::string sourcePath;
   int16_t width;
   int16_t height;
 
-  static void* extractCtx;
+  static void* extractContext;
   static ExtractFn extractFn;
+  static SeedCacheFn seedCacheFn;
 };

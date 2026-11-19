@@ -6,12 +6,12 @@
 
 namespace serialization {
 template <typename T>
-void writePod(std::ostream& os, const T& value) {
+static void writePod(std::ostream& os, const T& value) {
   os.write(reinterpret_cast<const char*>(&value), sizeof(T));
 }
 
 template <typename T>
-void writePod(HalFile& file, const T& value) {
+static void writePod(HalFile& file, const T& value) {
   file.write(reinterpret_cast<const uint8_t*>(&value), sizeof(T));
 }
 
@@ -26,7 +26,7 @@ void readPod(std::istream& is, T& value) {
 }
 
 template <typename T>
-void readPod(HalFile& file, T& value) {
+static void readPod(HalFile& file, T& value) {
   file.read(reinterpret_cast<uint8_t*>(&value), sizeof(T));
 }
 
@@ -41,7 +41,7 @@ inline void writeString(std::ostream& os, const std::string& s) {
   os.write(s.data(), len);
 }
 
-inline void writeString(HalFile& file, const std::string& s) {
+static void writeString(HalFile& file, const std::string& s) {
   const uint32_t len = s.size();
   writePod(file, len);
   file.write(reinterpret_cast<const uint8_t*>(s.data()), len);
@@ -59,14 +59,14 @@ inline void readString(std::istream& is, std::string& s) {
   is.read(&s[0], len);
 }
 
-inline void readString(HalFile& file, std::string& s) {
+static void readString(HalFile& file, std::string& s) {
   uint32_t len;
   readPod(file, len);
   s.resize(len);
   file.read(&s[0], len);
 }
 
-inline bool tryReadString(HalFile& file, std::string& s, const size_t maxLength) {
+inline bool tryReadString(HalFile& file, std::string& s, const size_t maxLength = std::numeric_limits<size_t>::max()) {
   uint32_t len = 0;
   if (!tryReadPod(file, len)) return false;
   const int remaining = file.available();

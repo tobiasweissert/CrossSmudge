@@ -2,8 +2,15 @@ name: CI (build)
 
 on:
   push:
-    branches: [develop]
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+# A newer commit supersedes older PR validation; keep main pushes independent.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -15,10 +22,11 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+          persist-credentials: false
 
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: "3.14"
 
       - name: Install clang-format-21
         run: |
@@ -39,196 +47,225 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+          persist-credentials: false
 
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: "3.14"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
           version: "latest"
-          enable-cache: false
-
-      - name: Install PlatformIO Core
-        run: |
-          uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
-          # platform-espressif32's builder/main.py imports these unconditionally; its own
-          # penv bootstrap (builder/penv_setup.py) is supposed to install them automatically
-          # but isn't picking them up reliably in this runner image, so pin them explicitly.
-          uv pip install --system -U "littlefs-python>=0.16.0" "fatfs-ng>=0.1.14" "pyyaml>=6.0.2" \
-            "rich-click>=1.8.6" "zopfli>=0.2.2" "intelhex>=2.3.0" "rich>=14.0.0" "urllib3<2" \
-            "cryptography>=45.0.3" "certifi>=2025.8.3" "ecdsa>=0.19.1" "bitstring>=4.3.1" \
-            "reedsolo>=1.5.3,<1.8" "esp-idf-size>=2.0.0" "esp-coredump>=1.14.0"
+          enable-cache: true
 
       - name: Cache PlatformIO packages
         uses: actions/cache@v4
         with:
-          path: ~/.platformio
-          key: pio-v2-${{ runner.os }}-${{ hashFiles('platformio.ini', 'scripts/patch_pioarduino_cache.py') }}
-          restore-keys: pio-v2-${{ runner.os }}-
+          # Do not cache PlatformIO's Python virtual environment. It is tied to
+          # the runner's Python and can become invalid when restored elsewhere.
+          path: |
+            ~/.platformio/packages
+            ~/.platformio/platforms
+          key: ${{ runner.os }}-platformio-py3.14-core6.1.19-${{ hashFiles('platformio.ini', 'platformio.local.example.ini') }}
 
-      - name: Install cppcheck runtime dependency
+      - name: Install PlatformIO Core
+        run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
+
+      - name: Pin nested core and verify source toolchain pins
         run: |
-          # pioarduino's Linux cppcheck binary links against libpcre.so.3.
-          # In newer Ubuntu runner images where libpcre3 is omitted from apt sources,
-          # download from Ubuntu archive over HTTPS and verify SHA-256 before installation.
-          sudo apt-get update
-          if ! sudo apt-get install -y --no-install-recommends libpcre3; then
-            PKG="libpcre3_8.39-13ubuntu0.22.04.1_amd64.deb"
-            SHA256="0d1eb051047eb0c637c893f618f45e1d419863bfa3bc821897ee05ad418ba22e"
-            wget -q "https://security.ubuntu.com/ubuntu/pool/main/p/pcre3/${PKG}"
-            echo "${SHA256}  ${PKG}" | sha256sum -c -
-            sudo dpkg -i "${PKG}"
-            rm -f "${PKG}"
-          fi
+          set -euo pipefail
+          pio pkg install -e sticky
+          uv pip install --python ~/.platformio/penv/bin/python "pioarduino==6.1.19"
+          python3 - <<'PY'
+          import configparser, pathlib, subprocess
+          c = configparser.ConfigParser(interpolation=None)
+          c.read('platformio.ini')
+          assert '/55.03.311/' in c['base']['platform']
+          assert subprocess.check_output(['git', 'ls-tree', 'HEAD', 'freeink-sdk'], text=True).split()[2] == '634a3f8c067a3714a6a7c622015138af096ab5d2'
+          assert subprocess.check_output(['git', '-C', 'freeink-sdk', 'rev-parse', 'HEAD'], text=True).strip() == '634a3f8c067a3714a6a7c622015138af096ab5d2'
+          for exe in ['pio', str(pathlib.Path.home()/'.platformio/penv/bin/pio')]:
+              assert '6.1.19' in subprocess.check_output([exe, '--version'], text=True)
+          PY
 
       - name: Run cppcheck
         run: pio check --fail-on-defect low --fail-on-defect medium --fail-on-defect high
 
   build:
-    name: Build ${{ matrix.env }}
+    # Standard Sticky only; PR/manual/reusable validation never publishes.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # Short board-specific names keep pull-request artifacts easy to identify.
-        # The release workflow applies the published crosspoint-<version>-<device>.bin names.
-        include:
-          - env: default
-            asset: firmware.bin
-          - env: sticky
-            asset: firmware-sticky.bin
-          - env: x4pro
-            asset: firmware-x4pro.bin
-          - env: x4c
-            asset: firmware-x4c.bin
-          - env: papermono
-            asset: firmware-papermono.bin
-          - env: metalio_eink4
-            asset: firmware-metalio_eink4.bin
-          - env: eego_a4
-            asset: firmware-eego_a4.bin
-          - env: picco
-            asset: firmware-picco.bin
+        environment: [sticky]
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
-          fetch-depth: 2
+          persist-credentials: false
+
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: "3.14"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
           version: "latest"
-          enable-cache: false
-
-      - name: Install PlatformIO Core
-        run: |
-          uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
-          # platform-espressif32's builder/main.py imports these unconditionally; its own
-          # penv bootstrap (builder/penv_setup.py) is supposed to install them automatically
-          # but isn't picking them up reliably in this runner image, so pin them explicitly.
-          uv pip install --system -U "littlefs-python>=0.16.0" "fatfs-ng>=0.1.14" "pyyaml>=6.0.2" \
-            "rich-click>=1.8.6" "zopfli>=0.2.2" "intelhex>=2.3.0" "rich>=14.0.0" "urllib3<2" \
-            "cryptography>=45.0.3" "certifi>=2025.8.3" "ecdsa>=0.19.1" "bitstring>=4.3.1" \
-            "reedsolo>=1.5.3,<1.8" "esp-idf-size>=2.0.0" "esp-coredump>=1.14.0"
+          enable-cache: true
 
       - name: Cache PlatformIO packages
         uses: actions/cache@v4
         with:
-          path: ~/.platformio
-          key: pio-v3-${{ runner.os }}-${{ matrix.env }}-${{ hashFiles('platformio.ini', 'scripts/patch_pioarduino_cache.py') }}
-          restore-keys: pio-v3-${{ runner.os }}-${{ matrix.env }}-
+          # Do not cache PlatformIO's Python virtual environment. It is tied to
+          # the runner's Python and can become invalid when restored elsewhere.
+          path: |
+            ~/.platformio/packages
+            ~/.platformio/platforms
+          key: ${{ runner.os }}-platformio-py3.14-core6.1.19-${{ matrix.environment }}-${{ hashFiles('platformio.ini', 'platformio.local.example.ini') }}
 
-      - name: Pin pioarduino core inside the platform penv
+      - name: Install PlatformIO Core
+        run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
+
+      - name: Pin nested core and verify source toolchain pins
         run: |
           set -euo pipefail
-          # Envs with custom_sdkconfig (default, sticky) run a nested `pio run` from
-          # ~/.platformio/penv. The platform bootstraps that penv with an open-ended
-          # "pioarduino>=6.1.19", which now resolves to 6.2.0. That core wants
-          # tool-scons 4.11.1 while platform 55.03.311 pins 4.8.1; the two keep
-          # reinstalling over each other and the running SCons loses its package
-          # mid-build ("No module named 'SCons.Tool.FortranCommon'"). Keep the penv
-          # core on the same version as the outer core installed above.
-          # See https://github.com/pioarduino/platform-espressif32/issues/529
-          pio pkg install -e ${{ matrix.env }}
+          pio pkg install -e sticky
           uv pip install --python ~/.platformio/penv/bin/python "pioarduino==6.1.19"
-          ~/.platformio/penv/bin/pio --version
+          python3 - <<'PY'
+          import configparser, pathlib, subprocess
+          c = configparser.ConfigParser(interpolation=None)
+          c.read('platformio.ini')
+          assert '/55.03.311/' in c['base']['platform']
+          assert subprocess.check_output(['git', 'ls-tree', 'HEAD', 'freeink-sdk'], text=True).split()[2] == '634a3f8c067a3714a6a7c622015138af096ab5d2'
+          assert subprocess.check_output(['git', '-C', 'freeink-sdk', 'rev-parse', 'HEAD'], text=True).strip() == '634a3f8c067a3714a6a7c622015138af096ab5d2'
+          for exe in ['pio', str(pathlib.Path.home()/'.platformio/penv/bin/pio')]:
+              assert '6.1.19' in subprocess.check_output([exe, '--version'], text=True)
+          PY
 
-      - name: Build ${{ matrix.env }} firmware
+      - name: Require recipient-encrypted artifact retention
+        id: recipient
+        env:
+          RECIPIENT_CERT: ${{ vars.CROSSCUB_ARTIFACT_RECIPIENT_CERT }}
         run: |
           set -euo pipefail
-          pio run -e ${{ matrix.env }} | tee pio.log
+          umask 077
+          printf '%s\n' "$RECIPIENT_CERT" > "$RUNNER_TEMP/crosscub-recipient.pem"
+          python3 scripts/seal_ci_artifacts.py validate-cert --cert "$RUNNER_TEMP/crosscub-recipient.pem"
 
-      - name: Upload firmware artifact
-        uses: actions/upload-artifact@v6
+      - name: Test authenticated artifact sealing
+        run: python3 -m unittest discover -s test/crosspoint_migration/ci-sealed-artifacts -v
+
+      - name: Check portable docs and workflow policy
+        run: python3 -m unittest discover -s test/crosspoint_migration/docs-ci -v
+
+      - name: Record approved source before build
+        run: |
+          set -euo pipefail
+          mkdir -p sticky-evidence
+          git rev-parse HEAD > sticky-evidence/source-sha.txt
+          git ls-tree -r HEAD > sticky-evidence/source-tree.txt
+          git submodule status --recursive > sticky-evidence/sdk-status.txt
+          git diff --binary HEAD > sticky-evidence/source-before-build.patch
+          cp platformio.ini partitions.csv sticky-evidence/
+          python3 - <<'PY'
+          import hashlib, json, pathlib, subprocess
+          files = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
+          hashes = {p: hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest() for p in files if p and pathlib.Path(p).is_file()}
+          pathlib.Path('sticky-evidence/source-manifest.json').write_text(json.dumps(hashes, indent=2)+'\n')
+          PY
+
+      - name: Build ${{ matrix.environment }} firmware
+        id: firmware
+        run: |
+          set -euo pipefail
+          # Raw diagnostics (including runner paths) stay inside the sealed evidence.
+          pio run -j1 -e sticky > pio-sticky.log 2>&1
+
+      - name: Stage exact Sticky BIN ELF and provenance
+        if: always() && steps.firmware.outcome != 'skipped'
+        id: qualify
+        run: |
+          set -euo pipefail
+          mkdir -p sticky-evidence
+          cp pio-sticky.log sticky-evidence/build.log
+          # Preserve primary bytes before any metadata command can fail.
+          for name in firmware.bin firmware.elf firmware.map bootloader.bin partitions.bin; do
+            if test -f ".pio/build/sticky/$name"; then
+              cp ".pio/build/sticky/$name" sticky-evidence/
+            fi
+          done
+          trap 'test -f sticky-evidence/image-validation.json || printf "{\"valid\":false,\"error\":\"provenance collection failed\",\"publication_authorized\":false}\\n" > sticky-evidence/image-validation.json' EXIT
+          git diff --binary HEAD > sticky-evidence/source-after-build.patch
+          git -C freeink-sdk diff --binary HEAD > sticky-evidence/sdk-after-build.patch
+          git -C freeink-sdk ls-tree -r HEAD > sticky-evidence/sdk-tree.txt
+          pio pkg list -e sticky --json-output > sticky-evidence/resolved-packages.json
+          python3 - <<'PY'
+          import configparser, hashlib, json, pathlib, shutil, subprocess, sys
+          sys.path.insert(0, 'scripts')
+          from validate_ota_release import validate_release, validate_version
+          out = pathlib.Path('sticky-evidence')
+          config = configparser.ConfigParser(interpolation=None)
+          config.read('platformio.ini')
+          version = validate_version(config['crosssmudge']['version'])
+          assert config['crossink']['version'] == version
+          build = pathlib.Path('.pio/build/sticky')
+          for name in ['firmware.bin', 'firmware.elf', 'firmware.map', 'bootloader.bin', 'partitions.bin']:
+              if (build/name).is_file(): shutil.copy2(build/name, out/name)
+          # Copy, never rebuild or patch descriptor bytes for validation.
+          canonical = out/('crosscub-sticky-v'+version+'.bin')
+          if (out/'firmware.bin').is_file(): shutil.copy2(out/'firmware.bin', canonical)
+          manifests = {}
+          for root, pattern in [(pathlib.Path.home()/'.platformio/packages', '*/package.json'), (pathlib.Path.home()/'.platformio/platforms', '*/platform.json')]:
+              for path in sorted(root.glob(pattern)):
+                  manifests[str(path)] = {'sha256': hashlib.sha256(path.read_bytes()).hexdigest(), 'manifest': json.loads(path.read_text())}
+          cores = {}
+          for exe in ['pio', str(pathlib.Path.home()/'.platformio/penv/bin/pio')]:
+              cores[exe] = subprocess.check_output([exe, '--version'], text=True).strip()
+          compilers = {}
+          for path in sorted((pathlib.Path.home()/'.platformio/packages').glob('toolchain*/bin/*-g++')):
+              compilers[str(path)] = {'sha256': hashlib.sha256(path.read_bytes()).hexdigest(), 'version': subprocess.check_output([str(path), '--version'], text=True)}
+          (out/'toolchain-manifest.json').write_text(json.dumps({'cores': cores, 'packages': manifests, 'compilers': compilers}, indent=2)+'\n')
+          valid = False
+          try:
+              report = validate_release(canonical, version)
+              report.update(valid=True, publication_authorized=False)
+              valid = (out/'firmware.elf').is_file() and bool(compilers)
+          except (ValueError, OSError) as exc:
+              report = {'valid': False, 'error': str(exc), 'publication_authorized': False}
+          (out/'image-validation.json').write_text(json.dumps(report, indent=2)+'\n')
+          hashes = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in out.iterdir() if p.is_file()}
+          (out/'artifact-sha256.json').write_text(json.dumps(hashes, indent=2)+'\n')
+          if not valid: raise SystemExit('BIN/ELF/toolchain qualification failed; preserve diagnostic artifact')
+          PY
+
+      - name: Seal exact Sticky evidence including failed-build diagnostics
+        if: always() && steps.recipient.outcome == 'success' && steps.firmware.outcome != 'skipped'
+        id: seal
+        run: |
+          set -euo pipefail
+          python3 scripts/seal_ci_artifacts.py seal --evidence sticky-evidence --cert "$RUNNER_TEMP/crosscub-recipient.pem" --output sticky-sealed
+
+      - name: Retain encrypted Sticky evidence
+        if: always() && steps.seal.outcome == 'success'
+        uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.asset }}
-          path: .pio/build/${{ matrix.env }}/firmware.bin
+          name: crosscub-sticky-sealed-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            sticky-sealed/sealed.envelope
+            sticky-sealed/receipt.json
           if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
 
       - name: Extract firmware stats
-        id: stats
-        continue-on-error: true
-        env:
-          STATS_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          if git rev-parse --verify HEAD^2 >/dev/null 2>&1; then
-            BASE_SHA="$(git rev-parse HEAD^1)"
-          fi
-          python3 .github/scripts/firmware-stats.py pio.log "${{ matrix.env }}" "$STATS_SHA" \
-            ".pio/build/${{ matrix.env }}/firmware.bin" "$BASE_SHA" > firmware-stats.json
+          set -euo pipefail
           {
-            echo '## ${{ matrix.env }} firmware build stats'
-            echo '```json'
-            cat firmware-stats.json
-            echo '```'
+            echo "## ${{ matrix.environment }} firmware build stats"
+            grep -E "RAM:\s|Flash:\s" pio-${{ matrix.environment }}.log | while read -r line; do echo "- ${line}"; done
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload firmware stats
-        if: steps.stats.outcome == 'success'
-        uses: actions/upload-artifact@v6
-        with:
-          name: firmware-stats-${{ matrix.env }}
-          path: firmware-stats.json
-          if-no-files-found: error
-
-  unit-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: recursive
-
-      - name: Test firmware comment and measurements
-        run: |
-          python3 -m unittest discover -s test -p test_firmware_stats.py
-          node --test test/firmware_comment.test.js
-
-      - name: Install build tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build zlib1g-dev
-
-      - name: Cache googletest source
-        uses: actions/cache@v4
-        with:
-          path: build/test/_deps/googletest-src
-          key: ${{ runner.os }}-googletest-${{ hashFiles('test/CMakeLists.txt') }}
-
-      - name: Configure
-        run: cmake -S test -B build/test -G Ninja -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        run: cmake --build build/test
-
-      - name: Run tests
-        run: ctest --test-dir build/test --output-on-failure -j
 
   # This job is used as the PR required actions check, allows for changes to other steps in the future without breaking
   # PR requirements.
@@ -238,7 +275,6 @@ jobs:
       - build
       - clang-format
       - cppcheck
-      - unit-tests
     if: always()
     runs-on: ubuntu-latest
     steps:

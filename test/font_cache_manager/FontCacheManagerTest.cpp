@@ -165,3 +165,39 @@ TEST(FontCacheManagerTest, IdleLookaheadDefaultsToOneForNonTtfFonts) {
 
   EXPECT_EQ(1, manager.getIdleLookaheadPages(7));
 }
+
+
+// Preserved owner regression cases; current-runtime harness above.
+TEST(FontCacheManagerTest, ReleasesEveryRebuildableFontCacheBeforeMemoryHeavyWork) {
+  SdCardFont readerFont;
+  SdCardFont fallbackFont;
+  FontDecompressor decompressor;
+  const std::map<int, EpdFontFamily> noBuiltinFonts;
+  const std::map<int, SdCardFont*> sdFonts{{-17, &readerFont}, {23, &fallbackFont}};
+  FontCacheManager manager(noBuiltinFonts, sdFonts, kNoTtfFonts);
+  manager.setFontDecompressor(&decompressor);
+
+  manager.releaseSdFontCaches();
+
+  EXPECT_EQ(1, decompressor.clearCacheCallCount);
+  // Modern no-preserve API replaces releaseForLowMemory(false): the full
+  // resident-cache release is required for both fonts, not a preserve-advance call.
+  EXPECT_EQ(1, readerFont.releaseResidentCachesCallCount);
+  EXPECT_EQ(1, fallbackFont.releaseResidentCachesCallCount);
+  EXPECT_EQ(0, readerFont.releaseForLowMemoryCallCount);
+  EXPECT_EQ(0, fallbackFont.releaseForLowMemoryCallCount);
+}
+
+TEST(FontCacheManagerTest, PrewarmScopePreservesSmallCapsConversion) {
+  SdCardFont font;
+  const std::map<int, EpdFontFamily> noBuiltinFonts;
+  const std::map<int, SdCardFont*> sdFonts{{7, &font}};
+  FontCacheManager manager(noBuiltinFonts, sdFonts, kNoTtfFonts);
+
+  auto scope = manager.createPrewarmScope();
+  manager.recordText("Small Caps", 7, EpdFontFamily::SMALL_CAPS);
+  scope.endScanAndPrewarm();
+
+  ASSERT_EQ(1, font.prewarmCallCount);
+  EXPECT_STREQ(" ACLMPS", font.prewarmCalls[0].text);
+}

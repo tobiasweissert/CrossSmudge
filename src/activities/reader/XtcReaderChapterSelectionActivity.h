@@ -1,32 +1,46 @@
 #pragma once
+#include <FreeInkApp.h>
+#include <FreeInkUIGfxRenderer.h>
 #include <Xtc.h>
 
+#include <array>
+#include <atomic>
 #include <memory>
-#include <vector>
 
-#include "activities/UiListActivity.h"
+#include "activities/Activity.h"
+#include "util/ButtonNavigator.h"
 
-class XtcReaderChapterSelectionActivity final : public UiListActivity {
+class XtcReaderChapterSelectionActivity final : public Activity {
+  using UiApp = freeink::ui::FreeInkApp<20, 4>;
+
   std::shared_ptr<Xtc> xtc;
+  ButtonNavigator buttonNavigator;
   uint32_t currentPage = 0;
+  int selectorIndex = 0;
+  freeink::ui::GfxRendererTarget uiTarget;
+  UiApp app;
+  std::atomic<bool> uiReady{false};
+  int visibleRows = 1;
+  int topIndex = 0;
+  bool initialViewportPending = true;
+  static constexpr size_t CHAPTER_WINDOW_SIZE = 20;
+  std::array<xtc::ChapterInfo, CHAPTER_WINDOW_SIZE> chapterWindow{};
+  std::array<freeink::ui::ListItem, CHAPTER_WINDOW_SIZE> itemWindow{};
 
-  // Row buffer, built once in onEnter() (chapters never change for the
-  // lifetime of this screen) and reused by buildScreen() on every repaint
-  // instead of rebuilding a ListItem vector per render.
-  std::vector<freeink::ui::ListItem> rowItems;
-  void buildRowItems();
+  static void chapterScreen(UiApp::ScreenType& screen, void* user);
+  static void onRowEvent(const freeink::ui::ActionEvent& event, void* user);
+  void buildChapterScreen(UiApp::ScreenType& screen);
+  void selectChapter();
 
-  int listCount() const override { return xtc ? static_cast<int>(xtc->getChapters().size()) : 0; }
-  void buildScreen(UiScreen& screen) override;
-  void activateIndex(int index) override;
-  // Back cancels with a result and Confirm activates on RELEASE here; a `!xtc`
-  // guard consumes the pass after Back so nothing else runs without a book.
-  bool handleButtons() override;
-  void drawChrome() override;
   int findChapterIndexForPage(uint32_t page) const;
 
  public:
-  explicit XtcReaderChapterSelectionActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                             const std::shared_ptr<Xtc>& xtc, uint32_t currentPage);
+  XtcReaderChapterSelectionActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
+                                    const std::shared_ptr<Xtc>& xtc, uint32_t currentPage);
   void onEnter() override;
+  void onExit() override;
+  void loop() override;
+  void render(RenderLock&&) override;
+  bool isReaderActivity() const override { return true; }
+  bool allowPowerAsConfirmInReaderMode() const override { return true; }
 };

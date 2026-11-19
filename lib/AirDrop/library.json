@@ -1,0 +1,17 @@
+{
+  "name": "AirDrop",
+  "version": "0.0.0",
+  "build": {
+    "srcDir": ".",
+    "includeDir": ".",
+    "srcFilter": [
+      "+<core/*.cpp>",
+      "+<stream/*.cpp>",
+      "+<storage/*.cpp>",
+      "+<browser/*.cpp>",
+      "+<vendor/ESP32Drop/src/awdl/port/awdl_port_esp32.cpp>",
+      "+<session/*.cpp>",
+      "+<port/*.cpp>"
+    ]
+  }
+}

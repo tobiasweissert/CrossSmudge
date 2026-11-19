@@ -132,3 +132,53 @@ inline bool utf8IsCombiningMark(const uint32_t cp) {
          || (cp >= 0x20D0 && cp <= 0x20FF)   // Combining Diacritical Marks for Symbols
          || (cp >= 0xFE20 && cp <= 0xFE2F);  // Combining Half Marks
 }
+
+// Crosscub dictionary and fallback-font compatibility helpers.
+void utf8TruncateChars(std::string& str, size_t numChars);
+bool utf8ContainsLookupCharacter(const char* text);
+bool utf8ContainsLookupCharacter(const std::string& text);
+std::string utf8CleanLookupWord(const std::string& text);
+
+inline bool utf8IsCjkCodepoint(const uint32_t cp) {
+  return (cp >= 0x1100 && cp <= 0x11FF)        // Hangul Jamo
+         || (cp >= 0x2E80 && cp <= 0x2FDF)     // CJK Radicals Supplement, Kangxi Radicals
+         || (cp >= 0x3000 && cp <= 0x33FF)     // CJK punctuation, Kana, Bopomofo, Hangul Compat
+                                               // Jamo, Kanbun, strokes, enclosed + compat forms
+         || (cp >= 0x3400 && cp <= 0x4DBF)     // CJK Extension A
+         || (cp >= 0x4E00 && cp <= 0x9FFF)     // CJK Unified Ideographs
+         || (cp >= 0xA960 && cp <= 0xA97F)     // Hangul Jamo Extended-A
+         || (cp >= 0xAC00 && cp <= 0xD7FF)     // Hangul Syllables, Hangul Jamo Extended-B
+         || (cp >= 0xF900 && cp <= 0xFAFF)     // CJK Compatibility Ideographs
+         || (cp >= 0xFE10 && cp <= 0xFE1F)     // Vertical Forms
+         || (cp >= 0xFE30 && cp <= 0xFE4F)     // CJK Compatibility Forms
+         || (cp >= 0xFF01 && cp <= 0xFF60)     // Fullwidth Latin / Punctuation
+         || (cp >= 0xFF65 && cp <= 0xFFEF)     // Halfwidth Katakana / Hangul
+         || (cp >= 0x20000 && cp <= 0x2EBEF)   // CJK Extensions B-F
+         || (cp >= 0x2F800 && cp <= 0x2FA1F)   // CJK Compatibility Ideographs Supplement
+         || (cp >= 0x30000 && cp <= 0x323AF);  // CJK Extensions G-H
+}
+
+inline bool utf8IsCjkWordCharacter(const uint32_t cp) {
+  return (cp >= 0x1100 && cp <= 0x11FF)        // Hangul Jamo
+         || (cp >= 0x3040 && cp <= 0x30FF)     // Hiragana and Katakana
+         || (cp >= 0x3100 && cp <= 0x312F)     // Bopomofo
+         || (cp >= 0x3130 && cp <= 0x318F)     // Hangul Compatibility Jamo
+         || (cp >= 0x31A0 && cp <= 0x31FF)     // Bopomofo Extended, Katakana Extensions
+         || (cp >= 0x3400 && cp <= 0x4DBF)     // CJK Extension A
+         || (cp >= 0x4E00 && cp <= 0x9FFF)     // CJK Unified Ideographs
+         || (cp >= 0xA960 && cp <= 0xA97F)     // Hangul Jamo Extended-A
+         || (cp >= 0xAC00 && cp <= 0xD7FF)     // Hangul Syllables, Hangul Jamo Extended-B
+         || (cp >= 0xF900 && cp <= 0xFAFF)     // CJK Compatibility Ideographs
+         || (cp >= 0xFF10 && cp <= 0xFF19)     // Fullwidth digits
+         || (cp >= 0xFF21 && cp <= 0xFF3A)     // Fullwidth Latin uppercase
+         || (cp >= 0xFF41 && cp <= 0xFF5A)     // Fullwidth Latin lowercase
+         || (cp >= 0xFF66 && cp <= 0xFFDC)     // Halfwidth Katakana and Hangul
+         || (cp >= 0x20000 && cp <= 0x2EBEF)   // CJK Extensions B-F
+         || (cp >= 0x2F800 && cp <= 0x2FA1F)   // CJK Compatibility Ideographs Supplement
+         || (cp >= 0x30000 && cp <= 0x323AF);  // CJK Extensions G-H
+}
+
+inline bool utf8IsVariationSelector(const uint32_t cp) {
+  return (cp >= 0x180B && cp <= 0x180D) || cp == 0x180F || (cp >= 0xFE00 && cp <= 0xFE0F) ||
+         (cp >= 0xE0100 && cp <= 0xE01EF);
+}

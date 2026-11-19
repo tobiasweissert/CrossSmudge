@@ -8,10 +8,13 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
+#include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 
 #include "BitmapHelpers.h"
+#include "Memory.h"
 
 // ============================================================================
 // IMAGE PROCESSING OPTIONS - Same as JpegToBmpConverter for consistency
@@ -81,7 +84,7 @@ void yieldDuringDecode(uint8_t& rowsSinceYield) {
 }
 
 // Read a big-endian 32-bit value from file
-bool readBE32(HalFile& file, uint32_t& value) {
+bool readBE32(FsFile& file, uint32_t& value) {
   uint8_t buf[4];
   if (file.read(buf, 4) != 4) return false;
   value = (static_cast<uint32_t>(buf[0]) << 24) | (static_cast<uint32_t>(buf[1]) << 16) |
@@ -179,6 +182,92 @@ void writeBmpHeader2bit(Print& bmpOut, const int width, const int height) {
     bmpOut.write(i);
   }
 }
+
+struct OutputGeometry {
+  int outWidth;
+  int outHeight;
+  uint32_t scaleX_fp;
+  uint32_t scaleY_fp;
+  uint32_t srcXOffset_fp;
+  uint32_t srcYOffset_fp;
+  bool needsScaling;
+};
+
+static uint32_t fpPerOutputPixel(const uint64_t srcSpan_fp, const int outPixels) {
+  if (outPixels <= 0) return 65536;
+  const uint64_t value = srcSpan_fp / static_cast<uint64_t>(outPixels);
+  if (value == 0) return 1;
+  if (value > UINT32_MAX) return UINT32_MAX;
+  return static_cast<uint32_t>(value);
+}
+
+static OutputGeometry calculateOutputGeometry(const int srcWidth, const int srcHeight, const int targetWidth,
+                                              const int targetHeight, const bool crop) {
+  OutputGeometry geometry{srcWidth, srcHeight, 65536, 65536, 0, 0, false};
+  if (targetWidth <= 0 || targetHeight <= 0 || srcWidth <= 0 || srcHeight <= 0) {
+    return geometry;
+  }
+
+  if (crop) {
+    geometry.outWidth = targetWidth;
+    geometry.outHeight = targetHeight;
+
+    const uint64_t srcWidth_fp = static_cast<uint64_t>(srcWidth) << 16;
+    const uint64_t srcHeight_fp = static_cast<uint64_t>(srcHeight) << 16;
+    uint64_t cropWidth_fp = srcWidth_fp;
+    uint64_t cropHeight_fp = srcHeight_fp;
+    const int64_t sourceVsTarget =
+        static_cast<int64_t>(srcWidth) * targetHeight - static_cast<int64_t>(targetWidth) * srcHeight;
+
+    if (sourceVsTarget > 0) {
+      cropWidth_fp = (static_cast<uint64_t>(targetWidth) * static_cast<uint64_t>(srcHeight) << 16) / targetHeight;
+      if (cropWidth_fp > srcWidth_fp) cropWidth_fp = srcWidth_fp;
+      geometry.srcXOffset_fp = static_cast<uint32_t>((srcWidth_fp - cropWidth_fp) / 2);
+    } else if (sourceVsTarget < 0) {
+      cropHeight_fp = (static_cast<uint64_t>(targetHeight) * static_cast<uint64_t>(srcWidth) << 16) / targetWidth;
+      if (cropHeight_fp > srcHeight_fp) cropHeight_fp = srcHeight_fp;
+      geometry.srcYOffset_fp = static_cast<uint32_t>((srcHeight_fp - cropHeight_fp) / 2);
+    }
+
+    geometry.scaleX_fp = fpPerOutputPixel(cropWidth_fp, targetWidth);
+    geometry.scaleY_fp = fpPerOutputPixel(cropHeight_fp, targetHeight);
+    geometry.needsScaling = srcWidth != targetWidth || srcHeight != targetHeight || geometry.srcXOffset_fp != 0 ||
+                            geometry.srcYOffset_fp != 0;
+    return geometry;
+  }
+
+  if (srcWidth != targetWidth || srcHeight != targetHeight) {
+    const float scaleToFitWidth = static_cast<float>(targetWidth) / srcWidth;
+    const float scaleToFitHeight = static_cast<float>(targetHeight) / srcHeight;
+    const float scale = (scaleToFitWidth < scaleToFitHeight) ? scaleToFitWidth : scaleToFitHeight;
+
+    geometry.outWidth = static_cast<int>(srcWidth * scale);
+    geometry.outHeight = static_cast<int>(srcHeight * scale);
+    if (geometry.outWidth < 1) geometry.outWidth = 1;
+    if (geometry.outHeight < 1) geometry.outHeight = 1;
+
+    geometry.scaleX_fp = fpPerOutputPixel(static_cast<uint64_t>(srcWidth) << 16, geometry.outWidth);
+    geometry.scaleY_fp = fpPerOutputPixel(static_cast<uint64_t>(srcHeight) << 16, geometry.outHeight);
+    geometry.needsScaling = true;
+  }
+
+  return geometry;
+}
+
+static bool shouldContainAdaptive(const int srcWidth, const int srcHeight, const int targetWidth,
+                                  const int targetHeight) {
+  if (srcWidth <= 0 || srcHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) {
+    return false;
+  }
+
+  constexpr int64_t kAspectTolerancePercent = 18;
+  const int64_t sourceScaledToTargetHeight = static_cast<int64_t>(srcWidth) * targetHeight;
+  const int64_t targetScaledToSourceHeight = static_cast<int64_t>(targetWidth) * srcHeight;
+  const int64_t diff = sourceScaledToTargetHeight > targetScaledToSourceHeight
+                           ? sourceScaledToTargetHeight - targetScaledToSourceHeight
+                           : targetScaledToSourceHeight - sourceScaledToTargetHeight;
+  return diff * 100 > targetScaledToSourceHeight * kAspectTolerancePercent;
+}
 }  // namespace
 
 // Context for streaming PNG decompression
@@ -208,6 +297,10 @@ struct PngDecodeContext {
   // Palette for indexed color (type 3)
   uint8_t palette[256 * 3];
   int paletteSize;
+  uint8_t paletteAlpha[256];
+  bool hasTransparency;
+  uint16_t transparentGray;
+  uint16_t transparentRgb[3];
 };
 
 // Read the next IDAT chunk header, skipping non-IDAT chunks
@@ -326,83 +419,65 @@ static bool decodeScanline(PngDecodeContext& ctx) {
 // Branches once on colorType/bitDepth, then runs a tight loop for the whole row.
 static void convertScanlineToGray(const PngDecodeContext& ctx, uint8_t* grayRow) {
   const uint8_t* src = ctx.currentRow;
-  const uint32_t w = ctx.width;
-
-  switch (ctx.colorType) {
-    case PNG_COLOR_GRAYSCALE:
-      if (ctx.bitDepth == 8) {
-        memcpy(grayRow, src, w);
-      } else if (ctx.bitDepth == 16) {
-        for (uint32_t x = 0; x < w; x++) grayRow[x] = src[x * 2];
-      } else {
-        const int ppb = 8 / ctx.bitDepth;
-        const uint8_t mask = (1 << ctx.bitDepth) - 1;
-        for (uint32_t x = 0; x < w; x++) {
-          int shift = (ppb - 1 - (x % ppb)) * ctx.bitDepth;
-          grayRow[x] = (src[x / ppb] >> shift & mask) * 255 / mask;
+  const auto be16 = [](const uint8_t* p) { return uint16_t((uint16_t(p[0]) << 8) | p[1]); };
+  const auto flatten = [](uint8_t gray, uint32_t alpha, uint32_t maximum) {
+    return uint8_t((uint32_t(gray) * alpha + 255u * (maximum - alpha)) / maximum);
+  };
+  for (uint32_t x = 0; x < ctx.width; ++x) {
+    uint8_t gray = 128;
+    uint32_t alpha = 255, maximum = 255;
+    switch (ctx.colorType) {
+      case PNG_COLOR_GRAYSCALE: {
+        uint16_t sample;
+        if (ctx.bitDepth == 16) sample = be16(src + x * 2);
+        else if (ctx.bitDepth == 8) sample = src[x];
+        else {
+          const unsigned bit = x * ctx.bitDepth;
+          sample = (src[bit / 8] >> (8 - ctx.bitDepth - bit % 8)) & ((1u << ctx.bitDepth) - 1);
         }
+        gray = ctx.bitDepth == 16 ? sample >> 8 : sample * 255u / ((1u << ctx.bitDepth) - 1);
+        if (ctx.hasTransparency && sample == ctx.transparentGray) alpha = 0;
+        break;
       }
-      break;
-
-    case PNG_COLOR_RGB:
-      if (ctx.bitDepth == 8) {
-        // Fast path: most common EPUB cover format
-        for (uint32_t x = 0; x < w; x++) {
-          const uint8_t* p = src + x * 3;
-          grayRow[x] = (p[0] * 25 + p[1] * 50 + p[2] * 25) / 100;
+      case PNG_COLOR_RGB:
+      case PNG_COLOR_RGBA: {
+        const bool wide = ctx.bitDepth == 16;
+        const unsigned channels = ctx.colorType == PNG_COLOR_RGBA ? 4 : 3;
+        const uint8_t* p = src + x * channels * (wide ? 2 : 1);
+        uint16_t rgb[3];
+        for (unsigned c = 0; c < 3; ++c) rgb[c] = wide ? be16(p + c * 2) : p[c];
+        gray = wide ? ((rgb[0] >> 8) * 25 + (rgb[1] >> 8) * 50 + (rgb[2] >> 8) * 25) / 100
+                    : (rgb[0] * 25 + rgb[1] * 50 + rgb[2] * 25) / 100;
+        if (channels == 4) {
+          maximum = wide ? 65535 : 255;
+          alpha = wide ? be16(p + 6) : p[3];
+        } else if (ctx.hasTransparency && rgb[0] == ctx.transparentRgb[0] &&
+                   rgb[1] == ctx.transparentRgb[1] && rgb[2] == ctx.transparentRgb[2]) alpha = 0;
+        break;
+      }
+      case PNG_COLOR_PALETTE: {
+        const unsigned bit = x * ctx.bitDepth;
+        unsigned index = (src[bit / 8] >> (8 - ctx.bitDepth - bit % 8)) & ((1u << ctx.bitDepth) - 1);
+        if (index >= unsigned(ctx.paletteSize)) index = 0;
+        const uint8_t* p = ctx.palette + index * 3;
+        gray = (p[0] * 25 + p[1] * 50 + p[2] * 25) / 100;
+        alpha = ctx.paletteAlpha[index];
+        break;
+      }
+      case PNG_COLOR_GRAYSCALE_ALPHA:
+        if (ctx.bitDepth == 16) {
+          gray = src[x * 4]; alpha = be16(src + x * 4 + 2); maximum = 65535;
+        } else {
+          gray = src[x * 2]; alpha = src[x * 2 + 1];
         }
-      } else {
-        for (uint32_t x = 0; x < w; x++) {
-          grayRow[x] = (src[x * 6] * 25 + src[x * 6 + 2] * 50 + src[x * 6 + 4] * 25) / 100;
-        }
-      }
-      break;
-
-    case PNG_COLOR_PALETTE: {
-      const int ppb = 8 / ctx.bitDepth;
-      const uint8_t mask = (1 << ctx.bitDepth) - 1;
-      const uint8_t* pal = ctx.palette;
-      const int palSize = ctx.paletteSize;
-      for (uint32_t x = 0; x < w; x++) {
-        int shift = (ppb - 1 - (x % ppb)) * ctx.bitDepth;
-        uint8_t idx = (src[x / ppb] >> shift) & mask;
-        if (idx >= palSize) idx = 0;
-        grayRow[x] = (pal[idx * 3] * 25 + pal[idx * 3 + 1] * 50 + pal[idx * 3 + 2] * 25) / 100;
-      }
-      break;
+        break;
     }
-
-    case PNG_COLOR_GRAYSCALE_ALPHA:
-      if (ctx.bitDepth == 8) {
-        for (uint32_t x = 0; x < w; x++) grayRow[x] = src[x * 2];
-      } else {
-        for (uint32_t x = 0; x < w; x++) grayRow[x] = src[x * 4];
-      }
-      break;
-
-    case PNG_COLOR_RGBA:
-      if (ctx.bitDepth == 8) {
-        for (uint32_t x = 0; x < w; x++) {
-          const uint8_t* p = src + x * 4;
-          grayRow[x] = (p[0] * 25 + p[1] * 50 + p[2] * 25) / 100;
-        }
-      } else {
-        for (uint32_t x = 0; x < w; x++) {
-          grayRow[x] = (src[x * 8] * 25 + src[x * 8 + 2] * 50 + src[x * 8 + 4] * 25) / 100;
-        }
-      }
-      break;
-
-    default:
-      memset(grayRow, 128, w);
-      break;
+    grayRow[x] = flatten(gray, alpha, maximum);
   }
 }
 
-bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpOut, int targetWidth, int targetHeight,
-                                                   bool oneBit, bool crop, bool originalThresholds) {
-  LOG_DBG("PNG", "Converting PNG to %s BMP (target: %dx%d)", oneBit ? "1-bit" : "2-bit", targetWidth, targetHeight);
-
+bool PngToBmpConverter::pngFileToBmpStreamInternal(FsFile& pngFile, Print& bmpOut, int targetWidth, int targetHeight,
+                                                   bool oneBit, bool crop, bool adaptiveContain, bool imageLevels) {
   // Verify PNG signature
   uint8_t sig[8];
   if (pngFile.read(sig, 8) != 8 || memcmp(sig, PNG_SIGNATURE, 8) != 0) {
@@ -414,6 +489,7 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
   uint32_t ihdrLen;
   if (!readBE32(pngFile, ihdrLen)) return false;
 
+  if (ihdrLen != 13) return false;
   uint8_t ihdrType[4];
   if (pngFile.read(ihdrType, 4) != 4 || memcmp(ihdrType, "IHDR", 4) != 0) {
     LOG_ERR("PNG", "Missing IHDR chunk");
@@ -435,8 +511,6 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
   // Skip IHDR CRC
   pngFile.seekCur(4);
 
-  LOG_DBG("PNG", "Image: %ux%u, depth=%u, color=%u, interlace=%u", width, height, bitDepth, colorType, interlace);
-
   if (compression != 0 || filter != 0) {
     LOG_ERR("PNG", "Unsupported compression/filter method");
     return false;
@@ -455,6 +529,15 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
     LOG_ERR("PNG", "Image too large or zero (%ux%u)", width, height);
     return false;
   }
+
+  // Reject the complete illegal color/depth matrix before row allocation or shifts.
+  const bool legalDepth = colorType == PNG_COLOR_GRAYSCALE
+      ? (bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8 || bitDepth == 16)
+      : colorType == PNG_COLOR_PALETTE
+          ? (bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8)
+          : (colorType == PNG_COLOR_RGB || colorType == PNG_COLOR_GRAYSCALE_ALPHA || colorType == PNG_COLOR_RGBA)
+              && (bitDepth == 8 || bitDepth == 16);
+  if (!legalDepth) return false;
 
   // Calculate bytes per pixel and raw row bytes
   uint8_t bytesPerPixel;
@@ -511,7 +594,10 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
   ctx.bytesPerPixel = bytesPerPixel;
   ctx.rawRowBytes = rawRowBytes;
   ctx.paletteSize = 0;
+  memset(ctx.paletteAlpha, 255, sizeof(ctx.paletteAlpha));
 
+  // These rows have the same lifetime, so one allocation avoids leaving small
+  // gaps in the constrained internal heap during image conversion.
   const size_t scanlineRowBytes = rawRowBytes;
   auto scanlineRows = makeUniqueNoThrow<uint8_t[]>(scanlineRowBytes * 2);
   if (!scanlineRows) {
@@ -531,15 +617,28 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
     uint8_t chunkType[4];
     if (pngFile.read(chunkType, 4) != 4) break;
 
+    if (pngFile.position() > pngFile.size() ||
+        uint64_t(chunkLen) + 4 > pngFile.size() - pngFile.position()) return false;
     if (memcmp(chunkType, "PLTE", 4) == 0) {
-      int entries = chunkLen / 3;
-      if (entries > 256) entries = 256;
-      ctx.paletteSize = entries;
-      size_t palBytes = entries * 3;
-      pngFile.read(ctx.palette, palBytes);
-      // Skip any remaining palette data
-      if (chunkLen > palBytes) pngFile.seekCur(chunkLen - palBytes);
-      pngFile.seekCur(4);  // CRC
+      if (!chunkLen || chunkLen % 3 || chunkLen > sizeof(ctx.palette) || ctx.paletteSize) return false;
+      ctx.paletteSize = chunkLen / 3;
+      if (pngFile.read(ctx.palette, chunkLen) != int(chunkLen) || !pngFile.seekCur(4)) return false;
+    } else if (memcmp(chunkType, "tRNS", 4) == 0) {
+      if (ctx.hasTransparency) return false;
+      ctx.hasTransparency = true;
+      if (colorType == PNG_COLOR_PALETTE) {
+        if (!chunkLen || chunkLen > unsigned(ctx.paletteSize) ||
+            pngFile.read(ctx.paletteAlpha, chunkLen) != int(chunkLen)) return false;
+      } else {
+        uint8_t key[6];
+        if ((colorType != PNG_COLOR_GRAYSCALE || chunkLen != 2) &&
+            (colorType != PNG_COLOR_RGB || chunkLen != 6)) return false;
+        if (pngFile.read(key, chunkLen) != int(chunkLen)) return false;
+        const auto readKey = [](const uint8_t* p) { return uint16_t((uint16_t(p[0]) << 8) | p[1]); };
+        if (colorType == PNG_COLOR_GRAYSCALE) ctx.transparentGray = readKey(key);
+        else for (unsigned c = 0; c < 3; ++c) ctx.transparentRgb[c] = readKey(key + c * 2);
+      }
+      if (!pngFile.seekCur(4)) return false;
     } else if (memcmp(chunkType, "IDAT", 4) == 0) {
       ctx.chunkBytesRemaining = chunkLen;
       foundIdat = true;
@@ -551,7 +650,7 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
     }
   }
 
-  if (!foundIdat) {
+  if (!foundIdat || (colorType == PNG_COLOR_PALETTE && !ctx.paletteSize)) {
     LOG_ERR("PNG", "No IDAT chunk found");
 
     return false;
@@ -567,36 +666,17 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
   // PNG IDAT data is zlib-wrapped (2-byte header + trailing adler32)
   ctx.reader.setZlibWrapped();
 
-  // Calculate output dimensions (same logic as JpegToBmpConverter)
-  int outWidth = width;
-  int outHeight = height;
-  uint32_t scaleX_fp = 65536;
-  uint32_t scaleY_fp = 65536;
-  bool needsScaling = false;
-
-  if (targetWidth > 0 && targetHeight > 0 &&
-      (static_cast<int>(width) != targetWidth || static_cast<int>(height) != targetHeight)) {
-    const float scaleToFitWidth = static_cast<float>(targetWidth) / width;
-    const float scaleToFitHeight = static_cast<float>(targetHeight) / height;
-    float scale = 1.0;
-    if (crop) {
-      scale = (scaleToFitWidth > scaleToFitHeight) ? scaleToFitWidth : scaleToFitHeight;
-    } else {
-      scale = (scaleToFitWidth < scaleToFitHeight) ? scaleToFitWidth : scaleToFitHeight;
-    }
-
-    outWidth = static_cast<int>(width * scale);
-    outHeight = static_cast<int>(height * scale);
-    if (outWidth < 1) outWidth = 1;
-    if (outHeight < 1) outHeight = 1;
-
-    scaleX_fp = (width << 16) / outWidth;
-    scaleY_fp = (height << 16) / outHeight;
-    needsScaling = true;
-
-    LOG_DBG("PNG", "Scaling %ux%u -> %dx%d (target %dx%d)", width, height, outWidth, outHeight, targetWidth,
-            targetHeight);
-  }
+  // Calculate output dimensions. Crop mode behaves like CSS object-fit: cover:
+  // scale to fill the requested box, then sample a centered source crop before dithering.
+  const bool containInsteadOfCrop =
+      crop && adaptiveContain &&
+      shouldContainAdaptive(static_cast<int>(width), static_cast<int>(height), targetWidth, targetHeight);
+  const bool cropOutput = crop && !containInsteadOfCrop;
+  const OutputGeometry geometry =
+      calculateOutputGeometry(static_cast<int>(width), static_cast<int>(height), targetWidth, targetHeight, cropOutput);
+  const int outWidth = geometry.outWidth;
+  const int outHeight = geometry.outHeight;
+  const bool needsScaling = geometry.needsScaling;
 
   // Write BMP header
   int bytesPerRow;
@@ -611,6 +691,8 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
     bytesPerRow = (outWidth * 2 + 31) / 32 * 4;
   }
 
+  // The encoded and grayscale rows are also used together for the whole
+  // conversion, so keep them in one automatically owned scratch allocation.
   const size_t rowScratchBytes = static_cast<size_t>(bytesPerRow) + static_cast<size_t>(width);
   auto rowScratch = makeUniqueNoThrow<uint8_t[]>(rowScratchBytes);
   if (!rowScratch) {
@@ -634,17 +716,15 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
     }
   } else if (!USE_8BIT_OUTPUT) {
     if (USE_ATKINSON) {
-      atkinsonDitherer = makeUniqueNoThrow<AtkinsonDitherer>(outWidth, originalThresholds);
+      atkinsonDitherer = makeUniqueNoThrow<AtkinsonDitherer>(outWidth, imageLevels);
       if (!atkinsonDitherer || !atkinsonDitherer->isValid()) {
         LOG_ERR("PNG", "OOM: AtkinsonDitherer or row buffers");
-
         return false;
       }
     } else if (USE_FLOYD_STEINBERG) {
-      fsDitherer = makeUniqueNoThrow<FloydSteinbergDitherer>(outWidth, originalThresholds);
+      fsDitherer = makeUniqueNoThrow<FloydSteinbergDitherer>(outWidth, imageLevels);
       if (!fsDitherer || !fsDitherer->isValid()) {
         LOG_ERR("PNG", "OOM: FloydSteinbergDitherer or row buffers");
-
         return false;
       }
     }
@@ -663,7 +743,7 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
       LOG_ERR("PNG", "OOM: scaling accumulators");
       return false;
     }
-    nextOutY_srcStart = scaleY_fp;
+    nextOutY_srcStart = geometry.srcYOffset_fp + geometry.scaleY_fp;
   }
 
   bool success = true;
@@ -721,10 +801,19 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
       bmpOut.write(rowBuffer, bytesPerRow);
       yieldDuringDecode(rowsSinceYield);
     } else {
+      const uint64_t srcY_fp = static_cast<uint64_t>(y + 1) << 16;
+      if (srcY_fp <= geometry.srcYOffset_fp) {
+        continue;
+      }
+
       // Area-averaging scaling (same as JpegToBmpConverter)
       for (int outX = 0; outX < outWidth; outX++) {
-        const int srcXStart = (static_cast<uint32_t>(outX) * scaleX_fp) >> 16;
-        const int srcXEnd = (static_cast<uint32_t>(outX + 1) * scaleX_fp) >> 16;
+        const uint64_t srcXStart_fp =
+            static_cast<uint64_t>(geometry.srcXOffset_fp) + static_cast<uint64_t>(outX) * geometry.scaleX_fp;
+        const uint64_t srcXEnd_fp =
+            static_cast<uint64_t>(geometry.srcXOffset_fp) + static_cast<uint64_t>(outX + 1) * geometry.scaleX_fp;
+        const int srcXStart = std::min(static_cast<int>(width) - 1, static_cast<int>(srcXStart_fp >> 16));
+        const int srcXEnd = std::min(static_cast<int>(width), static_cast<int>(srcXEnd_fp >> 16));
 
         int sum = 0;
         int count = 0;
@@ -743,8 +832,6 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
       }
 
       // Check if we've crossed into the next output row(s)
-      const uint32_t srcY_fp = static_cast<uint32_t>(y + 1) << 16;
-
       // Output all rows whose boundaries we've crossed (handles both up and downscaling)
       // For upscaling, one source row may produce multiple output rows
       while (srcY_fp >= nextOutY_srcStart && currentOutY < outHeight) {
@@ -790,7 +877,8 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
         currentOutY++;
         yieldDuringDecode(rowsSinceYield);
 
-        nextOutY_srcStart = static_cast<uint32_t>(currentOutY + 1) * scaleY_fp;
+        nextOutY_srcStart = static_cast<uint32_t>(static_cast<uint64_t>(geometry.srcYOffset_fp) +
+                                                  static_cast<uint64_t>(currentOutY + 1) * geometry.scaleY_fp);
 
         // For upscaling: don't reset accumulators if next output row uses same source data
         // Only reset when we'll move to a new source row
@@ -811,19 +899,22 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpO
   }
 
   if (success) {
-    LOG_DBG("PNG", "Successfully converted PNG to BMP");
+    uint8_t extra;
+    size_t produced = 0;
+    // Last scanline filling its buffer is not proof of a complete zlib stream.
+    success = ctx.reader.readAtMost(&extra, 1, &produced) == InflateStream::Status::Done && produced == 0;
   }
   return success;
 }
 
-bool PngToBmpConverter::pngFileToBmpStream(HalFile& pngFile, Print& bmpOut, bool crop, bool originalThresholds) {
+bool PngToBmpConverter::pngFileToBmpStream(FsFile& pngFile, Print& bmpOut, bool crop, bool imageLevels) {
   // Use runtime display dimensions (swapped for portrait cover sizing)
   const int targetWidth = display.getDisplayHeight();
   const int targetHeight = display.getDisplayWidth();
-  return pngFileToBmpStreamInternal(pngFile, bmpOut, targetWidth, targetHeight, false, crop, originalThresholds);
+  return pngFileToBmpStreamInternal(pngFile, bmpOut, targetWidth, targetHeight, false, crop, false, imageLevels);
 }
 
-bool PngToBmpConverter::pngFileTo1BitBmpStreamWithSize(HalFile& pngFile, Print& bmpOut, int targetMaxWidth,
-                                                       int targetMaxHeight) {
-  return pngFileToBmpStreamInternal(pngFile, bmpOut, targetMaxWidth, targetMaxHeight, true, true);
+bool PngToBmpConverter::pngFileTo1BitBmpStreamWithSize(FsFile& pngFile, Print& bmpOut, int targetMaxWidth,
+                                                       int targetMaxHeight, bool adaptiveContain) {
+  return pngFileToBmpStreamInternal(pngFile, bmpOut, targetMaxWidth, targetMaxHeight, true, true, adaptiveContain);
 }

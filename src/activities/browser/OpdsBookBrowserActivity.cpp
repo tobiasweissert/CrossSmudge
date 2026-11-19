@@ -17,6 +17,7 @@
 #include <StreamingJsonParser.h>
 #include <Util.h>
 #include <WolfsslCrypto.h>
+#include <WiFi.h>
 
 #include <iterator>
 
@@ -110,7 +111,13 @@ void OpdsBookBrowserActivity::onExit() {
     if (Storage.exists(detailCoverPath.c_str())) Storage.remove(detailCoverPath.c_str());
     detailCoverPath.clear();
   }
-  CatalogActivity::onExit();
+  // Ordinary catalog exit is an in-process radio handoff, not an update.
+  Activity::onExit();
+  if (WiFi.getMode() != WIFI_MODE_NULL) {
+    WiFi.disconnect(false);
+    delay(30);
+    if (!WiFi.mode(WIFI_OFF)) LOG_ERR("OPDS", "WiFi teardown failed");
+  }
 }
 
 void OpdsBookBrowserActivity::activateIndex(const int index) {
@@ -500,7 +507,7 @@ std::string OpdsBookBrowserActivity::downloadDestination(const OpdsEntry& book) 
   filename.reserve(96);
   if (haveFolder) filename += folder;
   filename += '/';
-  filename += opdsBookFilename(book.author, book.title, static_cast<OpdsFilenameFormat>(SETTINGS.opdsFilenameFormat));
+  filename += opdsBookFilename(book.author, book.title, server.filenameFormat);
   return filename;
 }
 
@@ -525,6 +532,29 @@ bool OpdsBookBrowserActivity::verifyAndRegisterEpub(const std::string& filename)
   clearBookCache(filename);
   library::markLibraryIndexDirty();
   return true;
+}
+
+bool OpdsBookBrowserActivity::admitNewDownload(const std::string& filename) {
+  // Retained staging/old roots are recovery state, never overwrite consent.
+  // The downloader rechecks; this UI check is not publication atomicity.
+  if (Storage.exists(filename.c_str()) || Storage.exists((filename + ".part").c_str()) ||
+      Storage.exists((filename + ".old").c_str())) {
+    state = State::ERROR;
+    errorMessage = "Transfer stopped: a file or recovery data already exists. Existing files were kept.";
+    requestUpdate();
+    return false;
+  }
+  return true;
+}
+
+void OpdsBookBrowserActivity::finishSafeDownload(const HttpDownloader::DownloadError result) {
+  if (result == HttpDownloader::PUBLICATION_UNCERTAIN) {
+    state = State::ERROR;
+    errorMessage = "Download publication is uncertain. Recovery files were kept; do not overwrite them.";
+    requestUpdate();
+    return;
+  }
+  finishDownload(result);
 }
 
 void OpdsBookBrowserActivity::downloadBook(const OpdsEntry& book) {
@@ -552,7 +582,7 @@ void OpdsBookBrowserActivity::downloadBook(const OpdsEntry& book) {
     downloadUrl = resolved;
   }
   const std::string filename = downloadDestination(book);
-  LOG_DBG("OPDS", "Downloading: %s -> %s", downloadUrl.c_str(), filename.c_str());
+  if (!admitNewDownload(filename)) return;
 
   // The selected book data is now copied into the download URL, filename, and
   // status line. Reclaim the catalog while TLS owns its record buffers; reload
@@ -593,7 +623,7 @@ void OpdsBookBrowserActivity::downloadBook(const OpdsEntry& book) {
   }
 
   if (result == HttpDownloader::OK && !verifyAndRegisterEpub(filename)) return;
-  finishDownload(result);
+  finishSafeDownload(result);
 }
 
 // LCP acquisition: the href is a small license document (.lcpl), not the
@@ -646,7 +676,7 @@ void OpdsBookBrowserActivity::downloadLcpBook(const OpdsEntry& book) {
   // firmware works unchanged when the service gains the production profile.
 
   const std::string filename = downloadDestination(book);
-  LOG_DBG("OPDS", "LCP fulfill: %s -> %s", licenseUrl.c_str(), filename.c_str());
+  if (!admitNewDownload(filename)) return;
 
   // Reclaim the catalog while TLS owns its record buffers, as for a plain
   // download; downloadFile() gates the heap and pumps cancel input.
@@ -657,7 +687,7 @@ void OpdsBookBrowserActivity::downloadLcpBook(const OpdsEntry& book) {
   const auto result = downloadFile(freeink::content::LCP_FULFILL_URL, filename, "", "", {}, &licenseText,
                                    "application/vnd.readium.lcp.license.v1.0+json");
   if (result != HttpDownloader::OK) {
-    finishDownload(result);
+    finishSafeDownload(result);
     return;
   }
   if (!verifyAndRegisterEpub(filename)) return;
@@ -955,7 +985,7 @@ void OpdsBookBrowserActivity::loadDetailCover(const std::string& docUrl, const s
   const auto result = HttpDownloader::downloadToFile(url, tmp, nullptr, nullptr, auth.username, auth.password, headers);
   if (result != HttpDownloader::OK) {
     LOG_ERR("OPDS", "Cover download failed: %d", static_cast<int>(result));
-    if (Storage.exists(tmp.c_str())) Storage.remove(tmp.c_str());
+    // Transport owns partial cleanup; uncertain roots may alias a destination.
     return;
   }
   detailCoverPath = std::move(tmp);

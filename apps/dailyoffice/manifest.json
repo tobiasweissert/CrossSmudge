@@ -1,0 +1,27 @@
+{
+  "id": "dailyoffice",
+  "name": "Daily Office",
+  "version": "1.0.2",
+  "author": "Mumfee",
+  "description": "Daily Office liturgical prayer book (Morning, Evening & Compline)",
+  "entry": "main.lua",
+  "files": [
+    "hours/compline.txt",
+    "hours/evensong.txt",
+    "hours/hymns.txt",
+    "hours/mattins.txt",
+    "hours/none.txt",
+    "hours/prime.txt",
+    "hours/sext.txt",
+    "hours/terce.txt",
+    "hymns.lua",
+    "icon.raw",
+    "lessons/2026-09-30.txt",
+    "main.lua",
+    "manifest.json",
+    "parser.lua",
+    "propers.txt",
+    "psalter.txt",
+    "unified_ui.lua"
+  ]
+}

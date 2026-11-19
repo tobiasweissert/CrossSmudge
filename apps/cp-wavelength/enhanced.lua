@@ -1,0 +1,67 @@
+local ok,device=pcall(smudge.get_device)
+if not ok or device~='sticky'then return dofile('legacy_enhanced.lua')end
+-- Original game/save controller with a phase-specific CrossPlay presentation.
+local M,S,V=dofile('core.lua'),dofile('storage.lua'),dofile('presentation.lua')
+local R=dofile('ui_record.lua')
+local g,last,lastSave,closed,notice=nil,0,0,false,''
+local function refresh()smudge.request_update()end
+local function save(begin)
+ local ok=S.save(M.encode(g));if ok then ok=R.save(g,M,V.abandoned,begin)end;notice=ok and ''or'SAVE FAILED';return ok
+end
+local function tick()
+ local before=g.phase;local now=smudge.millis();local delta=now-last;last=now
+ if delta>=0 and delta<3600000 and M.tick then M.tick(g,delta) end
+ if M.awake then smudge.prevent_sleep(M.awake(g)) end
+ return before~=g.phase
+end
+local function activate(hit)
+ if not hit then return end
+ local beforePhase=g.phase
+ local begin=hit.action=='fresh'
+ local result=V.act(g,M,hit.action,hit.value)
+ if type(result)=='table' then g=result;last=smudge.millis()
+ elseif result=='exit' then M.pause(g);if save() then closed=true;V.exit();smudge.exit() end;return end
+ V.focus=1
+ if begin or beforePhase~=g.phase or g.phase==5 or smudge.millis()-lastSave>=5000 then save(begin);lastSave=smudge.millis() end
+ refresh()
+end
+function on_init()
+ g=S.load(M.decode) or M.new(smudge.millis());M.pause(g);last=smudge.millis();closed=false;V.record=R.load(g,M);V.abandoned=R.abandoned;V.init(g);refresh()
+end
+function on_draw()if not closed then V.draw(g,M,notice) end end
+function on_button(button,pressed)
+ if closed then return end
+ if not pressed then
+  if button=='confirm'and g.phase==2 then V.buttonHeld=false;local was=V.peek;V.peek=V.touchPeek or false;if was and not V.peek then smudge.full_refresh()end;refresh()end
+  return
+ end
+ if button~='confirm' and button~='back' then V.keyboard=true end
+ if tick() then refresh();return end
+ if button=='back' then
+  if V.back(g) then refresh();return end
+  M.pause(g);if save() then closed=true;V.exit();smudge.exit() end
+ else activate(V.key(g,button));refresh() end
+end
+function on_touch(x,y,event)
+ if closed or event~='tap' then return end
+ V.keyboard=false
+ if tick() then refresh();return end
+ activate(V.at(x,y))
+end
+function on_swipe(direction)
+ if closed then return end
+ on_button((direction=='up' or direction=='left') and 'up' or 'down',true)
+end
+function on_update()
+ if closed then return end
+ local before=V.clock(g);local phase=g.phase;tick()
+ if V.update then V.update(g) end
+ if phase~=g.phase then save();refresh() elseif before~=V.clock(g) then refresh() end
+end
+function on_exit()
+ if g then tick();M.pause(g);if M.awake then smudge.prevent_sleep(false) end;save() end
+ V.exit();closed=true
+end
+function on_long_press(x,y)if not closed and V.hold(g,x,y) then refresh() end end
+function on_touch_release(x,y)if not closed and V.release() then refresh() end end
+return {state=function()return g end,view=V,core=M}

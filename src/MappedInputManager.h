@@ -2,38 +2,36 @@
 
 #include <HalGPIO.h>
 
-#include "util/HomeButtonInput.h"
-#include "util/PowerButtonClickInput.h"
-#include "util/PowerButtonInput.h"
+#include <array>
+#include <cstddef>
+
+#include "util/ReleaseSuppression.h"
 #include "util/RemoteButtonInput.h"
 
 class GfxRenderer;
-namespace freeink {
-namespace ui {
-enum class ScreenEdge : uint8_t;
-}
-}  // namespace freeink
 
 class MappedInputManager {
  public:
-  enum class Button {
-    Back,
-    Confirm,
-    Left,
-    Right,
-    Up,
-    Down,
-    Power,
-    PageBack,
-    PageForward,
-    NavNext,
-    NavPrevious,
-    ScreenLeft,
-    ScreenRight,
-    ScreenUp,
-    ScreenDown
-  };
+  enum class Button { Back, Confirm, Left, Right, Up, Down, Power, PageBack, PageForward, NavNext, NavPrevious, ScreenLeft, ScreenRight, ScreenUp, ScreenDown };
+  static constexpr size_t BUTTON_COUNT = static_cast<size_t>(Button::ScreenDown) + 1;
   enum class SwipeDir { None, Left, Right, Up, Down };
+
+  struct CompletedSwipe {
+    uint8_t contactCount = 0;
+    int startX = 0;
+    int startY = 0;
+    int endX = 0;
+    int endY = 0;
+    SwipeDir direction = SwipeDir::None;
+    unsigned long durationMs = 0;
+  };
+
+  struct CompletedRotation {
+    float degrees = 0.0f;
+    int centerX = 0;
+    int centerY = 0;
+    unsigned long durationMs = 0;
+  };
 
   struct Labels {
     const char* btn1;
@@ -42,155 +40,302 @@ class MappedInputManager {
     const char* btn4;
   };
 
-  MappedInputManager(HalGPIO& gpio, const GfxRenderer& renderer) : gpio(gpio), renderer(renderer) {}
+  // A label can be passed as plain text or as a localized arrow fragment plus
+  // text. The fragment may appear before or after the text, depending on the
+  // locale and the direction of the label.
+  struct Label {
+    enum class Placement { None, Prefix, Suffix };
 
-  // Blocking transfer loops pump physical input themselves. Defer configured
-  // Home-key actions so the next main-loop pass can dispatch them, while the
-  // current action remains available for immediate Home cancellation.
-  void update(bool deferHomeButtonAction = false) const;
-  bool powerSleepClick() const { return powerSleepFrame; }
-  bool wasPowerSingleClick() const {
-    return powerSingleClickFrame || (wasReleased(Button::Power) && wasShortPowerReleased());
-  }
-  void resetPowerButtonInput() const {
-    powerButtonClickInput.reset();
-    powerSingleClickFrame = false;
-    powerSleepFrame = false;
-    deferredPowerSleepFrame = false;
-  }
-  bool isPowerHeld() const {
-#ifdef SIMULATOR
-    return gpio.isPressed(HalGPIO::BTN_POWER);
+    // cppcheck-suppress noExplicitConstructor
+    constexpr Label(const char* text = nullptr) : text(text) {}
+    constexpr Label(const Placement placement, const char* arrow, const char* text)
+        : placement(placement), arrow(arrow), text(text) {}
+
+    static constexpr Label withPrefix(const char* arrow, const char* text) {
+      return Label(Placement::Prefix, arrow, text);
+    }
+    static constexpr Label withSuffix(const char* arrow, const char* text) {
+      return Label(Placement::Suffix, arrow, text);
+    }
+
+    Placement placement = Placement::None;
+    const char* arrow = nullptr;
+    const char* text = nullptr;
+  };
+
+  explicit MappedInputManager(HalGPIO& gpio, const GfxRenderer& renderer) : gpio(gpio), renderer(renderer) {}
+
+  // Enable/disable reader-specific front button mapping.
+  // Call with true in reader activity onEnter(), false in onExit().
+  void setReaderMode(bool enabled) { readerMode = enabled; }
+  void setPowerAsConfirmInReaderMode(bool enabled) { powerAsConfirmInReaderMode = enabled; }
+#if CROSSSMUDGE_APP_CAP_TOUCH
+  void setReaderTouchscreenOverride(bool enabled) { readerTouchscreenOverride = enabled; }
 #else
-    return gpio.isPressed(HalGPIO::BTN_POWER) || gpio.isPowerButtonPhysicallyPressed();
+  constexpr void setReaderTouchscreenOverride(bool) {}
 #endif
-  }
-  void beginPowerInput(bool suppressHold, bool held) {
-    powerButtonInput.begin(suppressHold, held);
-    resetPowerButtonInput();
-  }
-  bool wasShortPowerReleased() const {
-    return gpio.wasReleased(HalGPIO::BTN_POWER) && powerButtonInput.wasShortReleased();
-  }
-  bool powerSleepRequested() const { return powerButtonInput.shouldSleep(); }
-  bool wasPowerReleaseConsumed() const { return powerButtonInput.wasReleaseConsumed(); }
-  void consumePowerGesture() const {
-    powerButtonInput.consume();
-    resetPowerButtonInput();
-  }
-  bool suppressPowerAfterRestart() const { return isPowerHeld() && powerButtonInput.suppressesHold(); }
+
+  void update(bool deferHomeButtonAction = false) const;
+  // Sticky has no capacitive Home key; preserve the owner's deferred-Home path.
+  void resetHomeButtonInput() const { clearDeferredHomeGesture(); remoteInput.reset(); }
   bool injectRemoteClick(RemoteButton button);
   bool hasRemoteClick() const { return remoteInput.button != RemoteButton::None; }
-  bool wasPressed(Button button) const;
-  bool wasReleased(Button button) const;
-  // One-shot threshold event while the button is down; consumes its release.
   bool wasLongPressed(Button button, unsigned long thresholdMs) const;
   bool consumeSuppressedRelease() const;
-  bool isPressed(Button button) const;
-  bool hasTouch() const;
-  bool wasScreenTapped(int& x, int& y) const;
-  // Immediate press edge for drag handles, without the row-selection dwell.
   bool wasScreenTouchPressed(int& x, int& y) const;
-  bool wasScreenTouchDown(int& x, int& y) const;
-  // One-shot long-press from the SDK touch classifier, fired WHILE the finger
-  // is still down (stationary contact held past the SDK threshold). Consuming
-  // it suppresses the remainder of the contact — its continued hold and its
-  // release edge — so the ensuing finger lift can't also tap-dismiss the popup
-  // the long-press opened. The SDK owns that latch and self-clears it once the
-  // contact ends.
+  bool isNavDirectionSwapped() const;
+  Labels mapDirectionalLabels(const char* back, const char* confirm, const char* left, const char* right,
+                              const char* up, const char* down) const;
+  SwipeDir wasSwipe(int* startX, int* startY = nullptr) const;
+  bool wasReaderMenuSwipeUp() const { return hasHomeKey() && wasBottomEdgeUpSwipe(); }
+  void suppressNextBackRelease() { releaseSuppression.suppressBack(); }
+  void suppressNextConfirmRelease() { releaseSuppression.suppressConfirm(); }
+  void suppressNextPowerRelease() { releaseSuppression.suppressPower(); }
+  void suppressNextPowerConfirmRelease() { releaseSuppression.suppressPowerConfirm(); }
+  bool isPowerReleaseSuppressed() const { return releaseSuppression.isPowerReleaseSuppressed(); }
+  bool wasPressed(Button button) const;
+  bool wasReleased(Button button) const;
+  void injectRelease(Button button) const { injectedReleases[static_cast<size_t>(button)] = true; }
+  void clearInjectedReleases() const { injectedReleases.fill(false); }
+  bool isPressed(Button button) const;
+  // Physical state is intentionally independent of release suppression. Use it
+  // when a destination activity must consume the release of the button that
+  // opened it.
+  bool isPhysicalPressed(Button button) const;
+  const GfxRenderer& getRenderer() const { return renderer; }
+  enum class RowTouch : uint8_t { None, Down, Tap };
+#if CROSSSMUDGE_APP_CAP_TOUCH
+  bool hasTouch() const;
+  bool hasTouchHardware() const;
+  // Multi-touch follows the same reader touch gate as all other screen input,
+  // so it cannot bypass the Disable Touchscreen setting.
+  bool supportsMultiTouch() const;
+  bool getTwoFingerTouch(int& x1, int& y1, int& x2, int& y2) const;
+  bool wasCompletedMultiTouchSwipe(CompletedSwipe& swipe) const;
+  bool wasCompletedMultiTouchRotation(CompletedRotation& rotation) const;
+  // True on profiles with a capacitive home key, where the bottom-edge
+  // up-swipe is the reader-menu gesture rather than the exit-to-home gesture.
+  // The Home key has its own reader lock setting, so it remains available when
+  // "Disable Touchscreen" turns off only screen touch input.
+  bool hasHomeKey() const { return hasHomeKeyHardware(); }
+  // Capability is deliberately separate from this reader-only input gate so
+  // Home-key layouts remain available while the key is locked on reader pages.
+  bool isHomeButtonLockedInReader() const;
+  bool wasScreenTapped(int& x, int& y) const;
+  // Also reports how long the finger was held before release.
+  bool wasScreenTapped(int& x, int& y, unsigned long& heldMs) const;
+  bool isScreenTouchLongPress(int& x, int& y, unsigned long thresholdMs) const;
   bool wasScreenLongPress(int& x, int& y) const;
+  bool isInVerticalEdgeGestureZone(int y) const;
+  bool wasScreenTouchDown(int& x, int& y) const;
+  bool isScreenTouchTapCandidate(int& x, int& y, unsigned long& heldMs) const;
   bool isScreenTouchHeld(int& x, int& y) const;
+  // Ignore the remainder of the active contact when a touch-down action
+  // replaces the current activity before the finger lifts.
+  void suppressCurrentTouchContact() {
+    suppressNextTouchTap();
+    gpio.suppressTouchContact();
+#ifdef SIMULATOR
+    suppressSimulatedTouchContact = true;
+#endif
+  }
+  bool wasItemTapped(int& id) const;
+  bool wasItemTouchedDown(int& id) const;
+  bool wasTabTapped(int& id) const;
+  bool wasTabTouchedDown(int& id) const;
+  bool wasCoverTapped(int& id) const;
+  bool wasCoverTouchedDown(int& id) const;
   // Raw release edge, also true when the contact ended in a swipe or drag-off
   // (which wasScreenTapped never reports). InputSnapshot builders forward it
   // off-target so FreeInkUI routing clears its pressed-element state.
   bool wasScreenTouchReleased() const;
-
-  // Combined touch interaction for a band of equal rows with caller-supplied
-  // geometry — the shared hit-test for lists the theme helpers above do not
-  // cover (custom row heights, option prompts, menus). Down = a held
-  // tap-candidate is on a row (update the selection highlight); Tap = a tap
-  // released on one (activate). rowHeight limits the hit to the top rowHeight
-  // px of each step (0 = the full step, no gap band).
-  enum class RowTouch : uint8_t { None, Down, Tap };
+  // Physical contact survives tap suppression after an opt-in Lua hold.
+  bool isScreenContactActive() const;
+  bool wasTapInRect(int x, int y, int width, int height) const;
+  bool wasListItemTapped(int& index, int itemCount, int selectedIndex, int listTop, int listHeight,
+                         bool hasSubtitle) const;
+  bool wasListItemTouchedDown(int& index, int itemCount, int selectedIndex, int listTop, int listHeight,
+                              bool hasSubtitle) const;
+  bool isListItemTouchLongPressed(int& index, int itemCount, int selectedIndex, int listTop, int listHeight,
+                                  bool hasSubtitle, unsigned long thresholdMs) const;
+  void suppressNextTouchTap() { suppressTouchTap = true; }
   RowTouch rowTouch(int& row, int top, int rowStep, int rowCount, int xStart = 0, int xEnd = INT32_MAX,
                     int rowHeight = 0) const;
-  // Horizontal variant for side-by-side button pairs (confirmation prompts).
   RowTouch colTouch(int& col, int left, int colStep, int colCount, int yStart, int yEnd, int colWidth = 0) const;
-
-  SwipeDir wasSwipe(int* startX = nullptr, int* startY = nullptr) const;
-  // Back = left-to-right swipe anchored at the left edge. Public so swipe-mode
-  // page turns (reader) can exclude it from a plain SwipeDir::Right.
-  bool wasBackGesture() const;
-  // Home-key boards use a short Home-key tap to exit; their bottom-edge swipe
-  // is intentionally unused. Other boards retain the bottom-edge Home gesture.
-  // The reader menu remains on its existing top-edge gesture and middle tap.
+  SwipeDir wasSwipe() const;
+  bool wasSwipeWithPoints(SwipeDir& direction, int& startX, int& startY, int& endX, int& endY) const;
+  bool wasLeftEdgeGesture() const;
+  // An upward swipe that starts in the lower edge band. Home-key profiles use this for
+  // its reader menu because its capacitive key handles Home.
+  bool wasBottomEdgeUpSwipe() const;
+  // Exit-to-home intent. Profiles with a capacitive home key use the
+  // key's press edge; everywhere else it's the bottom-edge up-swipe.
   bool wasHomeGesture() const;
-  // Configured one-frame action, independent of the gesture that triggered it.
-  HomeButtonAction homeButtonAction() const { return homeAction; }
-  void resetHomeButtonInput() const {
-    homeButtonInput.reset();
-    deferredHomeAction = HomeButtonAction::Ignore;
-  }
+  // Deliver a delayed capacitive Home-key tap through the usual activity route.
+  void queueDeferredHomeGesture() { deferredHomeGesture = true; }
+  void clearDeferredHomeGesture() const { deferredHomeGesture = false; }
+  // Contextual menu intent (the reader menu). Home-key boards move this to the
+  // bottom-edge up-swipe (freed by the home key); others keep the top-edge
+  // down-swipe.
   bool wasMenuGesture() const;
-  // Bottom-edge up-swipe as the reader-menu gesture (SHOW_READER_MENU's Swipe
-  // Up option). Only meaningful on home-key boards, where Home lives on the
-  // key and the bottom edge is free; elsewhere the same swipe is the Home
-  // gesture and this returns false.
-  bool wasReaderMenuSwipeUp() const;
-  // Top-edge down-swipe opens the control center on touch boards.
-  // ActivityManager consumes it before activity input.
+  // Frontlight quick panel: top-edge down-swipe, only on home-key boards where
+  // that edge is no longer the menu gesture.
   bool wasLightPanelGesture() const;
+  // Full-screen vertical reader gestures. These preserve each board's existing
+  // action mapping, but intentionally do not apply to reader submenus or lists.
+  bool wasReaderMenuGesture() const;
+  bool wasReaderHomeGesture() const;
+  bool wasReaderLightPanelGesture() const;
+  // Reader-menu shortcut: a long press of the capacitive home key.
+  bool wasReaderMenuHold() const;
+#else
+  constexpr bool hasTouch() const { return false; }
+  constexpr bool hasTouchHardware() const { return false; }
+  constexpr bool supportsMultiTouch() const { return false; }
+  constexpr bool getTwoFingerTouch(int&, int&, int&, int&) const { return false; }
+  constexpr bool wasCompletedMultiTouchSwipe(CompletedSwipe&) const { return false; }
+  constexpr bool wasCompletedMultiTouchRotation(CompletedRotation&) const { return false; }
+  constexpr bool hasHomeKey() const { return false; }
+  constexpr bool isHomeButtonLockedInReader() const { return false; }
+  constexpr bool wasScreenTapped(int&, int&) const { return false; }
+  constexpr bool wasScreenTapped(int&, int&, unsigned long&) const { return false; }
+  constexpr bool isScreenTouchLongPress(int&, int&, unsigned long) const { return false; }
+  constexpr bool wasScreenLongPress(int&, int&) const { return false; }
+  constexpr bool isInVerticalEdgeGestureZone(int) const { return false; }
+  constexpr bool wasScreenTouchDown(int&, int&) const { return false; }
+  constexpr bool isScreenTouchTapCandidate(int&, int&, unsigned long&) const { return false; }
+  constexpr bool isScreenTouchHeld(int&, int&) const { return false; }
+  constexpr void suppressCurrentTouchContact() {}
+  constexpr bool wasItemTapped(int&) const { return false; }
+  constexpr bool wasItemTouchedDown(int&) const { return false; }
+  constexpr bool wasTabTapped(int&) const { return false; }
+  constexpr bool wasTabTouchedDown(int&) const { return false; }
+  constexpr bool wasCoverTapped(int&) const { return false; }
+  constexpr bool wasCoverTouchedDown(int&) const { return false; }
+  constexpr bool wasScreenTouchReleased() const { return false; }
+  constexpr bool isScreenContactActive() const { return false; }
+  constexpr bool wasTapInRect(int, int, int, int) const { return false; }
+  constexpr bool wasListItemTapped(int&, int, int, int, int, bool) const { return false; }
+  constexpr bool wasListItemTouchedDown(int&, int, int, int, int, bool) const { return false; }
+  constexpr bool isListItemTouchLongPressed(int&, int, int, int, int, bool, unsigned long) const { return false; }
+  constexpr void suppressNextTouchTap() {}
+  constexpr RowTouch rowTouch(int&, int, int, int, int = 0, int = INT32_MAX, int = 0) const { return RowTouch::None; }
+  constexpr RowTouch colTouch(int&, int, int, int, int, int, int = 0) const { return RowTouch::None; }
+  constexpr SwipeDir wasSwipe() const { return SwipeDir::None; }
+  constexpr bool wasSwipeWithPoints(SwipeDir& direction, int&, int&, int&, int&) const {
+    direction = SwipeDir::None;
+    return false;
+  }
+  constexpr bool wasLeftEdgeGesture() const { return false; }
+  constexpr bool wasBottomEdgeUpSwipe() const { return false; }
+  constexpr bool wasHomeGesture() const { return false; }
+  constexpr void queueDeferredHomeGesture() {}
+  constexpr void clearDeferredHomeGesture() const {}
+  constexpr bool wasMenuGesture() const { return false; }
+  constexpr bool wasLightPanelGesture() const { return false; }
+  constexpr bool wasReaderMenuGesture() const { return false; }
+  constexpr bool wasReaderHomeGesture() const { return false; }
+  constexpr bool wasReaderLightPanelGesture() const { return false; }
+  constexpr bool wasReaderMenuHold() const { return false; }
+#endif
+  bool wasAnyPressed() const;
+  bool wasAnyReleased() const;
   unsigned long getHeldTime() const;
-  Labels mapLabels(const char* back, const char* confirm, const char* previous, const char* next) const;
-  // Maps four screen-direction labels onto the two physical front-button roles
-  // using the same live-orientation transform as ScreenLeft/Right/Up/Down.
-  Labels mapDirectionalLabels(const char* back, const char* confirm, const char* left, const char* right,
-                              const char* up, const char* down) const;
+  // True when reader-mode orientation handling swaps the logical front navigation buttons.
+  bool isFrontNavButtonSwapActive() const;
+  Label withBackArrow(const char* text) const;
+  Label withPreviousPageArrow(const char* text) const;
+  Label withNextPageArrow(const char* text) const;
+  const char* resolveLabel(Label label) const;
+  Labels mapLabels(Label back, Label confirm, Label previous, Label next) const;
   // Returns the raw front button index that was pressed this frame (or -1 if none).
   int getPressedFrontButton() const;
+  // Returns the raw front button index that was released this frame (or -1 if none).
+  int getReleasedFrontButton() const;
+  bool isFrontButtonPressed(uint8_t buttonIndex) const;
 
-  // True when the control axis is flipped relative to the physical buttons: always on touch boards,
-  // or when button-only boards opt in, while the screen is currently INVERTED / LANDSCAPE_CCW.
-  [[nodiscard]] bool isNavDirectionSwapped() const;
+#ifdef SIMULATOR
+  void simulatorInjectPress(Button button);
+  void simulatorInjectRelease(Button button);
+  void simulatorClearInputFrame();
+#if CROSSSMUDGE_APP_CAP_TOUCH
+  void simulatorInjectTouchDown(int x, int y);
+  void simulatorInjectTouchMove(int x, int y);
+  void simulatorInjectTouchRelease(int x, int y);
+#endif
+#endif
 
  private:
-  HalGPIO& gpio;
-  // Logical-to-physical button mapping depends on what the user is actually looking at: when the
-  // screen is rendered rotated, the directional buttons must flip to match. The renderer is the only
-  // authority on the *live* orientation (the reader rotates it and restores portrait on exit), so we
-  // read it here instead of CrossPointSettings.orientation, which is just the persisted reader
-  // preference and stays "rotated" even while portrait UI like home/settings is on screen.
-  const GfxRenderer& renderer;
-
-  Button mapScreenDirection(Button button) const;
-  bool areSidePageButtonsSwapped() const;
-  Labels mapFrontLabels(const char* back, const char* confirm, const char* left, const char* right) const;
-  bool mapButton(Button button, bool (HalGPIO::*fn)(uint8_t) const) const;
-  // SDK edge classification (fui::edgeSwipe) + the shared decode/held-time
-  // bookkeeping; the wrappers below give each edge its board meaning.
-  bool wasEdgeSwipe(freeink::ui::ScreenEdge edge) const;
-  bool wasTopEdgeDownSwipe() const;
-  bool wasBottomEdgeUpSwipe() const;
-  // Fetch the pending swipe (if any) and map both endpoints to logical screen coords
-  bool decodeSwipe(int& sx, int& sy, int& ex, int& ey) const;
-#if FREEINK_CAP_TOUCH
-  bool wasPowerConfirmClick() const;
-#endif
-  void rememberTouchHeldTime() const;
-  void suppressNextRelease(Button button) const;
-
   mutable RemoteButtonInput remoteInput;
-  mutable HomeButtonInput homeButtonInput;
-  mutable PowerButtonInput powerButtonInput;
-  mutable PowerButtonClickInput powerButtonClickInput;
-  mutable bool powerSingleClickFrame = false;
-  mutable bool powerSleepFrame = false;
-  mutable bool deferredPowerSleepFrame = false;
-  mutable HomeButtonAction homeAction = HomeButtonAction::Ignore;
-  mutable HomeButtonAction deferredHomeAction = HomeButtonAction::Ignore;
+  mutable uint16_t longPressFiredButtons = 0;
+  mutable uint16_t suppressedReleaseButtons = 0;
+  Button mapScreenDirection(Button button) const;
+  bool remoteMatches(Button button) const;
+  HalGPIO& gpio;
+  const GfxRenderer& renderer;
+  bool readerMode = false;
+  bool powerAsConfirmInReaderMode = false;
+#if CROSSSMUDGE_APP_CAP_TOUCH
+  bool readerTouchscreenOverride = false;
+#endif
+  mutable ReleaseSuppression releaseSuppression;
+  static constexpr size_t LABEL_BUFFER_SIZE = 128;
+  mutable std::array<std::array<char, LABEL_BUFFER_SIZE>, 4> labelBuffers{};
+  // One-frame synthetic releases let a chord route through the existing
+  // activity navigation path without allocating an event object.
+  mutable std::array<bool, BUTTON_COUNT> injectedReleases{};
+#if CROSSSMUDGE_APP_CAP_TOUCH || CROSSINK_APP_CAP_TOUCH
+  mutable bool suppressTouchTap = false;
+  mutable bool deferredHomeGesture = false;
+#endif
+#ifdef SIMULATOR
+  std::array<bool, BUTTON_COUNT> simulatorPressed{};
+  std::array<bool, BUTTON_COUNT> simulatorReleased{};
+  std::array<bool, BUTTON_COUNT> simulatorHeld{};
+  std::array<unsigned long, BUTTON_COUNT> simulatorPressStart{};
+#if CROSSSMUDGE_APP_CAP_TOUCH
+  struct SimulatorTouch {
+    bool pressed = false;
+    bool pressedThisFrame = false;
+    bool releasedThisFrame = false;
+    bool longPressFired = false;
+    int startX = 0;
+    int startY = 0;
+    int currentX = 0;
+    int currentY = 0;
+    unsigned long startedAt = 0;
+  };
+  mutable SimulatorTouch simulatorTouch;
+  mutable bool suppressSimulatedTouchContact = false;
+#endif
+#endif
+
+  bool mapButton(Button button, bool (HalGPIO::*fn)(uint8_t) const) const;
+  bool wasPhysicallyReleased(Button button) const;
+  void expireReleaseSuppressions() const;
+  uint8_t mappedFrontButtonFor(Button button) const;
+  bool shouldUsePowerAsConfirmFallback() const;
+  bool shouldMirrorPowerAsConfirmHold() const;
+#if CROSSSMUDGE_APP_CAP_TOUCH
+  bool touchInputEnabled() const;
+  bool hasHomeKeyHardware() const;
+  bool wasBackGesture() const;
+  bool wasTopEdgeDownSwipe() const;
+  // Fetch the pending swipe (if any) and map both endpoints to logical screen coords.
+  bool decodeSwipe(int& sx, int& sy, int& ex, int& ey) const;
+  bool listItemFromPoint(int x, int y, int& index, int itemCount, int selectedIndex, int listTop, int listHeight,
+                         bool hasSubtitle) const;
+  bool wasRegistryTargetTapped(uint8_t kind, int& id) const;
+  bool wasRegistryTargetTouchedDown(uint8_t kind, int& id) const;
+  bool wasFrontButtonHintTapped(uint8_t buttonIndex) const;
+  bool wasFrontButtonHintTouchedDown(uint8_t buttonIndex) const;
+  void rememberTouchHeldTime() const;
   mutable bool touchHeldOverrideValid = false;
   mutable unsigned long touchHeldOverrideMs = 0;
   mutable unsigned long touchHeldOverrideAt = 0;
-  mutable uint16_t longPressFiredButtons = 0;
-  mutable uint16_t suppressedReleaseButtons = 0;
+#else
+  constexpr bool wasBackGesture() const { return false; }
+  constexpr bool wasFrontButtonHintTapped(uint8_t) const { return false; }
+  constexpr bool wasFrontButtonHintTouchedDown(uint8_t) const { return false; }
+#endif
 };

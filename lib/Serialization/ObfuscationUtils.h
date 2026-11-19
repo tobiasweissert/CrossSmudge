@@ -16,6 +16,14 @@
  */
 namespace obfuscation {
 
+enum class DecodeStatus : uint8_t {
+  EMPTY,
+  INVALID,
+  TOO_LONG,
+  LEGACY,
+  VALIDATED,
+};
+
 // XOR obfuscate/deobfuscate in-place using hardware MAC key (symmetric operation)
 void xorTransform(std::string& data);
 
@@ -23,8 +31,12 @@ void xorTransform(std::string& data);
 String obfuscateToBase64(const std::string& plaintext);
 
 // Decode base64 and de-obfuscate back to plaintext.
-// Returns empty string on invalid base64 input; sets *ok to false if decode fails.
+// Returns empty string on invalid input; sets *ok to false if decode or validation fails.
 std::string deobfuscateFromBase64(const char* encoded, bool* ok = nullptr);
+std::string deobfuscateFromBase64(const char* encoded, DecodeStatus* status);
+// Rejects oversized plaintext before returning it to a credential/settings
+// store, and bounds the decoded payload allocation for corrupted input.
+std::string deobfuscateFromBase64(const char* encoded, size_t maxPlaintextLength, DecodeStatus* status);
 
 // Bounded variant. Rejects decoded output larger than maxDecodedLength before
 // allocating its result buffer and reports that case through tooLong.

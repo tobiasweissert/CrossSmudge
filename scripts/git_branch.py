@@ -1,19 +1,37 @@
 """
-PlatformIO pre-build script: inject git branch and short SHA into
-CROSSPOINT_VERSION for development environments.
+PlatformIO pre-build script: inject git info into version defines.
 
-Results in a version string like:  1.1.0-dev-feat-kosync-xpath-05c6cf8
-Release environments are unaffected; they set CROSSPOINT_VERSION in the ini.
+  default:       1.1.0-dev+<branch>  (local development builds)
+  production:    1.1.0               (when $CROSSSMUDGE_RELEASE_VERSION or $CROSSINK_RELEASE_VERSION is set)
+  RC:            1.1.0-<hash>-RC     (when $CROSSSMUDGE_RC_HASH or $CROSSINK_RC_HASH is set)
+  test & debug:  1.2.6-<branch>+<5-char-hash>
+  gh_release_rc: 1.1.0-<hash>-RC     (hash from $CROSSSMUDGE_RC_HASH in CI,
+                                      or from git locally)
+
+Simulator environments set CROSSSMUDGE_VERSION / CROSSINK_VERSION directly in platformio.ini.
 """
 
 import configparser
+import hashlib
 import os
+import re
 import subprocess
 import sys
 
 
 def warn(msg):
     print(f'WARNING [git_branch.py]: {msg}', file=sys.stderr)
+
+
+def get_git_short_hash(project_dir, length=5):
+    try:
+        return subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            text=True, stderr=subprocess.PIPE, cwd=project_dir
+        ).strip()[:length]
+    except Exception as e:
+        warn(f'Could not read git hash: {e}; hash will be "00000"')
+        return '00000'
 
 
 def run_git_value(project_dir, args, label):
@@ -54,7 +72,15 @@ def get_git_branch(project_dir):
     # Detached HEAD has no branch name.
     if branch == 'HEAD':
         return 'detached'
-    return branch
+    return sanitize_version_component(branch)
+
+
+def sanitize_version_component(value):
+    value = value.strip()
+    value = re.sub(r'[^A-Za-z0-9._-]+', '-', value)
+    value = re.sub(r'-{2,}', '-', value)
+    value = value.strip('-.')
+    return value or 'unknown'
 
 
 def get_git_short_sha(project_dir):
@@ -63,57 +89,194 @@ def get_git_short_sha(project_dir):
     )
 
 
-def get_base_version(project_dir):
+def get_git_dirty(project_dir):
+    try:
+        status = subprocess.check_output(
+            ['git', 'status', '--porcelain', '--untracked-files=no'],
+            text=True, stderr=subprocess.PIPE, cwd=project_dir
+        )
+        return '1' if status.strip() else '0'
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        warn(f'Could not read git working-tree state: {e}; state will be "unknown"')
+        return 'unknown'
+
+
+def _read_ini(project_dir):
     ini_path = os.path.join(project_dir, 'platformio.ini')
-    if not os.path.isfile(ini_path):
-        warn(f'platformio.ini not found at {ini_path}; base version will be "0.0.0"')
-        return '0.0.0'
+    local_ini_path = os.path.join(project_dir, 'platformio.local.ini')
     config = configparser.ConfigParser()
-    config.read(ini_path, encoding='utf-8')
-    if not config.has_option('crosspoint', 'version'):
-        warn('No [crosspoint] version in platformio.ini; base version will be "0.0.0"')
-        return '0.0.0'
-    return config.get('crosspoint', 'version')
+    if os.path.isfile(ini_path):
+        config_paths = [ini_path]
+        if os.path.isfile(local_ini_path):
+            # Match PlatformIO's local override convention: values from the
+            # optional local file take precedence over the tracked config.
+            config_paths.append(local_ini_path)
+        config.read(config_paths)
+    else:
+        warn(f'platformio.ini not found at {ini_path}')
+    return config
+
+
+def get_crosssmudge_version(project_dir):
+    config = _read_ini(project_dir)
+    if config.has_option('crosssmudge', 'version'):
+        return config.get('crosssmudge', 'version')
+    if config.has_option('crossink', 'version'):
+        return config.get('crossink', 'version')
+    warn(
+        'No [crosssmudge] or [crossink] version in platformio.ini or platformio.local.ini; '
+        'build version will be "0.0.0"'
+    )
+    return '0.0.0'
+
+
+def get_crossink_version(project_dir):
+    return get_crosssmudge_version(project_dir)
+
+
+def get_release_candidate_version(project_dir):
+    short_hash = (
+        os.environ.get('CROSSSMUDGE_RC_HASH')
+        or os.environ.get('CROSSINK_RC_HASH')
+        or get_git_short_hash(project_dir)
+    )
+    base_version = re.sub(r'-RC$', '', get_crosssmudge_version(project_dir), flags=re.IGNORECASE)
+    return f'{base_version}-{sanitize_version_component(short_hash)}-RC'
+
+
+def get_production_version(project_dir):
+    release_version = (
+        os.environ.get('CROSSSMUDGE_RELEASE_VERSION')
+        or os.environ.get('CROSSINK_RELEASE_VERSION')
+    )
+    if release_version:
+        return sanitize_version_component(release_version.lstrip('v'))
+    return get_crosssmudge_version(project_dir)
+
+
+def owner_source_fingerprint(project_dir):
+    """Hash source bytes, including unstaged/new files, independently of Git metadata."""
+    paths = subprocess.check_output(
+        ['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd=project_dir
+    ).split(b'\0')
+    digest = hashlib.sha256()
+    for raw in sorted(set(paths)):
+        if not raw:
+            continue
+        path = os.path.join(project_dir, os.fsdecode(raw))
+        if os.path.isfile(path):
+            digest.update(raw + b'\0')
+            with open(path, 'rb') as source:
+                digest.update(hashlib.sha256(source.read()).digest())
+    return digest.hexdigest()
+
+
+def get_hardware_version(project_dir, pioenv):
+    if os.environ.get('CROSSSMUDGE_RC_HASH') or os.environ.get('CROSSINK_RC_HASH'):
+        return get_release_candidate_version(project_dir)
+
+    if pioenv == 'sticky-owner-test':
+        return f'{get_crosssmudge_version(project_dir)}-test.{get_git_short_hash(project_dir, 7)}.{owner_source_fingerprint(project_dir)[:8]}'
+
+    base_version = (
+        get_production_version(project_dir)
+        if (os.environ.get('CROSSSMUDGE_RELEASE_VERSION') or os.environ.get('CROSSINK_RELEASE_VERSION'))
+        else get_crosssmudge_version(project_dir)
+    )
+    if pioenv not in {'sticky', 'default'}:
+        raise ValueError('Crosscub hardware version requires Sticky')
+    device_suffix = '-sticky'
+    return f'{base_version}{device_suffix}'
 
 
 def inject_version(env):
-    # Only applies to development environments; release envs set the
-    # version via build_flags in platformio.ini and are unaffected.
-    if env['PIOENV'] not in (
-        'default', 'sticky', 'x4pro', 'x4c', 'metalio_eink4', 'papermono', 'eego_a4', 'picco'
-    ):
-        return
-
     project_dir = env['PROJECT_DIR']
-    base_version = get_base_version(project_dir)
-    branch = get_git_branch(project_dir)
-    short_sha = get_git_short_sha(project_dir)
-    version_string = f'{base_version}-dev-{branch}-{short_sha}'
+    pioenv = env['PIOENV']
+    # Keep build provenance separate from CROSSSMUDGE_VERSION: production versions
+    # intentionally omit the source revision, while diagnostics need the base
+    # commit and whether the compiled tree had tracked modifications.
+    env.Append(CPPDEFINES=[
+        ('CROSSINK_GIT_SHA', f'\\"{get_git_short_sha(project_dir)}\\"'),
+        ('CROSSINK_GIT_DIRTY', f'\\"{get_git_dirty(project_dir)}\\"'),
+    ])
 
-    def add_version(build_env, node):
-        # Only these translation units depend on Git metadata. Keep library and
-        # reader objects reusable when the branch or commit changes.
-        if b'CROSSPOINT_VERSION' not in node.srcnode().get_contents():
-            return node
-        version_env = build_env.Clone()
-        version_env.Append(CPPDEFINES=[('CROSSPOINT_VERSION', f'\\"{version_string}\\"')])
-        return version_env.Object(node)
+    if pioenv in {'default', 'sticky', 'sticky-owner-test'}:
+        version_string = get_hardware_version(project_dir, pioenv)
+        if os.environ.get('CROSSSMUDGE_RC_HASH') or os.environ.get('CROSSINK_RC_HASH'):
+            print(f'Crosscub RC build version: {version_string}')
+        elif os.environ.get('CROSSSMUDGE_RELEASE_VERSION') or os.environ.get('CROSSINK_RELEASE_VERSION'):
+            print(f'Crosscub production build version: {version_string}')
+        else:
+            print(f'Crosscub build version: {version_string}')
+        env.Append(CPPDEFINES=[
+            ('CROSSSMUDGE_VERSION', f'\\"{version_string}\\"'),
+            ('CROSSINK_VERSION', f'\\"{version_string}\\"'),
+        ])
 
-    env.AddBuildMiddleware(add_version)
-    print(f'CrossPoint build version: {version_string}')
+    elif pioenv == 'debug':
+        branch = get_git_branch(project_dir)
+        short_hash = get_git_short_hash(project_dir)
+        ci_version = get_crosssmudge_version(project_dir)
+        suffix = f'-{branch}+{short_hash}'
+        env.Append(CPPDEFINES=[
+            ('CROSSSMUDGE_VERSION', f'\\"{ci_version}{suffix}\\"'),
+            ('CROSSINK_VERSION', f'\\"{ci_version}{suffix}\\"'),
+            ('CROSSSMUDGE_BUILD_ENV', '\\"debug\\"'),
+            ('CROSSINK_BUILD_ENV', '\\"debug\\"'),
+            'CROSSSMUDGE_SHOW_SLEEP_BUILD_INFO',
+            'CROSSINK_SHOW_SLEEP_BUILD_INFO',
+        ])
+        print(f'Crosscub test build version: {ci_version}{suffix}')
+
+    elif pioenv == 'sticky-debug':
+        branch = get_git_branch(project_dir)
+        short_hash = get_git_short_hash(project_dir)
+        ci_version = get_crosssmudge_version(project_dir)
+        suffix = f'-{branch}+{short_hash}'
+        env.Append(CPPDEFINES=[
+            ('CROSSSMUDGE_VERSION', f'\\"{ci_version}{suffix}\\"'),
+            ('CROSSINK_VERSION', f'\\"{ci_version}{suffix}\\"'),
+            ('CROSSSMUDGE_BUILD_ENV', '\\"debug\\"'),
+            ('CROSSINK_BUILD_ENV', '\\"debug\\"'),
+            'CROSSSMUDGE_SHOW_SLEEP_BUILD_INFO',
+            'CROSSINK_SHOW_SLEEP_BUILD_INFO',
+        ])
+        print(f'Crosscub test build version: {ci_version}{suffix}')
+
+    elif pioenv == 'test':
+        branch = get_git_branch(project_dir)
+        short_hash = get_git_short_hash(project_dir)
+        ci_version = get_crosssmudge_version(project_dir)
+        suffix = f'-{branch}+{short_hash}'
+        env.Append(CPPDEFINES=[
+            ('CROSSSMUDGE_VERSION', f'\\"{ci_version}{suffix}\\"'),
+            ('CROSSINK_VERSION', f'\\"{ci_version}{suffix}\\"'),
+        ])
+        print(f'Crosscub test build version: {ci_version}{suffix}')
+
+    elif pioenv == 'gh_release_rc':
+        # CI passes CROSSSMUDGE_RC_HASH as an env var; locally we derive it from git.
+        version_string = get_release_candidate_version(project_dir)
+        env.Append(CPPDEFINES=[
+            ('CROSSSMUDGE_VERSION', f'\\"{version_string}\\"'),
+            ('CROSSINK_VERSION', f'\\"{version_string}\\"'),
+        ])
+        print(f'Crosscub RC build version: {version_string}')
 
 
 # PlatformIO/SCons entry point — Import and env are SCons builtins injected at runtime.
 # When run directly with Python (e.g. for validation), a lightweight fake env is used
 # so the git/version logic can be exercised without a full build.
 try:
-    Import('env')           # noqa: F821  # type: ignore[name-defined]
-    inject_version(env)     # noqa: F821  # type: ignore[name-defined]
+    Import('env')  # noqa: F821  # type: ignore[name-defined]
 except NameError:
     class _Env(dict):
-        def AddBuildMiddleware(self, _):
-            # Validation mode only reports the computed version.
-            return None
+        def Append(self, **_): pass
 
-    _project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if '__file__' in globals():
+        _project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    else:
+        _project_dir = os.getcwd()
     inject_version(_Env({'PIOENV': 'default', 'PROJECT_DIR': _project_dir}))
+else:
+    inject_version(env)  # noqa: F821  # type: ignore[name-defined]

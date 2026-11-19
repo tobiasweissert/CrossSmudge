@@ -1,32 +1,16 @@
 #pragma once
 #include <Arduino.h>
-#include <BoardConfig.h>
 #include <EInkDisplay.h>
+#include <BoardConfig.h>
 
 class HalDisplay {
  public:
   using Controller = BoardConfig::DisplayController;
   Controller getController() const;
-
+  void controllerIdle();
   using GrayscaleMode = freeink::GrayscaleMode;
   using GrayscaleCapabilities = freeink::GrayscaleCapabilities;
-  using GrayscaleBase = freeink::GrayscaleBase;
-  using GrayscaleEncoding = freeink::GrayscaleEncoding;
-
-  // When checking stripUploads, pass the grayscale mode used for the planes.
   GrayscaleCapabilities grayscaleCapabilities(GrayscaleMode mode = GrayscaleMode::Overlay) const;
-  // Controller of the driver chosen at boot (null if the driver does not say).
-  const char* controllerName() const { return einkDisplay.getControllerName(); }
-  // Part number of the panel the boot probe identified (null if unknown).
-  const char* panelName() const { return einkDisplay.getPanelName(); }
-  // True while book pages are presented; panels with a reading waveform use it.
-  void setReaderRefresh(bool reading) { einkDisplay.setReaderRefresh(reading); }
-  // True asks text-overlay gray passes for every gray level (image pages).
-  void setOverlayFullTone(bool fullTone) { einkDisplay.setOverlayFullTone(fullTone); }
-  bool displayRetainedGrayscaleOverlay(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool restore) {
-    return einkDisplay.displayRetainedGrayscaleOverlay(x, y, w, h, restore);
-  }
-
   // Constructor with pin configuration
   HalDisplay();
 
@@ -39,6 +23,8 @@ class HalDisplay {
     HALF_REFRESH,  // Half refresh (1720ms) - balanced quality and speed
     FAST_REFRESH   // Fast refresh using custom LUT
   };
+
+  bool displayGrayscaleBase(GrayscaleMode mode, RefreshMode fallback, bool turnOffScreen = false);
 
   // Pass seamless=true on any path where the panel already shows the
   // content it should after begin() returns (silent reboot's popup,
@@ -58,8 +44,13 @@ class HalDisplay {
   void clearScreen(uint8_t color = 0xFF) const;
   void drawImage(const uint8_t* imageData, uint16_t x, uint16_t y, uint16_t w, uint16_t h,
                  bool fromProgmem = false) const;
+  void drawImageTransparent(const uint8_t* imageData, uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+                            bool fromProgmem = false) const;
 
   void displayBuffer(RefreshMode mode = RefreshMode::FAST_REFRESH, bool turnOffScreen = false);
+  // Persistently invert panel output while leaving framebuffer drawing in its
+  // normal logical colors.
+  void setInverted(bool inverted);
   // Non-blocking refresh (shadow-free): starts the panel waveform and returns
   // while the panel refreshes on its own. The framebuffer must stay untouched
   // until waitRefreshComplete(), and the caller must rebuild the differential
@@ -71,16 +62,14 @@ class HalDisplay {
   // True when displayBufferAsync() genuinely overlaps (panel driver defers);
   // false where it falls back to a blocking refresh.
   bool supportsAsyncRefresh() const;
-
-  // Output polarity. The framebuffer remains in normal polarity; inversion is
-  // applied by the display driver while sending it to the panel.
-  void setInverted(bool inverted);
+  // True when the normal async refresh is equivalent to the panel's grayscale
+  // base pass. X3 has a dedicated grayscale waveform and must stay blocking.
+  bool supportsAsyncGrayscaleBase() const;
+  void refreshDisplay(RefreshMode mode = RefreshMode::FAST_REFRESH, bool turnOffScreen = false);
   bool isInverted() const;
 
   // Power management
   void deepSleep();
-  // Power the panel down between frames, keeping its image; the next paint wakes it.
-  void controllerIdle();
 
   // Access to frame buffer
   uint8_t* getFrameBuffer() const;
@@ -101,12 +90,14 @@ class HalDisplay {
   void preconditionGrayscale(uint16_t x, uint16_t y, uint16_t w, uint16_t h);
 
   // Display the framebuffer as the base frame for a grayscale overlay that
-  // follows. On X3, HALF fallback first requests a resync to match
-  // displayBuffer(HALF); FAST fallback keeps the OEM differential base waveform
-  // ("AA-pre-BW(mid)"). Other panels display normally with `fallback` mode.
+  // follows. X3 uses the OEM differential base waveform ("AA-pre-BW(mid)");
+  // other panels display normally with `fallback` mode (previous behavior).
+  // Forces the same X3 resync that displayBuffer(HALF)/displayBuffer(FULL) do
+  // whenever `fallback` isn't FAST_REFRESH, so a HALF/FULL caller gets a clean
+  // base instead of ghosting through the differential waveform.
   void displayGrayscaleBase(RefreshMode fallback = HALF_REFRESH, bool turnOffScreen = false);
-  bool displayGrayscaleBase(GrayscaleMode mode, RefreshMode fallback = HALF_REFRESH, bool turnOffScreen = false);
 
+  void copyGrayscaleBuffers(const uint8_t* lsbBuffer, const uint8_t* msbBuffer);
   void copyGrayscaleLsbBuffers(const uint8_t* lsbBuffer);
   void copyGrayscaleMsbBuffers(const uint8_t* msbBuffer);
   void cleanupGrayscaleBuffers(const uint8_t* bwBuffer);
@@ -114,9 +105,12 @@ class HalDisplay {
   void displayGrayBuffer(bool turnOffScreen = false);
 
   // Tiled grayscale: stream one band of a plane (lsbPlane selects LSB/MSB RAM)
-  // straight to the controller. Check grayscaleCapabilities(mode).stripUploads
-  // with the same grayscale mode used for the planes.
+  // straight to the controller; supportsStripGrayscale() gates the path. See
+  // EInkDisplay::writeGrayscalePlaneStrip.
   void writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t* rows, uint16_t yStart, uint16_t numRows);
+  // Firmware policy for the reader's extra white-image refresh.
+  bool shouldSkipImageBlanking() const;
+  bool supportsStripGrayscale() const;
 
   // Runtime geometry passthrough
   uint16_t getDisplayWidth() const;

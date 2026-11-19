@@ -1,6 +1,7 @@
 #pragma once
 #include <HalStorage.h>
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -23,14 +24,30 @@ struct RenderConfig {
   float sourceCropY = 0.0f;         // Fraction cropped equally from the top and bottom edges
   bool preserveAlpha = false;       // Skip transparent pixels instead of compositing them against white
   std::string cachePath;            // If non-empty, decoder will write pixel cache to this path
+  bool cacheOnly = false;  // Browser worker; no live renderer access.
+  bool useMonochromeDither = false;  // Opt-in BW quantization; EPUB default remains four-level.
 };
 
+struct ImageDecodeControl {
+  const std::atomic<bool>* cancel = nullptr;
+  uint32_t start = 0, timeout = 30000;
+  bool stopped() const;
+};
+class ImageDecodeScope {
+  const ImageDecodeControl* previous;
+
+ public:
+  explicit ImageDecodeScope(const ImageDecodeControl* control);
+  ~ImageDecodeScope();
+};
 class ImageToFramebufferDecoder {
  public:
   virtual ~ImageToFramebufferDecoder() = default;
 
   virtual bool decodeToFramebuffer(const std::string& imagePath, GfxRenderer& renderer, const RenderConfig& config) = 0;
 
+  virtual bool decodeToCache(const std::string& imagePath, const RenderConfig& config) { return false; }
+  static bool cancelled();
   virtual bool getDimensions(const std::string& imagePath, ImageDimensions& dims) const = 0;
 
   virtual const char* getFormatName() const = 0;

@@ -19,13 +19,12 @@ class FontInstaller {
 
   explicit FontInstaller(SdCardFontRegistry& registry);
 
-  /// Validate a family name: alphanumeric + hyphen + underscore only, no path traversal.
+  /// Validate a family name: safe filename chars only, no path traversal.
   static bool isValidFamilyName(const char* name);
 
   /// Validate a .cpfont filename: ends with ".cpfont", no path separators or
-  /// traversal sequences, basename uses only alphanumeric + hyphen + underscore
-  /// + dot (only as the extension separator). Rejects "../foo.cpfont" and
-  /// "evil/foo.cpfont".
+  /// traversal sequences, basename uses only safe filename chars. Rejects
+  /// "../foo.cpfont" and "evil/foo.cpfont".
   static bool isValidCpfontFilename(const char* name);
 
   /// Validate a vector font filename (.ttf/.otf, case-insensitive extension)
@@ -50,10 +49,8 @@ class FontInstaller {
   Error deleteFamily(const char* familyName);
 
   /// Re-run registry discovery to pick up new/removed fonts.
-  void refreshRegistry();
-
-  /// Check whether a family name already exists in the registry.
-  bool isFamilyInstalled(const char* familyName) const;
+  /// Returns false only when discovery could not complete due to low memory.
+  bool refreshRegistry();
 
  private:
   SdCardFontRegistry& registry_;

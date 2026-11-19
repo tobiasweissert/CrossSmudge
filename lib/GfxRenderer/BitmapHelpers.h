@@ -20,7 +20,7 @@ struct GrayPlanePixel {
   bool black;
 };
 
-// level: 0=black, 1=dark, 2=light, 3=white. drawPixel(true) clears a bit.
+// Levels: black, dark, light, white. drawPixel(true) clears a framebuffer bit.
 constexpr GrayPlanePixel grayPlanePixel(uint8_t level, bool msb, bool absolute) {
   if (absolute) return {true, !(level == 3 || level == (msb ? 2 : 1))};
   return {msb ? (level == 1 || level == 2) : level == 1, false};
@@ -50,7 +50,6 @@ class Atkinson1BitDitherer {
     errorRow2 = errorRow1 + rowSize;
   }
 
-  // Callers must check row allocation before processing pixels.
   bool isValid() const { return errorRows != nullptr; }
 
   // EXPLICITLY DELETE THE COPY CONSTRUCTOR
@@ -104,6 +103,13 @@ class Atkinson1BitDitherer {
     memset(errorRow2, 0, rowSize * sizeof(int16_t));
   }
 
+  void reset() {
+    if (!isValid()) return;
+    memset(errorRow0, 0, rowSize * sizeof(int16_t));
+    memset(errorRow1, 0, rowSize * sizeof(int16_t));
+    memset(errorRow2, 0, rowSize * sizeof(int16_t));
+  }
+
  private:
   size_t rowSize{0};
   std::unique_ptr<int16_t[]> errorRows;
@@ -120,7 +126,7 @@ class Atkinson1BitDitherer {
 // Less error buildup = fewer artifacts than Floyd-Steinberg
 class AtkinsonDitherer {
  public:
-  explicit AtkinsonDitherer(int width, bool originalThresholds = false) : originalThresholds(originalThresholds) {
+  explicit AtkinsonDitherer(int width, bool imageLevels = false) : imageLevels(imageLevels) {
     if (width <= 0) return;
     const size_t candidateRowSize = static_cast<size_t>(width) + 4;
     if (candidateRowSize > SIZE_MAX / (3 * sizeof(int16_t))) return;
@@ -131,15 +137,13 @@ class AtkinsonDitherer {
     errorRow1 = errorRow0 + rowSize;
     errorRow2 = errorRow1 + rowSize;
   }
-
-  // Callers must check row allocation before processing pixels.
-  bool isValid() const { return errorRows != nullptr; }
-
   // **1. EXPLICITLY DELETE THE COPY CONSTRUCTOR**
   AtkinsonDitherer(const AtkinsonDitherer& other) = delete;
 
   // **2. EXPLICITLY DELETE THE COPY ASSIGNMENT OPERATOR**
   AtkinsonDitherer& operator=(const AtkinsonDitherer& other) = delete;
+
+  bool isValid() const { return errorRows != nullptr; }
 
   uint8_t processPixel(int gray, int x) {
     // Add accumulated error
@@ -150,7 +154,7 @@ class AtkinsonDitherer {
     // Quantize to 4 levels
     uint8_t quantized;
     int quantizedValue;
-    if (originalThresholds) {
+    if (imageLevels) {  // evenly spaced image tones
       if (adjusted < 43) {
         quantized = 0;
         quantizedValue = 0;
@@ -164,16 +168,16 @@ class AtkinsonDitherer {
         quantized = 3;
         quantizedValue = 255;
       }
-    } else {  // Legacy panel tuning; slightly darker midtones.
+    } else {  // fine-tuned to X4 eink display
       if (adjusted < 30) {
         quantized = 0;
         quantizedValue = 15;
-      } else if (adjusted < 55) {
+      } else if (adjusted < 50) {
         quantized = 1;
-        quantizedValue = 35;
-      } else if (adjusted < 150) {
+        quantizedValue = 30;
+      } else if (adjusted < 140) {
         quantized = 2;
-        quantizedValue = 90;
+        quantizedValue = 80;
       } else {
         quantized = 3;
         quantizedValue = 210;
@@ -213,12 +217,12 @@ class AtkinsonDitherer {
   }
 
  private:
+  const bool imageLevels;
   size_t rowSize{0};
   std::unique_ptr<int16_t[]> errorRows;
   int16_t* errorRow0 = nullptr;
   int16_t* errorRow1 = nullptr;
   int16_t* errorRow2 = nullptr;
-  const bool originalThresholds;
 };
 
 // Floyd-Steinberg error diffusion dithering with serpentine scanning
@@ -231,8 +235,7 @@ class AtkinsonDitherer {
 //      7/16  X
 class FloydSteinbergDitherer {
  public:
-  explicit FloydSteinbergDitherer(int width, bool originalThresholds = false)
-      : rowCount(0), originalThresholds(originalThresholds) {
+  explicit FloydSteinbergDitherer(int width, bool imageLevels = false) : imageLevels(imageLevels), rowCount(0) {
     if (width <= 0) return;
     const size_t candidateRowSize = static_cast<size_t>(width) + 2;
     if (candidateRowSize > SIZE_MAX / (2 * sizeof(int16_t))) return;
@@ -243,7 +246,6 @@ class FloydSteinbergDitherer {
     errorNextRow = errorCurRow + rowSize;
   }
 
-  // Callers must check row allocation before processing pixels.
   bool isValid() const { return errorRows != nullptr; }
 
   // **1. EXPLICITLY DELETE THE COPY CONSTRUCTOR**
@@ -265,7 +267,7 @@ class FloydSteinbergDitherer {
     // Quantize to 4 levels (0, 85, 170, 255)
     uint8_t quantized;
     int quantizedValue;
-    if (originalThresholds) {
+    if (imageLevels) {  // evenly spaced image tones
       if (adjusted < 43) {
         quantized = 0;
         quantizedValue = 0;
@@ -279,16 +281,16 @@ class FloydSteinbergDitherer {
         quantized = 3;
         quantizedValue = 255;
       }
-    } else {  // Legacy panel tuning; slightly darker midtones.
+    } else {  // fine-tuned to X4 eink display
       if (adjusted < 30) {
         quantized = 0;
         quantizedValue = 15;
-      } else if (adjusted < 55) {
+      } else if (adjusted < 50) {
         quantized = 1;
-        quantizedValue = 35;
-      } else if (adjusted < 150) {
+        quantizedValue = 30;
+      } else if (adjusted < 140) {
         quantized = 2;
-        quantizedValue = 90;
+        quantizedValue = 80;
       } else {
         quantized = 3;
         quantizedValue = 210;
@@ -350,10 +352,10 @@ class FloydSteinbergDitherer {
   }
 
  private:
+  const bool imageLevels;
   int rowCount;
   size_t rowSize{0};
   std::unique_ptr<int16_t[]> errorRows;
   int16_t* errorCurRow = nullptr;
   int16_t* errorNextRow = nullptr;
-  const bool originalThresholds;
 };

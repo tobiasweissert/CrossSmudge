@@ -1,6 +1,17 @@
+> **Experimental migration candidate — not release-ready.** Crosscub remains Sticky-only.
+> This branch uses pinned CrossPoint develop directly, selectively adopts CrossInk,
+> and preserves Crosscub behavior. Stable Crosscub **1.6.5.5 is unchanged**.
+> Source/host checks do not establish a complete firmware build or device acceptance.
+> See [the feature and readiness ledger](../SCOPE.md).
+
+---
+title: SD Card Fonts
+nav_order: 4
+---
+
 # SD Card Fonts
 
-CrossPoint supports loading additional fonts from the SD card, including fonts
+Crosscub supports loading additional fonts from the SD card, including fonts
 with extended Unicode coverage (CJK, Cyrillic, Greek, etc.).
 
 If CrossPoint enables external RAM on your device, you can load `.ttf`, `.otf`,
@@ -16,12 +27,12 @@ The source notices are in [licenses/fonts.txt](../licenses/fonts.txt).
 There are three ways to install `.cpfont` fonts. Direct TTF/OTF/TTC loading uses
 the manual SD card copy method below.
 
-### Option 1: Download from device (recommended)
+### Option 1: Download from device
 
 1. Connect your CrossPoint reader to Wi-Fi
-2. Go to **Settings > Reader > Manage Fonts**
+2. Go to **Settings > Reader > Font Options > Manage Fonts**
 3. Browse available font families and tap to download
-4. Downloaded fonts appear immediately in **Settings > Reader > Font Family**
+4. Downloaded fonts appear immediately in **Settings > Reader > Font Options > Font Family**
 
 ### Option 2: Upload via web browser
 
@@ -30,43 +41,73 @@ the manual SD card copy method below.
 3. Navigate to the **Fonts** tab
 4. Upload `.cpfont` files using the upload form
 
-### Option 3: Manual SD card copy
+### Option 3: Manual SD card copy (Fastest)
 
-1. Download font files from the
-   [crosspoint-fonts repository](https://github.com/crosspoint-reader/crosspoint-fonts)
-2. Copy font family folders to one of two locations on your SD card:
+1.  Download font files from the
+    [Crosscub Fonts](https://github.com/uxjulia/crosssmudge-fonts/tree/main/cpfonts) repository.
+    - Click the `.zip` file for the font you want then click on the download icon to download the raw file.
+2.  Copy font family folders to one of two locations on your SD card:
+    - `/.fonts/` — hidden directory (preferred; keeps the SD root tidy
+      when mounted on a desktop)
+    - `/fonts/` — visible directory (use this if your OS hides dot-files
+      and you'd rather see the folder in your file manager)
 
-   - `/.fonts/` — hidden directory (preferred; keeps the SD root tidy
-     when mounted on a desktop)
-   - `/fonts/` — visible directory (use this if your OS hides dot-files
-     and you'd rather see the folder in your file manager)
+    Both roots are always scanned at boot and the results are merged: a
+    family installed in `/fonts/` shows up even when `/.fonts/` also
+    exists, and vice versa. The two roots only collide if the same family
+    name appears in both — in that case the copy in `/.fonts/` wins and
+    the duplicate in `/fonts/` is ignored.
 
-   Both roots are always scanned at boot and the results are merged: a
-   family installed in `/fonts/` shows up even when `/.fonts/` also
-   exists, and vice versa. The two roots only collide if the same family
-   name appears in both — in that case the copy in `/.fonts/` wins and
-   the duplicate in `/fonts/` is ignored.
+        SD Card Root/
+        ├── .fonts/                     ← Hidden root (preferred)
+        │   └── Literata/
+        │       ├── Literata_12.cpfont
+        │       ├── Literata_14.cpfont
+        │       ├── Literata_16.cpfont
+        │       └── Literata_18.cpfont
+        └── fonts/                      ← Visible root (equally valid)
+            └── Merriweather/
+                ├── Merriweather_12.cpfont
+                └── ...
 
-       SD Card Root/
-       ├── .fonts/                     ← Hidden root (preferred)
-       │   └── Literata/
-       │       ├── Literata_12.cpfont
-       │       ├── Literata_14.cpfont
-       │       ├── Literata_16.cpfont
-       │       └── Literata_18.cpfont
-       └── fonts/                      ← Visible root (equally valid)
-           └── Merriweather/
-               ├── Merriweather_12.cpfont
-               └── ...
+3.  Insert the SD card and power on your Crosscub device
 
-3. Insert the SD card and power on your CrossPoint reader
+## Dictionary Fonts
+
+EPUB books can use a different installed SD-card family for dictionary definitions.
+This can be set globally or per-book via `Font Options`. If a
+saved point size is no longer available, Crosscub chooses the closest file from
+the dictionary family. If the device experiences low available RAM, you may see the
+dictionary font fall back to your reader font. This is normal.
+
+### Generating dictionary font families
+
+Use the dictionary-specific builder to generate the complete family catalog with
+the extra coverage used by dictionary definitions:
+
+    python3 -m pip install -r lib/EpdFont/scripts/requirements.txt
+    python3 lib/EpdFont/scripts/build-dictionary-fonts.py \
+      --output-dir ./generated-dictionary-fonts \
+      --clean \
+      --jobs 2
+
+The dictionary build includes the `reading` ranges and the built-in ranges, plus
+IPA and phonetic-extension characters (`U+0250–U+02FF` and `U+1D00–U+1DBF`) and
+combining-mark ranges (`U+1DC0–U+1DFF`, `U+20D0–U+20FF`, and
+`U+FE20–U+FE2F`).
+
+The default output is `../crosssmudge-fonts/dictionary-fonts`. Use a separate
+`--output-dir` for personal builds, because `--clean` removes the selected output
+directory before generating the fonts. The output contains family folders and ZIP
+archives; copy a family folder or unzip its archive into `/.fonts/` or `/fonts/`
+on the SD card. Use `--only FamilyA,FamilyB` to generate selected families.
 
 ### Direct TTF/OTF/TTC fonts
 
 If CrossPoint enables external RAM on your device, copy a `.ttf`, `.otf`, or
 `.ttc` file directly into `/fonts/` or `/.fonts/`. The filename without its
 extension becomes the family name. For example, `/fonts/Bookerly.ttf` appears as
-`Bookerly` in **Settings > Reader > Font Family**.
+`Bookerly` in **Settings > Reader > Font Options > Font Family**.
 
 For a family with separate styles, put its files in one subfolder. The folder
 name becomes the family name. For example:
@@ -134,7 +175,7 @@ When converting your own font, include the UI sizes:
 
 What this means in practice:
 
-- Select a non-Latin-capable SD font under **Settings > Reader > Font Family**
+- Select a non-Latin-capable SD font under **Settings > Reader > Font Options > Font Family**
   (see [Installing Fonts](#installing-fonts) and the interval presets for
   `.cpfont` under [Converting Custom Fonts](#converting-custom-fonts)). That
   single selection drives both book content *and* size-matched fallback in
@@ -152,10 +193,9 @@ What this means in practice:
 
 ## Available Pre-Built Fonts
 
-The current list of pre-built fonts is maintained in the
-[crosspoint-fonts repository](https://github.com/crosspoint-reader/crosspoint-fonts).
+You can view pre-built fonts available for download at [Inky](https://inky.crossink.dev/#downloads).
 
-## Converting Custom Fonts
+## Converting Custom Fonts with CrossPoint's Font Builder
 
 To make `.cpfont` files for any device, convert your TrueType/OpenType fonts:
 
@@ -230,3 +270,15 @@ To list all presets with codepoint counts:
 `--force-autohint` — force FreeType's auto-hinter instead of the font's native hinting (useful when a font's built-in hints produce poor results at small sizes).
 
 Install custom fonts via the web interface or manual SD card copy.
+
+## Candidate runtime boundary
+
+Only upstream TtfEpdFont/FreeInkFont is used, not Ink HalScalableFont. SD discovery
+includes `.cpfont`, `.ttf`, `.otf`, `.ttc`, but the web upload API accepts only
+`.cpfont`, `.ttf`, `.otf`. Vector reader choices are 8–22pt; CSS variants retain
+6–72pt handling. Lexend/Bitter numeric IDs and owner bitmap assets remain intact.
+The bounded per-family adapter persists only `twoBit`, `cacheKiB`, `maxGlyphs`;
+there is no on-device profile UI and no implemented hinting/interpreter/weight/slant/
+stem-darkening parity or Ink JSON profile import. Profile/caches require serialized
+save/reload and real vector-pixel/device-memory qualification. Registry schema 2
+is derived/rebuildable; source font files and user preferences are not disposable.

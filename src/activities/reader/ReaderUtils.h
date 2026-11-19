@@ -2,123 +2,193 @@
 
 #include <CrossPointSettings.h>
 #include <GfxRenderer.h>
-#include <HalGPIO.h>
+#include <HalClock.h>
 #include <HalTiltSensor.h>
 #include <Logging.h>
 
-#include <cctype>
-#include <string_view>
+#include <algorithm>
 
-#include "HapticFeedback.h"
+#include "GlobalActions.h"
 #include "MappedInputManager.h"
-#include "activities/ActivityManager.h"
+#include "ReaderStatusBarTapTarget.h"
+#include "components/UITheme.h"
 
 namespace ReaderUtils {
 
-constexpr unsigned long GO_HOME_MS = 1000;
-constexpr unsigned long GO_BACK_OR_HOME_MS = GO_HOME_MS;
 constexpr unsigned long SKIP_HOLD_MS = 700;
-constexpr unsigned long BOOKMARK_HOLD_MS = 400;
-constexpr unsigned long BOOKMARK_MESSAGE_DURATION_MS = 2500;
+constexpr unsigned long GO_HOME_MS = 1000;
+// Hold duration to delete a row in the bookmark and clipping lists. Shared so the
+// same gesture cannot drift apart between the two lists.
+constexpr unsigned long DELETE_HOLD_MS = 1000;
+constexpr uint8_t STATUS_BAR_TEXT_PADDING = 3;
+// Gap between the top clock status bar band and the first line of book text.
+// Signed so negative values pull the text up toward the clock (unsigned would wrap
+// a negative to a huge positive). Note the book-text top margin is
+// std::max(screenMarginVertical, reservedClockHeight + TOP_CLOCK_TEXT_PADDING), so this only
+// bites once reservedClockHeight + padding drops below the vertical-margin setting.
+constexpr int8_t TOP_CLOCK_TEXT_PADDING = 0;
 
-inline bool gestureAllowsSwipe(const uint8_t gesture) {
-  return gesture == CrossPointSettings::TAP_AND_SWIPE || gesture == CrossPointSettings::SWIPE_ONLY;
-}
-
-inline bool gestureAllowsTap(const uint8_t gesture) {
-  return gesture == CrossPointSettings::TAP_AND_SWIPE || gesture == CrossPointSettings::TAP_ONLY ||
-         gesture == CrossPointSettings::INVERTED_TAP;
-}
-
-inline bool isRtlBookLanguage(std::string_view tag) {
-  if (tag.size() < 2 || (tag.size() > 2 && tag[2] != '-' && tag[2] != '_')) return false;
-  const auto first = std::tolower(static_cast<unsigned char>(tag[0]));
-  const auto second = std::tolower(static_cast<unsigned char>(tag[1]));
-  return (first == 'h' && second == 'e') || (first == 'i' && second == 'w') || (first == 'a' && second == 'r') ||
-         (first == 'f' && second == 'a');
-}
-
-inline void applyOrientation(GfxRenderer& renderer, const uint8_t orientation) {
+inline GfxRenderer::Orientation toRendererOrientation(const uint8_t orientation) {
   switch (orientation) {
     case CrossPointSettings::ORIENTATION::PORTRAIT:
-      renderer.setOrientation(GfxRenderer::Orientation::Portrait);
-      break;
+      return GfxRenderer::Orientation::Portrait;
     case CrossPointSettings::ORIENTATION::LANDSCAPE_CW:
-      renderer.setOrientation(GfxRenderer::Orientation::LandscapeClockwise);
-      break;
+      return GfxRenderer::Orientation::LandscapeClockwise;
     case CrossPointSettings::ORIENTATION::INVERTED:
-      renderer.setOrientation(GfxRenderer::Orientation::PortraitInverted);
-      break;
+      return GfxRenderer::Orientation::PortraitInverted;
     case CrossPointSettings::ORIENTATION::LANDSCAPE_CCW:
-      renderer.setOrientation(GfxRenderer::Orientation::LandscapeCounterClockwise);
-      break;
+      return GfxRenderer::Orientation::LandscapeCounterClockwise;
     default:
-      break;
+      return GfxRenderer::Orientation::Portrait;
   }
 }
 
-struct FrontPageTurnButtons {
-  MappedInputManager::Button previous;
-  MappedInputManager::Button next;
+inline void applyOrientation(GfxRenderer& renderer, const uint8_t orientation) {
+  renderer.setOrientation(toRendererOrientation(orientation));
+}
+
+// Vertical position for the readers' full-screen fallback messages (empty chapter,
+// page load error, out of bounds). Derived from the live screen height so the text
+// stays centered in every orientation instead of sitting at a fixed portrait offset.
+inline int messageCenterY(const GfxRenderer& renderer) { return renderer.getScreenHeight() / 2; }
+
+inline bool shouldShowTopClockStatusBar() { return halClock.isAvailable() && SETTINGS.shouldShowClockInReader(); }
+
+// Night Mode is applied by the display after normal-polarity reader content is
+// rendered. Keep this compatibility helper for existing reader call sites.
+inline bool readerDarkModeEnabled() { return false; }
+
+inline uint8_t readerBackgroundColor() { return readerDarkModeEnabled() ? 0x00 : 0xFF; }
+
+inline bool readerForegroundBlack() { return true; }
+
+inline int getTopClockStatusBarHeight() {
+  if (!shouldShowTopClockStatusBar()) {
+    return 0;
+  }
+
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  return std::max(UITheme::getStatusBarHeight(), metrics.statusBarVerticalMargin);
+}
+
+inline int getTopClockStatusBarReservedHeight(const GfxRenderer& renderer) {
+  const int statusBarHeight = getTopClockStatusBarHeight();
+  if (statusBarHeight <= 0) {
+    return 0;
+  }
+
+  return UITheme::getInstance().getMetrics().topPadding + UITheme::getTopStatusBarInset(renderer) + statusBarHeight;
+}
+
+inline int getReaderFooterReservedHeight(const bool automaticPageTurnActive) {
+  const uint8_t statusBarHeight = UITheme::getInstance().getStatusBarHeight();
+  if (automaticPageTurnActive &&
+      (statusBarHeight == 0 || statusBarHeight == UITheme::getInstance().getProgressBarHeight())) {
+    return std::max(static_cast<int>(SETTINGS.screenMarginVertical),
+                    static_cast<int>(statusBarHeight + UITheme::getInstance().getMetrics().statusBarVerticalMargin +
+                                     STATUS_BAR_TEXT_PADDING));
+  }
+  return std::max(static_cast<int>(SETTINGS.screenMarginVertical),
+                  static_cast<int>(statusBarHeight + STATUS_BAR_TEXT_PADDING));
+}
+
+inline uint8_t rotatedOrientation(const uint8_t orientation, const bool clockwise) {
+  return clockwise ? (orientation + 1) % CrossPointSettings::ORIENTATION_COUNT
+                   : (orientation + CrossPointSettings::ORIENTATION_COUNT - 1) % CrossPointSettings::ORIENTATION_COUNT;
+}
+
+// A per-reader state; an inherited release cannot trigger a newly entered page.
+struct SideShortcutState {
+  bool active[2] = {};
+  bool fired[2] = {};
+  bool quarantine = false;
 };
 
-inline FrontPageTurnButtons getFrontPageTurnButtons(const MappedInputManager& input) {
-  const bool swapped = input.isNavDirectionSwapped();
-  return {swapped ? MappedInputManager::Button::Right : MappedInputManager::Button::Left,
-          swapped ? MappedInputManager::Button::Left : MappedInputManager::Button::Right};
+template<class Dispatch>
+bool routeSideShortcuts(const MappedInputManager& input, SideShortcutState& state, Dispatch dispatch) {
+  using Button = MappedInputManager::Button;
+  const Button buttons[] = {Button::Up, Button::Down};
+  const bool side = input.isPressed(Button::Up) || input.isPressed(Button::Down) ||
+                    input.wasPressed(Button::Up) || input.wasPressed(Button::Down) ||
+                    input.wasReleased(Button::Up) || input.wasReleased(Button::Down);
+  if (side && (input.isPhysicalPressed(Button::Power) || input.wasReleased(Button::Power))) state.quarantine = true;
+  if (state.quarantine) {
+    state.active[0] = state.active[1] = false;
+    if (!side && !input.isPhysicalPressed(Button::Power)) state.quarantine = false;
+    return side;
+  }
+  for (int index = 0; index < 2; ++index) {
+    const auto button = buttons[index];
+    const uint8_t shortAction = index == 0 ? SETTINGS.sideButtonUpShort : SETTINGS.sideButtonDownShort;
+    const uint8_t holdAction = index == 0 ? SETTINGS.sideButtonUpLong : SETTINGS.sideButtonDownLong;
+    if (input.wasPressed(button) && !state.active[index]) {
+      state.active[index] = true;
+      state.fired[index] = false;
+      if (holdAction == CrossPointSettings::IGNORE) {
+        state.fired[index] = true;
+        if (shortAction != CrossPointSettings::IGNORE) dispatch(shortAction);
+      }
+    }
+    if (state.active[index] && !state.fired[index] && input.getHeldTime() >= SKIP_HOLD_MS &&
+        (input.isPressed(button) || input.wasReleased(button)) && holdAction != CrossPointSettings::IGNORE) {
+      state.fired[index] = true;
+      dispatch(holdAction);
+    }
+    if (input.wasReleased(button)) {
+      if (state.active[index] && !state.fired[index] && shortAction != CrossPointSettings::IGNORE) dispatch(shortAction);
+      state.active[index] = false;
+      state.fired[index] = false;
+    }
+  }
+  // Never let an unassigned/unsupported side binding fall through to legacy paging.
+  return side;
 }
+// END independent side shortcut routing
 
 struct PageTurnResult {
   bool prev;
   bool next;
+  bool fromSideBtn;
   bool fromTilt;
 };
-
-inline PageTurnResult detectPageTurn(const MappedInputManager& input) {
-  const bool usePress = SETTINGS.longPressButtonBehavior == SETTINGS.OFF;
-  const bool tiltNext = SETTINGS.tiltPageTurn && halTiltSensor.wasTiltedForward();
-  const bool tiltPrev = SETTINGS.tiltPageTurn && halTiltSensor.wasTiltedBack();
-  const auto frontButtons = getFrontPageTurnButtons(input);
-  const auto pageButtonTriggered = [&](const MappedInputManager::Button button) {
-    if (usePress) return input.wasPressed(button);
-    return input.wasLongPressed(button, SKIP_HOLD_MS) || input.wasReleased(button);
-  };
-  const bool prev = tiltPrev || (pageButtonTriggered(MappedInputManager::Button::PageBack) ||
-                                 pageButtonTriggered(frontButtons.previous));
-  const bool powerTurn =
-      SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::PAGE_TURN && input.wasPowerSingleClick();
-  const bool next = input.homeButtonAction() == HomeButtonAction::NextPage || tiltNext ||
-                    pageButtonTriggered(MappedInputManager::Button::PageForward) || powerTurn ||
-                    pageButtonTriggered(frontButtons.next);
-  return {prev, next, tiltPrev || tiltNext};
-}
 
 struct TouchPageTurn {
   bool prev;
   bool next;
+  bool tapped;
+  int x;
+  int y;
   unsigned long heldMs;
 };
 
-inline TouchPageTurn detectTouchPageTurn(const GfxRenderer& renderer, const MappedInputManager& input,
-                                         const bool rtlBook = false, const bool reserveReaderMenuTap = true) {
-  TouchPageTurn result{false, false, 0};
+inline TouchPageTurn detectTouchPageTurn(const GfxRenderer& renderer, const MappedInputManager& input) {
+#if !CROSSSMUDGE_APP_CAP_TOUCH
+  (void)renderer;
+  (void)input;
+  return {false, false, false, 0, 0, 0};
+#else
+  TouchPageTurn result{false, false, false, 0, 0, 0};
   if (!SETTINGS.touchReaderControls || !input.hasTouch()) {
     return result;
   }
 
-  // A slow swipe never becomes a long-press chapter skip.
-  const auto dir = input.wasSwipe();
-  if (dir != MappedInputManager::SwipeDir::None) {
-    result.next = dir == (rtlBook ? MappedInputManager::SwipeDir::Right : MappedInputManager::SwipeDir::Left) &&
-                  gestureAllowsSwipe(SETTINGS.pageTurnGesture);
-    result.prev = dir == (rtlBook ? MappedInputManager::SwipeDir::Left : MappedInputManager::SwipeDir::Right) &&
-                  gestureAllowsSwipe(SETTINGS.previousPageGesture);
+  const int width = renderer.getScreenWidth();
+  if (width <= 0) {
     return result;
   }
 
-  const bool nextTaps = gestureAllowsTap(SETTINGS.pageTurnGesture);
-  const bool prevTaps = gestureAllowsTap(SETTINGS.previousPageGesture);
-  if (!nextTaps && !prevTaps) {
+  const auto allowsSwipe = [](const uint8_t gesture) {
+    return gesture == CrossPointSettings::TAP_AND_SWIPE || gesture == CrossPointSettings::SWIPE_ONLY;
+  };
+  const auto allowsTap = [](const uint8_t gesture) {
+    return gesture == CrossPointSettings::TAP_AND_SWIPE || gesture == CrossPointSettings::TAP_ONLY ||
+           gesture == CrossPointSettings::INVERTED_TAP;
+  };
+
+  const auto swipe = input.wasSwipe();
+  if (swipe != MappedInputManager::SwipeDir::None) {
+    result.prev = swipe == MappedInputManager::SwipeDir::Right && allowsSwipe(SETTINGS.previousPageGesture);
+    result.next = swipe == MappedInputManager::SwipeDir::Left && allowsSwipe(SETTINGS.pageTurnGesture);
     return result;
   }
 
@@ -127,58 +197,82 @@ inline TouchPageTurn detectTouchPageTurn(const GfxRenderer& renderer, const Mapp
   if (!input.wasScreenTapped(x, y)) {
     return result;
   }
-
-  const int width = renderer.getScreenWidth();
-  const int height = renderer.getScreenHeight();
-  // Reserve the centered reader-menu tap target when this view has a menu.
-  if (reserveReaderMenuTap && SETTINGS.showReaderMenu == CrossPointSettings::READER_MENU_TAP && x >= width / 3 &&
-      x < width - width / 3 && y >= height / 3 && y < height - height / 3) {
+  result.tapped = true;
+  result.x = x;
+  result.y = y;
+  result.heldMs = input.getHeldTime();
+  // Reserve the top/bottom gesture bands for vertical edge swipes. If the touch
+  // controller loses part of a short edge swipe, do not reinterpret it as a page tap.
+  if (input.isInVerticalEdgeGestureZone(y)) {
     return result;
   }
 
-  // Give the whole page to the sole tap-enabled direction. When both accept
-  // taps, split at the left third. RTL books and Inverted Tap each reverse
-  // the shared zones.
-  const bool inverted = (SETTINGS.pageTurnGesture == CrossPointSettings::INVERTED_TAP ||
-                         SETTINGS.previousPageGesture == CrossPointSettings::INVERTED_TAP) != rtlBook;
-  const bool nextZone = inverted ? x < (width * 2) / 3 : x >= width / 3;
-  result.next = nextTaps && (!prevTaps || nextZone);
-  result.prev = prevTaps && (!nextTaps || !nextZone);
-  result.heldMs = gpio.lastTouchHeldMs();
+  // Give the entire page tap area to the sole tap-enabled direction. When
+  // both accept taps, either Inverted Tap setting swaps their shared zones.
+  const bool nextTaps = allowsTap(SETTINGS.pageTurnGesture);
+  const bool previousTaps = allowsTap(SETTINGS.previousPageGesture);
+  const bool invertedTaps = SETTINGS.pageTurnGesture == CrossPointSettings::INVERTED_TAP ||
+                            SETTINGS.previousPageGesture == CrossPointSettings::INVERTED_TAP;
+  const bool nextZone = invertedTaps ? x < (width * 2) / 3 : x >= width / 3;
+  result.next = nextTaps && (!previousTaps || nextZone);
+  result.prev = previousTaps && (!nextTaps || !nextZone);
   return result;
+#endif
 }
 
-// Tap in the center third of the screen: the tap path into the reader menu on
-// every touch board. Reader pages reserve this rectangle for the menu,
-// so it stays free in tap mode. The Off/Swipe Up
-// alternatives are only surfaced on home-key boards (SettingsList), where the
-// menu stays reachable through the key's long-press function.
-inline bool isTouchMenuTap(const GfxRenderer& renderer, const MappedInputManager& input) {
-  if (!input.hasTouch()) return false;
-  if (SETTINGS.showReaderMenu != CrossPointSettings::READER_MENU_TAP) return false;
-  int x = 0;
-  int y = 0;
-  if (!input.wasScreenTapped(x, y)) return false;
-  const int width = renderer.getScreenWidth();
-  const int height = renderer.getScreenHeight();
-  const int zoneWidth = width / 3;
-  const int zoneHeight = height / 3;
-  return x >= zoneWidth && x < width - zoneWidth && y >= zoneHeight && y < height - zoneHeight;
+inline bool isBottomStatusBarTap(const GfxRenderer& renderer, const int y, const int statusBarHeight) {
+  int orientedMarginTop, orientedMarginRight, orientedMarginBottom, orientedMarginLeft;
+  renderer.getOrientedViewableTRBL(&orientedMarginTop, &orientedMarginRight, &orientedMarginBottom,
+                                   &orientedMarginLeft);
+  return ReaderStatusBarTapTarget::containsBottom(y, renderer.getScreenHeight(), orientedMarginBottom, statusBarHeight);
 }
 
-// Reader menu opens on the menu edge-swipe or a center-third tap. Home-key
-// actions are configured separately from screen gestures.
-// Menu gestures honor showReaderMenu independently of touchReaderControls,
-// which only gates page-turn touch zones in detectTouchPageTurn().
-inline bool isTouchMenuGesture(const GfxRenderer& renderer, const MappedInputManager& input) {
-  if (!input.hasTouch()) return false;
-  if (input.wasMenuGesture()) return true;
-  // Bottom-edge up-swipe variant: only selectable on home-key boards, where
-  // Home is the capacitive key and the bottom edge is otherwise unused.
-  if (SETTINGS.showReaderMenu == CrossPointSettings::READER_MENU_SWIPE_UP && input.wasReaderMenuSwipeUp()) {
-    return true;
-  }
-  return isTouchMenuTap(renderer, input);
+inline bool isTopStatusBarTap(const GfxRenderer& renderer, const int y, const int statusBarHeight) {
+  int orientedMarginTop, orientedMarginRight, orientedMarginBottom, orientedMarginLeft;
+  renderer.getOrientedViewableTRBL(&orientedMarginTop, &orientedMarginRight, &orientedMarginBottom,
+                                   &orientedMarginLeft);
+  return ReaderStatusBarTapTarget::containsTop(y, renderer.getScreenHeight(), orientedMarginTop, statusBarHeight);
+}
+
+// Reader menu opens on its board-specific vertical swipe anywhere on the open
+// page, or a long press of the capacitive home key (a short home tap still goes home).
+inline bool isTouchMenuGesture(const MappedInputManager& input) {
+  // The capacitive Home key is independent from screen touch. Its configured
+  // long-press reader-menu action must still work when screen touch is disabled.
+  return input.wasReaderMenuHold() ||
+         (SETTINGS.touchReaderControls && input.hasTouch() && input.wasReaderMenuGesture());
+}
+
+// Legacy Home-key profiles open the reader menu with an upward swipe. The top-edge downward
+// swipe is the opposite gesture and dismisses the menu instead of opening the
+// frontlight panel. Other touch boards retain their existing menu behavior.
+inline bool isTouchMenuDismissGesture(const MappedInputManager& input) {
+  return SETTINGS.touchReaderControls && input.hasTouch() && input.hasHomeKey() && input.wasLightPanelGesture();
+}
+
+inline PageTurnResult detectPageTurn(const MappedInputManager& input) {
+  // Side buttons fire on press only when long-press action is OFF (nothing to detect).
+  const bool sideUsePress = SETTINGS.sideButtonLongPress == CrossPointSettings::SIDE_LONG_PRESS::SIDE_LONG_OFF;
+
+  const bool tiltNext = SETTINGS.tiltPageTurn && halTiltSensor.wasTiltedForward();
+  const bool tiltPrev = SETTINGS.tiltPageTurn && halTiltSensor.wasTiltedBack();
+  const bool sidePrev = sideUsePress ? input.wasPressed(MappedInputManager::Button::PageBack)
+                                     : input.wasReleased(MappedInputManager::Button::PageBack);
+  const bool sideNext = sideUsePress ? input.wasPressed(MappedInputManager::Button::PageForward)
+                                     : input.wasReleased(MappedInputManager::Button::PageForward);
+
+  const bool frontPrev = input.wasReleased(MappedInputManager::Button::Left);
+  const bool powerReleased = input.wasReleased(MappedInputManager::Button::Power);
+  const bool shortPowerTurn = SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::PAGE_TURN && powerReleased &&
+                              input.getHeldTime() < SETTINGS.getPowerButtonLongPressDuration();
+  const bool longPowerTurn = SETTINGS.longPwrBtn == CrossPointSettings::SHORT_PWRBTN::PAGE_TURN && powerReleased &&
+                             input.getHeldTime() >= SETTINGS.getPowerButtonLongPressDuration();
+  const bool powerTurn = shortPowerTurn || longPowerTurn;
+  const bool frontNext = input.wasReleased(MappedInputManager::Button::Right) || powerTurn;
+
+  // fromSideBtn is true when only side buttons contributed to this page turn.
+  const bool fromSide = (sidePrev || sideNext) && !(frontPrev || frontNext);
+  return {tiltPrev || sidePrev || frontPrev, tiltNext || sideNext || frontNext, fromSide, tiltPrev || tiltNext};
 }
 
 // One helper, blocking or deferred: the async form starts the refresh and
@@ -187,7 +281,12 @@ inline bool isTouchMenuGesture(const GfxRenderer& renderer, const MappedInputMan
 // renderer.waitRefreshComplete() and must rebuild the differential baseline
 // before the next page turn (the tiled grayscale cleanup does).
 inline void displayWithRefreshCycle(const GfxRenderer& renderer, int& pagesUntilFullRefresh, bool async = false) {
-  const auto mode = (pagesUntilFullRefresh <= 1) ? HalDisplay::HALF_REFRESH : HalDisplay::FAST_REFRESH;
+  // A negative countdown is reserved for the explicit Refresh Screen shortcut.
+  // Regular cadence cleanup remains a HALF refresh at 1; the explicit
+  // manual refresh uses the full waveform.
+  const auto mode = pagesUntilFullRefresh < 0    ? manualScreenRefreshMode()
+                    : pagesUntilFullRefresh <= 1 ? HalDisplay::HALF_REFRESH
+                                                 : HalDisplay::FAST_REFRESH;
   if (async) {
     renderer.displayBufferAsync(mode);
   } else {
@@ -200,73 +299,31 @@ inline void displayWithRefreshCycle(const GfxRenderer& renderer, int& pagesUntil
   }
 }
 
-// Display the B/W base of a page whose grayscale pass follows. Panels that
-// combine the base (Paper Mono) defer the activation so base + gray planes go
-// out as one waveform — displaying the base separately makes the gray pass
-// re-drive the whole text body (a visible flash). Other panels display
-// normally. Same refresh-cadence bookkeeping as displayWithRefreshCycle.
-inline void displayBaseWithRefreshCycle(const GfxRenderer& renderer, int& pagesUntilFullRefresh) {
-  if (renderer.grayscaleCapabilities().base != HalDisplay::GrayscaleBase::Combined) {
-    displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
+// Grayscale anti-aliasing pass. Renders content twice (LSB + MSB) to build
+// the grayscale buffer. Only the content callback is re-rendered — status bars
+// and other overlays should be drawn before calling this.
+// Kept as a template to avoid std::function overhead; instantiated once per reader type.
+template <typename RenderFn>
+void renderAntiAliased(GfxRenderer& renderer, RenderFn&& renderFn) {
+  if (!renderer.storeBwBuffer()) {
+    LOG_ERR("READER", "Failed to store BW buffer for anti-aliasing");
     return;
   }
-  const auto mode = (pagesUntilFullRefresh <= 1) ? HalDisplay::HALF_REFRESH : HalDisplay::FAST_REFRESH;
-  renderer.displayGrayscaleBase(mode);
-  if (pagesUntilFullRefresh <= 1) {
-    pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
-  } else {
-    pagesUntilFullRefresh--;
-  }
-}
 
-// Book page presentation: lets the panel use its reading waveform.
-struct ReaderRefreshScope {
-  ReaderRefreshScope() { display.setReaderRefresh(true); }
-  ~ReaderRefreshScope() { display.setReaderRefresh(false); }
-  ReaderRefreshScope(const ReaderRefreshScope&) = delete;
-  ReaderRefreshScope& operator=(const ReaderRefreshScope&) = delete;
-};
+  renderer.clearScreen(0x00);
+  renderer.setRenderMode(GfxRenderer::GRAYSCALE_LSB);
+  renderFn();
+  renderer.copyGrayscaleLsbBuffers();
 
-struct BackNavCallback {
-  void* ctx;
-  void (*fn)(void*);
-};
+  renderer.clearScreen(0x00);
+  renderer.setRenderMode(GfxRenderer::GRAYSCALE_MSB);
+  renderFn();
+  renderer.copyGrayscaleMsbBuffers();
 
-// Returns true if the back button was consumed (caller should return).
-// Long press (>= GO_BACK_OR_HOME_MS):
-// - default: go to file browser
-// - with backShortToFileBrowser: go home
-// Short press (< GO_BACK_OR_HOME_MS):
-// - default: go home
-// - with backShortToFileBrowser: go to file browser.
-inline bool handleBackNavigation(const MappedInputManager& mappedInput, ActivityManager& activityManager,
-                                 const char* filePath, BackNavCallback goHome) {
-  if (mappedInput.homeButtonAction() == HomeButtonAction::FileBrowser) {
-    activityManager.goToFileBrowser(filePath);
-    return true;
-  }
+  renderer.displayGrayBuffer();
+  renderer.setRenderMode(GfxRenderer::BW);
 
-  // The reading surface deliberately has no left-edge swipe-to-exit path: in
-  // swipe page-turn mode a right swipe must page back instead. Home remains
-  // available through the board's dedicated Home gesture/key. Back swipes stay
-  // available in menus and other activities; only this reader-surface handler
-  // ignores them. Physical Back buttons are unaffected: isPressed() is
-  // button-only, and this guard skips just the gesture's own release frame.
-  if (mappedInput.wasBackGesture()) {
-    return false;
-  }
-
-  const bool backTriggered = mappedInput.wasLongPressed(MappedInputManager::Button::Back, GO_BACK_OR_HOME_MS) ||
-                             mappedInput.wasReleased(MappedInputManager::Button::Back);
-  if (!backTriggered) return false;
-
-  const bool longPress = mappedInput.getHeldTime() >= GO_BACK_OR_HOME_MS;
-  if (longPress != SETTINGS.backShortToFileBrowser) {
-    activityManager.goToFileBrowser(filePath);
-  } else {
-    goHome.fn(goHome.ctx);
-  }
-  return true;
+  renderer.restoreBwBuffer();
 }
 
 }  // namespace ReaderUtils

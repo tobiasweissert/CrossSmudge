@@ -2,6 +2,7 @@
 #include <ArduinoJson.h>
 #include <PersistableStore.h>
 
+#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -27,16 +28,17 @@ class WifiCredentialStore : public PersistableStore<WifiCredentialStore> {
  private:
   std::vector<WifiCredential> credentials;
   std::string lastConnectedSsid;
-  // Protects the in-memory strings independently of PersistableStore's file
-  // serialization mutex. Readers only hold this briefly and never wait on SD
-  // I/O; saveToFile() snapshots under this mutex from toJson().
   mutable std::mutex credentialMutex;
+  mutable std::once_flag loadOnce;
 
   static constexpr size_t MAX_NETWORKS = 8;
   static constexpr size_t MAX_PASSWORD_LENGTH = 64;
 
   // Private constructor for singleton
   WifiCredentialStore() = default;
+  bool loadFromFile();
+  bool loadFromBinaryFile();
+  void ensureLoaded() const;
 
   friend class PersistableStore<WifiCredentialStore>;
 
@@ -52,7 +54,8 @@ class WifiCredentialStore : public PersistableStore<WifiCredentialStore> {
   std::optional<WifiCredential> getCredentialAt(size_t index) const;
   std::optional<std::string> getSsidAt(size_t index) const;
   size_t getCredentialCount() const;
-  // Password-free snapshot for display/API consumers.
+  // Bounded to MAX_NETWORKS (8): copy SSIDs so the web task never holds the
+  // credential mutex across blocking network writes.
   std::vector<WifiCredentialSummary> getCredentialSummaries() const;
 
   // Check if a network is saved
@@ -61,6 +64,9 @@ class WifiCredentialStore : public PersistableStore<WifiCredentialStore> {
   // Last connected network
   void setLastConnectedSsid(const std::string& ssid);
   std::string getLastConnectedSsid() const;
+
+  // Clear all credentials
+  void clearAll();
 };
 
 // Helper macro to access credentials store

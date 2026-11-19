@@ -14,24 +14,28 @@ bool HalTiltSensor::readGyro(float& gx, float& gy, float& gz) const {
 }
 
 void HalTiltSensor::begin() {
-  if (!_sdkImu.begin()) {
-    LOG_ERR("GYR", "SDK IMU not found");
-    return;
-  }
-  // begin() leaves the sensors sampling; stand them by until tilt page turn
-  // actually wakes them, so a disabled IMU doesn't drain the battery.
-  if (!_sdkImu.sleep()) {
-    LOG_ERR("GYR", "IMU standby failed");
-  }
-  // Tilt detection reads the gyro; accelerometer-only parts (SC7A20H) can't drive it.
-  _available = _sdkImu.hasGyroscope();
-  if (!_available) {
-    LOG_INF("GYR", "IMU has no gyroscope");
-    return;
-  }
+#ifdef FORCE_TILT_SENSOR_AVAILABLE
+  _available = true;
+  _isAwake = false;
   _initMs = millis();
   _lastPollMs = millis();
-  LOG_INF("GYR", "SDK IMU initialized");
+  LOG_INF("GYR", "Tilt sensor override active via build flag");
+  return;
+#endif
+
+  _available = _sdkImu.begin() && _sdkImu.hasGyroscope();
+  if (_available) {
+    _initMs = millis();
+    _lastPollMs = millis();
+    // begin() leaves the sensors sampling; stand them by until tilt page turn
+    // actually wakes them, so a disabled IMU doesn't drain the battery.
+    if (!_sdkImu.sleep()) {
+      LOG_ERR("GYR", "IMU standby failed");
+    }
+    LOG_INF("GYR", "SDK IMU initialized");
+    return;
+  }
+  LOG_ERR("GYR", "SDK IMU not found");
 }
 
 bool HalTiltSensor::wake() {
@@ -67,22 +71,25 @@ bool HalTiltSensor::deepSleep() {
   return true;
 }
 
-void HalTiltSensor::update(const uint8_t mode, const uint8_t orientation, const bool inReader) {
+void HalTiltSensor::update(const uint8_t enabled, const uint8_t direction, const uint8_t orientation,
+                           const bool inReader) {
   if (!_available) {
     return;
   }
 
-  // State machine: wake up or sleep based on the enabled flag
-  if ((mode != CrossPointTiltPageTurn::TILT_OFF) && !_isAwake) {
+  const bool shouldBeAwake = (enabled != CrossPointTiltPageTurn::TILT_OFF) && inReader;
+
+  // State machine: keep the sensor awake only while tilt is enabled in a reader.
+  if (shouldBeAwake && !_isAwake) {
     _isAwake = wake();
     return;
-  } else if ((mode == CrossPointTiltPageTurn::TILT_OFF) && _isAwake) {
+  } else if (!shouldBeAwake && _isAwake) {
     _isAwake = !deepSleep();
     return;
   }
 
-  // If disabled, skip the rest of the polling logic and avoid unnecessary I2C traffic in non-reader activities
-  if ((mode == CrossPointTiltPageTurn::TILT_OFF) || !inReader) {
+  // If disabled or outside a reader, skip polling and avoid unnecessary I2C traffic.
+  if (!shouldBeAwake) {
     return;
   }
 
@@ -102,25 +109,32 @@ void HalTiltSensor::update(const uint8_t mode, const uint8_t orientation, const 
     return;
   }
 
-  // Map the gyro axis to left/right tilt based on reader orientation.
+  // Map the gyro axis to the selected gesture based on reader orientation.
   // On the X3 PCB: X axis = left/right in portrait, Y axis = left/right in landscape.
+  const bool forwardBack = direction == CrossPointTiltPageTurnDirection::TILT_FORWARD_BACK ||
+                           direction == CrossPointTiltPageTurnDirection::TILT_FORWARD_BACK_INVERTED;
+  const bool inverted = direction == CrossPointTiltPageTurnDirection::TILT_LEFT_RIGHT ||
+                        direction == CrossPointTiltPageTurnDirection::TILT_FORWARD_BACK_INVERTED;
   float tiltAxis;
   switch (orientation) {
     case CrossPointOrientation::PORTRAIT:
-      tiltAxis = mode == CrossPointTiltPageTurn::TILT_INVERTED ? -gx : gx;
+      tiltAxis = forwardBack ? gy : gx;
       break;
     case CrossPointOrientation::INVERTED:
-      tiltAxis = mode == CrossPointTiltPageTurn::TILT_INVERTED ? gx : -gx;
+      tiltAxis = forwardBack ? -gy : -gx;
       break;
     case CrossPointOrientation::LANDSCAPE_CW:
-      tiltAxis = mode == CrossPointTiltPageTurn::TILT_INVERTED ? gy : -gy;
+      tiltAxis = forwardBack ? gx : -gy;
       break;
     case CrossPointOrientation::LANDSCAPE_CCW:
-      tiltAxis = mode == CrossPointTiltPageTurn::TILT_INVERTED ? -gy : gy;
+      tiltAxis = forwardBack ? -gx : gy;
       break;
     default:
-      tiltAxis = gx;
+      tiltAxis = forwardBack ? gy : gx;
       break;
+  }
+  if (inverted) {
+    tiltAxis = -tiltAxis;
   }
 
   if (_inTilt) {

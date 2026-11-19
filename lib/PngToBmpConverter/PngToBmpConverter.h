@@ -5,10 +5,11 @@
 class Print;
 
 class PngToBmpConverter {
-  static bool pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpOut, int targetWidth, int targetHeight,
-                                         bool oneBit, bool crop = true, bool originalThresholds = false);
+  static bool pngFileToBmpStreamInternal(FsFile& pngFile, Print& bmpOut, int targetWidth, int targetHeight, bool oneBit,
+                                         bool crop = true, bool adaptiveContain = false, bool imageLevels = false);
 
  public:
-  static bool pngFileToBmpStream(HalFile& pngFile, Print& bmpOut, bool crop = true, bool originalThresholds = false);
-  static bool pngFileTo1BitBmpStreamWithSize(HalFile& pngFile, Print& bmpOut, int targetMaxWidth, int targetMaxHeight);
+  static bool pngFileToBmpStream(FsFile& pngFile, Print& bmpOut, bool crop = true, bool imageLevels = false);
+  static bool pngFileTo1BitBmpStreamWithSize(FsFile& pngFile, Print& bmpOut, int targetMaxWidth, int targetMaxHeight,
+                                             bool adaptiveContain = false);
 };

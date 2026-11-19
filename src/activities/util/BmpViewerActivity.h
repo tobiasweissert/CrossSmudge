@@ -16,10 +16,14 @@ class BmpViewerActivity final : public Activity {
 
  private:
   void loadSiblingImages();
+  bool renderCompressedImage();
   void doSetSleepCover();
-  bool canSetSleepCover() const;
-  bool renderImage();
-  bool saveJpegSleepCover();
+  void showContextMenu();
+  void promptDeleteImage();
+  void pinSleepFavorite();
+  void unpinSleepFavorite();
+  void pinBootFavorite();
+  void unpinBootFavorite();
 
   std::string filePath;
   std::vector<std::string> siblingImages;

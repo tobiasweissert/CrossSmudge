@@ -1,7 +1,13 @@
+> **Experimental migration candidate — not release-ready.** Crosscub remains Sticky-only.
+> This branch uses pinned CrossPoint develop directly, selectively adopts CrossInk,
+> and preserves Crosscub behavior. Stable Crosscub **1.6.5.5 is unchanged**.
+> Source/host checks do not establish a complete firmware build or device acceptance.
+> See [the feature and readiness ledger](../SCOPE.md).
+
 # Webserver Endpoints
 
 This document describes the HTTP, WebSocket, WebDAV, and discovery endpoints
-available while CrossPoint Reader is in File Transfer or Calibre Wireless mode.
+available while Crosscub is in File Transfer or Calibre Wireless mode.
 
 - HTTP server: port 80
 - WebSocket upload server: port 81
@@ -49,7 +55,8 @@ Response:
   "rssi": -45,
   "freeHeap": 123456,
   "uptime": 3600,
-  "device": "X4"
+  "device": "Sticky",
+  "serial": "Not found"
 }
 ```
 
@@ -65,7 +72,8 @@ Response:
 | `freeHeap` | number | Free heap in bytes |
 | `uptime` | number | Seconds since boot |
 | `deviceId` | string | With `?plugin=<name>`: 64 hex chars, stable per device and plugin (SHA-256 of an on-device NVS secret and the name); omitted if NVS is unavailable |
-| `device` | string | `"X3"` or `"X4"` hardware detection |
+| `device` | string | `"Sticky"` Crosscub hardware identity |
+| `serial` | string | Device serial or `"Not found"` when unavailable |
 
 ## File Management
 
@@ -274,6 +282,8 @@ Types:
 | `string` | `value` |
 
 The font-family setting includes SD-card font families when they are installed.
+For enum settings, `value` is the selected option's display index in the
+returned `options` array. It is not necessarily the raw firmware enum value.
 
 ### `POST /api/settings`
 
@@ -383,6 +393,7 @@ Response:
     "name": "My Catalog",
     "url": "http://calibre.local:8080/opds",
     "username": "reader",
+    "filenameFormat": "author_title",
     "hasPassword": true
   }
 ]
@@ -391,7 +402,9 @@ Response:
 ### `POST /api/opds`
 
 Adds or updates an OPDS server. Include `index` to update an existing entry.
-If `password` is omitted during an update, the existing password is preserved.
+If `password` or `filenameFormat` is omitted during an update, the existing value
+is preserved. `filenameFormat` is either `author_title` (the default) or
+`title_author`.
 
 ```bash
 curl -X POST \
@@ -746,3 +759,23 @@ poll promptly after completion).
 Headless executor page: loads every plugin with its UI hidden so registered
 actions run. Keep it open (browser tab or embedded webview) while jobs are
 queued; jobs enqueued with no page open stay pending until one opens.
+
+## Crosscub candidate caller contract
+
+`GET /api/settings` uses display indexes for enums, **not owner raw enum bytes**;
+options are strings in the returned order. `value: null` means an unrepresented
+saved value and must remain unchanged until an explicit user selection. VALUE
+settings may exceed 255 (`value16Ptr`); never narrow them. Missing string password
+fields leave secrets unchanged; only explicit edits/clears may send them.
+The current peer POST implementation still needs display-index-to-raw translation,
+value16 support and checked persistence/rollback before write acceptance. Do not
+interpret HTTP 200 alone as durable success until that seam is fixed and tested.
+The web client does not invent raw-value metadata or infer actions from translations.
+
+OPDS `headers` slots carry `name` and `hasValue`, never returned secret values.
+Omitting a value preserves it; clearing a header explicitly sends an empty value.
+Owner per-server `filenameFormat` requires server GET/POST integration; the client
+keeps the control disabled when absent rather than posting an unsupported field.
+Plugin/device identity fields are additive; retaining endpoints does not qualify
+independent plugin TLS/SSRF or secure file publication. Credential-store blocks are
+mandatory even with hidden files enabled. See [security limits](webserver.md).

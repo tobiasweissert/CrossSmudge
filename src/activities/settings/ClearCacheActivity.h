@@ -28,4 +28,5 @@ class ClearCacheActivity final : public Activity {
   OptionPopup confirmPopup;
   void beginClear();
   void clearCache();
+  void startClearing();
 };

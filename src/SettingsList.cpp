@@ -1,274 +1,424 @@
 #include "SettingsList.h"
 
-#include <array>
-#include <utility>
+// This overload deliberately spells its callback type, so the retained owner
+// header remains source-compatible until the coordinator applies the adapter.
+void forEachBaseSetting(void (*visit)(void*, SettingInfo&), void* context) {
+  if (!visit) return;
+  auto add = [visit, context](SettingInfo setting) {
+    if (!QuickActions::supportsTiltPageTurn()) {
+      if (setting.nameId == StrId::STR_SHORT_PWR_BTN || settingKeyIs(setting, "longPwrBtn"))
+        removeEnumRawValue(setting, static_cast<uint8_t>(CrossPointSettings::TOGGLE_TILT_PAGE_TURN));
+      else if (setting.nameId == StrId::STR_LONG_PRESS_MENU_ACTION || setting.nameId == StrId::STR_LONG_PRESS_BACK_ACTION)
+        removeEnumRawValue(setting, static_cast<uint8_t>(CrossPointSettings::LONG_MENU_TOGGLE_TILT_PAGE_TURN));
+    }
+    if (setting.nameId == StrId::STR_SLEEP_SCREEN) {
+      removeEnumRawValue(setting, static_cast<uint8_t>(CrossPointSettings::MINIMAL_STATS_SLEEP));
+      setting.enumValues.push_back(StrId::STR_TRANSPARENT);
+      setting.enumRawValues.push_back(CrossPointSettings::TRANSPARENT_CUSTOM);
+      setting.enumValues.push_back(StrId::STR_COVER_TRANSPARENT);
+      setting.enumRawValues.push_back(CrossPointSettings::COVER_TRANSPARENT);
+    }
+    if (settingKeyIs(setting, "uiTheme")) {
+      setting.enumValues.push_back(StrId::STR_THEME_COVER_GRID);
+      setting.enumRawValues.push_back(CrossPointSettings::COVER_GRID);
+    }
+    visit(context, setting);
+  };
+    // --- Display ---
+    add(buildSleepScreenSetting());
+    add(SettingInfo::Enum(StrId::STR_SLEEP_COVER_MODE, &CrossPointSettings::sleepScreenCoverMode,
+                          {StrId::STR_FIT, StrId::STR_CROP}, "sleepScreenCoverMode", StrId::STR_CAT_DISPLAY));
+    add(SettingInfo::Enum(StrId::STR_SLEEP_COVER_FILTER, &CrossPointSettings::sleepScreenCoverFilter,
+                          {StrId::STR_NONE_OPT, StrId::STR_FILTER_CONTRAST, StrId::STR_INVERTED},
+                          "sleepScreenCoverFilter", StrId::STR_CAT_DISPLAY));
+    add(SettingInfo::Toggle(StrId::STR_QUICK_RESUME_TIMEOUT, &CrossPointSettings::quickResumeSleepScreen,
+                            "quickResumeSleepScreen", StrId::STR_CAT_DISPLAY));
+    add(SettingInfo::Enum(StrId::STR_HIDE_BATTERY, &CrossPointSettings::hideBatteryPercentage,
+                          {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS}, "hideBatteryPercentage",
+                          StrId::STR_CAT_DISPLAY));
+    add(SettingInfo::Enum(StrId::STR_HIDE_CLOCK, &CrossPointSettings::hideClock,
+                          {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS}, "hideClock",
+                          StrId::STR_CAT_DISPLAY)
+            .withEnumRawValues({CrossPointSettings::HIDE_CLOCK_NEVER, CrossPointSettings::HIDE_CLOCK_IN_READER,
+                                CrossPointSettings::HIDE_CLOCK_ALWAYS}));
+    add(SettingInfo::Enum(StrId::STR_REFRESH_FREQ, &CrossPointSettings::refreshFrequency,
+                          {StrId::STR_PAGES_1, StrId::STR_PAGES_5, StrId::STR_PAGES_10, StrId::STR_PAGES_15,
+                           StrId::STR_PAGES_30, StrId::STR_NEVER},
+                          "refreshFrequency", StrId::STR_CAT_DISPLAY)
+            .withEnumRawValues({CrossPointSettings::REFRESH_1, CrossPointSettings::REFRESH_5,
+                                CrossPointSettings::REFRESH_10, CrossPointSettings::REFRESH_15,
+                                CrossPointSettings::REFRESH_30, CrossPointSettings::REFRESH_NEVER}));
+    add(SettingInfo::Toggle(StrId::STR_NIGHT_MODE, &CrossPointSettings::screenInverted, "screenInverted",
+                            StrId::STR_CAT_DISPLAY));
+    add(SettingInfo::Enum(
+            StrId::STR_UI_THEME, &CrossPointSettings::uiTheme,
+            {StrId::STR_THEME_CLASSIC, StrId::STR_THEME_MINIMAL, StrId::STR_THEME_DASHBOARD, StrId::STR_THEME_LYRA,
+             StrId::STR_THEME_LYRA_EXTENDED, StrId::STR_THEME_LYRA_CAROUSEL, StrId::STR_THEME_ROUNDEDRAFF},
+            "uiTheme", StrId::STR_CAT_DISPLAY)
+            .withEnumRawValues({CrossPointSettings::UI_THEME::CLASSIC, CrossPointSettings::UI_THEME::MINIMAL,
+                                CrossPointSettings::UI_THEME::DASHBOARD, CrossPointSettings::UI_THEME::LYRA,
+                                CrossPointSettings::UI_THEME::LYRA_3_COVERS,
+                                CrossPointSettings::UI_THEME::LYRA_CAROUSEL,
+                                CrossPointSettings::UI_THEME::ROUNDEDRAFF}));
+    add(SettingInfo::Enum(StrId::STR_UI_SCALE, &CrossPointSettings::uiScale, {StrId::STR_SMALL, StrId::STR_LARGE},
+                          "uiScale", StrId::STR_CAT_DISPLAY)
+            .withEnumRawValues({CrossPointSettings::UI_SCALE_SMALL, CrossPointSettings::UI_SCALE_LARGE}));
+    add(SettingInfo::Enum(StrId::STR_RECENT_BOOKS_VIEW, &CrossPointSettings::recentBooksView,
+                          {StrId::STR_LIST_VIEW, StrId::STR_GRID_VIEW}, "recentBooksView", StrId::STR_CAT_DISPLAY));
+    add(SettingInfo::Toggle(StrId::STR_SUNLIGHT_FADING_FIX, &CrossPointSettings::fadingFix, "fadingFix",
+                            StrId::STR_CAT_DISPLAY));
+    add(SettingInfo::Toggle(StrId::STR_RESTORE_LIGHT_ON_WAKE, &CrossPointSettings::frontlightRestoreOnWake,
+                            "frontlightRestoreOnWake", StrId::STR_CAT_DISPLAY));
+    // Kept in the shared catalog for persistence and the web API. On-device,
+    // these values are presented only by Display > Frontlight.
+    add(SettingInfo::Toggle(StrId::STR_FRONTLIGHT_SCHEDULE, &CrossPointSettings::frontlightScheduleEnabled,
+                            "frontlightScheduleEnabled", StrId::STR_CAT_DISPLAY));
+    add(SettingInfo::Value16(StrId::STR_START, &CrossPointSettings::frontlightScheduleStart,
+                             {0, FrontlightSchedule::kUnsetTimeOfDay, 1}, "frontlightScheduleStart",
+                             StrId::STR_CAT_DISPLAY));
+    add(SettingInfo::Value16(StrId::STR_END, &CrossPointSettings::frontlightScheduleEnd,
+                             {0, FrontlightSchedule::kUnsetTimeOfDay, 1}, "frontlightScheduleEnd",
+                             StrId::STR_CAT_DISPLAY));
 
-void forEachBaseSetting(SettingVisitor visit, void* context) {
-  // Load and save walk this list, so every condition here must be fixed before
-  // settings load. Runtime probes belong in isHiddenOnDevice().
+    // --- Reader ---
+    // Built-in font-family entry. Replaced per-call with a registry-aware
+    // version when SD fonts are installed.
+    add(SettingInfo::Enum(StrId::STR_FONT_FAMILY, &CrossPointSettings::fontFamily,
+                          {StrId::STR_LEXEND_DECA, StrId::STR_BITTER, StrId::STR_NOTO_SANS}, "fontFamily", StrId::STR_CAT_READER));
+    add(buildBuiltinFontSizeSetting());
+    add(SettingInfo::Enum(StrId::STR_SD_FONT_SIZE_RANGE, &CrossPointSettings::sdFontSizeRange,
+                          {StrId::STR_FONT_RANGE_TEENSY, StrId::STR_FONT_RANGE_TINY, StrId::STR_FONT_RANGE_XLARGE,
+                           StrId::STR_FONT_RANGE_ALL},
+                          "sdFontSizeRange", StrId::STR_CAT_READER)
+            .withEnumRawValues({CrossPointSettings::SD_FONT_RANGE_TEENSY, CrossPointSettings::SD_FONT_RANGE_TINY,
+                                CrossPointSettings::SD_FONT_RANGE_XLARGE, CrossPointSettings::SD_FONT_RANGE_ALL}));
+    add(SettingInfo::Value(StrId::STR_LINE_SPACING, &CrossPointSettings::lineHeightPercent,
+                           {CrossPointSettings::MIN_LINE_HEIGHT_PERCENT, CrossPointSettings::MAX_LINE_HEIGHT_PERCENT,
+                            CrossPointSettings::LINE_HEIGHT_PERCENT_STEP},
+                           "lineHeightPercent", StrId::STR_CAT_READER));
+    add(SettingInfo::Value(StrId::STR_WORD_SPACING, &CrossPointSettings::wordSpacing,
+                           {0, CrossPointSettings::MAX_WORD_SPACING, 1}, "wordSpacing", StrId::STR_CAT_READER));
+    add(SettingInfo::Enum(
+            StrId::STR_ORIENTATION, &CrossPointSettings::orientation,
+            {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_LANDSCAPE_CCW, StrId::STR_ORIENTATION_INVERTED},
+            "orientation", StrId::STR_CAT_READER)
+            .withEnumRawValues({CrossPointSettings::PORTRAIT, CrossPointSettings::LANDSCAPE_CW,
+                                CrossPointSettings::LANDSCAPE_CCW, CrossPointSettings::INVERTED}));
+    add(SettingInfo::Submenu(StrId::STR_SCREEN_MARGIN, SettingAction::ScreenMargin));
+    add(SettingInfo::Value(StrId::STR_TOP_BOTTOM, &CrossPointSettings::screenMarginVertical,
+                           {CrossPointSettings::MIN_SCREEN_MARGIN, CrossPointSettings::MAX_SCREEN_MARGIN,
+                            CrossPointSettings::SCREEN_MARGIN_SMALL_STEP},
+                           "screenMarginVertical", StrId::STR_CAT_READER));
+    add(SettingInfo::Value(StrId::STR_LEFT_RIGHT, &CrossPointSettings::screenMarginHorizontal,
+                           {CrossPointSettings::MIN_SCREEN_MARGIN, CrossPointSettings::MAX_SCREEN_MARGIN,
+                            CrossPointSettings::SCREEN_MARGIN_SMALL_STEP},
+                           "screenMarginHorizontal", StrId::STR_CAT_READER));
+    add(SettingInfo::Toggle(StrId::STR_PUBLISHER_PAGE_NUMBERS, &CrossPointSettings::publisherPageNumbers,
+                            "publisherPageNumbers", StrId::STR_CAT_READER));
+    add(SettingInfo::Enum(
+        StrId::STR_PARA_ALIGNMENT, &CrossPointSettings::paragraphAlignment,
+        {StrId::STR_JUSTIFY, StrId::STR_ALIGN_LEFT, StrId::STR_CENTER, StrId::STR_ALIGN_RIGHT, StrId::STR_BOOK_S_STYLE},
+        "paragraphAlignment", StrId::STR_CAT_READER));
+    add(SettingInfo::Toggle(StrId::STR_EMBEDDED_STYLE, &CrossPointSettings::embeddedStyle, "embeddedStyle",
+                            StrId::STR_CAT_READER));
+    add(SettingInfo::Toggle(StrId::STR_HYPHENATION, &CrossPointSettings::hyphenationEnabled, "hyphenationEnabled",
+                            StrId::STR_CAT_READER));
+    add(SettingInfo::Toggle(StrId::STR_TEXT_AA, &CrossPointSettings::textAntiAliasing, "textAntiAliasing",
+                            StrId::STR_CAT_READER));
+    add(SettingInfo::Enum(StrId::STR_IMAGES, &CrossPointSettings::imageRendering,
+                          {StrId::STR_IMAGES_DISPLAY, StrId::STR_IMAGES_PLACEHOLDER, StrId::STR_IMAGES_SUPPRESS},
+                          "imageRendering", StrId::STR_CAT_READER));
+    add(SettingInfo::Toggle(StrId::STR_TOUCH_READER_CONTROLS, &CrossPointSettings::touchReaderControls,
+                            "touchReaderControls", StrId::STR_CAT_READER));
+    add(SettingInfo::Toggle(StrId::STR_DISABLE_TOUCHSCREEN, &CrossPointSettings::disableReaderTouchscreen,
+                            "disableReaderTouchscreen", StrId::STR_CAT_READER));
+    add(SettingInfo::Toggle(StrId::STR_EXTRA_SPACING, &CrossPointSettings::extraParagraphSpacing,
+                            "extraParagraphSpacing", StrId::STR_CAT_READER));
+    add(SettingInfo::Toggle(StrId::STR_FORCE_PARAGRAPH_INDENTS, &CrossPointSettings::forceParagraphIndents,
+                            "forceParagraphIndents", StrId::STR_CAT_READER));
+    add(SettingInfo::Toggle(StrId::STR_FOCUS_READING, &CrossPointSettings::focusReadingEnabled, "focusReadingEnabled",
+                            StrId::STR_CAT_READER));
+    add(SettingInfo::Toggle(StrId::STR_GUIDE_READING, &CrossPointSettings::guideReadingEnabled, "guideReadingEnabled",
+                            StrId::STR_CAT_READER));
+    add(SettingInfo::Enum(StrId::STR_INDEXING_METHOD, &CrossPointSettings::indexingMethod,
+                          {StrId::STR_INDEXING_INCREMENTAL, StrId::STR_INDEXING_FULL_SECTION}, "indexingMethod",
+                          StrId::STR_CAT_READER));
 
-  // Enum settings are persisted as numeric values. Assign these labels by enum
-  // value so a reordered menu or enum cannot silently swap their behavior.
-  static constexpr auto SLEEP_SCREEN_VALUES = [] {
-    std::array<StrId, CrossPointSettings::SLEEP_SCREEN_MODE_COUNT> values{};
-    values[CrossPointSettings::DARK] = StrId::STR_DARK;
-    values[CrossPointSettings::LIGHT] = StrId::STR_LIGHT;
-    values[CrossPointSettings::CUSTOM] = StrId::STR_CUSTOM;
-    values[CrossPointSettings::COVER] = StrId::STR_COVER;
-    values[CrossPointSettings::COVER_CUSTOM] = StrId::STR_COVER_CUSTOM;
-    values[CrossPointSettings::BLANK] = StrId::STR_NONE_OPT;
-    values[CrossPointSettings::QUICK_RESUME] = StrId::STR_QUICK_RESUME;
-    values[CrossPointSettings::TRANSPARENT_CUSTOM] = StrId::STR_TRANSPARENT;
-    values[CrossPointSettings::COVER_TRANSPARENT] = StrId::STR_COVER_TRANSPARENT;
-    return values;
-  }();
-  static constexpr auto STATUS_BAR_CLOCK_VALUES = [] {
-    std::array<StrId, CrossPointSettings::STATUS_BAR_CLOCK_MODE_COUNT> values{};
-    values[CrossPointSettings::STATUS_BAR_CLOCK_HIDE] = StrId::STR_HIDE;
-    values[CrossPointSettings::STATUS_BAR_CLOCK_RIGHT] = StrId::STR_DIR_RIGHT;
-    values[CrossPointSettings::STATUS_BAR_CLOCK_LEFT] = StrId::STR_DIR_LEFT;
-    return values;
-  }();
+    // --- Controls ---
+    add(SettingInfo::Toggle(StrId::STR_PINCH_FONT_RESIZE, &CrossPointSettings::pinchFontResizeEnabled,
+                            "pinchFontResizeEnabled", StrId::STR_CAT_CONTROLS));
+    add(SettingInfo::Toggle(StrId::STR_TWO_FINGER_ROTATION, &CrossPointSettings::twoFingerRotationEnabled,
+                            "twoFingerRotationEnabled", StrId::STR_CAT_CONTROLS));
+    const std::vector<StrId> twoFingerSwipeActions = {
+        StrId::STR_NOT_SET,          StrId::STR_INCREASE_BRIGHTNESS, StrId::STR_DECREASE_BRIGHTNESS,
+        StrId::STR_INCREASE_WARMTH,  StrId::STR_DECREASE_WARMTH,     StrId::STR_NEXT_CHAPTER,
+        StrId::STR_PREVIOUS_CHAPTER, StrId::STR_INCREASE_FONT_SIZE,  StrId::STR_DECREASE_FONT_SIZE,
+    };
+    const std::vector<uint8_t> twoFingerSwipeActionValues = {
+        CrossPointSettings::TWO_FINGER_SWIPE_NOT_SET,
+        CrossPointSettings::TWO_FINGER_SWIPE_INCREASE_BRIGHTNESS,
+        CrossPointSettings::TWO_FINGER_SWIPE_DECREASE_BRIGHTNESS,
+        CrossPointSettings::TWO_FINGER_SWIPE_INCREASE_WARMTH,
+        CrossPointSettings::TWO_FINGER_SWIPE_DECREASE_WARMTH,
+        CrossPointSettings::TWO_FINGER_SWIPE_NEXT_CHAPTER,
+        CrossPointSettings::TWO_FINGER_SWIPE_PREVIOUS_CHAPTER,
+        CrossPointSettings::TWO_FINGER_SWIPE_INCREASE_FONT_SIZE,
+        CrossPointSettings::TWO_FINGER_SWIPE_DECREASE_FONT_SIZE,
+    };
+    add(SettingInfo::Enum(StrId::STR_TWO_FINGER_SWIPE_UP, &CrossPointSettings::twoFingerSwipeUp, twoFingerSwipeActions,
+                          "twoFingerSwipeUp", StrId::STR_CAT_CONTROLS)
+            .withEnumRawValues(twoFingerSwipeActionValues));
+    add(SettingInfo::Enum(StrId::STR_TWO_FINGER_SWIPE_DOWN, &CrossPointSettings::twoFingerSwipeDown,
+                          twoFingerSwipeActions, "twoFingerSwipeDown", StrId::STR_CAT_CONTROLS)
+            .withEnumRawValues(twoFingerSwipeActionValues));
+    add(SettingInfo::Enum(StrId::STR_TWO_FINGER_SWIPE_LEFT, &CrossPointSettings::twoFingerSwipeLeft,
+                          twoFingerSwipeActions, "twoFingerSwipeLeft", StrId::STR_CAT_CONTROLS)
+            .withEnumRawValues(twoFingerSwipeActionValues));
+    add(SettingInfo::Enum(StrId::STR_TWO_FINGER_SWIPE_RIGHT, &CrossPointSettings::twoFingerSwipeRight,
+                          twoFingerSwipeActions, "twoFingerSwipeRight", StrId::STR_CAT_CONTROLS)
+            .withEnumRawValues(twoFingerSwipeActionValues));
+    add(SettingInfo::Enum(StrId::STR_SIDE_BTN_LAYOUT, &CrossPointSettings::sideButtonLayout,
+                          {StrId::STR_DISABLED, StrId::STR_PREV_NEXT, StrId::STR_NEXT_PREV, StrId::STR_NEXT_NEXT},
+                          "sideButtonLayout", StrId::STR_CAT_CONTROLS)
+            .withEnumRawValues({CrossPointSettings::SIDE_BUTTONS_DISABLED, CrossPointSettings::PREV_NEXT,
+                                CrossPointSettings::NEXT_PREV, CrossPointSettings::NEXT_NEXT}));
+    add(SettingInfo::Enum(StrId::STR_ORIENTATION_AWARE, &CrossPointSettings::sideButtonOrientationAware,
+                          {StrId::STR_NO, StrId::STR_YES}, "sideButtonOrientationAware", StrId::STR_CAT_CONTROLS));
+    add(SettingInfo::Enum(StrId::STR_LONG_PRESS_ACTION, &CrossPointSettings::sideButtonLongPress,
+                          {StrId::STR_IGNORE, StrId::STR_CHAPTER_SKIP_OPT, StrId::STR_CHANGE_FONT_SIZE,
+                           StrId::STR_LONG_PRESS_BEHAVIOR_ORIENTATION},
+                          "sideButtonLongPress", StrId::STR_CAT_CONTROLS)
+            .withEnumRawValues({CrossPointSettings::SIDE_LONG_OFF, CrossPointSettings::SIDE_LONG_CHAPTER_SKIP,
+                                CrossPointSettings::SIDE_LONG_FONT_SIZE,
+                                CrossPointSettings::SIDE_LONG_ORIENTATION_CHANGE}));
+    add(SettingInfo::Enum(StrId::STR_ORIENTATION_AWARE, &CrossPointSettings::frontButtonOrientationAware,
+                          {StrId::STR_NO, StrId::STR_NAV_BUTTONS, StrId::STR_ALL_BUTTONS},
+                          "frontButtonOrientationAware", StrId::STR_CAT_CONTROLS));
+    add(SettingInfo::Enum(StrId::STR_LONG_PRESS_ACTION, &CrossPointSettings::longPressButtonBehavior,
+                          {StrId::STR_LONG_PRESS_BEHAVIOR_OFF, StrId::STR_LONG_PRESS_BEHAVIOR_SKIP,
+                           StrId::STR_CHANGE_FONT_SIZE, StrId::STR_LONG_PRESS_BEHAVIOR_ORIENTATION},
+                          "longPressButtonBehavior", StrId::STR_CAT_CONTROLS)
+            .withEnumRawValues({CrossPointSettings::OFF, CrossPointSettings::CHAPTER_SKIP,
+                                CrossPointSettings::FONT_SIZE_CHANGE, CrossPointSettings::ORIENTATION_CHANGE}));
+    add(buildShortcutSetting(StrId::STR_SHORT_PWR_BTN, &CrossPointSettings::shortPwrBtn, "shortPwrBtn",
+                             ShortcutOptionCatalog::PowerButton));
+    add(buildShortcutSetting(StrId::STR_LONG_PRESS_ACTION, &CrossPointSettings::longPwrBtn, "longPwrBtn",
+                             ShortcutOptionCatalog::PowerButton));
+    add(buildShortcutSetting(StrId::STR_POWER_BUTTON_CHORD, &CrossPointSettings::powerChordAction, "powerChordAction",
+                             ShortcutOptionCatalog::ButtonChord));
+    add(buildShortcutSetting(StrId::STR_SIDE_BUTTON_CHORD, &CrossPointSettings::sideButtonChordAction,
+                             "sideButtonChordAction", ShortcutOptionCatalog::ButtonChord));
+    add(SettingInfo::Enum(StrId::STR_IN_READER, &CrossPointSettings::homeButtonInReaderEnabled,
+                          {StrId::STR_ENABLED, StrId::STR_DISABLED}, "homeButtonInReaderEnabled",
+                          StrId::STR_CAT_CONTROLS)
+            .withEnumRawValues({1, 0}));
+    add(buildHomeButtonActionSetting(StrId::STR_HOME_BUTTON_TAP, &CrossPointSettings::homeButtonTapAction,
+                                     "homeButtonTapAction"));
+    add(buildHomeButtonActionSetting(StrId::STR_HOME_BUTTON_DOUBLE_TAP, &CrossPointSettings::homeButtonDoubleTapAction,
+                                     "homeButtonDoubleTapAction"));
+    add(buildHomeButtonActionSetting(StrId::STR_LONG_PRESS_ACTION, &CrossPointSettings::homeButtonLongPressAction,
+                                     "homeButtonLongPressAction"));
+    add(buildShortcutSetting(StrId::STR_LONG_PRESS_MENU_ACTION, &CrossPointSettings::longPressMenuAction,
+                             "longPressMenuAction", ShortcutOptionCatalog::LongPress));
+    add(buildShortcutSetting(StrId::STR_LONG_PRESS_BACK_ACTION, &CrossPointSettings::longPressBackAction,
+                             "longPressBackAction", ShortcutOptionCatalog::LongPress));
+    add(SettingInfo::Toggle(StrId::STR_PWR_BTN_FOOTNOTE_BACK, &CrossPointSettings::pwrBtnFootnoteBack,
+                            "pwrBtnFootnoteBack", StrId::STR_CAT_CONTROLS));
+    add(SettingInfo::Enum(StrId::STR_NEXT_PAGE, &CrossPointSettings::pageTurnGesture,
+                          {StrId::STR_TAP_AND_SWIPE, StrId::STR_TAP_ONLY, StrId::STR_SWIPE_ONLY,
+                           StrId::STR_INVERTED_TAP, StrId::STR_DISABLED},
+                          "pageTurnGesture", StrId::STR_CAT_CONTROLS));
+    add(SettingInfo::Enum(StrId::STR_PREV_PAGE, &CrossPointSettings::previousPageGesture,
+                          {StrId::STR_TAP_AND_SWIPE, StrId::STR_TAP_ONLY, StrId::STR_SWIPE_ONLY,
+                           StrId::STR_INVERTED_TAP, StrId::STR_DISABLED},
+                          "previousPageGesture", StrId::STR_CAT_CONTROLS));
+    add(SettingInfo::Toggle(StrId::STR_TAP_HIDE_STATUS_BAR, &CrossPointSettings::tapToHideStatusBar,
+                            "tapToHideStatusBar", StrId::STR_CAT_CONTROLS));
 
-  const auto emit = [visit, context](auto&& info) { visit(context, info); };
-  // --- Display ---
-  emit(SettingInfo::StaticEnum(StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen, SLEEP_SCREEN_VALUES,
-                               "sleepScreen", StrId::STR_CAT_DISPLAY));
-  emit(SettingInfo::Enum(StrId::STR_SLEEP_COVER_MODE, &CrossPointSettings::sleepScreenCoverMode,
-                         {StrId::STR_FIT, StrId::STR_CROP}, "sleepScreenCoverMode", StrId::STR_CAT_DISPLAY));
-  emit(SettingInfo::Enum(StrId::STR_SLEEP_COVER_FILTER, &CrossPointSettings::sleepScreenCoverFilter,
-                         {StrId::STR_NONE_OPT, StrId::STR_FILTER_CONTRAST, StrId::STR_INVERTED},
-                         "sleepScreenCoverFilter", StrId::STR_CAT_DISPLAY));
-  emit(SettingInfo::Enum(StrId::STR_QUICK_RESUME_TIMEOUT, &CrossPointSettings::quickResumeSleepScreen,
-                         {StrId::STR_STATE_OFF, StrId::STR_STATE_ON}, "quickResumeSleepScreen",
-                         StrId::STR_CAT_DISPLAY));
-  emit(SettingInfo::Enum(StrId::STR_HIDE_BATTERY, &CrossPointSettings::hideBatteryPercentage,
-                         {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS}, "hideBatteryPercentage",
-                         StrId::STR_CAT_DISPLAY));
-  emit(SettingInfo::Enum(StrId::STR_REFRESH_FREQ, &CrossPointSettings::refreshFrequency,
-                         {StrId::STR_PAGES_1, StrId::STR_PAGES_5, StrId::STR_PAGES_10, StrId::STR_PAGES_15,
-                          StrId::STR_PAGES_30, StrId::STR_NEVER},
-                         "refreshFrequency", StrId::STR_CAT_DISPLAY));
-  emit(SettingInfo::Enum(StrId::STR_UI_THEME, &CrossPointSettings::uiTheme, homeThemeValues(), "uiTheme",
-                         StrId::STR_CAT_DISPLAY));
-  if (!BoardConfig::hasTouch()) {
-    auto fadingFix = SettingInfo::Toggle(StrId::STR_SUNLIGHT_FADING_FIX, &CrossPointSettings::fadingFix, "fadingFix",
-                                         StrId::STR_CAT_DISPLAY);
-    // Keep it persisted, but do not offer it where the renderer ignores it.
-    if (!CrossPointSettings::fadingFixSupported()) fadingFix.withWebHidden();
-    emit(fadingFix);
-  }
-#if FREEINK_CAP_FRONTLIGHT
-  emit(SettingInfo::Toggle(StrId::STR_RESTORE_LIGHT_ON_WAKE, &CrossPointSettings::frontlightRestoreOnWake,
-                           "frontlightRestoreOnWake", StrId::STR_CAT_DISPLAY));
-#endif
-  // Night mode = inverted output polarity everywhere (ActivityManager
-  // applies it to every activity), so it lives in the Display category.
-  emit(SettingInfo::Toggle(StrId::STR_NIGHT_MODE, &CrossPointSettings::screenInverted, "screenInverted",
-                           StrId::STR_CAT_DISPLAY));
+    // --- System ---
+    add(SettingInfo::String(StrId::STR_DEVICE_NAME, SETTINGS.deviceName, sizeof(SETTINGS.deviceName), "deviceName",
+                            StrId::STR_CAT_SYSTEM));
+    add(SettingInfo::Value(
+        StrId::STR_TIME_TO_SLEEP, &CrossPointSettings::sleepTimeoutMinutes,
+        {CrossPointSettings::MIN_SLEEP_TIMEOUT_MINUTES, CrossPointSettings::MAX_SLEEP_TIMEOUT_MINUTES, 1},
+        "sleepTimeoutMinutes", StrId::STR_CAT_SYSTEM));
+    add(SettingInfo::Toggle(StrId::STR_CUSTOM_BOOTSCREEN, &CrossPointSettings::customBootscreenEnabled,
+                            "customBootscreenEnabled", StrId::STR_CAT_SYSTEM));
+    add(SettingInfo::Toggle(StrId::STR_SHOW_HIDDEN_FILES, &CrossPointSettings::showHiddenFiles, "showHiddenFiles",
+                            StrId::STR_CAT_SYSTEM));
+    add(SettingInfo::Toggle(StrId::STR_HIDE_FILE_EXTENSION, &CrossPointSettings::hideFileExtension, "hideFileExtension",
+                            StrId::STR_CAT_SYSTEM));
+    add(SettingInfo::Enum(StrId::STR_FILE_BROWSER_DISPLAY, &CrossPointSettings::fileBrowserDisplay,
+                          {StrId::STR_FILE_BROWSER_DISPLAY_1_LINE, StrId::STR_FILE_BROWSER_DISPLAY_2_LINES},
+                          "fileBrowserDisplay", StrId::STR_CAT_SYSTEM));
+    add(SettingInfo::Toggle(StrId::STR_REMOVE_READ_FROM_RECENTS, &CrossPointSettings::removeReadBooksFromRecents,
+                            "removeReadBooksFromRecents", StrId::STR_CAT_SYSTEM));
+    add(SettingInfo::Toggle(StrId::STR_MOVE_FINISHED_TO_READ, &CrossPointSettings::moveFinishedToReadFolder,
+                            "moveFinishedToReadFolder", StrId::STR_CAT_SYSTEM));
+    add(SettingInfo::Toggle(StrId::STR_AUTO_BACKUP_STATS, &CrossPointSettings::autoBackupStats, "autoBackupStats",
+                            StrId::STR_CAT_SYSTEM));
+    // Persisted and available to the web settings API, but category-less because
+    // the on-device editor lives under System > OPDS Servers.
+    add(SettingInfo::String(StrId::STR_OPDS_DOWNLOAD_FOLDER, SETTINGS.opdsDownloadFolder,
+                            sizeof(SETTINGS.opdsDownloadFolder), "opdsDownloadFolder"));
+    // Persisted here, but edited from the nearby receive screen's folder picker.
+    add(SettingInfo::String(StrId::STR_NEARBY_RECEIVE_FOLDER, SETTINGS.nearbyReceiveFolder,
+                            sizeof(SETTINGS.nearbyReceiveFolder), "nearbyReceiveFolder"));
+    add(SettingInfo::Value(StrId::STR_IDLE_TIME_THRESHOLD, &CrossPointSettings::readingIdleTimeThresholdUnits,
+                           {CrossPointSettings::MIN_READING_IDLE_TIME_THRESHOLD_UNITS,
+                            CrossPointSettings::MAX_READING_IDLE_TIME_THRESHOLD_UNITS, 1},
+                           "readingIdleTimeThresholdUnits", StrId::STR_CAT_SYSTEM));
+    add(SettingInfo::Toggle(StrId::STR_TRACK_READING_STATS, &CrossPointSettings::trackReadingStats, "trackReadingStats",
+                            StrId::STR_CAT_SYSTEM));
 
-  // --- Reader ---
-  // Built-in font-family entry. Replaced per-call with a registry-aware
-  // version when SD fonts are installed.
-  emit(SettingInfo::Enum(StrId::STR_FONT_FAMILY, &CrossPointSettings::fontFamily, {StrId::STR_NOTO_SANS}, "fontFamily",
-                         StrId::STR_CAT_READER)
-           .withTextSettings());
-  // Placeholder: the selectable sizes depend on the active font family, so
-  // UI callers replace this entry with buildFontSizeSetting(). It only
-  // fixes the setting's position in the Reader category.
-  emit(SettingInfo::Enum(StrId::STR_FONT_SIZE, nullptr, {}, "fontSize", StrId::STR_CAT_READER).withTextSettings());
-  // "lineHeight": fromJson() moves older "lineSpacing" saves up one slot for the added 1.0.
-  emit(SettingInfo::StaticEnum(StrId::STR_LINE_SPACING, &CrossPointSettings::lineSpacing, LINE_SPACING_IDS,
-                               "lineHeight", StrId::STR_CAT_READER)
-           .withTextSettings());
-  emit(SettingInfo::Value(StrId::STR_WORD_SPACING, &CrossPointSettings::wordSpacing,
-                          {CrossPointSettings::WORD_SPACING_MIN, CrossPointSettings::WORD_SPACING_MAX,
-                           CrossPointSettings::WORD_SPACING_STEP},
-                          "wordSpacing", StrId::STR_CAT_READER)
-           .withTextSettings());
-  emit(SettingInfo::Enum(StrId::STR_CHARACTER_SPACING, &CrossPointSettings::characterSpacing,
+    // Frontlight quick-panel state: persisted + web-exposed, category-less so
+    // it stays off the Settings screen (edited from the swipe-down panel).
+    add(SettingInfo::Value(StrId::STR_BRIGHTNESS, &CrossPointSettings::frontlightBrightness, {0, 100, 5},
+                           "frontlightBrightness"));
+    add(SettingInfo::Value(StrId::STR_WARMTH, &CrossPointSettings::frontlightWarmth, {0, 100, 5}, "frontlightWarmth"));
+    add(SettingInfo::Toggle(StrId::STR_FRONTLIGHT, &CrossPointSettings::frontlightOn, "frontlightOn"));
+
+    // --- KOReader Sync (web-only, uses KOReaderCredentialStore) ---
+    add(SettingInfo::DynamicString(
+        StrId::STR_KOREADER_USERNAME, [] { return KOREADER_STORE.getUsername(); },
+        [](const std::string& v) {
+          KOREADER_STORE.setCredentials(v, KOREADER_STORE.getPassword());
+          KOREADER_STORE.saveToFile();
+        },
+        "koUsername", StrId::STR_KOREADER_SYNC));
+    add(SettingInfo::DynamicString(
+        StrId::STR_KOREADER_PASSWORD, [] { return KOREADER_STORE.getPassword(); },
+        [](const std::string& v) {
+          KOREADER_STORE.setCredentials(KOREADER_STORE.getUsername(), v);
+          KOREADER_STORE.saveToFile();
+        },
+        "koPassword", StrId::STR_KOREADER_SYNC));
+    add(SettingInfo::DynamicString(
+        StrId::STR_SYNC_SERVER_URL, [] { return KOREADER_STORE.getServerUrl(); },
+        [](const std::string& v) {
+          KOREADER_STORE.setServerUrl(v);
+          KOREADER_STORE.saveToFile();
+        },
+        "koServerUrl", StrId::STR_KOREADER_SYNC));
+    add(SettingInfo::DynamicEnum(
+        StrId::STR_DOCUMENT_MATCHING, {StrId::STR_FILENAME, StrId::STR_BINARY},
+        [] { return static_cast<uint8_t>(KOREADER_STORE.getMatchMethod()); },
+        [](uint8_t v) {
+          KOREADER_STORE.setMatchMethod(static_cast<DocumentMatchMethod>(v));
+          KOREADER_STORE.saveToFile();
+        },
+        "koMatchMethod", StrId::STR_KOREADER_SYNC));
+    add(SettingInfo::DynamicEnum(
+        StrId::STR_SEND_METADATA, {StrId::STR_STATE_OFF, StrId::STR_STATE_ON},
+        [] { return static_cast<uint8_t>(KOREADER_STORE.getSendMetadata()); },
+        [](uint8_t v) {
+          KOREADER_STORE.setSendMetadata(v != 0);
+          KOREADER_STORE.saveToFile();
+        },
+        "koSendMetadata", StrId::STR_KOREADER_SYNC));
+
+    add(SettingInfo::DynamicEnum(
+        StrId::STR_SYNC_BEHAVIOR, {StrId::STR_ASK_EVERY_TIME, StrId::STR_SMART_SYNC},
+        [] { return static_cast<uint8_t>(KOREADER_STORE.getSyncBehavior()); },
+        [](uint8_t v) {
+          KOREADER_STORE.setSyncBehavior(static_cast<KOReaderSyncBehavior>(v));
+          KOREADER_STORE.saveToFile();
+        },
+        "koSyncBehavior", StrId::STR_KOREADER_SYNC));
+
+    // --- Status Bar Settings (web-only, uses StatusBarSettingsActivity) ---
+    add(SettingInfo::Toggle(StrId::STR_CHAPTER_PAGE_COUNT, &CrossPointSettings::statusBarChapterPageCount,
+                            "statusBarChapterPageCount", StrId::STR_CUSTOMISE_STATUS_BAR));
+    add(SettingInfo::Toggle(StrId::STR_STABLE_PAGE_NUMBERS, &CrossPointSettings::stablePageNumbers, "stablePageNumbers",
+                            StrId::STR_CUSTOMISE_STATUS_BAR));
+    add(SettingInfo::Toggle(StrId::STR_BOOK_PROGRESS_PERCENTAGE, &CrossPointSettings::statusBarBookProgressPercentage,
+                            "statusBarBookProgressPercentage", StrId::STR_CUSTOMISE_STATUS_BAR));
+    add(SettingInfo::Enum(StrId::STR_PERCENTAGE_FORMAT, &CrossPointSettings::statusBarBookPercentageFormat,
+                          {StrId::STR_PERCENTAGE_FORMAT_WHOLE, StrId::STR_PERCENTAGE_FORMAT_ONE_DECIMAL,
+                           StrId::STR_PERCENTAGE_FORMAT_TWO_DECIMALS},
+                          "statusBarBookPercentageFormat", StrId::STR_CUSTOMISE_STATUS_BAR));
+    add(SettingInfo::Enum(StrId::STR_PROGRESS_BAR, &CrossPointSettings::statusBarProgressBar,
+                          {StrId::STR_HIDE, StrId::STR_BOOK, StrId::STR_CHAPTER}, "statusBarProgressBar",
+                          StrId::STR_CUSTOMISE_STATUS_BAR)
+            .withEnumRawValues({CrossPointSettings::HIDE_PROGRESS, CrossPointSettings::BOOK_PROGRESS,
+                                CrossPointSettings::CHAPTER_PROGRESS}));
+    add(SettingInfo::Enum(StrId::STR_PROGRESS_BAR_THICKNESS, &CrossPointSettings::statusBarProgressBarThickness,
+                          {StrId::STR_PROGRESS_BAR_THIN, StrId::STR_PROGRESS_BAR_MEDIUM, StrId::STR_PROGRESS_BAR_THICK},
+                          "statusBarProgressBarThickness", StrId::STR_CUSTOMISE_STATUS_BAR));
+    add(SettingInfo::Enum(StrId::STR_TITLE, &CrossPointSettings::statusBarTitle,
+                          {StrId::STR_HIDE, StrId::STR_BOOK, StrId::STR_CHAPTER}, "statusBarTitle",
+                          StrId::STR_CUSTOMISE_STATUS_BAR)
+            .withEnumRawValues(
+                {CrossPointSettings::HIDE_TITLE, CrossPointSettings::BOOK_TITLE, CrossPointSettings::CHAPTER_TITLE}));
+    add(SettingInfo::Enum(StrId::STR_TIME_LEFT, &CrossPointSettings::statusBarTimeLeft,
+                          {StrId::STR_HIDE, StrId::STR_CHAPTER, StrId::STR_BOOK}, "statusBarTimeLeft",
+                          StrId::STR_CUSTOMISE_STATUS_BAR));
+    add(SettingInfo::Toggle(StrId::STR_BATTERY, &CrossPointSettings::statusBarBattery, "statusBarBattery",
+                            StrId::STR_CUSTOMISE_STATUS_BAR));
+    add(SettingInfo::Enum(StrId::STR_XTC_STATUS_BAR, &CrossPointSettings::xtcStatusBarMode,
+                          {StrId::STR_HIDE, StrId::STR_BOTTOM, StrId::STR_TOP}, "xtcStatusBarMode",
+                          StrId::STR_CUSTOMISE_STATUS_BAR));
+    // Clock detail entries live under System > Device in the device UI.
+    // Range 0..104 = quarter-hour steps from UTC-12:00 to UTC+14:00, biased by 48.
+    add(SettingInfo::Value(StrId::STR_CLOCK_UTC_OFFSET, &CrossPointSettings::clockUtcOffsetQ, {0, 104, 1},
+                           "clockUtcOffsetQ", StrId::STR_CAT_SYSTEM));
+    add(SettingInfo::Enum(StrId::STR_CLOCK_FORMAT, &CrossPointSettings::clockFormat,
+                          {StrId::STR_CLOCK_FORMAT_24H, StrId::STR_CLOCK_FORMAT_12H}, "clockFormat",
+                          StrId::STR_CAT_SYSTEM));
+    add(SettingInfo::Enum(StrId::STR_DATE_FORMAT, &CrossPointSettings::dateFormat,
+                          {StrId::STR_DATE_FORMAT_MONTH_DAY_YEAR_LONG, StrId::STR_DATE_FORMAT_DAY_MONTH_YEAR_LONG,
+                           StrId::STR_DATE_FORMAT_MONTH_DAY_YEAR_NUMERIC, StrId::STR_DATE_FORMAT_DAY_MONTH_YEAR_NUMERIC,
+                           StrId::STR_DATE_FORMAT_YEAR_MONTH_DAY_NUMERIC, StrId::STR_DATE_FORMAT_MONTH_DAY_NUMERIC,
+                           StrId::STR_DATE_FORMAT_DAY_MONTH_NUMERIC, StrId::STR_DATE_FORMAT_MONTH_DAY_LONG,
+                           StrId::STR_DATE_FORMAT_DAY_MONTH_LONG},
+                          "dateFormat", StrId::STR_CAT_SYSTEM));
+    add(SettingInfo::Enum(
+        StrId::STR_DATE_SEPARATOR, &CrossPointSettings::dateSeparator,
+        {StrId::STR_DATE_SEPARATOR_PERIOD, StrId::STR_DATE_SEPARATOR_HYPHEN, StrId::STR_DATE_SEPARATOR_SLASH},
+        "dateSeparator", StrId::STR_CAT_SYSTEM));
+    // Persistence flag for NTP debounce. Resetting from the web UI forces a re-sync
+    // on next WiFi connect, which is useful when crossing time zones.
+    add(SettingInfo::Toggle(StrId::STR_CLOCK_SYNCED, &CrossPointSettings::clockHasBeenSynced, "clockHasBeenSynced",
+                            StrId::STR_CAT_SYSTEM));
+
+  // Modern additions whose raw meaning does not replace an owner key.
+  add(SettingInfo::Enum(StrId::STR_CHARACTER_SPACING, &CrossPointSettings::characterSpacing,
                          {StrId::STR_SPACING_MINUS_2, StrId::STR_SPACING_MINUS_1, StrId::STR_SPACING_ZERO,
                           StrId::STR_SPACING_PLUS_1, StrId::STR_SPACING_PLUS_2},
                          "characterSpacing", StrId::STR_CAT_READER)
-           .withTextSettings());
-  emit(SettingInfo::Value(StrId::STR_SCREEN_MARGIN, &CrossPointSettings::screenMargin,
-                          {CrossPointSettings::SCREEN_MARGIN_MIN, CrossPointSettings::SCREEN_MARGIN_MAX,
-                           CrossPointSettings::SCREEN_MARGIN_STEP},
-                          "screenMargin", StrId::STR_CAT_READER)
-           .withTextSettings());
-  emit(SettingInfo::Enum(StrId::STR_PARA_ALIGNMENT, &CrossPointSettings::paragraphAlignment,
-                         {StrId::STR_JUSTIFY, StrId::STR_ALIGN_LEFT, StrId::STR_CENTER, StrId::STR_ALIGN_RIGHT,
-                          StrId::STR_BOOK_S_STYLE},
-                         "paragraphAlignment", StrId::STR_CAT_READER)
-           .withTextSettings());
-  emit(SettingInfo::Toggle(StrId::STR_EMBEDDED_STYLE, &CrossPointSettings::embeddedStyle, "embeddedStyle",
-                           StrId::STR_CAT_READER)
-           .withTextSettings());
-  emit(SettingInfo::Toggle(StrId::STR_FOCUS_READING, &CrossPointSettings::focusReadingEnabled, "focusReadingEnabled",
-                           StrId::STR_CAT_READER)
-           .withTextSettings());
-  emit(SettingInfo::Toggle(StrId::STR_HYPHENATION, &CrossPointSettings::hyphenationEnabled, "hyphenationEnabled",
-                           StrId::STR_CAT_READER)
-           .withTextSettings());
-  emit(SettingInfo::Enum(
-      StrId::STR_ORIENTATION, &CrossPointSettings::orientation,
-      {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_ORIENTATION_INVERTED, StrId::STR_LANDSCAPE_CCW},
-      "orientation", StrId::STR_CAT_READER));
-  emit(SettingInfo::Toggle(StrId::STR_EXTRA_SPACING, &CrossPointSettings::extraParagraphSpacing,
-                           "extraParagraphSpacing", StrId::STR_CAT_READER)
-           .withTextSettings());
-  emit(SettingInfo::Value(StrId::STR_PARAGRAPH_INDENTATION, &CrossPointSettings::paragraphIndentSpaces, {0, 5, 1},
+           );
+  add(SettingInfo::Value(StrId::STR_PARAGRAPH_INDENTATION, &CrossPointSettings::paragraphIndentSpaces, {0, 5, 1},
                           "paragraphIndentSpaces", StrId::STR_CAT_READER)
-           .withTextSettings());
-  emit(SettingInfo::Toggle(StrId::STR_TEXT_AA, &CrossPointSettings::textAntiAliasing, "textAntiAliasing",
-                           StrId::STR_CAT_READER)
-           .withTextSettings());
-  emit(SettingInfo::Enum(StrId::STR_IMAGES, &CrossPointSettings::imageRendering,
-                         {StrId::STR_IMAGES_DISPLAY, StrId::STR_IMAGES_PLACEHOLDER, StrId::STR_IMAGES_SUPPRESS,
-                          StrId::STR_IMAGES_DISPLAY_BW},
-                         "imageRendering", StrId::STR_CAT_READER));
-  emit(SettingInfo::Enum(StrId::STR_READER_MENU_STYLE, &CrossPointSettings::readerMenuStyle,
+           );
+  add(SettingInfo::Enum(StrId::STR_READER_MENU_STYLE, &CrossPointSettings::readerMenuStyle,
                          {StrId::STR_MENU_STYLE_LIST, StrId::STR_MENU_STYLE_TOOLBAR}, "readerMenuStyle",
                          StrId::STR_CAT_READER));
-  emit(SettingInfo::Toggle(StrId::STR_SAVE_VOCABULARY_LOOKUPS, &CrossPointSettings::vocabularyHistoryEnabled,
+  add(SettingInfo::Toggle(StrId::STR_SAVE_VOCABULARY_LOOKUPS, &CrossPointSettings::vocabularyHistoryEnabled,
                            "vocabularyHistoryEnabled", StrId::STR_CAT_READER));
-  // --- Controls ---
-#if FREEINK_CAP_HAPTIC
-  emit(SettingInfo::Enum(StrId::STR_VIBRATION, &CrossPointSettings::vibration,
+  add(SettingInfo::Enum(StrId::STR_VIBRATION, &CrossPointSettings::vibration,
                          {StrId::STR_VIBRATION_TOUCH, StrId::STR_VIBRATION_TOUCH_PAGE, StrId::STR_STATE_OFF},
                          "vibration", StrId::STR_CAT_CONTROLS));
-  emit(SettingInfo::Enum(StrId::STR_HAPTIC_INTENSITY, &CrossPointSettings::hapticIntensity,
+  add(SettingInfo::Enum(StrId::STR_HAPTIC_INTENSITY, &CrossPointSettings::hapticIntensity,
                          {StrId::STR_HAPTIC_LOW, StrId::STR_HAPTIC_MEDIUM, StrId::STR_HAPTIC_HIGH}, "hapticIntensity",
                          StrId::STR_CAT_CONTROLS));
-#endif
-  emit(SettingInfo::Enum(
-      StrId::STR_SIDE_BTN_LAYOUT, &CrossPointSettings::sideButtonLayout,
-      {StrId::STR_PREV_NEXT, StrId::STR_NEXT_PREV, StrId::STR_DISABLED, StrId::STR_NEXT_NEXT, StrId::STR_PREV_PREV},
-      "sideButtonLayout", StrId::STR_CAT_CONTROLS));
-#if FREEINK_DEVICE_PICCO
-  emit(SettingInfo::Enum(StrId::STR_SLIDE_SWITCH, &CrossPointSettings::slideSwitchAction,
-                         {StrId::STR_FRONTLIGHT, StrId::STR_NIGHT_MODE, StrId::STR_TOUCH_READER_CONTROLS},
-                         "slideSwitchAction", StrId::STR_CAT_CONTROLS));
-#endif
-  // The reader menu style stays available on button boards (the toolbar
-  // chrome is button-navigable); only the touch controls are hidden.
-  if (BoardConfig::hasTouch()) {
-    emit(SettingInfo::Toggle(StrId::STR_TOUCH_READER_CONTROLS, &CrossPointSettings::touchReaderControls,
-                             "touchReaderControls", StrId::STR_CAT_CONTROLS));
-    emit(SettingInfo::Enum(StrId::STR_NEXT_PAGE_GESTURE, &CrossPointSettings::pageTurnGesture,
-                           {StrId::STR_TAP_AND_SWIPE, StrId::STR_TAP_ONLY, StrId::STR_SWIPE_ONLY,
-                            StrId::STR_INVERTED_TAP, StrId::STR_DISABLED},
-                           "pageTurnGesture", StrId::STR_CAT_CONTROLS));
-    emit(SettingInfo::Enum(StrId::STR_PREV_PAGE_GESTURE, &CrossPointSettings::previousPageGesture,
-                           {StrId::STR_TAP_AND_SWIPE, StrId::STR_TAP_ONLY, StrId::STR_SWIPE_ONLY,
-                            StrId::STR_INVERTED_TAP, StrId::STR_DISABLED},
-                           "previousPageGesture", StrId::STR_CAT_CONTROLS));
-  }
-  // The reader-menu gesture choice only makes sense where the menu stays
-  // reachable without the tap and the bottom edge is free (the capacitive
-  // Home key); everywhere else the bottom-edge up-swipe is Home and the
-  // center tap is the primary path, so the setting stays at its Tap default.
-  // Persisted under the legacy "tapForReaderMenu" key: old saves map
-  // 0 = Off, 1 = Tap.
-  if (BoardConfig::hasHomeKey())
-    emit(SettingInfo::Enum(StrId::STR_SHOW_READER_MENU, &CrossPointSettings::showReaderMenu,
-                           {StrId::STR_STATE_OFF, StrId::STR_STATE_TAP, StrId::STR_STATE_SWIPE_UP}, "tapForReaderMenu",
-                           StrId::STR_CAT_CONTROLS));
-  if (!BoardConfig::hasTouch())
-    emit(SettingInfo::Toggle(StrId::STR_FRONT_BTN_FOLLOW_ORIENTATION, &CrossPointSettings::frontButtonFollowOrientation,
-                             "frontButtonFollowOrientation", StrId::STR_CAT_CONTROLS));
-  emit(SettingInfo::Toggle(StrId::STR_SIDE_BTN_FOLLOW_ORIENTATION, &CrossPointSettings::sideButtonFollowOrientation,
-                           "sideButtonFollowOrientation", StrId::STR_CAT_CONTROLS));
-  emit(SettingInfo::Enum(StrId::STR_LONG_PRESS_BEHAVIOR, &CrossPointSettings::longPressButtonBehavior,
-                         {StrId::STR_LONG_PRESS_BEHAVIOR_OFF, StrId::STR_LONG_PRESS_BEHAVIOR_SKIP,
-                          StrId::STR_LONG_PRESS_BEHAVIOR_ORIENTATION},
-                         "longPressButtonBehavior", StrId::STR_CAT_CONTROLS));
-  emit(buildLongPressMenuSetting());
-  if (CrossPointSettings::hasPowerDoubleClick()) emit(buildDoublePowerButtonSetting());
-  emit(buildShortPowerButtonSetting());
-  // Always persisted; isHiddenOnDevice() hides it when the IMU probe fails.
-  emit(SettingInfo::Enum(StrId::STR_TILT_PAGE_TURN, &CrossPointSettings::tiltPageTurn,
-                         {StrId::STR_STATE_OFF, StrId::STR_NORMAL, StrId::STR_INVERTED}, "tiltPageTurn",
-                         StrId::STR_CAT_CONTROLS));
-  emit(SettingInfo::Toggle(StrId::STR_PWR_BTN_FOOTNOTE_BACK, &CrossPointSettings::pwrBtnFootnoteBack,
-                           "pwrBtnFootnoteBack", StrId::STR_CAT_CONTROLS));
-  if (!BoardConfig::hasTouch())
-    emit(SettingInfo::Toggle(StrId::STR_BACK_SHORT_TO_FILE_BROWSER, &CrossPointSettings::backShortToFileBrowser,
-                             "backShortToFileBrowser", StrId::STR_CAT_CONTROLS));
-
-  // Persisted here; set from the Connectivity -> Plugins popup.
-  emit(SettingInfo::Toggle(StrId::STR_PLUGINS, &CrossPointSettings::pluginsEnabled, "pluginsEnabled").withWebHidden());
-  emit(SettingInfo::Toggle(StrId::STR_PLUGIN_HUB, &CrossPointSettings::pluginHubPromptHidden, "pluginHubPromptHidden")
-           .withWebHidden());
-
-  // --- System ---
-  emit(SettingInfo::Value(
-      StrId::STR_TIME_TO_SLEEP, &CrossPointSettings::sleepTimeoutMinutes,
-      {CrossPointSettings::MIN_SLEEP_TIMEOUT_MINUTES, CrossPointSettings::MAX_SLEEP_TIMEOUT_MINUTES, 1},
-      "sleepTimeoutMinutes", StrId::STR_CAT_SYSTEM));
-  emit(SettingInfo::Toggle(StrId::STR_SHOW_HIDDEN_FILES, &CrossPointSettings::showHiddenFiles, "showHiddenFiles",
-                           StrId::STR_CAT_SYSTEM));
-  emit(SettingInfo::Toggle(StrId::STR_SHOW_FILE_EXTENSIONS, &CrossPointSettings::showFileExtensions,
-                           "showFileExtensions", StrId::STR_CAT_SYSTEM));
-  emit(SettingInfo::Toggle(StrId::STR_LIBRARY_USE_METADATA, &CrossPointSettings::libraryUseMetadata,
+  add(SettingInfo::Toggle(StrId::STR_PLUGINS, &CrossPointSettings::pluginsEnabled, "pluginsEnabled"));
+  add(SettingInfo::Toggle(StrId::STR_PLUGIN_HUB, &CrossPointSettings::pluginHubPromptHidden, "pluginHubPromptHidden")
+           );
+  add(SettingInfo::Toggle(StrId::STR_LIBRARY_USE_METADATA, &CrossPointSettings::libraryUseMetadata,
                            "libraryUseMetadata", StrId::STR_CAT_SYSTEM));
-  emit(SettingInfo::Toggle(StrId::STR_LIBRARY_RECENT_OPENED_ONLY, &CrossPointSettings::libraryRecentOpenedOnly,
+  add(SettingInfo::Toggle(StrId::STR_LIBRARY_RECENT_OPENED_ONLY, &CrossPointSettings::libraryRecentOpenedOnly,
                            "libraryRecentOpenedOnly", StrId::STR_CAT_SYSTEM));
-  emit(SettingInfo::Toggle(StrId::STR_REMOVE_READ_FROM_RECENTS, &CrossPointSettings::removeReadBooksFromRecents,
-                           "removeReadBooksFromRecents", StrId::STR_CAT_SYSTEM));
-  emit(SettingInfo::Toggle(StrId::STR_MOVE_FINISHED_TO_READ, &CrossPointSettings::moveFinishedToReadFolder,
-                           "moveFinishedToReadFolder", StrId::STR_CAT_SYSTEM));
-
-  // OPDS download folder: persisted + web-exposed, but category-less so it
-  // is hidden from the on-device Settings screen (edited via OPDS UI).
-  emit(SettingInfo::String(StrId::STR_OPDS_DOWNLOAD_FOLDER, &SETTINGS.opdsDownloadFolder[0],
-                           sizeof(SETTINGS.opdsDownloadFolder), "opdsDownloadFolder"));
-  // OPDS download filename format: persisted + web-exposed, category-less so it
-  // is hidden from the on-device Settings screen (cycled from the OPDS UI).
-  emit(SettingInfo::Enum(StrId::STR_OPDS_FILENAME_FORMAT, &CrossPointSettings::opdsFilenameFormat,
+  add(SettingInfo::Enum(StrId::STR_OPDS_FILENAME_FORMAT, &CrossPointSettings::opdsFilenameFormat,
                          {StrId::STR_FMT_AUTHOR_TITLE, StrId::STR_FMT_TITLE_AUTHOR, StrId::STR_FMT_TITLE},
                          "opdsFilenameFormat"));
-
-  // Frontlight quick-panel state: persisted and web-exposed, but hidden
-  // from the on-device Settings screen because the swipe panel owns it.
-  emit(SettingInfo::Value(StrId::STR_BRIGHTNESS, &CrossPointSettings::frontlightBrightness, {0, 100, 5},
-                          "frontlightBrightness"));
-#if FREEINK_CAP_WARMLIGHT
-  emit(SettingInfo::Value(StrId::STR_WARMTH, &CrossPointSettings::frontlightWarmth, {0, 100, 5}, "frontlightWarmth"));
-#endif
-  emit(SettingInfo::Toggle(StrId::STR_FRONTLIGHT, &CrossPointSettings::frontlightOn, "frontlightOn"));
-
-  // --- KOReader Sync (web-only, uses KOReaderCredentialStore) ---
-  emit(SettingInfo::DynamicString(
-      StrId::STR_KOREADER_USERNAME, [] { return KOREADER_STORE.getUsername(); },
-      [](const std::string& v) {
-        KOREADER_STORE.setCredentials(v, KOREADER_STORE.getPassword());
-        KOREADER_STORE.saveToFile();
-      },
-      "koUsername", StrId::STR_KOREADER_SYNC));
-  emit(SettingInfo::DynamicString(
-           StrId::STR_KOREADER_PASSWORD, [] { return KOREADER_STORE.getPassword(); },
-           [](const std::string& v) {
-             KOREADER_STORE.setCredentials(KOREADER_STORE.getUsername(), v);
-             KOREADER_STORE.saveToFile();
-           },
-           "koPassword", StrId::STR_KOREADER_SYNC)
-           .withObfuscated());
-  emit(SettingInfo::DynamicString(
-      StrId::STR_SYNC_SERVER_URL, [] { return KOREADER_STORE.getServerUrl(); },
-      [](const std::string& v) {
-        KOREADER_STORE.setServerUrl(v);
-        KOREADER_STORE.saveToFile();
-      },
-      "koServerUrl", StrId::STR_KOREADER_SYNC));
-  emit(SettingInfo::DynamicString(
+  add(SettingInfo::DynamicString(
       StrId::STR_KOREADER_CUSTOM_HEADER_1_NAME, [] { return KOREADER_STORE.getCustomHeaders()[0].name; },
       [](const std::string& v) {
         KOREADER_STORE.setCustomHeader(0, v, KOREADER_STORE.getCustomHeaders()[0].value);
         KOREADER_STORE.saveToFile();
       },
       "koHeader1Name", StrId::STR_KOREADER_SYNC));
-  emit(SettingInfo::DynamicString(
+  add(SettingInfo::DynamicString(
            StrId::STR_KOREADER_CUSTOM_HEADER_1_VALUE, [] { return KOREADER_STORE.getCustomHeaders()[0].value; },
            [](const std::string& v) {
              KOREADER_STORE.setCustomHeader(0, KOREADER_STORE.getCustomHeaders()[0].name, v);
@@ -276,14 +426,14 @@ void forEachBaseSetting(SettingVisitor visit, void* context) {
            },
            "koHeader1Value", StrId::STR_KOREADER_SYNC)
            .withObfuscated());
-  emit(SettingInfo::DynamicString(
+  add(SettingInfo::DynamicString(
       StrId::STR_KOREADER_CUSTOM_HEADER_2_NAME, [] { return KOREADER_STORE.getCustomHeaders()[1].name; },
       [](const std::string& v) {
         KOREADER_STORE.setCustomHeader(1, v, KOREADER_STORE.getCustomHeaders()[1].value);
         KOREADER_STORE.saveToFile();
       },
       "koHeader2Name", StrId::STR_KOREADER_SYNC));
-  emit(SettingInfo::DynamicString(
+  add(SettingInfo::DynamicString(
            StrId::STR_KOREADER_CUSTOM_HEADER_2_VALUE, [] { return KOREADER_STORE.getCustomHeaders()[1].value; },
            [](const std::string& v) {
              KOREADER_STORE.setCustomHeader(1, KOREADER_STORE.getCustomHeaders()[1].name, v);
@@ -291,7 +441,7 @@ void forEachBaseSetting(SettingVisitor visit, void* context) {
            },
            "koHeader2Value", StrId::STR_KOREADER_SYNC)
            .withObfuscated());
-  emit(SettingInfo::DynamicEnum(
+  add(SettingInfo::DynamicEnum(
       StrId::STR_SERVER_TYPE, {StrId::STR_CROSSPOINT, StrId::STR_KOSYNC_SERVER, StrId::STR_OTHER},
       [] { return static_cast<uint8_t>(KOREADER_STORE.getServerType()); },
       [](uint8_t v) {
@@ -299,31 +449,7 @@ void forEachBaseSetting(SettingVisitor visit, void* context) {
         KOREADER_STORE.saveToFile();
       },
       "koServerType", StrId::STR_KOREADER_SYNC));
-  emit(SettingInfo::DynamicEnum(
-      StrId::STR_DOCUMENT_MATCHING, {StrId::STR_FILENAME, StrId::STR_BINARY},
-      [] { return static_cast<uint8_t>(KOREADER_STORE.getMatchMethod()); },
-      [](uint8_t v) {
-        KOREADER_STORE.setMatchMethod(static_cast<DocumentMatchMethod>(v));
-        KOREADER_STORE.saveToFile();
-      },
-      "koMatchMethod", StrId::STR_KOREADER_SYNC));
-  emit(SettingInfo::DynamicEnum(
-      StrId::STR_SEND_METADATA, {StrId::STR_STATE_OFF, StrId::STR_STATE_ON},
-      [] { return static_cast<uint8_t>(KOREADER_STORE.getSendMetadata()); },
-      [](uint8_t v) {
-        KOREADER_STORE.setSendMetadata(v != 0);
-        KOREADER_STORE.saveToFile();
-      },
-      "koSendMetadata", StrId::STR_KOREADER_SYNC));
-  emit(SettingInfo::DynamicEnum(
-      StrId::STR_SYNC_BEHAVIOR, {StrId::STR_ASK_EVERY_TIME, StrId::STR_SMART_SYNC},
-      [] { return static_cast<uint8_t>(KOREADER_STORE.getSyncBehavior()); },
-      [](uint8_t v) {
-        KOREADER_STORE.setSyncBehavior(static_cast<KOReaderSyncBehavior>(v));
-        KOREADER_STORE.saveToFile();
-      },
-      "koSyncBehavior", StrId::STR_KOREADER_SYNC));
-  emit(SettingInfo::DynamicEnum(
+  add(SettingInfo::DynamicEnum(
       StrId::STR_SYNC_CLIPPINGS, {StrId::STR_STATE_OFF, StrId::STR_STATE_ON},
       [] { return static_cast<uint8_t>(KOREADER_STORE.getSyncClippings()); },
       [](uint8_t v) {
@@ -332,61 +458,74 @@ void forEachBaseSetting(SettingVisitor visit, void* context) {
         KOREADER_STORE.saveToFile();
       },
       "koSyncClippings", StrId::STR_KOREADER_SYNC));
-  // --- Status Bar Settings (web-only, uses StatusBarSettingsActivity) ---
-  emit(SettingInfo::Toggle(StrId::STR_CHAPTER_PAGE_COUNT, &CrossPointSettings::statusBarChapterPageCount,
-                           "statusBarChapterPageCount", StrId::STR_CUSTOMISE_STATUS_BAR));
-  emit(SettingInfo::Toggle(StrId::STR_BOOK_PROGRESS_PERCENTAGE, &CrossPointSettings::statusBarBookProgressPercentage,
-                           "statusBarBookProgressPercentage", StrId::STR_CUSTOMISE_STATUS_BAR));
-  emit(SettingInfo::Enum(StrId::STR_PROGRESS_BAR, &CrossPointSettings::statusBarProgressBar,
-                         {StrId::STR_BOOK, StrId::STR_CHAPTER, StrId::STR_HIDE}, "statusBarProgressBar",
-                         StrId::STR_CUSTOMISE_STATUS_BAR));
-  emit(SettingInfo::Enum(StrId::STR_PROGRESS_BAR_THICKNESS, &CrossPointSettings::statusBarProgressBarThickness,
-                         {StrId::STR_PROGRESS_BAR_THIN, StrId::STR_PROGRESS_BAR_MEDIUM, StrId::STR_PROGRESS_BAR_THICK},
-                         "statusBarProgressBarThickness", StrId::STR_CUSTOMISE_STATUS_BAR));
-  emit(SettingInfo::Enum(StrId::STR_TITLE, &CrossPointSettings::statusBarTitle,
-                         {StrId::STR_BOOK, StrId::STR_CHAPTER, StrId::STR_HIDE}, "statusBarTitle",
-                         StrId::STR_CUSTOMISE_STATUS_BAR));
-  emit(SettingInfo::Toggle(StrId::STR_BATTERY, &CrossPointSettings::statusBarBattery, "statusBarBattery",
-                           StrId::STR_CUSTOMISE_STATUS_BAR));
-  emit(SettingInfo::Enum(StrId::STR_XTC_STATUS_BAR, &CrossPointSettings::xtcStatusBarMode,
-                         {StrId::STR_HIDE, StrId::STR_BOTTOM, StrId::STR_TOP}, "xtcStatusBarMode",
-                         StrId::STR_CUSTOMISE_STATUS_BAR));
-  // Clock entries (persistence + web settings; the device UI is
-  // ClockSettingsActivity under System settings).
-  emit(SettingInfo::StaticEnum(StrId::STR_CLOCK, &CrossPointSettings::statusBarClock, STATUS_BAR_CLOCK_VALUES,
-                               "statusBarClock", StrId::STR_CUSTOMISE_STATUS_BAR));
-  // LEGACY: retired quarter-hour UTC offset (biased by 48). Persisted so
-  // timezones::activeIndex() can migrate it into clockTimezone.
-  emit(SettingInfo::Value(StrId::STR_CLOCK, &CrossPointSettings::clockUtcOffsetQ, {0, 104, 1}, "clockUtcOffsetQ",
+  add(SettingInfo::Value(StrId::STR_TIMEZONE, &CrossPointSettings::clockTimezone, {0, 255, 1}, "clockTimezone",
                           StrId::STR_CUSTOMISE_STATUS_BAR)
-           .withWebHidden());
-  emit(SettingInfo::Enum(StrId::STR_CLOCK_FORMAT, &CrossPointSettings::clockFormat,
-                         {StrId::STR_CLOCK_FORMAT_24H, StrId::STR_CLOCK_FORMAT_12H}, "clockFormat",
-                         StrId::STR_CUSTOMISE_STATUS_BAR));
-  // Index into the append-only table in src/util/Timezones.cpp; 255 = unset.
-  // Web-hidden: a raw index is unusable there; the device has a picker.
-  emit(SettingInfo::Value(StrId::STR_TIMEZONE, &CrossPointSettings::clockTimezone, {0, 255, 1}, "clockTimezone",
-                          StrId::STR_CUSTOMISE_STATUS_BAR)
-           .withWebHidden());
-  emit(SettingInfo::Enum(StrId::STR_CLOCK_DST, &CrossPointSettings::clockDst,
+           );
+  add(SettingInfo::Enum(StrId::STR_CLOCK_DST, &CrossPointSettings::clockDst,
                          {StrId::STR_CLOCK_DST_AUTO, StrId::STR_STATE_ON, StrId::STR_STATE_OFF}, "clockDst",
                          StrId::STR_CUSTOMISE_STATUS_BAR));
-  emit(SettingInfo::Toggle(StrId::STR_CLOCK_IN_HEADER, &CrossPointSettings::clockShowInHeader, "clockShowHeader",
+  add(SettingInfo::Toggle(StrId::STR_CLOCK_IN_HEADER, &CrossPointSettings::clockShowInHeader, "clockShowHeader",
                            StrId::STR_CUSTOMISE_STATUS_BAR));
-  // Persistence flag for NTP debounce. Resetting from the web UI forces a re-sync
-  // on next WiFi connect, which is useful when crossing time zones.
-  emit(SettingInfo::Toggle(StrId::STR_CLOCK_SYNCED, &CrossPointSettings::clockHasBeenSynced, "clockHasBeenSynced",
-                           StrId::STR_CUSTOMISE_STATUS_BAR));
-  if (BoardConfig::hasHomeKey()) {
-    for (unsigned i = 0; i < 3; ++i) {
-      emit(SettingInfo::StaticEnum(home_button::GESTURE_LABELS[i], home_button::FIELDS[i], home_button::ACTION_LABELS,
-                                   home_button::KEYS[i], StrId::STR_CAT_CONTROLS));
-    }
-  }
+  add(SettingInfo::Value(StrId::STR_WORD_SPACING, &CrossPointSettings::wordSpacingPercent,
+                         {50, 200, 5}, "wordSpacingPercent", StrId::STR_CAT_READER));
+  add(SettingInfo::Enum(StrId::STR_CLOCK, &CrossPointSettings::statusBarClock,
+       {StrId::STR_HIDE, StrId::STR_DIR_RIGHT, StrId::STR_DIR_LEFT}, "statusBarClock",
+       StrId::STR_CUSTOMISE_STATUS_BAR));
+  // Persist tilt fields even while a probe is absent. UI visibility is separate.
+  add(SettingInfo::Toggle(StrId::STR_TILT_PAGE_TURN, &CrossPointSettings::tiltPageTurn,
+                          "tiltPageTurn", StrId::STR_CAT_CONTROLS));
+  add(SettingInfo::Enum(StrId::STR_TILT_PAGE_TURN_DIRECTION, &CrossPointSettings::tiltPageTurnDirection,
+      {StrId::STR_TILT_DIRECTION_LEFT_RIGHT, StrId::STR_TILT_DIRECTION_LEFT_RIGHT_INVERTED,
+       StrId::STR_TILT_DIRECTION_FORWARD_BACK, StrId::STR_TILT_DIRECTION_FORWARD_BACK_INVERTED},
+      "tiltPageTurnDirection", StrId::STR_CAT_CONTROLS));
 }
 
 size_t countBaseSettings() {
   size_t count = 0;
-  forEachBaseSetting([](void* context, SettingInfo&) { ++*static_cast<size_t*>(context); }, &count);
+  forEachBaseSetting([](void* p, SettingInfo&) { ++*static_cast<size_t*>(p); }, &count);
   return count;
+}
+
+SettingInfo buildDictionarySetting(const std::vector<DictionaryEntry>& dictionaries) {
+  SettingInfo s;
+  s.nameId = StrId::STR_DICTIONARY;
+  s.type = SettingType::ENUM;
+  s.key = "dictionary";
+  s.category = StrId::STR_CAT_READER;
+  s.enumStringValues.push_back(I18N.get(StrId::STR_DICT_NONE));
+
+  std::vector<DictionaryEntry> entries;
+  {
+    entries.assign(dictionaries.begin(), dictionaries.begin() + std::min<size_t>(dictionaries.size(), 254));
+    s.enumStringValues.reserve(entries.size() + 1);
+    for (const auto& entry : entries) {
+      s.enumStringValues.push_back(entry.name);
+    }
+  }
+
+  s.valueGetter = [entries]() -> uint8_t {
+    const std::string activePath = Dictionary::readDictPath();
+    if (activePath.empty()) {
+      return 0;
+    }
+    for (size_t i = 0; i < entries.size(); i++) {
+      if (entries[i].basePath == activePath) {
+        return static_cast<uint8_t>(i + 1);
+      }
+    }
+    return 0;
+  };
+
+  s.valueSetter = [entries](uint8_t v) {
+    if (v == 0) {
+      Dictionary::saveGlobalDictPath("");
+      return;
+    }
+    const size_t entryIndex = static_cast<size_t>(v - 1);
+    if (entryIndex < entries.size()) {
+      Dictionary::saveGlobalDictPath(entries[entryIndex].basePath.c_str());
+    }
+  };
+
+  return s;
 }

@@ -1,24 +1,30 @@
 #include "FrontlightPanelActivity.h"
 
-#include <BlePageTurner.h>
-#include <FreeInkUIIcon.h>
+#include <CrossInkHalFrontlight.h>
 #include <GfxRenderer.h>
-#include <HalFrontlight.h>
-#include <HalGPIO.h>
 #include <I18n.h>
+#include <Memory.h>
 
 #include <algorithm>
 #include <cstdio>
-#include <iterator>
 
 #include "CrossPointSettings.h"
 #include "MappedInputManager.h"
+#include "activities/ActivityManager.h"
+#include "activities/RenderLock.h"
+#include "activities/home/BookActions.h"
+#include "activities/settings/SettingsActivity.h"
+#include "components/DrawerHandle.h"
+#include "components/HeaderDate.h"
+#include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
 #include "components/UIThemeTokens.h"
-#include "components/icons/customListIcons.h"
+#include "components/UiAppHelpers.h"
+#include "components/icons/frontlightHeaderIcons.h"
 #include "components/icons/listIcons.h"
-#include "components/icons/readerToolbarIcons.h"
-#include "util/SlideSwitch.h"
+#include "components/icons/readingStatsIcons.h"
+#include "components/icons/tablerIcons.h"
+#include "components/icons/touchscreenStateIcons.h"
 
 namespace fui = freeink::ui;
 
@@ -28,24 +34,14 @@ constexpr fui::ActionId ACTION_WARMTH = 2;
 constexpr fui::ActionId ACTION_TOGGLE = 3;
 constexpr fui::ActionId ACTION_BRIGHTNESS_STEP = 4;
 constexpr fui::ActionId ACTION_WARMTH_STEP = 5;
-constexpr fui::ActionId ACTION_TILE = 6;  // value = tile index
-
-// iOS-style geometry. The panel is a card hanging from the top of the screen:
-// a grabber, full-width slider pills, then a row of quick-setting icons. The chrome
-// itself is fui::sheet / fui::sliderRow; these constants only
-// size the bands, and computePanelBottom() mirrors them.
-constexpr int16_t kPanelSideMargin = 16;
-constexpr int16_t kGrabberHeight = 5;     // fui::SheetProps default, mirrored here
-constexpr int16_t kSliderRowHeight = 56;  // the pill itself (finger-sized)
-constexpr int16_t kQuickControlSize = kSliderRowHeight;
-constexpr int16_t kQuickIconSize = 32;
-// One percent per press, on the -/+ buttons and on the physical Left/Right keys
-// alike (both repeat while held), so a level can be set exactly.
-constexpr int BRIGHTNESS_STEP = 1;
-// The dimmest setting is 1%, not 0: turning the light off is what the lamp
-// button next to the slider is for, so a 0% "on" level would only be a second,
-// worse way to reach the same place.
-constexpr uint8_t MIN_BRIGHTNESS = 1;
+constexpr fui::ActionId ACTION_QUICK = 6;
+constexpr fui::ActionId ACTION_DISMISS = 7;
+constexpr int BRIGHTNESS_STEP = 5;
+constexpr int FINE_STEP = 1;
+constexpr int HEADER_ICON_SIZE = 24;
+constexpr int HEADER_BUTTON_WIDTH = 64;
+constexpr int HEADER_CONTENT_BOTTOM_GAP = 8;
+constexpr int ACTION_BAR_HEIGHT = 58;
 
 uint8_t percentFromPermille(const int16_t permille) {
   int value = (static_cast<int>(permille) * 100 + 500) / 1000;
@@ -53,69 +49,80 @@ uint8_t percentFromPermille(const int16_t permille) {
   if (value > 100) value = 100;
   return static_cast<uint8_t>(value);
 }
+
+fui::SheetProps frontlightSheetProps() {
+  fui::SheetProps sheet;
+  sheet.anchor = fui::SheetEdge::Top;
+  sheet.dismissAction = ACTION_DISMISS;
+  sheet.radius = 0;
+  return sheet;
+}
 }  // namespace
 
-FrontlightPanelActivity::FrontlightPanelActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-    : Activity("FrontlightPanel", renderer, mappedInput), UiAppHost(renderer) {}
+FrontlightPanelActivity::FrontlightPanelActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
+                                                 FrontlightPanelContext context)
+    : Activity("FrontlightPanel", renderer, mappedInput),
+      context(std::move(context)),
+      drawerState(this->context.drawerState),
+      uiTarget(makeUiTarget(renderer)),
+      app(uiTarget, uiTarget.deviceContext()) {}
 
 void FrontlightPanelActivity::onEnter() {
   Activity::onEnter();
 
-  // A stored 0% predates the 1% floor (or came from the web settings): show it
-  // as the floor rather than a level the slider can no longer produce. onExit
-  // persists that, which is the intent — 0 is not a brightness any more.
-  brightness = std::max(MIN_BRIGHTNESS, Frontlight.brightness());
+  // The HAL is the live source of truth; SETTINGS only mirrors it for boot.
+  brightness = Frontlight.brightness();
   warmth = Frontlight.warmth();
   lightOn = Frontlight.isOn();
-  lightOnChanged = false;
+  initialInversion = SETTINGS.screenInverted;
+  initialTouchscreenDisabled = SETTINGS.disableReaderTouchscreen;
+  pendingTouchscreenDisabled = initialTouchscreenDisabled;
+  mappedInput.setReaderTouchscreenOverride(true);
 
-  // Seed the touch tile's restore mode from the live setting, so toggling off
-  // and back on within this session returns to the mode the user had.
-  if (SETTINGS.touchReaderControls != CrossPointSettings::TOUCH_READER_OFF) {
-    touchModeRestore = SETTINGS.touchReaderControls;
-  }
-
-  resetUi();
+  uiReady = false;
+  applySharedUiTheme(app, uiTarget);
   app.on(ACTION_BRIGHTNESS, &FrontlightPanelActivity::onBrightnessEvent, this);
   app.on(ACTION_WARMTH, &FrontlightPanelActivity::onWarmthEvent, this);
   app.on(ACTION_TOGGLE, &FrontlightPanelActivity::onToggleEvent, this);
   app.on(ACTION_BRIGHTNESS_STEP, &FrontlightPanelActivity::onBrightnessStepEvent, this);
   app.on(ACTION_WARMTH_STEP, &FrontlightPanelActivity::onWarmthStepEvent, this);
-  app.on(ACTION_TILE, &FrontlightPanelActivity::onTileEvent, this);
+  app.on(ACTION_QUICK, &FrontlightPanelActivity::onQuickActionEvent, this);
+  app.on(ACTION_DISMISS, &FrontlightPanelActivity::onDismissEvent, this);
   app.setScreen(&FrontlightPanelActivity::panelScreen, this);
+  prepareReaderDetailsLayout();
   requestUpdate();
 }
 
-void FrontlightPanelActivity::persistLightSettings() {
-  if (!Frontlight.present()) return;
-  // brightness/warmth are always restored unconditionally on boot (see
-  // main.cpp), so they never diverge from SETTINGS at onEnter() — comparing
-  // against SETTINGS here only fires on a genuine user change. lightOn has
-  // no such guarantee (see lightOnChanged's declaration), so it's gated on
-  // the user actually having touched it this session instead.
-  const bool changed = SETTINGS.frontlightBrightness != brightness || SETTINGS.frontlightWarmth != warmth ||
-                       (lightOnChanged && SETTINGS.frontlightOn != (lightOn ? 1 : 0));
-  if (changed) {
-    SETTINGS.frontlightBrightness = brightness;
-    SETTINGS.frontlightWarmth = warmth;
-    if (lightOnChanged) SETTINGS.frontlightOn = lightOn ? 1 : 0;
-    SETTINGS.saveToFile();
-  }
-}
-
 void FrontlightPanelActivity::onExit() {
-  persistLightSettings();
+  // Debounced persistence: one SPIFFS write on close, never per slider tick.
+  const bool inversionChanged = initialInversion != static_cast<bool>(SETTINGS.screenInverted);
+  const bool touchscreenChanged = initialTouchscreenDisabled != pendingTouchscreenDisabled;
+  SETTINGS.disableReaderTouchscreen = pendingTouchscreenDisabled ? 1 : 0;
+  const bool frontlightChanged =
+      !context.showReaderDetails && (SETTINGS.frontlightBrightness != brightness ||
+                                     SETTINGS.frontlightWarmth != warmth || SETTINGS.frontlightOn != (lightOn ? 1 : 0));
+  if (frontlightChanged || inversionChanged || touchscreenChanged) {
+    if (!context.showReaderDetails) {
+      SETTINGS.frontlightBrightness = brightness;
+      SETTINGS.frontlightWarmth = warmth;
+      SETTINGS.frontlightOn = lightOn ? 1 : 0;
+    }
+    // The drawer can be opened over a dictionary or another reader child.
+    // Find the owning reader so its per-book values stay out of the global file.
+    activityManager.persistGlobalSettings();
+  }
+  mappedInput.setReaderTouchscreenOverride(false);
   Activity::onExit();
 }
 
 void FrontlightPanelActivity::onBrightnessEvent(const fui::ActionEvent& event, void* user) {
   auto* self = static_cast<FrontlightPanelActivity*>(user);
   if (event.dragPermille < 0) return;
-  self->brightness = std::max(MIN_BRIGHTNESS, percentFromPermille(event.dragPermille));
+  self->brightness = percentFromPermille(event.dragPermille);
   Frontlight.setBrightness(self->brightness);
-  if (!self->lightOn && !slideSwitchOwnsLight()) {
+  // Adjusting brightness while off is an obvious "I want light" intent.
+  if (!self->lightOn) {
     self->lightOn = true;
-    self->lightOnChanged = true;
     Frontlight.setOn(true);
   }
 }
@@ -127,84 +134,35 @@ void FrontlightPanelActivity::onWarmthEvent(const fui::ActionEvent& event, void*
   Frontlight.setWarmth(self->warmth);
 }
 
+void FrontlightPanelActivity::onBrightnessStepEvent(const fui::ActionEvent& event, void* user) {
+  static_cast<FrontlightPanelActivity*>(user)->adjustBrightness(event.value * FINE_STEP);
+}
+
+void FrontlightPanelActivity::onWarmthStepEvent(const fui::ActionEvent& event, void* user) {
+  static_cast<FrontlightPanelActivity*>(user)->adjustWarmth(event.value * FINE_STEP);
+}
+
 void FrontlightPanelActivity::onToggleEvent(const fui::ActionEvent&, void* user) {
   static_cast<FrontlightPanelActivity*>(user)->toggleLight();
 }
 
-void FrontlightPanelActivity::onBrightnessStepEvent(const fui::ActionEvent& event, void* user) {
-  static_cast<FrontlightPanelActivity*>(user)->adjustBrightness(event.value);
+void FrontlightPanelActivity::onQuickActionEvent(const fui::ActionEvent& event, void* user) {
+  static_cast<FrontlightPanelActivity*>(user)->activateQuickAction(event.value);
 }
 
-void FrontlightPanelActivity::onWarmthStepEvent(const fui::ActionEvent& event, void* user) {
-  static_cast<FrontlightPanelActivity*>(user)->adjustWarmth(event.value);
-}
-
-void FrontlightPanelActivity::onTileEvent(const fui::ActionEvent& event, void* user) {
-  static_cast<FrontlightPanelActivity*>(user)->runTile(event.value);
-}
-
-void FrontlightPanelActivity::runTile(const int idx) {
-  switch (idx) {
-    case 0:  // Night mode (inverted output polarity, applied to the whole UI)
-      SETTINGS.screenInverted = SETTINGS.screenInverted ? 0 : 1;
-      SETTINGS.saveToFile();
-      // Inversion rewrites every pixel; take the clean waveform so the panel
-      // does not keep a ghost of the old polarity.
-      cleanRefreshPending = true;
-      requestUpdate();
-      break;
-    case 1:  // Ghost-cleanup refresh of the whole frame
-      // Refreshing with the panel still up would clean a frame the user is
-      // about to dismiss anyway: drop the panel first and let the repaint of
-      // the screen underneath carry the clean waveform instead.
-      renderer.promoteNextRefresh(HalDisplay::FULL_REFRESH);
-      close();
-      break;
-    case 2:  // Cycle the reading orientation
-      SETTINGS.orientation = static_cast<uint8_t>((SETTINGS.orientation + 1) % CrossPointSettings::ORIENTATION_COUNT);
-      SETTINGS.saveToFile();
-      // Only the setting changes: turning the renderer cropped the portrait-only
-      // screens the panel opens over. The reader reflows on its next loop().
-      requestUpdate();
-      break;
-    case 3:  // Touch reader controls (for reading with the palm on the glass)
-      // Toggles the existing Settings -> Controls option, nothing lower-level:
-      // that setting only governs the reader's tap/swipe handling, so the
-      // panel's own gestures (including the swipe that reopens it) keep
-      // working while it is off. Off remembers the mode (Tap/Swipe/Inverted
-      // Tap) so toggling back does not stomp the user's choice.
-      if (SETTINGS.touchReaderControls != CrossPointSettings::TOUCH_READER_OFF) {
-        touchModeRestore = SETTINGS.touchReaderControls;
-        SETTINGS.touchReaderControls = CrossPointSettings::TOUCH_READER_OFF;
-      } else {
-        SETTINGS.touchReaderControls = touchModeRestore;
-      }
-      SETTINGS.saveToFile();
-      requestUpdate();
-      break;
-    case 4:  // Bluetooth page turner
-      if (!bleturner::status().compiledIn) break;
-      SETTINGS.ble.enabled = SETTINGS.ble.enabled ? 0 : 1;
-      // The panel suspends the radio; tick() reconnects in an eligible screen.
-      if (!SETTINGS.ble.enabled) bleturner::switchOff();
-      SETTINGS.saveToFile();
-      requestUpdate();
-      break;
-    default:
-      break;
-  }
+void FrontlightPanelActivity::onDismissEvent(const fui::ActionEvent&, void* user) {
+  static_cast<FrontlightPanelActivity*>(user)->close();
 }
 
 void FrontlightPanelActivity::adjustBrightness(const int delta) {
   int next = static_cast<int>(brightness) + delta;
-  if (next < MIN_BRIGHTNESS) next = MIN_BRIGHTNESS;
+  if (next < 0) next = 0;
   if (next > 100) next = 100;
   if (next == brightness) return;
   brightness = static_cast<uint8_t>(next);
   Frontlight.setBrightness(brightness);
-  if (!lightOn && !slideSwitchOwnsLight()) {
+  if (!lightOn) {
     lightOn = true;
-    lightOnChanged = true;
     Frontlight.setOn(true);
   }
   requestUpdate();
@@ -222,60 +180,159 @@ void FrontlightPanelActivity::adjustWarmth(const int delta) {
 
 void FrontlightPanelActivity::toggleLight() {
   lightOn = !lightOn;
-  lightOnChanged = true;
   Frontlight.setOn(lightOn);
+  requestUpdate();
+}
+
+void FrontlightPanelActivity::toggleReaderTouchscreen() {
+  pendingTouchscreenDisabled = !pendingTouchscreenDisabled;
+  {
+    RenderLock lock;
+    BookActions::drawToast(renderer,
+                           pendingTouchscreenDisabled ? tr(STR_TOUCHSCREEN_DISABLED) : tr(STR_TOUCHSCREEN_ENABLED));
+  }
+  delay(1000);
   requestUpdate();
 }
 
 void FrontlightPanelActivity::close() { finish(); }
 
+void FrontlightPanelActivity::openReadingStats() {
+  if (!context.readingStatsActivity && context.sourceActivity) {
+    context.readingStatsActivity = context.sourceActivity->createFrontlightReadingStatsActivity();
+  }
+  if (!context.readingStatsActivity) return;
+  startActivityForResult(std::move(context.readingStatsActivity), [this](const ActivityResult&) { close(); });
+}
+
+void FrontlightPanelActivity::openGlobalSettings() {
+  // A drawer over Settings must not end the outer screen's edit session.
+  const bool startedGlobalEdit = activityManager.beginGlobalSettingsEdit();
+  auto settings = makeUniqueNoThrow<SettingsActivity>(renderer, mappedInput, true, true);
+  if (!settings) {
+    LOG_ERR("LIGHT", "OOM opening Settings from frontlight panel");
+    if (startedGlobalEdit) activityManager.endGlobalSettingsEdit();
+    return;
+  }
+  startActivityForResult(std::move(settings), [this, startedGlobalEdit](const ActivityResult&) {
+    if (startedGlobalEdit) activityManager.endGlobalSettingsEdit();
+    close();
+  });
+}
+
+void FrontlightPanelActivity::openSyncDialog() {
+  static constexpr std::array<StrId, 3> OPTIONS = {StrId::STR_SYNC_PROGRESS, StrId::STR_NEARBY_POSITION_SYNC,
+                                                   StrId::STR_SEND_NEARBY_BOOK};
+  drawerState.syncDialogOpen = true;
+  const bool canSyncBookProgress = context.activeEpub;
+  const bool canSendBook = !context.bookPath.empty();
+  optionPopup.show(StrId::STR_SYNC_AND_TRANSFER, OPTIONS.data(), OPTIONS.size(), canSyncBookProgress ? 0 : 2,
+                   [this](const int index) {
+                     drawerState.syncDialogOpen = false;
+                     FrontlightPanelResult panelResult;
+                     panelResult.state = drawerState;
+                     panelResult.activeEpub = context.activeEpub;
+                     panelResult.bookPath = context.bookPath;
+                     if (index == 0) panelResult.action = FrontlightPanelAction::SyncProgress;
+                     if (index == 1) panelResult.action = FrontlightPanelAction::NearbyPositionSync;
+                     if (index == 2) panelResult.action = FrontlightPanelAction::SendNearbyBook;
+                     setResult(ActivityResult(std::move(panelResult)));
+                     finish();
+                   });
+  optionPopup.setDisabledOptions({!canSyncBookProgress, !canSyncBookProgress, !canSendBook});
+  optionPopup.setCancelCallback([this] { closeSyncDialog(); });
+  requestUpdate();
+}
+
+void FrontlightPanelActivity::closeSyncDialog() {
+  drawerState.syncDialogOpen = false;
+  close();
+}
+
+void FrontlightPanelActivity::activateQuickAction(const int index) {
+  if (index < 0 || index >= 5) return;
+  drawerState.selectedAction = static_cast<int8_t>(index);
+  switch (index) {
+    case 0:
+      openReadingStats();
+      return;
+    case 1:
+      openSyncDialog();
+      return;
+    case 2:
+      SETTINGS.screenInverted = SETTINGS.screenInverted ? 0 : 1;
+      display.setInverted(SETTINGS.screenInverted != 0);
+      requestUpdate();
+      return;
+    case 3:
+      openGlobalSettings();
+      return;
+    case 4:
+      toggleReaderTouchscreen();
+      return;
+  }
+}
+
 bool FrontlightPanelActivity::handleHomeGesture() {
+  if (context.activeReaderBook) {
+    activityManager.goHome();
+    return true;
+  }
   close();
   return true;
 }
 
 void FrontlightPanelActivity::loop() {
-  const auto touch = routeTouch(mappedInput, false, /*routeHeld=*/true);
-  if (touch.routed) {
-    if (app.invalidated()) requestUpdate();
-    if (touch) {
-      if (touch.event.dragPermille >= 0) draggingSlider = true;
-      return;
-    }
-    // Swipe up dismisses the sheet, the way it was pulled down from the top
-    // edge. draggingSlider keeps a fast slider flick from closing it.
-    if (!draggingSlider && mappedInput.wasSwipe() == MappedInputManager::SwipeDir::Up) {
-      close();
-      return;
-    }
-    // panelBottom > 0 guards the frame the sheet opens in: the release that
-    // opened it (a status-bar tap) is still in the input snapshot when the panel
-    // runs its first loop(), and panelBottom is only known once render() has
-    // measured the layout — so at 0 that release read as "tapped below the
-    // sheet" and closed it again before it was ever drawn.
-    if (touch.snap.touchReleased && !draggingSlider && panelBottom > 0 && touch.snap.touchY >= panelBottom) {
-      close();
-      return;
-    }
+  if (optionPopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
+
+  // A power-button shortcut can change the light globally while this panel is
+  // open. Keep the panel's state and eventual persistence in sync.
+  if (!context.showReaderDetails && lightOn != Frontlight.isOn()) {
+    lightOn = Frontlight.isOn();
+    requestUpdate();
   }
-  if (draggingSlider) {
-    if (!touch.snap.touchHeld) {
-      draggingSlider = false;
-      cleanRefreshPending = true;
-      requestUpdate();
-    }
+
+  const Rect homeButton = homeButtonRect();
+  if (context.activeReaderBook &&
+      mappedInput.wasTapInRect(homeButton.x, homeButton.y, homeButton.width, homeButton.height)) {
+    activityManager.goHome();
     return;
+  }
+
+  if (DrawerHandle::wasDismissSwipe(mappedInput, drawerHandleRect, fui::SheetEdge::Top)) {
+    close();
+    return;
+  }
+
+  fui::InputSnapshot snap{};
+  if (uiReady) {
+    snap = touchSnapshotFrom(mappedInput);
+    if (snap.touchPressed || snap.touchHeld || snap.touchReleased) {
+      const auto event = app.route(snap);
+      if (app.invalidated()) requestUpdate();
+      if (event) {
+        if (event.dragPermille >= 0) draggingSlider = true;
+        return;
+      }
+    }
+    if (draggingSlider) {
+      // Drag ended (possibly off the slider): swallow the release's swipe so
+      // it can't double as the left-edge back gesture and close the panel.
+      if (!snap.touchHeld) draggingSlider = false;
+      return;
+    }
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     close();
     return;
   }
-  if (!Frontlight.present()) return;
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    if (!slideSwitchOwnsLight()) toggleLight();
+    if (!context.showReaderDetails) toggleLight();
     return;
   }
+
+  if (context.showReaderDetails) return;
 
   buttonNavigator.onPressAndContinuous({MappedInputManager::Button::Left},
                                        [this] { adjustBrightness(-BRIGHTNESS_STEP); });
@@ -283,170 +340,256 @@ void FrontlightPanelActivity::loop() {
                                        [this] { adjustBrightness(BRIGHTNESS_STEP); });
 }
 
-int FrontlightPanelActivity::computePanelBottom() const {
-  const auto tokens = uiThemeTokens(uiTarget);
+Rect FrontlightPanelActivity::homeButtonRect() const {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  const int16_t lineHeight = uiTarget.lineHeight(tokens.smallText.font);
-  // Slim battery band + the air around it (mirrors buildPanelScreen).
-  const int y0 = std::max<int>(metrics.batteryHeight, lineHeight);
-  int y = tokens.spaceMd + y0 + tokens.spaceMd;
-  if (Frontlight.present()) {
-    // Screen::sliderRow reserves caption + spaceMd + control band, then a
-    // spaceMd gap; addSliderRow() adds one more spaceMd of air after each row.
-    y += lineHeight + tokens.spaceMd + kSliderRowHeight + 2 * tokens.spaceMd;  // brightness
-    if (Frontlight.hasColorTemperature()) {
-      y += lineHeight + tokens.spaceMd + kSliderRowHeight + 2 * tokens.spaceMd;  // warmth
-    }
-    y += tokens.spaceSm;
-  }
-  // Icons are touch targets, so a buttons-only board gets no row and the
-  // sheet is exactly the frontlight controls.
-  if (mappedInput.hasTouch()) y += kQuickControlSize;
-  // The sheet's grabber band: content margin + grabber + air to the edge.
-  // buildPanelScreen() feeds the same theme spacings into SheetProps.
-  y += 2 * (tokens.spaceLg + tokens.spaceMd) + kGrabberHeight;
-  return y;
+  return Rect{renderer.getScreenWidth() - HEADER_BUTTON_WIDTH, metrics.topPadding, HEADER_BUTTON_WIDTH,
+              TouchHeaderBackButton::height(metrics, mappedInput)};
 }
 
-void FrontlightPanelActivity::panelScreen(UiScreen& screen, void* user) {
+int FrontlightPanelActivity::computePanelBottom() const {
+  // Mirror buildPanelScreen's takeTop/spacer sequence so the frame, content
+  // margin, and dismiss threshold land on the same edge.
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const auto tokens = uiThemeTokens(uiTarget);
+  const int16_t lh = uiTarget.lineHeight(tokens.bodyText.font);
+  int y = metrics.topPadding + TouchHeaderBackButton::height(metrics, mappedInput);
+  if (context.showReaderDetails) {
+    const int16_t titleLh = uiTarget.lineHeight(tokens.titleText.font);
+    y += tokens.spaceLg * 2;
+    y += titleLh * static_cast<int>(readerTitleLines.size());
+    if (!readerTitleLines.empty()) y += tokens.spaceLg;
+    if (!context.bookDetails.chapter.empty() || !context.bookDetails.author.empty()) {
+      y += lh + tokens.spaceLg;
+    }
+    y += lh;
+    y += tokens.spaceLg * 3 + ACTION_BAR_HEIGHT;
+    const auto sheet = frontlightSheetProps();
+    return y + DrawerHandle::bandHeight(sheet);
+  }
+  y += tokens.spaceLg;                     // leading spacer
+  y += tokens.rowHeight + tokens.spaceSm;  // brightness label + frontlight toggle row
+  y += tokens.rowHeight + tokens.spaceLg;  // brightness slider
+  if (Frontlight.hasColorTemperature()) {
+    y += lh + tokens.spaceSm + tokens.rowHeight + tokens.spaceLg;  // warmth label + slider
+  }
+  y += tokens.spaceLg + ACTION_BAR_HEIGHT;  // trailing padding + actions
+  const auto sheet = frontlightSheetProps();
+  return y + DrawerHandle::bandHeight(sheet);
+}
+
+void FrontlightPanelActivity::prepareReaderDetailsLayout() {
+  readerTitleLines.clear();
+  if (!context.showReaderDetails || context.bookDetails.title.empty()) return;
+  const auto tokens = uiThemeTokens(uiTarget);
+  const int16_t sideInset = static_cast<int16_t>(tokens.spaceLg * 2);
+  const int width = std::max<int>(1, renderer.getScreenWidth() - sideInset * 2);
+  readerTitleLines =
+      renderer.wrappedText(UI_12_FONT_ID, context.bookDetails.title.c_str(), width, 2, EpdFontFamily::BOLD);
+}
+
+void FrontlightPanelActivity::drawReaderDetails(fui::Screen<20>& screen) {
+  const auto& theme = screen.theme();
+  const fui::Insets sideInset{0, static_cast<int16_t>(theme.spaceLg * 2), 0, static_cast<int16_t>(theme.spaceLg * 2)};
+  screen.spacer(static_cast<int16_t>(theme.spaceLg * 2));
+
+  fui::TextStyle title = theme.titleText;
+  title.bold = true;
+  title.align = fui::TextAlign::Center;
+  const int16_t titleLh = screen.target().lineHeight(title.font);
+  for (const std::string& line : readerTitleLines) {
+    screen.target().text(screen.takeTop(titleLh).inset(sideInset), line.c_str(), title);
+  }
+  if (!readerTitleLines.empty()) screen.spacer(theme.spaceLg);
+
+  const char* subtitle =
+      !context.bookDetails.chapter.empty() ? context.bookDetails.chapter.c_str() : context.bookDetails.author.c_str();
+  fui::TextStyle body = theme.bodyText;
+  body.align = fui::TextAlign::Center;
+  const int16_t bodyLh = screen.target().lineHeight(body.font);
+  if (subtitle[0] != '\0') {
+    const std::string visible =
+        renderer.truncatedText(UI_10_FONT_ID, subtitle, screen.body().width - sideInset.left - sideInset.right);
+    screen.target().text(screen.takeTop(bodyLh, theme.spaceLg).inset(sideInset), visible.c_str(), body);
+  }
+
+  char progress[48];
+  std::snprintf(progress, sizeof(progress), "%d%% %s", context.bookDetails.progressPercent, tr(STR_COMPLETE));
+  screen.target().text(screen.takeTop(bodyLh).inset(sideInset), progress, body);
+  screen.spacer(static_cast<int16_t>(theme.spaceLg * 3));
+}
+
+void FrontlightPanelActivity::panelScreen(UiApp::ScreenType& screen, void* user) {
   static_cast<FrontlightPanelActivity*>(user)->buildPanelScreen(screen);
 }
 
-void FrontlightPanelActivity::addSliderRow(UiScreen& screen, const char* label, const uint8_t value,
-                                           const fui::ActionId sliderAction, const fui::ActionId stepAction,
-                                           const bool showToggle) {
-  // Live percentage readout. The row draws before this call returns
-  // (immediate mode), so borrowing a stack buffer is safe.
-  char pct[8];
-  snprintf(pct, sizeof(pct), "%u%%", static_cast<unsigned>(value));
+void FrontlightPanelActivity::buildPanelScreen(UiApp::ScreenType& screen) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const auto& theme = screen.theme();
+  const fui::SheetProps sheet = frontlightSheetProps();
+  const fui::Rect sheetRect{0, 0, static_cast<int16_t>(renderer.getScreenWidth()), static_cast<int16_t>(panelBottom)};
+  fui::sheet(screen.frame(), sheetRect, sheet);
+  // Body spans from below the header to the sheet's content edge. The grabber
+  // owns the remaining band at the bottom of this top-anchored drawer.
+  const fui::Rect sheetContent = fui::sheetContentRect(sheetRect, sheet);
+  drawerHandleRect = DrawerHandle::registerTap(screen.frame(), sheetContent, sheet, ACTION_DISMISS);
+  const int16_t bottomInset = static_cast<int16_t>(renderer.getScreenHeight() - sheetContent.bottom());
+  screen.setContentMargin(
+      fui::Insets{static_cast<int16_t>(metrics.topPadding + TouchHeaderBackButton::height(metrics, mappedInput)), 0,
+                  bottomInset, 0});
 
-  // rowProps is a member (fui::SliderRowProps embeds a 324-byte StyleSet, well
-  // past the 256-byte budget a local gets — AGENTS.md). Every field that
-  // varies between the two rows is reassigned here; the rest keep their
-  // constructed defaults, which already match the panel's card language.
-  rowProps.label = label;
-  rowProps.value = pct;
-  rowProps.sliderValue = value;
-  rowProps.sliderAction = sliderAction;
-  rowProps.decrement = stepAction;
-  rowProps.increment = stepAction;
-  rowProps.decrementValue = -BRIGHTNESS_STEP;
-  rowProps.incrementValue = BRIGHTNESS_STEP;
-  if (showToggle) {
-    // Lamp on/off after the +: the sliders set the level, this kills the light
-    // outright. Filled glyph = on, outline = off.
-    rowProps.toggleAction = ACTION_TOGGLE;
-    rowProps.toggleIcon = fui::bitmapFromIcon(lightOn ? icon_sun_filled_32 : icon_sun_32);
-  } else {
-    rowProps.toggleAction = fui::NO_ACTION;
-    rowProps.toggleIcon = fui::BitmapRef{};
+  const fui::Rect actionBar = screen.takeBottom(ACTION_BAR_HEIGHT);
+  const int16_t slotWidth = static_cast<int16_t>(actionBar.width / 5);
+  const std::array<fui::BitmapRef, 5> icons = {
+      fui::bitmapFromIcon(icon_reading_stats_24), fui::bitmapFromIcon(icon_transfer_24),
+      fui::bitmapFromIcon(icon_tabler_moon_filled_24), fui::bitmapFromIcon(icon_sliders_horizontal_24),
+      fui::bitmapFromIcon(pendingTouchscreenDisabled ? icon_device_tablet_off_24 : icon_device_tablet_24)};
+  for (int16_t i = 0; i < 5; ++i) {
+    const int16_t x = static_cast<int16_t>(actionBar.x + i * slotWidth);
+    const int16_t width = i == 4 ? static_cast<int16_t>(actionBar.right() - x) : slotWidth;
+    const fui::Rect slot{x, actionBar.y, width, actionBar.height};
+    screen.frame().hit(slot, ACTION_QUICK, i);
+    screen.target().bitmap(slot, icons[static_cast<size_t>(i)], fui::BitmapMode::Center);
   }
-  screen.sliderRow(rowProps, kSliderRowHeight);
-  // The wrapper's own trailing gap is one spaceMd; double it so the rows
-  // breathe — a control band this tall reads cramped at the list cadence.
-  screen.spacer(screen.theme().spaceMd);
+  screen.target().fill(fui::Rect{actionBar.x, actionBar.y, actionBar.width, 1}, fui::Paint::solid(fui::Color::Black));
+
+  if (context.showReaderDetails) {
+    drawReaderDetails(screen);
+    return;
+  }
+
+  const int16_t lh = screen.target().lineHeight(theme.bodyText.font);
+  const int16_t rowH = theme.rowHeight;
+  const fui::Insets sideInset{0, static_cast<int16_t>(theme.spaceLg * 2), 0, static_cast<int16_t>(theme.spaceLg * 2)};
+  char line[48];
+
+  screen.spacer(theme.spaceLg);
+
+  // Header row: "Brightness NN%" on the left, a tappable bulb icon on the right
+  // that toggles the light — `lightbulb` when on, `lightbulb-off` when off (the
+  // icon itself is the state indicator). Sharing a row with the label frees the
+  // whole bottom toggle row, shrinking the panel.
+  const fui::Rect headerRow = screen.takeTop(rowH, theme.spaceSm).inset(sideInset);
+  snprintf(line, sizeof(line), "%s  %u%%", tr(STR_BRIGHTNESS), static_cast<unsigned>(brightness));
+  const fui::BitmapRef lightIcon = fui::bitmapFromIcon(lightOn ? icon_lightbulb_28 : icon_lightbulb_off_28);
+  const int16_t iconW = static_cast<int16_t>(lightIcon.width);
+  const int16_t iconH = static_cast<int16_t>(lightIcon.height);
+  const fui::Rect iconRect{static_cast<int16_t>(headerRow.x + headerRow.width - iconW),
+                           static_cast<int16_t>(headerRow.y + (rowH - iconH) / 2), iconW, iconH};
+  const fui::Rect labelRect{headerRow.x, static_cast<int16_t>(headerRow.y + (rowH - lh) / 2),
+                            static_cast<int16_t>(headerRow.width - iconW - theme.spaceMd), lh};
+  screen.target().text(labelRect, line, theme.bodyText);
+  // Keep the visible glyph aligned to the content inset, but let its touch
+  // target fill the otherwise blank right edge and the adjacent row gaps.
+  // This makes the control more forgiving without reaching the brightness
+  // slider below.
+  const int16_t hitW = static_cast<int16_t>(iconW + theme.spaceLg * 4);
+  const fui::Rect hitRect{static_cast<int16_t>(headerRow.right() - hitW),
+                          static_cast<int16_t>(headerRow.y - theme.spaceSm),
+                          static_cast<int16_t>(hitW + sideInset.right), static_cast<int16_t>(rowH + theme.spaceSm * 2)};
+  screen.frame().hit(hitRect, ACTION_TOGGLE);
+  screen.target().bitmap(iconRect, lightIcon, fui::BitmapMode::Center);
+
+  addStepSlider(screen, screen.takeTop(theme.rowHeight, theme.spaceLg).inset(sideInset), brightness, ACTION_BRIGHTNESS,
+                ACTION_BRIGHTNESS_STEP);
+
+  if (Frontlight.hasColorTemperature()) {
+    snprintf(line, sizeof(line), "%s  %u%%", tr(STR_WARMTH), static_cast<unsigned>(warmth));
+    screen.target().text(screen.takeTop(lh, theme.spaceSm).inset(sideInset), line, theme.bodyText);
+    addStepSlider(screen, screen.takeTop(theme.rowHeight, theme.spaceLg).inset(sideInset), warmth, ACTION_WARMTH,
+                  ACTION_WARMTH_STEP);
+  }
+
+  screen.spacer(theme.spaceLg);
 }
 
-void FrontlightPanelActivity::buildPanelScreen(UiScreen& screen) {
+void FrontlightPanelActivity::drawHeader() {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int headerHeight = TouchHeaderBackButton::height(metrics, mappedInput);
+  const Rect header{0, metrics.topPadding, renderer.getScreenWidth(), headerHeight};
+
+  char date[16] = {};
+  const char* title = context.showReaderDetails ? "" : tr(STR_FRONTLIGHT);
+  int titleFontId = UI_12_FONT_ID;
+  if (context.showReaderDetails) {
+    if (formatHeaderDateText(date, sizeof(date))) title = date;
+    titleFontId = UI_10_FONT_ID;
+  } else if (context.activeReaderBook && !context.bookTitle.empty()) {
+    title = context.bookTitle.c_str();
+    titleFontId = UI_10_FONT_ID;
+  } else if (formatHeaderDateText(date, sizeof(date))) {
+    title = date;
+    titleFontId = UI_10_FONT_ID;
+  }
+
+  // Reuse the normal header chrome so the drawer retains its separator, clock,
+  // and battery indicator. The date remains deliberately smaller than a page
+  // title, matching its secondary status role.
+  // The panel is a global overlay even when it was opened from a reader. Its
+  // clock and battery therefore follow the outside-reader visibility settings.
+  GUI.drawHeader(renderer, header, "", nullptr, false);
+  // Keep the title/date in the header's lower lane. The status chrome above
+  // owns the clock and battery, so centering across the whole header crowds it.
+  const int headerBottom = header.y + header.height;
+  const int titleY = headerBottom - HEADER_CONTENT_BOTTOM_GAP - renderer.getLineHeight(titleFontId);
+  const bool showBookTitle = !context.showReaderDetails && context.activeReaderBook && !context.bookTitle.empty();
+  if (showBookTitle) {
+    const auto tokens = uiThemeTokens(uiTarget);
+    const Rect homeButton = homeButtonRect();
+    const int titleX = header.x + tokens.headerSidePadding;
+    const int titleRight = homeButton.x - tokens.spaceSm;
+    const int titleWidth = std::max(0, titleRight - titleX);
+    const std::string visibleTitle = renderer.truncatedText(titleFontId, title, titleWidth, EpdFontFamily::REGULAR);
+    renderer.drawText(titleFontId, titleX, titleY, visibleTitle.c_str(), true);
+  } else {
+    UITheme::drawCenteredText(renderer, header, titleFontId, titleY, title, true);
+  }
+
+  if (context.activeReaderBook) {
+    const Rect button = homeButtonRect();
+    uiTarget.bitmap(fui::Rect{static_cast<int16_t>(button.x + (button.width - HEADER_ICON_SIZE) / 2),
+                              static_cast<int16_t>(headerBottom - HEADER_CONTENT_BOTTOM_GAP - HEADER_ICON_SIZE),
+                              HEADER_ICON_SIZE, HEADER_ICON_SIZE},
+                    fui::bitmapFromIcon(icon_home_24), fui::BitmapMode::Center);
+  }
+}
+
+void FrontlightPanelActivity::addStepSlider(UiApp::ScreenType& screen, const fui::Rect& row, const uint8_t value,
+                                            const fui::ActionId sliderAction, const fui::ActionId stepAction) {
   const auto& theme = screen.theme();
+  const int16_t stepWidth = row.height;
+  const fui::Rect minusHit{row.x, row.y, stepWidth, row.height};
+  const fui::Rect plusHit{static_cast<int16_t>(row.right() - stepWidth), row.y, stepWidth, row.height};
 
-  // Sheet chrome first: the card body, the 2px rule along its bottom edge, and
-  // the grabber on the edge the sheet is dragged from. Screen::sheet() also
-  // clamps the content area to the sheet, so every band below lays out inside
-  // it. (No header: the panel is a floating card, and its own grabber says
-  // what it is.)
-  fui::SheetProps sheetProps;
-  // Keep equal padding above and below the grabber.
-  sheetProps.grabberMargin = static_cast<int16_t>(theme.spaceLg + theme.spaceMd);
-  sheetProps.grabberInset = sheetProps.grabberMargin;
-  screen.sheet(sheetProps, static_cast<int16_t>(panelBottom));
-  screen.insetContent(fui::Insets{0, kPanelSideMargin, 0, kPanelSideMargin});
+  fui::TextStyle glyph = theme.bodyText;
+  glyph.align = fui::TextAlign::Center;
+  const int16_t lineHeight = screen.target().lineHeight(glyph.font);
+  const int16_t glyphY = static_cast<int16_t>(row.y + (row.height - lineHeight) / 2);
+  screen.target().text(fui::Rect{minusHit.x, glyphY, stepWidth, lineHeight}, "-", glyph);
+  screen.target().text(fui::Rect{plusHit.x, glyphY, stepWidth, lineHeight}, "+", glyph);
+  screen.frame().hit(minusHit, stepAction, -1, fui::InputTouch);
+  screen.frame().hit(plusHit, stepAction, +1, fui::InputTouch);
 
-  // Reuse the exact battery renderer and header rectangle used by Home. Call
-  // the base implementation directly because RoundedRaff suppresses its
-  // untitled Home header.
-  {
-    const auto& metrics = UITheme::getInstance().getMetrics();
-    screen.spacer(theme.spaceMd);
-    const int16_t bandH = std::max<int16_t>(static_cast<int16_t>(metrics.batteryHeight),
-                                            screen.target().lineHeight(theme.smallText.font));
-    screen.takeTop(bandH, theme.spaceMd);
-    UITheme::getInstance().getTheme().BaseTheme::drawHeader(
-        renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.homeTopPadding - metrics.topPadding},
-        nullptr);
-  }
-
-  if (Frontlight.present()) {
-    addSliderRow(screen, tr(STR_BRIGHTNESS), brightness, ACTION_BRIGHTNESS, ACTION_BRIGHTNESS_STEP,
-                 /*showToggle=*/!slideSwitchOwnsLight());
-    if (Frontlight.hasColorTemperature()) {
-      addSliderRow(screen, tr(STR_WARMTH), warmth, ACTION_WARMTH, ACTION_WARMTH_STEP, /*showToggle=*/false);
-    }
-    screen.spacer(theme.spaceSm);
-  }
-
-  // Match the reader toolbar's equal icon slots; the full slot is the touch target.
-  if (mappedInput.hasTouch()) {
-    const int tileCount = bleturner::status().compiledIn ? kTileCount : kTileCount - 1;
-    const fui::BitmapRef icons[kTileCount] = {
-        fui::bitmapFromIcon(icon_moon_32), fui::bitmapFromIcon(icon_refresh_cw_32),
-        fui::bitmapFromIcon(icon_reader_text_24), fui::bitmapFromIcon(icon_pointer_32),
-        fui::bitmapFromIcon(SETTINGS.ble.enabled ? icon_bluetooth_32 : icon_bluetooth_off_32)};
-    const bool enabled[kTileCount] = {SETTINGS.screenInverted != 0, false, false,
-                                      SETTINGS.touchReaderControls != CrossPointSettings::TOUCH_READER_OFF,
-                                      SETTINGS.ble.enabled != 0};
-    static constexpr fui::Rotation rotations[] = {fui::Rotation::None, fui::Rotation::CCW90, fui::Rotation::R180,
-                                                  fui::Rotation::CW90};
-    // The underline rotates around the same 32px square as the toolbar's T.
-    static constexpr fui::Rect underlines[] = {{4, 29, 24, 3}, {29, 4, 3, 24}, {4, 0, 24, 3}, {0, 4, 3, 24}};
-    // The panel inherits the current screen rotation until the reader resumes.
-    constexpr int orientationCount = CrossPointSettings::ORIENTATION_COUNT;
-    const int preview = (SETTINGS.orientation + orientationCount - renderer.getOrientation()) % orientationCount;
-    const fui::Rect row = screen.takeTop(kQuickControlSize);
-    const fui::Paint ink = fui::Paint::solid(fui::Color::Black);
-    for (int id = 0; id < tileCount; ++id) {
-      const int16_t left = static_cast<int16_t>(row.x + row.width * id / tileCount);
-      const int16_t right = static_cast<int16_t>(row.x + row.width * (id + 1) / tileCount);
-      const fui::Rect slot{left, row.y, static_cast<int16_t>(right - left), row.height};
-      const fui::Rect control{static_cast<int16_t>(slot.x + (slot.width - kQuickControlSize) / 2), row.y,
-                              kQuickControlSize, kQuickControlSize};
-      if (enabled[id]) {
-        screen.target().fill(control, ink, theme.controlRadius);
-      } else {
-        screen.target().stroke(control, ink, 2, theme.controlRadius);
-      }
-      const fui::Rect iconRect{static_cast<int16_t>(control.x + (control.width - kQuickIconSize) / 2),
-                               static_cast<int16_t>(control.y + (control.height - kQuickIconSize) / 2), kQuickIconSize,
-                               kQuickIconSize};
-      const fui::Paint foreground = fui::Paint::solid(enabled[id] ? fui::Color::White : fui::Color::Black);
-      screen.target().bitmap(iconRect, icons[id], fui::BitmapMode::Center, foreground,
-                             id == 2 ? rotations[preview] : fui::Rotation::None);
-      if (id == 2) {
-        const auto& line = underlines[preview];
-        screen.target().fill(fui::Rect{static_cast<int16_t>(iconRect.x + line.x),
-                                       static_cast<int16_t>(iconRect.y + line.y), line.width, line.height},
-                             ink);
-      }
-      // A tile whose function the slide switch owns shows its state but takes no tap.
-      const bool switchOwned = (id == 0 && slideSwitchOwns(CrossPointSettings::SLIDE_SWITCH_NIGHT_MODE)) ||
-                               (id == 3 && slideSwitchOwns(CrossPointSettings::SLIDE_SWITCH_TOUCH_CONTROLS));
-      if (!switchOwned) screen.frame().hit(slot, ACTION_TILE, static_cast<int16_t>(id), fui::InputTouch);
-    }
-  }
+  fui::SliderProps slider;
+  slider.value = value;
+  slider.max = 100;
+  slider.action = sliderAction;
+  slider.inputMask = fui::InputTouch | fui::InputDrag;
+  const int16_t sideGap = static_cast<int16_t>(stepWidth + theme.spaceSm);
+  fui::slider(screen.frame(), row.inset(fui::Insets{0, sideGap, 0, sideGap}), slider);
 }
 
 void FrontlightPanelActivity::render(RenderLock&&) {
+  // Overlay drop-down: keep the framebuffer content (the reader/menu we opened
+  // over) intact below the panel; only the top third is repainted. No full
+  // clearScreen — same as the theme popups draw over the current frame.
   panelBottom = computePanelBottom();
+  uiReady = false;
+  app.render();
+  uiReady = true;
+  drawHeader();
 
-  // fui::sheet draws the card body, its bottom rule, and the grabber during
-  // renderUi(); the battery band at the card's top is part of the screen build.
-  renderUi();
+  // The dialog is the topmost layer.
+  if (optionPopup.isActive()) optionPopup.render(renderer);
 
-  // A tile that rewrote the whole frame (night mode) re-drives every pixel
-  // once; ordinary repaints stay on the fast path. HALF: strong enough to
-  // flip the whole frame's polarity without the FULL waveform's blackout
-  // flash. Any faint residue clears with the panel's dedicated refresh tile
-  // or the next scheduled clean refresh.
-  renderer.displayBuffer(cleanRefreshPending ? HalDisplay::HALF_REFRESH : HalDisplay::FAST_REFRESH);
-  cleanRefreshPending = false;
+  renderer.displayBuffer();
 }

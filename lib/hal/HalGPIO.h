@@ -3,142 +3,143 @@
 #include <Arduino.h>
 #include <InputManager.h>
 
-// Display SPI pins (custom pins for XteinkX4, not hardware SPI defaults)
-#define EPD_SCLK 8   // SPI Clock
-#define EPD_MOSI 10  // SPI MOSI (Master Out Slave In)
-#define EPD_CS 21    // Chip Select
-#define EPD_DC 4     // Data/Command
-#define EPD_RST 5    // Reset
-#define EPD_BUSY 6   // Busy
-
-#define SPI_MISO 7  // SPI MISO, shared between SD card and display (Master In Slave Out)
-
-#define BAT_GPIO0 0  // Battery voltage
-
-#define UART0_RXD 20  // Used for USB connection detection
-
-// Xteink X3 Hardware
-#define X3_I2C_SDA 20
-#define X3_I2C_SCL 0
-#define X3_I2C_FREQ 400000
-
-// TI BQ27220 Fuel gauge I2C
-#define I2C_ADDR_BQ27220 0x55  // Fuel gauge I2C address
-#define BQ27220_SOC_REG 0x2C   // StateOfCharge() command code (%)
-#define BQ27220_CUR_REG 0x0C   // Current() command code (signed mA)
-#define BQ27220_VOLT_REG 0x08  // Voltage() command code (mV)
-
-// Analog DS3231 RTC I2C
-#define I2C_ADDR_DS3231 0x68  // RTC I2C address
-#define DS3231_SEC_REG 0x00   // Seconds command code (BCD)
-
-// QST QMI8658 IMU I2C
-#define I2C_ADDR_QMI8658 0x6B        // IMU I2C address
-#define I2C_ADDR_QMI8658_ALT 0x6A    // IMU I2C fallback address
-#define QMI8658_WHO_AM_I_REG 0x00    // WHO_AM_I command code
-#define QMI8658_WHO_AM_I_VALUE 0x05  // WHO_AM_I expected value
+#include "AppCapabilities.h"
 
 class HalGPIO {
 #if CROSSPOINT_EMULATED == 0
   InputManager inputMgr;
 #endif
 
-  bool lastUsbConnected = false;
-  bool usbStateChanged = false;
   uint8_t previousCapacitivePageButtons = 0;
   bool capacitivePagePressed = false;
+  bool lastUsbConnected = false;
+  bool usbStateChanged = false;
+  bool usbStateSampled = false;
+  unsigned long lastUsbPollMs = 0;
 
  public:
-  enum class DeviceType : uint8_t { X4, X3 };
+  // HAL-owned, normalized multi-touch representation. Activities must not
+  // depend on the SDK's controller-specific touch snapshot type.
+  struct TouchContact {
+    uint8_t id = 0;
+    float nx = 0.0f;
+    float ny = 0.0f;
+  };
 
- private:
-  DeviceType _deviceType = DeviceType::X4;
+  struct TouchSnapshot {
+    // Mirror the SDK's bounded capture capacity while keeping app code
+    // independent of its controller-specific snapshot type.
+    static constexpr uint8_t MAX_CONTACTS = InputManager::MAX_TOUCH_CONTACTS;
+    uint8_t count = 0;
+    // Actual controller count. This may exceed count when the SDK truncates a
+    // frame, allowing firmware to opt into exact cardinalities safely.
+    uint8_t reportedCount = 0;
+    TouchContact contacts[MAX_CONTACTS];
+  };
 
- public:
+  struct CompletedMultiTouchSwipe {
+    uint8_t contactCount = 0;
+    float nxStart = 0.0f;
+    float nyStart = 0.0f;
+    float nxEnd = 0.0f;
+    float nyEnd = 0.0f;
+    unsigned long durationMs = 0;
+  };
+
+  struct CompletedMultiTouchRotation {
+    float degrees = 0.0f;
+    float nxCenter = 0.0f;
+    float nyCenter = 0.0f;
+    unsigned long durationMs = 0;
+  };
+
   HalGPIO() = default;
 
-  // Inline device type helpers for cleaner downstream checks
-  inline bool deviceIsX3() const { return _deviceType == DeviceType::X3; }
-  inline bool deviceIsX4() const { return _deviceType == DeviceType::X4; }
-  bool isXteinkDevice() const;
-
   // True when the board's page buttons sit on the left/right screen edges
-  // (X3, X4 Pro) rather than an off-screen vertical rocker. Drives side-hint
-  // placement and the flipped large-step direction in selection activities.
-  // Keyed off the active BoardConfig profile, not the X3/X4 runtime detection.
+  // rather than an off-screen vertical rocker. Drives side-hint
+  // placement, the flipped large-step direction in selection activities, and
+  // the keyboard's side-gutter reserve. Keyed off the active BoardConfig
+  // profile, not runtime board detection.
   bool hasEdgeSideButtons() const;
 
   // Start button GPIO and setup SPI for screen and SD card
   void begin();
-  void prepareForDeepSleep();
 
   // Button input methods
   void update();
-  bool isPressed(uint8_t buttonIndex) const;
-  bool isPowerButtonPhysicallyPressed() const {
-#if CROSSPOINT_EMULATED == 0
-    return inputMgr.isPowerButtonPhysicallyPressed();
-#else
-    return isPressed(BTN_POWER);
-#endif
+  void prepareForDeepSleep();
+  bool rawInputActive();
+  bool hasToggleSwitch() const;
+  bool isToggleSwitchOn() const;
+  bool isXteinkDevice() const { return false; } // Crosscub admits Sticky only.
+  bool wasCapacitivePagePressed() const { return capacitivePagePressed; }
+  bool isCapacitivePagePressed(uint8_t buttonIndex) const {
+    return buttonIndex < 8 && (previousCapacitivePageButtons & (1u << buttonIndex)) != 0;
   }
+  bool isPressed(uint8_t buttonIndex) const;
   bool wasPressed(uint8_t buttonIndex) const;
   bool wasAnyPressed() const;
   bool wasReleased(uint8_t buttonIndex) const;
   bool wasAnyReleased() const;
   unsigned long getHeldTime() const;
   unsigned long getPowerButtonHeldTime() const;
-  // True when any button contact is closed right now, read straight from the
-  // hardware (ADC ladder off its idle rail, the power GPIO asserted, or the T5S3
-  // expander key, one I2C read), without going through the debounced state.
-  // Cheap enough to call every few ms.
-  bool rawInputActive();
+#if CROSSSMUDGE_APP_CAP_TOUCH
   bool hasTouch() const;
-  // Capacitive Home key reported by the touch controller (X4 Pro). The tap
-  // event fires on release and excludes a long hold.
+  bool isTouchPressed() const;
+  bool supportsMultiTouch() const;
+  TouchSnapshot getTouchSnapshot() const;
+  bool wasCompletedMultiTouchSwipe(CompletedMultiTouchSwipe& swipe) const;
+  bool wasCompletedMultiTouchRotation(CompletedMultiTouchRotation& rotation) const;
+  // Capacitive home key under the bezel, reported by the touch controller
+  // when supported by the SDK. Tap = short press (fires on release, the primary
+  // "home" action); LongPress = held ~700ms (a hold shortcut, e.g. reader menu).
   bool hasHomeKey() const;
-  // Two-position slide switch (Picco). Debounced position and its change edge.
-  bool hasToggleSwitch() const;
-  bool isToggleSwitchOn() const;
   bool wasHomeKeyPressed() const;
   bool wasHomeKeyTapped() const;
   bool wasHomeKeyLongPressed() const;
   bool wasTouchTap(float& nx, float& ny) const;
   bool wasTouchDown(float& nx, float& ny) const;
-  bool wasCapacitivePagePressed() const { return capacitivePagePressed; }
-  bool isCapacitivePagePressed(uint8_t buttonIndex) const {
-    return buttonIndex < 8 && (previousCapacitivePageButtons & (1u << buttonIndex)) != 0;
-  }
   // Raw release edge, reported even when the contact was not a tap (swipe end,
   // drag-off). Snapshot builders forward it so interaction routing can clear
   // pressed state.
   bool wasTouchReleased() const;
   bool isTouchTapCandidate(float& nx, float& ny, unsigned long& heldMs) const;
-  bool isTouchHeldAt(float& nx, float& ny) const;
-  // One-shot long-press, fired by the SDK classifier while the finger is still
-  // down (stationary contact held past its threshold). Position = touch-down
-  // point. Callers that act on it should suppressTouchContact() so the lift
-  // cannot also tap.
   bool wasTouchLongPress(float& nx, float& ny) const;
-  // Ignore the remainder of the current contact (its continued hold and its
-  // release edge). Self-clears once the contact ends.
   void suppressTouchContact();
+  bool isTouchHeldAt(float& nx, float& ny) const;
   unsigned long lastTouchHeldMs() const;
   bool wasSwipe(float& nxStart, float& nyStart, float& nxEnd, float& nyEnd) const;
   bool wasTouchActivity() const;
+#else
+  constexpr bool hasTouch() const { return false; }
+  constexpr bool isTouchPressed() const { return false; }
+  constexpr bool supportsMultiTouch() const { return false; }
+  constexpr TouchSnapshot getTouchSnapshot() const { return {}; }
+  constexpr bool wasCompletedMultiTouchSwipe(CompletedMultiTouchSwipe&) const { return false; }
+  constexpr bool wasCompletedMultiTouchRotation(CompletedMultiTouchRotation&) const { return false; }
+  constexpr bool hasHomeKey() const { return false; }
+  constexpr bool wasHomeKeyPressed() const { return false; }
+  constexpr bool wasHomeKeyTapped() const { return false; }
+  constexpr bool wasHomeKeyLongPressed() const { return false; }
+#endif
   void setSharedConfirmPowerShortPressEmitsPower(bool enabled);
 
   // Verify that the physical power button remains held through input debounce.
+  // A device configured to sleep on a short power press can wake on that same
+  // short press, which has normally ended before firmware reaches this check.
   // Returns true if verification succeeded, false if device should return to sleep.
   // Should only be called when wakeup reason is PowerButton.
-  bool verifyPowerButtonWakeup();
+  bool verifyPowerButtonWakeup(bool shortPressWakes);
 
   // Check if USB is connected
   bool isUsbConnected() const;
 
+  // Return the latest loop-owned sample. Before the first update(), fall back
+  // to a direct probe so setup-time callers still report external power.
+  bool isUsbConnectedCached() const;
+
   // Whether a cold boot with no USB detected can be trusted to mean a held
-  // power button (Xteink-style button-energized rail with reliable USB
-  // detection). When false, cold boots always proceed to a normal boot.
+  // power button on the active board's power topology.
   bool coldBootImpliesPowerButton() const;
 
   // Returns true once per edge (plug or unplug) since the last update()

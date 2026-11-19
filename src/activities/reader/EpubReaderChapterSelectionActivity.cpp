@@ -1,158 +1,195 @@
 #include "EpubReaderChapterSelectionActivity.h"
 
-#include <FontCacheManager.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
 
-#include <string>
+#include <algorithm>
 
 #include "MappedInputManager.h"
-#include "components/UIScale.h"
+#include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
+#include "components/UIThemeTokens.h"
+#include "components/UiAppHelpers.h"
 
 namespace fui = freeink::ui;
+
+namespace {
+constexpr fui::ActionId ACTION_ROW = 1;
+}
 
 EpubReaderChapterSelectionActivity::EpubReaderChapterSelectionActivity(GfxRenderer& renderer,
                                                                        MappedInputManager& mappedInput,
                                                                        const std::shared_ptr<Epub>& epub,
-                                                                       const int currentTocIndex)
-    : UiListActivity("EpubReaderChapterSelection", renderer, mappedInput),
+                                                                       const std::string& epubPath,
+                                                                       const int currentSpineIndex)
+    : Activity("EpubReaderChapterSelection", renderer, mappedInput),
       epub(epub),
-      currentTocIndex(currentTocIndex) {}
+      epubPath(epubPath),
+      currentSpineIndex(currentSpineIndex),
+      uiTarget(makeUiTarget(renderer)),
+      app(uiTarget, uiTarget.deviceContext()) {}
+
+int EpubReaderChapterSelectionActivity::getTotalItems() const { return epub->getTocItemsCount(); }
 
 void EpubReaderChapterSelectionActivity::onEnter() {
-  UiListActivity::onEnter();
+  Activity::onEnter();
+  mappedInput.setReaderTouchscreenOverride(true);
 
-  // The reader underneath pins its page-render glyph arenas while this
-  // overlay is up. clearCache() is heap-adaptive: below the retention floor
-  // it frees them (the next page render's PrewarmScope rebuilds them at
-  // normal page-turn cost), giving this list room to keep every row's
-  // fallback glyphs resident — otherwise each repaint re-reads the visible
-  // rows' glyphs from SD.
-  if (auto* fcm = renderer.getFontCacheManager()) {
-    fcm->clearCache();
-  }
-
-  if (!epub) {
-    return;
-  }
-
-  // Start with the current chapter at the top of the viewport; the first
-  // screen build pulls the viewport to it (ListNav follow-on-build) and
-  // materializes the row window there (refreshTocWindow in buildScreen).
-  nav.selected = currentTocIndex;
+  // epub is a required collaborator: the caller dereferences it before constructing
+  // this activity, and loop()/render() use it unguarded on every frame.
+  selectorIndex = epub->getTocIndexForSpineIndex(currentSpineIndex);
+  if (selectorIndex < 0) selectorIndex = 0;
+  topIndex = 0;
+  visibleRows = 1;
+  initialViewportPending = true;
+  uiReady = false;
+  applySharedUiTheme(app, uiTarget);
+  app.on(ACTION_ROW, &EpubReaderChapterSelectionActivity::onRowEvent, this);
+  app.setScreen(&EpubReaderChapterSelectionActivity::chapterScreen, this);
+  requestUpdate();
 }
 
-// Materialize the ListItem/label window starting at `start` (clamped). TOC
-// entries are SD LUT reads (getTocItem), so this runs only when the viewport
-// leaves the current window. Finishes with a batch prewarm of the window's
-// CJK fallback glyphs -- one bounded SD pass per list page; repaints inside
-// the window stay RAM-only.
-void EpubReaderChapterSelectionActivity::refreshTocWindow(const int start) {
-  const int total = listCount();
-  int clamped = start;
-  if (clamped > total - TOC_WINDOW) clamped = total - TOC_WINDOW;
-  if (clamped < 0) clamped = 0;
-  if (clamped == windowStart) return;
-
-  windowCount = total - clamped < TOC_WINDOW ? total - clamped : TOC_WINDOW;
-  for (int i = 0; i < windowCount; i++) {
-    const auto tocItem = epub->getTocItem(clamped + i);
-    std::string indent(tocItem.level > 0 ? (tocItem.level - 1) * 2 : 0, ' ');
-    windowLabels[i] = indent + tocItem.title;
-    fui::ListItem item;
-    item.label = windowLabels[i].c_str();
-    item.actionValue = static_cast<int16_t>(clamped + i);
-    windowItems[i] = item;
-  }
-  windowStart = clamped;
-
-  struct PrewarmCtx {
-    const std::string* labels;
-    int count;
-  } prewarmCtx{windowLabels, windowCount};
-  renderer.prewarmFallbackText(
-      uiScaleSpec().bodyFontId,
-      [](const void* ctx, uint32_t i) -> const char* {
-        const auto* c = static_cast<const PrewarmCtx*>(ctx);
-        return i < static_cast<uint32_t>(c->count) ? c->labels[i].c_str() : nullptr;
-      },
-      &prewarmCtx, static_cast<uint32_t>(windowCount));
+void EpubReaderChapterSelectionActivity::onExit() {
+  mappedInput.setReaderTouchscreenOverride(false);
+  Activity::onExit();
 }
 
-void EpubReaderChapterSelectionActivity::activateIndex(const int index) {
-  if (index < 0 || index >= listCount()) {
-    return;
-  }
-  // The activated row leaves this screen (finish); a lingering flash would gray
-  // an unrelated element on the next render.
-  app.clearTapFlash();
-  nav.selected = index;
-  const auto tocItem = epub->getTocItem(index);
-  if (tocItem.spineIndex == -1) {
+void EpubReaderChapterSelectionActivity::selectChapter() {
+  const auto tocItem = epub->getTocItem(selectorIndex);
+  if (tocItem.spineIndex < 0) {
     ActivityResult result;
     result.isCancelled = true;
     setResult(std::move(result));
-    finish();
   } else {
     setResult(ChapterResult{tocItem.spineIndex, tocItem.anchor});
-    finish();
   }
+  finish();
 }
 
-bool EpubReaderChapterSelectionActivity::handleButtons() {
-  if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+void EpubReaderChapterSelectionActivity::onRowEvent(const fui::ActionEvent& event, void* user) {
+  auto* self = static_cast<EpubReaderChapterSelectionActivity*>(user);
+  if (event.value < 0 || event.value >= self->getTotalItems()) return;
+  self->selectorIndex = event.value;
+  self->app.clearTapFlash();
+  self->selectChapter();
+}
+
+void EpubReaderChapterSelectionActivity::loop() {
+  const int totalItems = getTotalItems();
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+  const Rect header{safe.x, safe.y + metrics.topPadding, safe.width,
+                    TouchHeaderBackButton::height(metrics, mappedInput)};
+  if (TouchHeaderBackButton::wasTapped(mappedInput, header) ||
+      mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     ActivityResult result;
     result.isCancelled = true;
     setResult(std::move(result));
     finish();
-    return true;
+    return;
   }
 
-  if (!epub) {
-    return true;
+  if (uiReady) {
+    const fui::InputSnapshot snap = touchSnapshotFrom(mappedInput);
+    if (snap.touchPressed || snap.touchReleased) {
+      const auto event = app.route(snap);
+      if (app.invalidated()) requestUpdate();
+      if (event) return;
+    }
   }
 
-  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    activateIndex(nav.selected);
-    return true;
+  const auto swipe = mappedInput.wasSwipe();
+  if (swipe == MappedInputManager::SwipeDir::Up || swipe == MappedInputManager::SwipeDir::Down) {
+    const int delta = swipe == MappedInputManager::SwipeDir::Up ? visibleRows : -visibleRows;
+    const int next = scrollListBy(topIndex, delta, visibleRows, totalItems);
+    if (next != topIndex) {
+      topIndex = next;
+      requestUpdate();
+    }
+    return;
   }
 
-  return false;
+  const auto moveSelection = [this, totalItems](const int index) {
+    selectorIndex = index;
+    topIndex = followListSelection(selectorIndex, topIndex, visibleRows, totalItems);
+    requestUpdate();
+  };
+  buttonNavigator.onNextRelease(
+      [this, totalItems, &moveSelection] { moveSelection(ButtonNavigator::nextIndex(selectorIndex, totalItems)); });
+  buttonNavigator.onPreviousRelease(
+      [this, totalItems, &moveSelection] { moveSelection(ButtonNavigator::previousIndex(selectorIndex, totalItems)); });
+  buttonNavigator.onNextContinuous([this, totalItems, &moveSelection] {
+    moveSelection(ButtonNavigator::nextPageIndex(selectorIndex, totalItems, visibleRows));
+  });
+  buttonNavigator.onPreviousContinuous([this, totalItems, &moveSelection] {
+    moveSelection(ButtonNavigator::previousPageIndex(selectorIndex, totalItems, visibleRows));
+  });
+
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) selectChapter();
 }
 
-void EpubReaderChapterSelectionActivity::buildScreen(UiScreen& screen) {
+void EpubReaderChapterSelectionActivity::chapterScreen(UiApp::ScreenType& screen, void* user) {
+  static_cast<EpubReaderChapterSelectionActivity*>(user)->buildChapterScreen(screen);
+}
+
+void EpubReaderChapterSelectionActivity::buildChapterScreen(UiApp::ScreenType& screen) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  // Content: the safe area minus the header band drawChrome paints the title in.
-  screen.setContentMarginFromScreen(fui::Insets{
-      static_cast<int16_t>(safe.y + metrics.topPadding + metrics.headerHeight),
-      static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
-      static_cast<int16_t>(renderer.getScreenHeight() - (safe.y + safe.height)), static_cast<int16_t>(safe.x)});
+  screen.setContentMargin(fui::Insets{
+      static_cast<int16_t>(safe.y + metrics.topPadding + TouchHeaderBackButton::height(metrics, mappedInput)),
+      static_cast<int16_t>(renderer.getScreenWidth() - safe.x - safe.width),
+      static_cast<int16_t>(renderer.getScreenHeight() - safe.y - safe.height), static_cast<int16_t>(safe.x)});
   screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
 
-  if (!epub) {
-    return;
-  }
-  if (listCount() == 0) {
-    screen.centeredText(tr(STR_NO_CHAPTERS), screen.theme().bodyText);
-    return;
+  const int totalItems = getTotalItems();
+  fui::ListProps props;
+  props.labelText = screen.theme().bodyText;
+  const auto rows = configureUiList(props, screen.theme(), screen.body());
+  visibleRows = rows > 0 ? rows : 1;
+  topIndex = initialViewportPending ? followListSelection(selectorIndex, 0, visibleRows, totalItems)
+                                    : scrollListBy(topIndex, 0, visibleRows, totalItems);
+  initialViewportPending = false;
+
+  const size_t drawCount =
+      std::min({static_cast<size_t>(visibleRows), CHAPTER_WINDOW_SIZE, static_cast<size_t>(totalItems - topIndex)});
+  for (size_t i = 0; i < drawCount; ++i) {
+    const auto item = epub->getTocItem(topIndex + static_cast<int>(i));
+    const size_t indent = item.level > 0 ? static_cast<size_t>(item.level - 1) * 2 : 0;
+    labelWindow[i].assign(indent, ' ');
+    labelWindow[i] += item.title;
+    itemWindow[i] = fui::ListItem{};
+    itemWindow[i].label = labelWindow[i].c_str();
+    itemWindow[i].actionValue = static_cast<int16_t>(topIndex + static_cast<int>(i));
   }
 
-  fui::ListProps props;
-  props.count = static_cast<uint16_t>(listCount());
+  props.items = itemWindow.data();
+  props.count = static_cast<uint16_t>(drawCount);
+  props.selectedIndex = static_cast<int16_t>(selectorIndex - topIndex);
   props.action = ACTION_ROW;
-  props.inputMask = fui::InputTouch;  // physical buttons stay in loop()
-  syncListViewport(screen, props);
-  // Materialize the row window for the final viewport (syncListViewport just
-  // applied follow/clamping to nav.top) and hand list() the window with its
-  // absolute base index.
-  refreshTocWindow(nav.top);
-  props.items = windowItems;
-  props.itemsWindowFirst = static_cast<uint16_t>(windowStart);
+  props.inputMask = fui::InputTouch;
+  props.topIndex = 0;
   screen.list(props);
+  fui::drawListScrollIndicator(screen.target(), screen.body(), static_cast<size_t>(totalItems), visibleRows, topIndex,
+                               screen.theme().listScrollWidth, screen.theme().listScrollSide,
+                               screen.theme().listScrollInset);
 }
 
-void EpubReaderChapterSelectionActivity::drawChrome() {
-  GUI.drawHeader(renderer, UITheme::getInstance().getHeaderRect(renderer, true, false), tr(STR_SELECT_CHAPTER));
+void EpubReaderChapterSelectionActivity::render(RenderLock&&) {
+  renderer.clearScreen();
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+  const Rect header{safe.x, safe.y + metrics.topPadding, safe.width,
+                    TouchHeaderBackButton::height(metrics, mappedInput)};
+  if (mappedInput.hasTouchHardware()) {
+    TouchHeaderBackButton::draw(renderer, uiTarget, header, tr(STR_SELECT_CHAPTER), true);
+  } else {
+    GUI.drawHeader(renderer, header, tr(STR_SELECT_CHAPTER), nullptr, true);
+  }
+  uiReady = false;
+  app.render();
+  uiReady = true;
+  const auto labels =
+      mappedInput.mapLabels(mappedInput.withBackArrow(tr(STR_BACK)), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4, true);
+  renderer.displayBuffer();
 }

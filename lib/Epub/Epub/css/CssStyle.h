@@ -115,6 +115,7 @@ struct CssPropertyFlags {
   uint16_t floatLeft : 1;
   uint16_t initialLetter : 1;
   uint16_t whiteSpace : 1;
+  uint16_t backgroundBlack : 1;
 
   CssPropertyFlags()
       : textAlign(0),
@@ -147,21 +148,21 @@ struct CssPropertyFlags {
         shaded(0),
         floatLeft(0),
         initialLetter(0),
-        whiteSpace(0) {}
+        whiteSpace(0), backgroundBlack(0) {}
 
   [[nodiscard]] bool anySet() const {
     return textAlign || fontStyle || fontWeight || textDecoration || textIndent || marginTop || marginBottom ||
            marginLeft || marginRight || paddingTop || paddingBottom || paddingLeft || paddingRight || imageHeight ||
            imageWidth || display || direction || verticalAlign || listStyleType || fontSize || smallCaps ||
            pageBreakBefore || pageBreakAfter || borderTop || borderRight || borderBottom || borderLeft || shaded ||
-           floatLeft || initialLetter || whiteSpace;
+           floatLeft || initialLetter || whiteSpace || backgroundBlack;
   }
 };
 
-// Cache serializes defined flags as uint32_t with bit indices 0..30.
+// Cache serializes defined flags as uint32_t with bit indices 0..31.
 static_assert(sizeof(CssPropertyFlags) <= sizeof(uint32_t),
               "CssPropertyFlags exceeds 32 bits; update cache read/write in CssParser.cpp");
-static_assert(sizeof(CssPropertyFlags) * 8 >= 31,
+static_assert(sizeof(CssPropertyFlags) * 8 >= 32,
               "CssPropertyFlags has fewer bits than properties; update bitfield widths");
 
 // Represents a collection of CSS style properties
@@ -195,6 +196,7 @@ struct CssStyle {
   CssBorderSide borderTop, borderRight, borderBottom, borderLeft;
   uint8_t borderWidthsDefined = 0;  // one bit per side, top/right/bottom/left
   uint8_t borderStylesDefined = 0;
+  bool backgroundBlack = false;  // Owner dark-image background contract
   bool shaded = false;        // light background-color, drawn as a gray fill
   bool floatLeft = false;     // float: left (marks drop-cap spans and ::first-letter rules)
   uint8_t initialLetter = 0;  // initial-letter: lines a drop cap spans, 0 = normal
@@ -320,6 +322,10 @@ struct CssStyle {
       applyBorder(borderLeft, base.borderLeft, 8);
       defined.borderLeft = 1;
     }
+    if (base.defined.backgroundBlack) {
+      backgroundBlack = base.backgroundBlack;
+      defined.backgroundBlack = 1;
+    }
     if (base.defined.shaded) {
       shaded = base.shaded;
       defined.shaded = 1;
@@ -353,6 +359,7 @@ struct CssStyle {
   [[nodiscard]] bool hasPaddingRight() const { return defined.paddingRight; }
   [[nodiscard]] bool hasImageHeight() const { return defined.imageHeight; }
   [[nodiscard]] bool hasImageWidth() const { return defined.imageWidth; }
+  [[nodiscard]] bool hasBackgroundBlack() const { return defined.backgroundBlack; }
   [[nodiscard]] bool hasDisplay() const { return defined.display; }
   [[nodiscard]] bool hasDirection() const { return defined.direction; }
   [[nodiscard]] bool hasVerticalAlign() const { return defined.verticalAlign; }

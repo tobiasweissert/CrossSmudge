@@ -1,6 +1,7 @@
 add_executable(FsHelpersTest
   FsHelpersTest.cpp
   ${REPO_ROOT}/lib/FsHelpers/FsHelpers.cpp
+  ${REPO_ROOT}/lib/FsHelpers/NaturalSort.cpp
   ${REPO_ROOT}/lib/Utf8/Utf8.cpp
 )
 

@@ -1,0 +1,7 @@
+local M=dofile('core.lua');local read=smudge.read_file;local saves={};smudge.read_file=function(path,n,o)if saves[path]then return saves[path]:sub((o or 0)+1,(o or 0)+n)end;if path:match('%.dat$')then return nil end;return read(path,n,o)end;smudge.write_file=function(path,v)saves[path]=v;return true end
+local app=dofile('main.lua');on_init();on_draw();on_button('confirm',true);on_draw();local function tap(p,hold)local l=app.layout();local x=l.x+(p-1)%8*l.cell+l.cell//2;local y=l.y+(p-1)//8*l.cell+l.cell//2;if hold then on_long_press(x,y)else on_touch(x,y,'tap')end end
+tap(1);on_draw();local at
+for p,v in ipairs(app.state().b)do if v&2~=0 and M.adjacent(app.state(),p,1)>0 then local r,c=(p-1)//8,(p-1)%8;for dy=-1,1 do for dx=-1,1 do local rr,cc=r+dy,c+dx;if rr>=0 and rr<10 and cc>=0 and cc<8 then local q=rr*8+cc+1;local n=app.state().b[q];if n&3==0 then at=p end end end end;if at then break end end end
+assert(at);local r,c=(at-1)//8,(at-1)%8
+for dy=-1,1 do for dx=-1,1 do local rr,cc=r+dy,c+dx;if rr>=0 and rr<10 and cc>=0 and cc<8 then local q=rr*8+cc+1;if app.state().b[q]&5==1 then tap(q,true)end end end end
+local before=M.encode(app.state());tap(at);on_draw();assert(app.state().status~=3 and M.encode(app.state())~=before,'actual chord did not reveal safe neighbors');capture('chord.pgm');on_exit();local saved=M.encode(app.state());app=dofile('main.lua');on_init();on_draw();assert(M.encode(app.state())==saved);on_exit()

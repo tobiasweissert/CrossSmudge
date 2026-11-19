@@ -1,6 +1,12 @@
+> **Experimental migration candidate — not release-ready.** Crosscub remains Sticky-only.
+> This branch uses pinned CrossPoint develop directly, selectively adopts CrossInk,
+> and preserves Crosscub behavior. Stable Crosscub **1.6.5.5 is unchanged**.
+> Source/host checks do not establish a complete firmware build or device acceptance.
+> See [the feature and readiness ledger](../SCOPE.md).
+
 # Web Server Guide
 
-This guide explains how to use CrossPoint Reader's built-in web server for file
+This guide explains how to use Crosscub's built-in web server for file
 transfer, device settings, Wi-Fi/OPDS management, and SD-card font management.
 
 ## Overview
@@ -23,11 +29,11 @@ networks or in hotspot mode when you control who is connected.
 1. From the Home screen, select **File Transfer**.
 2. Choose one of the available modes:
 
-| Mode | Use when |
-|------|----------|
-| **Join Network** | You want the reader to join an existing Wi-Fi network. |
+| Mode                 | Use when                                                               |
+| -------------------- | ---------------------------------------------------------------------- |
+| **Join Network**     | You want the reader to join an existing Wi-Fi network.                 |
 | **Calibre Wireless** | You want to receive books from the CrossPoint Calibre plugin workflow. |
-| **Create Hotspot** | You want the reader to create its own open Wi-Fi network. |
+| **Create Hotspot**   | You want the reader to create its own open Wi-Fi network.              |
 
 ## Join Network Mode
 
@@ -92,6 +98,7 @@ The File Manager page can:
 
 - Browse SD-card folders
 - Upload files, using WebSocket upload when available and HTTP upload as a fallback
+- Optimize EPUB files before upload
 - Create folders
 - Download files
 - Rename files
@@ -104,6 +111,23 @@ Uploads do not replace a file that has the same name: the upload fails with
 `POST /upload?overwrite=1` (see `webserver-endpoints.md`). When EPUB files are
 replaced, moved, renamed, or deleted through the web server, the matching book
 cache is cleared so stale metadata is not reused.
+
+#### EPUB Optimization
+
+When uploading an EPUB, the upload dialog can optimize the file in the browser
+before sending it to the reader. This is useful for image-heavy books that are
+too large or memory-sensitive for the device.
+
+The default optimization path converts images for e-ink reading, limits them to
+the target device size, saves them as JPEG at 85% quality, and applies basic EPUB
+repairs such as safer SVG handling. Advanced Mode lets you pick the target
+device, JPEG quality, image split or rotation handling, split overlap, and
+whether large EPUB sections should be split into smaller reader sections.
+
+Optimization changes the EPUB file contents before upload. Note: if you use
+hash-based KOReader sync, this will break the syncing because it changes the epub
+and therefore the hash. Use filename based syncing to ensure compatibility.
+If optimization fails, the uploader falls back to sending the original file.
 
 ### Settings
 
@@ -124,7 +148,7 @@ Choose the folder that contains one font family; the picker selects folders,
 not single files. The server validates the font family name, filename, and
 font magic bytes before accepting the upload.
 
-Installed fonts appear in **Settings > Reader > Font Family** after the font
+Installed fonts appear in **Settings > Reader > Font Options > Font Family** after the font
 registry refreshes.
 
 On devices with external RAM enabled in CrossPoint, you can use TTF/OTF/TTC
@@ -165,9 +189,14 @@ Endpoint details are documented in [webserver-endpoints.md](./webserver-endpoint
 4. Upload custom fonts through the Fonts page or copy them to `/.fonts/` or `/fonts/` on the SD card.
 5. Exit File Transfer mode when finished to conserve battery.
 
-## Related Documentation
+## Crosscub security and migration limits
 
-- [User Guide](../USER_GUIDE.md)
-- [Webserver Endpoints](./webserver-endpoints.md)
-- [SD Card Fonts](./sd-card-fonts.md)
-- [Troubleshooting](./troubleshooting.md)
+Applications and Browser remain alongside upstream plugins; plugins do not replace
+Lua/API7. Credential-store denial applies independently of Show Hidden Files,
+including canonical/FAT aliases and temp/backup siblings. Never expose Wi-Fi,
+OPDS, Sync, plugin tokens or protected-content passphrases via Files/WebDAV.
+Retaining `/api/fetch`, relay, plugin-job/filesystem and protected-content routes
+is not TLS/SSRF acceptance. Plugin sleep networking is default-off until its own
+transport is verified. Browser keyless transport/cancellation is a separate contract.
+Overwrite/resume/recovery and durable file-metadata transactions remain release gates;
+negative FAT acknowledgement retains recovery roots and blocks destructive retries.

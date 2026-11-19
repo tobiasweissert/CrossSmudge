@@ -5,10 +5,11 @@
 #include <memory>
 #include <optional>
 
+#include "KOReaderCredentialStore.h"
 #include "KOReaderSyncClient.h"
 #include "ProgressMapper.h"
 #include "activities/Activity.h"
-#include "components/UiAppHost.h"
+#include "activities/ScreenTransitionRefresh.h"
 
 /**
  * Activity for syncing reading progress with KOReader sync server.
@@ -20,17 +21,45 @@
  * 4. Show comparison and options (Apply/Upload)
  * 5. Apply or upload progress
  */
-class KOReaderSyncActivity final : public Activity, private UiAppHost {
+class KOReaderSyncActivity final : public Activity {
  public:
-  explicit KOReaderSyncActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& epubPath,
-                                CrossPointPosition localPosition, SavedProgressPosition localKoPos,
-                                std::string localChapterName, const bool pluginEventsOnly = false);
+  static constexpr const char* NAME = "KOReaderSync";
+
+  explicit KOReaderSyncActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const uint8_t readerOrientation)
+      : Activity(NAME, renderer, mappedInput),
+        currentSpineIndex(0),
+        currentPage(0),
+        totalPagesInSpine(1),
+        primaryMatchMethod(DocumentMatchMethod::FILENAME),
+        remoteMatchMethod(DocumentMatchMethod::FILENAME),
+        remoteProgress{},
+        remotePosition{},
+        localProgress{},
+        restartBeforeNetwork(true),
+        readerOrientation(readerOrientation) {}
+
+  explicit KOReaderSyncActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string epubPath,
+                                DocumentMatchMethod matchMethod, const uint8_t readerOrientation)
+      : Activity(NAME, renderer, mappedInput),
+        epubPath(std::move(epubPath)),
+        currentSpineIndex(0),
+        currentPage(0),
+        totalPagesInSpine(1),
+        primaryMatchMethod(matchMethod),
+        remoteMatchMethod(matchMethod),
+        remoteProgress{},
+        remotePosition{},
+        localProgress{},
+        localProgressDeferred(true),
+        readerOrientation(readerOrientation) {}
 
   void onEnter() override;
   void onExit() override;
   void loop() override;
   void render(RenderLock&&) override;
   bool preventAutoSleep() override { return state == CONNECTING || state == SYNCING || state == UPLOADING; }
+  bool isReaderActivity() const override { return true; }
+  bool allowPowerAsConfirmInReaderMode() const override { return true; }
 
  private:
   enum State {
@@ -49,9 +78,15 @@ class KOReaderSyncActivity final : public Activity, private UiAppHost {
   std::shared_ptr<Epub> epub;  // null until lazy-loaded after TLS in performSync()
   std::string epubPath;
   std::string localChapterName;
-  CrossPointPosition localPosition;
+  int currentSpineIndex;
+  int currentPage;
+  int totalPagesInSpine;
+  std::optional<uint16_t> currentParagraphIndex;
+  DocumentMatchMethod primaryMatchMethod;
+  DocumentMatchMethod remoteMatchMethod;
 
   State state = WIFI_SELECTION;
+  ScreenTransitionRefresh screenTransitionRefresh;
   std::string statusMessage;
   std::string documentHash;
 
@@ -60,8 +95,14 @@ class KOReaderSyncActivity final : public Activity, private UiAppHost {
   KOReaderProgress remoteProgress;
   CrossPointPosition remotePosition;
 
-  // Local progress as KOReader format (pre-computed before Epub was released)
-  SavedProgressPosition localProgress;
+  // Loaded from saved reader progress after the remote TLS probe completes.
+  KOReaderPosition localProgress;
+  bool localProgressDeferred = false;
+  bool restartBeforeNetwork = false;
+  // The reader can use a book-specific orientation that its teardown restores
+  // before this activity gets control. Keep that one value through the
+  // lightweight network reboot so every sync screen matches the book.
+  uint8_t readerOrientation = CrossPointSettings::ORIENTATION_COUNT;
 
   // Selection in result screen (0=Apply, 1=Upload)
   int selectedOption = 0;
@@ -75,29 +116,18 @@ class KOReaderSyncActivity final : public Activity, private UiAppHost {
   // WiFi.getMode() because performUpload() calls esp_wifi_stop() on the way out,
   // which makes WiFi.getMode() return WIFI_MODE_NULL.
   bool wifiActivated = false;
-
-  // Reuses the KOReader WiFi connect/drain/return flow without a server: flush
-  // plugged-outbox events instead of syncing progress.
-  bool pluginEventsOnly = false;
+  bool lockInitialConfirmRelease = false;
+  bool touchOverrideActive = false;
 
   void onWifiSelectionComplete(bool success);
   void performSync();
   void performUpload();
+  bool consumeInitialConfirmRelease();
   bool smartSyncEnabled() const;
   void markAutoReturn();
   void completeAlreadySynced();
   void ensureEpubLoaded();
-  void saveProgressAndReturn(int spineIndex, int page);
+  bool ensureLocalProgressLoaded();
+  void saveProgressAndReturn(const CrossPointPosition& position);
   void returnToReader();
-
-  // The UiAppHost app hosts the interactive states (SHOWING_RESULT compare
-  // rows and the NO_REMOTE_PROGRESS upload prompt) so they get themed
-  // rows/buttons and tap-flash; the header stays on GUI.drawHeader for the
-  // battery indicator and the purely-informational states keep their raw
-  // centered text.
-  static void resultScreen(UiScreen& screen, void* user);
-  static void onResultRow(const freeink::ui::ActionEvent& event, void* user);
-  void buildResultScreen(UiScreen& screen);
-  void chooseResultOption();
-  void startUpload();
 };

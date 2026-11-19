@@ -5,11 +5,11 @@
 #include <HalStorage.h>
 #include <Logging.h>
 #include <Memory.h>
+#include <MemoryBudget.h>
 #include <PNGdec.h>
 
 #include <algorithm>
 #include <cstdlib>
-#include <memory>
 #include <new>
 
 #include "DirectPixelWriter.h"
@@ -20,7 +20,7 @@ namespace {
 
 // Context struct passed through PNGdec callbacks to avoid global mutable state.
 // The draw callback receives this via pDraw->pUser (set by png.decode()).
-// The file I/O callbacks receive the HalFile* via pFile->fHandle (set by pngOpen()).
+// The file I/O callbacks receive the FsFile* via pFile->fHandle (set by pngOpen()).
 struct PngContext {
   PNG* decoder{nullptr};
   GfxRenderer* renderer{nullptr};
@@ -47,20 +47,24 @@ struct PngContext {
   uint32_t lastYieldMs{0};  // throttle state for yieldDuringDecode()
 };
 
-// File I/O callbacks use pFile->fHandle to access the HalFile*,
+// File I/O callbacks use pFile->fHandle to access the FsFile*,
 // avoiding the need for global file state.
 void* pngOpenWithHandle(const char* filename, int32_t* size) {
-  HalFile* f = new HalFile();
+  if (ImageToFramebufferDecoder::cancelled()) return nullptr;
+  auto f = makeUniqueNoThrow<FsFile>();
+  if (!f) {
+    LOG_ERR("PNG", "OOM: PNG file handle (%u free, %u max alloc)", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+    return nullptr;
+  }
   if (!Storage.openFileForRead("PNG", std::string(filename), *f)) {
-    delete f;
     return nullptr;
   }
   *size = f->size();
-  return f;
+  return f.release();  // PNGdec owns this handle until pngCloseWithHandle deletes it.
 }
 
 void pngCloseWithHandle(void* handle) {
-  HalFile* f = reinterpret_cast<HalFile*>(handle);
+  FsFile* f = reinterpret_cast<FsFile*>(handle);
   if (f) {
     f->close();
     delete f;
@@ -68,14 +72,14 @@ void pngCloseWithHandle(void* handle) {
 }
 
 int32_t pngReadWithHandle(PNGFILE* pFile, uint8_t* pBuf, int32_t len) {
-  HalFile* f = reinterpret_cast<HalFile*>(pFile->fHandle);
-  if (!f) return 0;
+  FsFile* f = reinterpret_cast<FsFile*>(pFile->fHandle);
+  if (!f || ImageToFramebufferDecoder::cancelled()) return 0;
   return f->read(pBuf, len);
 }
 
 int32_t pngSeekWithHandle(PNGFILE* pFile, int32_t pos) {
-  HalFile* f = reinterpret_cast<HalFile*>(pFile->fHandle);
-  if (!f) return -1;
+  FsFile* f = reinterpret_cast<FsFile*>(pFile->fHandle);
+  if (!f || ImageToFramebufferDecoder::cancelled()) return -1;
   return f->seek(pos);
 }
 
@@ -83,8 +87,7 @@ int32_t pngSeekWithHandle(PNGFILE* pFile, int32_t pos) {
 // We heap-allocate it on demand rather than using a static instance, so this memory
 // is only consumed while actually decoding/querying PNG images. This is critical on
 // the ESP32-C3 where total RAM is ~320 KB.
-constexpr size_t PNG_DECODER_APPROX_SIZE = 44 * 1024;                          // ~42 KB + overhead
-constexpr size_t MIN_FREE_HEAP_FOR_PNG = PNG_DECODER_APPROX_SIZE + 16 * 1024;  // decoder + 16 KB headroom
+constexpr uint32_t PNG_DECODER_APPROX_SIZE = 44U * 1024U;  // ~42 KB + overhead
 
 // PNGdec keeps TWO scanlines in its internal ucPixels buffer (current + previous)
 // and each scanline includes a leading filter byte.
@@ -214,7 +217,9 @@ void convertLineToGray(const uint8_t* pPixels, uint8_t* grayLine, int width, int
 
 int pngDrawCallback(PNGDRAW* pDraw) {
   PngContext* ctx = reinterpret_cast<PngContext*>(pDraw->pUser);
-  if (!ctx || !ctx->config || !ctx->renderer || !ctx->grayLineBuffer) return 0;
+  if (ImageToFramebufferDecoder::cancelled() || !ctx || !ctx->config || (!ctx->renderer && !ctx->config->cacheOnly) ||
+      !ctx->grayLineBuffer)
+    return 0;
 
   ImageToFramebufferDecoder::yieldDuringDecode(ctx->lastYieldMs);
 
@@ -251,13 +256,13 @@ int pngDrawCallback(PNGDRAW* pDraw) {
   bool useDithering = ctx->config->useDithering;
 
   // Pre-compute orientation and render-mode state once per callback.
-  DirectPixelWriter pw;
-  pw.init(*ctx->renderer);
+  DirectPixelWriter pw{};
+  if (ctx->renderer) pw.init(*ctx->renderer);
 
   for (int dstY = firstDstY; dstY < endDstY; dstY++) {
     ctx->lastDstY = dstY;
     int outY = ctx->config->y + dstY;
-    if (outY >= ctx->screenHeight) continue;
+    if (outY < 0 || outY >= ctx->screenHeight) continue;
 
     pw.beginRow(outY);
 
@@ -282,14 +287,15 @@ int pngDrawCallback(PNGDRAW* pDraw) {
 
     for (int dstX = 0; dstX < dstWidth; dstX++) {
       int outX = outXBase + dstX;
-      if (outX < screenWidth) {
+      if (outX >= 0 && outX < screenWidth) {
         const uint8_t alpha = ctx->alphaLineBuffer ? ctx->alphaLineBuffer[srcX] : 255;
         if (alpha >= 8 && alpha > alphaThreshold4x4(outX, outY)) {
           uint8_t gray = ctx->grayLineBuffer[srcX];
 
           uint8_t ditheredGray;
           if (useDithering) {
-            ditheredGray = applyBayerDither4Level(gray, outX, outY);
+            ditheredGray = ctx->config->useMonochromeDither ? applyBayerDither1Bit(gray, outX, outY)
+                                                         : applyBayerDither4Level(gray, outX, outY);
           } else {
             ditheredGray = gray >> 6;
           }
@@ -313,9 +319,7 @@ int pngDrawCallback(PNGDRAW* pDraw) {
 }  // namespace
 
 bool PngToFramebufferConverter::getDimensionsStatic(const std::string& imagePath, ImageDimensions& out) {
-  size_t freeHeap = ESP.getFreeHeap();
-  if (freeHeap < MIN_FREE_HEAP_FOR_PNG) {
-    LOG_ERR("PNG", "Not enough heap for PNG decoder (%u free, need %u)", freeHeap, MIN_FREE_HEAP_FOR_PNG);
+  if (!MemoryBudget::hasHeapForImageDecoder("PNG", "PNG", PNG_DECODER_APPROX_SIZE)) {
     return false;
   }
 
@@ -327,23 +331,24 @@ bool PngToFramebufferConverter::getDimensionsStatic(const std::string& imagePath
 
   int rc = png->open(imagePath.c_str(), pngOpenWithHandle, pngCloseWithHandle, pngReadWithHandle, pngSeekWithHandle,
                      nullptr);
-  const ScopedCleanup cleanup{[&png]() { png->close(); }};
 
   if (rc != 0) {
     LOG_ERR("PNG", "Failed to open PNG for dimensions: %d", rc);
     return false;
   }
 
+  const auto closePng = ScopedCleanup{[&png] { png->close(); }};
   return validateAndStoreDimensions(png->getWidth(), png->getHeight(), out, "PNG");
 }
 
 bool PngToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath, GfxRenderer& renderer,
                                                     const RenderConfig& config) {
-  LOG_DBG("PNG", "Decoding PNG: %s", imagePath.c_str());
-
-  size_t freeHeap = ESP.getFreeHeap();
-  if (freeHeap < MIN_FREE_HEAP_FOR_PNG) {
-    LOG_ERR("PNG", "Not enough heap for PNG decoder (%u free, need %u)", freeHeap, MIN_FREE_HEAP_FOR_PNG);
+  return decode(imagePath, &renderer, config);
+}
+bool PngToFramebufferConverter::decode(const std::string& imagePath, GfxRenderer* renderer,
+                                       const RenderConfig& config) {
+  if (ImageToFramebufferDecoder::cancelled() || (!renderer && !config.cacheOnly)) return false;
+  if (!MemoryBudget::hasHeapForImageDecoder("PNG", "PNG", PNG_DECODER_APPROX_SIZE)) {
     return false;
   }
 
@@ -356,19 +361,19 @@ bool PngToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath
 
   PngContext ctx;
   ctx.decoder = png.get();
-  ctx.renderer = &renderer;
+  ctx.renderer = renderer;
   ctx.config = &config;
-  ctx.screenWidth = renderer.getScreenWidth();
-  ctx.screenHeight = renderer.getScreenHeight();
+  ctx.screenWidth = renderer ? renderer->getScreenWidth() : config.maxWidth;
+  ctx.screenHeight = renderer ? renderer->getScreenHeight() : config.maxHeight;
 
   int rc = png->open(imagePath.c_str(), pngOpenWithHandle, pngCloseWithHandle, pngReadWithHandle, pngSeekWithHandle,
                      pngDrawCallback);
-  const ScopedCleanup cleanup{[&png]() { png->close(); }};
   if (rc != PNG_SUCCESS) {
     LOG_ERR("PNG", "Failed to open PNG: %d", rc);
     return false;
   }
 
+  const auto closePng = ScopedCleanup{[&png] { png->close(); }};
   ImageDimensions sourceDimensions;
   if (!validateAndStoreDimensions(png->getWidth(), png->getHeight(), sourceDimensions, "PNG")) return false;
 
@@ -399,6 +404,7 @@ bool PngToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath
     ctx.dstWidth = (int)(ctx.visibleWidth * ctx.scale);
     ctx.dstHeight = (int)(ctx.visibleHeight * ctx.scale);
   }
+  if (ctx.dstWidth <= 0 || ctx.dstHeight <= 0) return false;
   ctx.lastDstY = -1;  // Reset row tracking
 
   const int pixelType = png->getPixelType();
@@ -454,34 +460,33 @@ bool PngToFramebufferConverter::decodeToFramebuffer(const std::string& imagePath
   // re-decode on every one of an image page's ~14 render passes.
   ctx.caching = !config.preserveAlpha && !config.cachePath.empty();
   if (ctx.caching) {
-    if (!ctx.cache.begin(config.cachePath, ctx.dstWidth, ctx.dstHeight, config.x, config.y, 1)) {
+    if (!ctx.cache.begin(config.cachePath, ctx.dstWidth, ctx.dstHeight, config.x, config.y, 1,
+                         config.cacheOnly ? ImageToFramebufferDecoder::cancelled : nullptr)) {
       LOG_ERR("PNG", "Failed to start cache stream, continuing without caching");
       ctx.caching = false;
     }
   }
 
-  unsigned long decodeStart = millis();
-  ctx.lastYieldMs = decodeStart;
+  ctx.lastYieldMs = millis();
   rc = png->decode(&ctx, 0);
-  unsigned long decodeTime = millis() - decodeStart;
 
   ctx.grayLineBuffer = nullptr;
   ctx.alphaLineBuffer = nullptr;
 
-  if (rc != PNG_SUCCESS) {
+  if (rc != PNG_SUCCESS || ImageToFramebufferDecoder::cancelled()) {
     LOG_ERR("PNG", "Decode failed: %d", rc);
     if (ctx.caching) ctx.cache.abort();
     return false;
   }
 
-  LOG_DBG("PNG", "PNG decoding complete - render time: %lu ms", decodeTime);
 
   // Finalize the streamed cache (caching may have been cleared on a flush error).
   if (ctx.caching) {
-    ctx.cache.finalize();
+    bool saved = ctx.cache.finalize();
+    if (config.cacheOnly && !saved) return false;
   }
 
-  return true;
+  return !config.cacheOnly || ctx.caching;
 }
 
 bool PngToFramebufferConverter::supportsFormat(const std::string& extension) {

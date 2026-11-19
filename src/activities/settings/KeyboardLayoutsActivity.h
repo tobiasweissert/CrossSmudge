@@ -1,31 +1,41 @@
 #pragma once
 
-#include <GfxRenderer.h>
+#include <FreeInkApp.h>
+#include <FreeInkUIGfxRenderer.h>
 
-#include "activities/UiListActivity.h"
+#include <atomic>
+
+#include "activities/Activity.h"
 #include "activities/util/KeyboardLayoutSet.h"
+#include "util/ButtonNavigator.h"
 
-class MappedInputManager;
+class KeyboardLayoutsActivity final : public Activity {
+  using UiApp = freeink::ui::FreeInkApp<16, 4>;
 
-class KeyboardLayoutsActivity final : public UiListActivity {
  public:
-  explicit KeyboardLayoutsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-      : UiListActivity("KeyboardLayouts", renderer, mappedInput) {}
+  KeyboardLayoutsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
   void onEnter() override;
   void onExit() override;
+  void loop() override;
+  void render(RenderLock&&) override;
 
  private:
-  int listCount() const override { return keyboard_layouts::COUNT; }
-  void buildScreen(UiScreen& screen) override;
-  void activateIndex(int index) override;
-  const char* headerTitle() const override;
+  ButtonNavigator buttonNavigator;
+  int selectedIndex = 0;
+  uint16_t workingMask = 0;
+  bool edited = false;
 
-  bool isLocked(uint8_t i) const;
-
+  freeink::ui::GfxRendererTarget uiTarget;
+  UiApp app;
+  std::atomic<bool> uiReady{false};
+  int visibleRows = 1;
+  int topIndex = 0;
   freeink::ui::ListItem rowItems[keyboard_layouts::COUNT]{};
 
-  uint16_t workingMask = 0;
-  // Do not persist a derived default merely because the screen was visited.
-  bool edited = false;
+  bool isLocked(uint8_t index) const;
+  void toggleSelected();
+  static void listScreen(UiApp::ScreenType& screen, void* user);
+  static void onRowEvent(const freeink::ui::ActionEvent& event, void* user);
+  void buildListScreen(UiApp::ScreenType& screen);
 };

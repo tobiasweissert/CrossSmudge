@@ -39,6 +39,7 @@ struct PixelCache {
   HalFile file;
   std::string cachePathStr;
   bool ok;
+  bool (*cancelled)() = nullptr;
 
   PixelCache()
       : buffer(nullptr),
@@ -60,7 +61,9 @@ struct PixelCache {
 
   // Open the cache file, write the header, and allocate a band buffer big enough
   // to hold the tallest single decode block (maxBlockDstRows output rows).
-  bool begin(const std::string& cachePath, int w, int h, int ox, int oy, int maxBlockDstRows) {
+  bool begin(const std::string& cachePath, int w, int h, int ox, int oy, int maxBlockDstRows,
+             bool (*shouldCancel)() = nullptr) {
+    cancelled = shouldCancel;
     width = w;
     height = h;
     originX = ox;
@@ -112,7 +115,6 @@ struct PixelCache {
       return false;
     }
 
-    LOG_DBG("IMG", "Cache stream started: %s (%dx%d, band %d rows)", cachePath.c_str(), w, h, bandRows);
     ok = true;
     return true;
   }
@@ -126,6 +128,10 @@ struct PixelCache {
     if (newTopRow > height) newTopRow = height;
 
     for (int r = bandStart; r < newTopRow; ++r) {
+      if (cancelled && cancelled()) {
+        abort();
+        return false;
+      }
       const int idx = r - bandStart;
       const uint8_t* rowPtr = (idx < bandRows) ? (buffer + (size_t)idx * bytesPerRow) : zeroRow;
       if (file.write(rowPtr, (size_t)bytesPerRow) != (size_t)bytesPerRow) {
@@ -148,6 +154,10 @@ struct PixelCache {
       return false;
     }
     for (int r = flushedRows; r < height; ++r) {
+      if (cancelled && cancelled()) {
+        abort();
+        return false;
+      }
       const int idx = r - bandStart;
       const uint8_t* rowPtr = (idx >= 0 && idx < bandRows) ? (buffer + (size_t)idx * bytesPerRow) : zeroRow;
       if (file.write(rowPtr, (size_t)bytesPerRow) != (size_t)bytesPerRow) {
@@ -155,6 +165,10 @@ struct PixelCache {
         abort();
         return false;
       }
+    }
+    if (!file.sync()) {
+      abort();
+      return false;
     }
     if (!file.close()) {
       LOG_ERR("IMG", "Failed to close cache: %s", cachePathStr.c_str());

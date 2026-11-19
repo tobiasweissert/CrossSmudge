@@ -1,0 +1,14 @@
+{
+  "id": "browser",
+  "name": "Browser",
+  "version": "0.3.5",
+  "author": "CrossSmudge",
+  "description": "Public keyless Assisted reader with shared capacity, Direct/Offline modes, checked saves, links and search forms. Assisted needs public-mode firmware.",
+  "entry": "main.lua",
+  "min_api": 6,
+  "network": {
+    "domains": []
+  },
+  "browser": true,
+  "requires_psram": true
+}

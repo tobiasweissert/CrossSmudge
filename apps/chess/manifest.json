@@ -1,0 +1,8 @@
+{
+  "id": "chess",
+  "name": "Chess",
+  "version": "1.1.1",
+  "author": "Mumfee",
+  "description": "CrossPlay Chess on Sticky; original game and saves unchanged on other devices",
+  "entry": "main.lua"
+}

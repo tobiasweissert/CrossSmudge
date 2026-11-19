@@ -11,12 +11,15 @@
 #include <string>
 #include <vector>
 
+#include "Epub/EpubRenderMode.h"
 #include "Epub/FootnoteEntry.h"
+#include "Epub/Page.h"
 #include "Epub/ParsedText.h"
 #include "Epub/blocks/ImageBlock.h"
 #include "Epub/blocks/TextBlock.h"
 #include "Epub/css/CssParser.h"
 #include "Epub/css/CssStyle.h"
+#include "Epub/tables/CompactTableLayout.h"
 
 class Page;
 class GfxRenderer;
@@ -30,7 +33,38 @@ class ChapterHtmlSlimParser {
   GfxRenderer& renderer;
   std::function<void(std::unique_ptr<Page>, uint16_t, uint16_t, uint32_t)> completePageFn;
   std::function<void()> popupFn;  // Popup callback
-  bool imagePopupFired = false;   // popupFn fired for the first image probe (single-shot)
+  std::function<void(std::unique_ptr<Page>, uint16_t, uint16_t, uint32_t, uint32_t)> ownerCompletePageFn;
+  bool guideReadingEnabled = false;
+  bool forceParagraphIndents = false;
+  uint8_t legacyWordSpacing = 0;
+  uint8_t nextFootnoteLinkId = 1;
+  EpubRenderMode renderMode = EpubRenderMode::CrossSmudgeDefault;
+  bool lowMemoryImageFallback = false;
+  bool attemptedTextLayoutFontCacheRelease = false;
+  bool shouldAbortForLowMemory(const char* stage);
+  bool startNewPage(const char* reason);
+  bool effectiveBackgroundBlack = false;
+  uint32_t referenceTextOffset = 0, partWordReferenceOffset = 0, currentPageReferenceOffset = 0;
+  int referenceExcludedUntilDepth = INT_MAX;
+  bool trackReferenceCharacters = false, referenceTextStarted = false, referenceWhitespacePending = false;
+  uint32_t consumeReferenceCodepoint(uint32_t codepoint);
+  std::string previewAnchor;
+  uint16_t previewMaxPages = 0;
+  bool previewAnchorFound = false, previewStopRequested = false;
+  uint32_t previewStartOrdinal = 0, previewElementOrdinal = 0;
+  void locatePreviewBlockStart();
+  bool handlePreviewScanStart(const XML_Char** atts);
+  void startPreviewAtAnchor();
+  bool isPreviewBuild() const { return !previewAnchor.empty() && previewMaxPages; }
+  bool isScanningForPreviewAnchor() const { return isPreviewBuild() && !previewAnchorFound; }
+  struct PendingInlineImage {
+    uint16_t id;
+    std::unique_ptr<ImageBlock> block;
+  };
+  std::vector<PendingInlineImage> pendingInlineImages;
+  uint16_t nextInlineImageId = 1;
+  static constexpr size_t MAX_PENDING_INLINE_IMAGES = 16;
+  bool imagePopupFired = false;  // popupFn fired for the first image probe (single-shot)
   int depth = 0;
   int skipUntilDepth = INT_MAX;
   int boldUntilDepth = INT_MAX;
@@ -73,6 +107,7 @@ class ChapterHtmlSlimParser {
   // Style tracking (replaces depth-based approach)
   struct StyleStackEntry {
     int depth = 0;
+    bool hasBackgroundBlack = false, backgroundBlack = false;
     bool hasBold = false, bold = false;
     bool hasItalic = false, italic = false;
     bool hasTextDecoration = false;
@@ -153,10 +188,33 @@ class ChapterHtmlSlimParser {
   bool canCarry(size_t carry) const;
   void breakPageCarryingLines(size_t carry, size_t paragraphLines, uint32_t visibleOffset);
   std::vector<BoxScope> boxScopes;
-  static constexpr size_t MAX_GRID_TABLE_COLUMNS = 4;
+  static constexpr size_t MAX_GRID_TABLE_COLUMNS = 8;
   // ponytail: buffer at most 160 tokens / 2 KB per row; larger rows use stacked flow.
   static constexpr size_t MAX_GRID_TABLE_ROW_WORDS = 160;
   static constexpr size_t MAX_GRID_TABLE_ROW_BYTES = 2048;
+  // Allocated only for constrained-heap tables. Source metadata is bounded alongside
+  // the collaborator's 256 tokens; no second copy of row text or rich cells is retained.
+  struct CompactSourceToken {
+    uint32_t visible, reference;
+    uint16_t length;
+    bool startsCell;
+  };
+  struct CompactCapture {
+    std::array<CompactSourceToken, 256> source{};
+    uint16_t count = 0;
+    bool nextStartsCell = true;
+    bool topSpacingApplied = false;
+  };
+  std::unique_ptr<CompactTableLayout> compactTable;
+  std::unique_ptr<CompactCapture> compactCapture;
+  bool compactTableUsed = false;
+  bool beginCompactTable(const CssStyle& css);
+  bool beginCompactRow();
+  void finishCompactRow();
+  bool splitCompactCell();
+  bool annotateCompactLine(TextBlock& line, uint16_t& token, uint16_t& consumed);
+  void emitCompactLine(std::shared_ptr<TextBlock>& line, uint16_t selection, uint16_t width,
+                       const std::vector<FootnoteEntry>& footnotes);
   int tableDepth = 0;
   bool insideTableCell = false;
   bool tableRowStacked = false;
@@ -190,6 +248,7 @@ class ChapterHtmlSlimParser {
   // bullet itself, or (list-style-type: none) emit no marker at all. Pushed on
   // <ul>/<ol> open, popped on close, so nested lists restart their own counter
   // without disturbing the parent list's.
+  uint16_t tableSelectionBase = 0;
   struct ListContext {
     bool ordered = false;    // true for <ol>, false for <ul>
     bool styleNone = false;  // true when list-style-type: none is set on this list
@@ -323,6 +382,46 @@ class ChapterHtmlSlimParser {
         imageBasePath(imageBasePath),
         tocAnchors(std::move(tocAnchors)) {}
 
+  ChapterHtmlSlimParser(
+      Epub& book, const std::string& path, GfxRenderer& renderer, int font, float compression, bool extraSpacing,
+      bool forceIndents, uint8_t alignment, uint16_t width, uint16_t height, bool hyphenation, bool focus, bool guide,
+      uint8_t wordSpacing,
+      const std::function<void(std::unique_ptr<Page>, uint16_t, uint16_t, uint32_t, uint32_t)>& callback, bool embedded,
+      const std::string& base, const std::string& images, uint8_t imageMode = 0, std::vector<std::string> anchors = {},
+      const std::function<void()>& popup = nullptr, const CssParser* css = nullptr,
+      EpubRenderMode mode = EpubRenderMode::CrossSmudgeDefault, std::string preview = {}, uint16_t maxPreviewPages = 0,
+      bool referenceCharacters = false)
+      : ChapterHtmlSlimParser(std::shared_ptr<Epub>{}, path, renderer, font, compression, extraSpacing, alignment,
+                              width, height, hyphenation, focus, {}, embedded, base, images, imageMode,
+                              std::move(anchors), popup, css) {
+    epub = std::shared_ptr<Epub>(std::shared_ptr<Epub>{}, &book);
+    ownerCompletePageFn = callback;
+    guideReadingEnabled = guide;
+    forceParagraphIndents = forceIndents;
+    paragraphIndentSpaces = forceIndents ? 2 : 0;
+    legacyWordSpacing = std::min<uint8_t>(wordSpacing, 4);
+    renderMode = mode;
+    previewAnchor = std::move(preview);
+    previewMaxPages = maxPreviewPages;
+    trackReferenceCharacters = referenceCharacters;
+  }
+  bool usedCompactTableFallback() const { return compactTableUsed; }
+  bool wasLowMemoryFallbackTriggered() const { return lowMemoryImageFallback; }
+  bool wasLowMemoryAbortTriggered() const { return layoutOom; }
+  bool imagesWereSuppressedForLowMemory() const { return lowMemoryImageFallback; }
+  bool layoutWasAbortedForLowMemory() const { return layoutOom; }
+  bool wasTruncatedForMalformedMarkup() const { return malformedMarkupTruncated; }
+  uint32_t getVisibleTextLength() const { return visibleTextOffset; }
+  uint32_t getReferenceTextLength() const { return referenceTextOffset; }
+  void releaseInputFile();
+
+ private:
+  bool malformedMarkupTruncated = false;
+  bool appendMalformedMarkupWarningPage();
+  size_t parseFileOffset_ = 0, parseFileSize_ = 0;
+  bool ensureInputFileOpen();
+
+ public:
   ~ChapterHtmlSlimParser();
   void setTextSpacing(const int8_t character, const uint8_t wordPercent) {
     characterSpacing = character;

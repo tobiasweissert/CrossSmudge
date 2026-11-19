@@ -23,8 +23,8 @@ special formatting), use the underlying logSerial object directly:
     logSerial.printf("Special case: %d\n", value);
     logSerial.write(binaryData, length);
 
-The logSerial reference (defined below) points to the real Serial object and
-won't trigger deprecation warnings.
+The logSerial reference (defined below) points to the board's physical USB
+serial transport and won't trigger deprecation warnings.
 */
 
 #ifndef LOG_LEVEL

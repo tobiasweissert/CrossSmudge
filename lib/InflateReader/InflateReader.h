@@ -78,6 +78,9 @@ class InflateReader {
   // Returns false if the stream ends before producing len bytes, or on error.
   bool read(uint8_t* dest, size_t len);
 
+  // One-shot only; caller supplies len + 1 writable bytes to detect overflow.
+  bool readExact(uint8_t* dest, size_t len);
+
  private:
   uzlib_uncomp decomp = {};
   uint8_t* ringBuffer = nullptr;  // owned contiguous ring from init(true)

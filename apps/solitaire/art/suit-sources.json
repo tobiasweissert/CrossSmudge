@@ -1,0 +1,23 @@
+{
+  "source": "src/apps_local/cards/CardSuits.h",
+  "commit": "d3a49ce8e85f9bd0d3e0c774a54adc267fd7547b",
+  "sha256": "d1f427b3a19e39e09a94de9d0031ed94448f79a73d4090315a70c4a66440ceec",
+  "assets": {
+    "spadeSolid_18": "e3d18fd523fc853be98856be1a70ff7ff6cb91abb1d002f7a1682e56c5c36a59",
+    "spadeSolid_46": "44eacaba35836d10d0571210df5a9bf68d0de8799648e2c0f96e697ad767367d",
+    "spadeOutline_18": "5fe0004fb4522cfd43657a42c2bd49b832ab61ff19842ba0c7ae7980f794193b",
+    "spadeOutline_46": "70d69c7a2528124a8a6c2fba2b604347d78a7f2930aa094952efb9e2dba8e2e1",
+    "heartSolid_18": "48c270eaf7f31da9c9d6f0f5f7d060a9e96cc4d6f86956e5fb3acafa92cb775a",
+    "heartSolid_46": "7169d9432ccf8334a96ff6ff4aacfbd54a51990a698493f518cd8f2adc770d83",
+    "heartOutline_18": "1ea9222db5a98adec6f79fefe77779347b89ede0bfc94fade0789aad5913a71b",
+    "heartOutline_46": "23292542d3ce80c94451ad8e056d9d0e8ab620cd6b4195a0f2f84d3196e09899",
+    "diamondSolid_18": "88d485fc8dd98407c15fe28b2f199933c3d1f55ede9a3e0067cd17d8fd69f1ab",
+    "diamondSolid_46": "db22a89feed421fe6c677d316384ac8c4610130a2c8613edea5e2474b0da9b27",
+    "diamondOutline_18": "337af4fc004e4ec73309300136df340b8b577250d6927349602a2e5ca6b66242",
+    "diamondOutline_46": "cebed18b4211c28954e528018066c312a9570838eb5566679cfb802db6436c2d",
+    "clubSolid_18": "be4ac9894ded5a4a62f5647548440ecb3a7f8a34876684056249e7a612dc06e7",
+    "clubSolid_46": "1ee798292234e6957cea09042425359099152e211c62af89a8f3475165ab5899",
+    "clubOutline_18": "dd65d194d88a8643866b1a8e1619b5ea88e51b1b7f0ebb3526d8be28c9d12178",
+    "clubOutline_46": "451664827888143770a90355c33756de3a6d50756bd6f2bd67e3d1e3e3bbebcc"
+  }
+}

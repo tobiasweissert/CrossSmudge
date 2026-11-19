@@ -2,18 +2,24 @@
 
 #include <FrontlightManager.h>
 
-// Thin firmware HAL over the SDK frontlight manager. It is inert on boards
-// without a frontlight, so callers do not need board-specific conditionals.
+// Thin HAL over the SDK's FrontlightManager (activities never touch SDK
+// classes directly). Inert on boards without a frontlight, so it is always
+// safe to call. State (brightness / warmth / on) is owned by the SDK manager;
+// persistence policy lives in CrossPointSettings and the frontlight panel.
 class HalFrontlight {
  public:
   static HalFrontlight& getInstance() { return instance; }
 
+  // Bring up the PWM channel(s) and apply the given persisted state.
   void begin(uint8_t brightness, uint8_t warmth, bool on);
 
   bool present() const { return manager.present(); }
   bool hasColorTemperature() const { return manager.hasColorTemperature(); }
 
+  // Brightness as 0-100 (total light on a warm/cool pair). Setting a value
+  // while off leaves the light off; it is applied on the next on().
   void setBrightness(uint8_t percent);
+  // Warm/cool mix, 0 = cool .. 100 = warm. No-op on single-channel boards.
   void setWarmth(uint8_t warmPercent);
   void setOn(bool on);
 
@@ -25,8 +31,8 @@ class HalFrontlight {
   HalFrontlight() = default;
 
   FrontlightManager manager;
-  // The SDK represents off as brightness 0. Keep the selected brightness so
-  // toggling back on restores it.
+  // The SDK manager folds "off" into brightness 0; keep the user's level and
+  // the on/off state separate so toggling restores the previous level.
   uint8_t lastBrightness = 60;
   bool lit = false;
 

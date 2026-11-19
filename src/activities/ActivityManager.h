@@ -10,15 +10,26 @@
 #include <string>
 #include <vector>
 
+#include "CrossPointSettings.h"
 #include "GfxRenderer.h"
 #include "MappedInputManager.h"
+#include "util/QuickLockTrigger.h"
 #include "settings/SettingsSection.h"
+#include "util/EdgeSlide.h"
 #include "util/ScreenshotInfo.h"
+
+#ifndef portMUX_INITIALIZER_UNLOCKED
+struct portMUX_TYPE {};
+#define portMUX_INITIALIZER_UNLOCKED \
+  {                                  \
+  }
+#endif
 
 class Activity;    // forward declaration
 class RenderLock;  // forward declaration
 
-enum class HomeMenuItem { NONE, FILE_BROWSER, LIBRARY, PLUGINS, OPDS_BROWSER, FILE_TRANSFER, SETTINGS_MENU };
+enum class RequestUpdateResult { Rendered, Rejected };
+enum class HomeMenuItem { NONE, FILE_BROWSER, RECENTS, OPDS_BROWSER, FILE_TRANSFER, SETTINGS_MENU, LIBRARY, PLUGINS };
 
 /**
  * ActivityManager
@@ -34,6 +45,7 @@ enum class HomeMenuItem { NONE, FILE_BROWSER, LIBRARY, PLUGINS, OPDS_BROWSER, FI
  * - No onPause/onResume, since we don't have a concept of background activities
  * - onActivityResult is implemented via a callback instead of a separate method, for simplicity
  */
+class ReaderActivity;
 class ActivityManager {
   friend class RenderLock;
 
@@ -49,6 +61,14 @@ class ActivityManager {
   std::unique_ptr<Activity> pendingActivity;
   enum class PendingAction { None, Push, Pop, Replace, ReplaceForSleep };
   PendingAction pendingAction = PendingAction::None;
+  // Set when an overlay is closed specifically to hand control back to the
+  // reader's menu. It must wait until the reader is current again.
+  int16_t pendingReaderMenuAction = -1;
+
+  // A one-shot Home selection to restore after Settings replaces Home. This
+  // is intentionally not persisted as recent-book order.
+  std::string preferredHomeBookPath;
+  bool returningHomeThroughSettings = false;
 
   // Task to render and display the activity
   TaskHandle_t renderTaskHandle = nullptr;
@@ -58,6 +78,7 @@ class ActivityManager {
   // Set by requestUpdateAndWait(); read and cleared by the render task after render completes.
   // Note: only one waiting task is supported at a time
   TaskHandle_t waitingTaskHandle = nullptr;
+  portMUX_TYPE renderStateMux = portMUX_INITIALIZER_UNLOCKED;
 
   // Mutex to protect rendering operations from race conditions
   // Must only be used via RenderLock
@@ -66,39 +87,60 @@ class ActivityManager {
   // Whether to trigger a render after the current loop()
   // This variable must only be set by the main loop, to avoid race conditions
   std::atomic<bool> requestedUpdate{false};
+  // A popped full-screen child leaves its pixels in the framebuffer until the
+  // restored activity renders. Partial-screen overlays must not preserve that
+  // stale child as their backdrop.
+  std::atomic<bool> restoredActivityNeedsRender{false};
 
-  // Counts screen changes, so the Bluetooth page turner can tell one visit of a book from the next.
-  // Written by the main loop under RenderLock; the render task captures it under that lock.
-  uint32_t screenVisit = 0;
-  // The screen visit whose frame the render task painted last.
+  uint32_t screenVisit = 1;
   std::atomic<uint32_t> paintedVisit{0};
+  bool inputLocked = false;
+  bool radioInputAllowed = false;
+  bool handleEdgeSlide();
+  Activity* findEpubReader() const;
+  bool handleGlobalHomeGesture();
+  bool restoreBackdropBehindCurrentOverlay();
 
  public:
   explicit ActivityManager(GfxRenderer& renderer, MappedInputManager& mappedInput);
   ~ActivityManager();
 
-  void begin();
+  void begin(uint32_t renderTaskStackBytes = 16384);
   void loop();
 
   // Will replace currentActivity and drop all activities on stack
   void replaceActivity(std::unique_ptr<Activity>&& newActivity);
 
   // goTo... functions are convenient wrapper for replaceActivity()
-  void goToFileTransfer();
-  void goToJoinNetwork();  // File Transfer straight into Join Network (post heap-defrag reboot)
+  void goToFileTransfer(std::string returnBookPath = {});
+  bool goToAirDropReceive(const std::string& returnBookPath = {});
+  void returnFromAirDrop(const std::string& returnBookPath, bool homeRequested);
+  void goToCalibreWireless(const std::string& returnBookPath = {});
+  void goToJoinNetworkFileTransfer(const std::string& returnBookPath = {});
+  void goToHotspotFileTransfer(const std::string& returnBookPath = {});
   void goToUsbDrive();
-  // openSection jumps straight into one group (End = the section list).
-  void goToSettings(SettingsSection openSection = SettingsSection::End);
+  bool resumeFileTransferFromNetworkBoot(uint32_t payload);
+  void goToNearbyStatsSync();
+  bool goToNearbyBookSend(std::string path, bool returnToReader);
+  void goToNearbyBookReceive();
+  void goToSettings(bool dismissOnUpSwipe = false);
   void goToFileBrowser(std::string path = {});
+  void goToRecentBooks();
   void goToLibrary();
-  void goToBrowser();
   void goToPlugins();
-  void goToReader(std::string path, bool allowFastInitialRefresh = false);
+  void goToJoinNetwork();
+  void goToSettings(SettingsSection section);
+  void goToBrowser();
+  bool goToOpdsServer(uint32_t serverIndex, bool networkBootReady = false);
+  void goToReader(std::string path, bool suppressBackRelease = false, bool allowFastInitialRefresh = false,
+                  bool cleanImageBaseOnEntry = false);
+  void goToReaderAndRunMenuAction(std::string path, uint8_t action);
   void goToSleep(bool fromTimeout = false);
   void goToBoot();
   void goToFullScreenMessage(std::string message, EpdFontFamily::Style style = EpdFontFamily::REGULAR);
   void goToCrashReport();
-  void goHome(HomeMenuItem initialMenuItem = HomeMenuItem::NONE, bool cleanInitialRefresh = false);
+  void goHome(HomeMenuItem initialMenuItem = HomeMenuItem::NONE,
+              HalDisplay::RefreshMode initialRefreshMode = HalDisplay::FAST_REFRESH);
 
   // This will move current activity to stack instead of deleting it
   void pushActivity(std::unique_ptr<Activity>&& activity);
@@ -108,22 +150,45 @@ class ActivityManager {
   void popActivity();
 
   bool preventAutoSleep() const;
+  bool deferGlobalPowerAction(CrossPointSettings::SHORT_PWRBTN action);
   bool requiresExclusiveStorageLoop() const;
+  // The active activity has an open modal that owns all global shortcuts and
+  // gestures until it is dismissed.
+  bool blocksGlobalInput() const;
+  bool isHomeActivity() const;
   bool isReaderActivity() const;
-  // Bluetooth page turner (lib/BlePageTurner): the book in front, whether it has painted a page, and
-  // a page or chapter turn from a remote. False when no book in front took the turn.
+  bool openReaderSettingsForTouchscreenEscapeHatch();
+  bool handleHomeButtonBackOrHome();
+  bool openReaderMenuFromShortcut();
+  bool handleShortcutAction(uint8_t action);
+  bool hasActivityNamed(const char* activityName) const;
+#ifdef SIMULATOR
+  bool isCurrentActivityNamed(const char* activityName) const;
+#endif
+  bool canSnapshotForSleepOverlay() const;
+  bool requestManualReaderRefresh();
+  bool handleShortcutAction(CrossPointSettings::SHORT_PWRBTN action);
+  bool handleQuickLockUnlock(QuickLockTrigger trigger);
+  void persistGlobalSettings();
+  bool beginGlobalSettingsEdit();
+  void endGlobalSettingsEdit();
+  void notifyInputLockChanged(bool locked);
+  // Serialized session-only pause/resume; never changes the owner's stats timer.
+  void setReaderSessionActive(ReaderActivity& reader, bool active);
+  void notifyUserInput();
+  bool skipLoopDelay() const;
+  std::string getCurrentBookPath() const;
+  ScreenshotInfo getScreenshotInfo() const;
+
+  void setRadioInputAllowed(bool allowed) { radioInputAllowed = allowed; }
   bool isForegroundReader() const;
   bool isRemoteReaderContext() const;
-  bool remoteClick(RemoteButton button);
-  // Home is in front and has painted a frame of its own (not one left from the screen before).
   bool isForegroundHomeShown() const;
   uint32_t visit() const { return screenVisit; }
-  bool remoteTurn(bool forward, bool chapter);
-  // A remote button mapped to the reader menu (true) or to a new clipping (false).
+  bool remoteClick(RemoteButton button);
   bool remoteShortcut(bool readerMenu);
+  bool remoteTurn(bool forward, bool chapter);
   bool handleForcedRefresh();
-  bool skipLoopDelay() const;
-  ScreenshotInfo getScreenshotInfo() const;
   void prepareForSleep();
 
   // If immediate is true, the update will be triggered immediately.
@@ -131,8 +196,9 @@ class ActivityManager {
   void requestUpdate(bool immediate = false);
 
   // Trigger a render and block until it completes.
-  // Must NOT be called from the render task or while holding a RenderLock.
-  void requestUpdateAndWait();
+  // Returns Rejected when a synchronous render would be unsafe, such as from the render task,
+  // while another task is already waiting, or while holding a RenderLock.
+  RequestUpdateResult requestUpdateAndWait();
 };
 
 extern ActivityManager activityManager;  // singleton, to be defined in main.cpp

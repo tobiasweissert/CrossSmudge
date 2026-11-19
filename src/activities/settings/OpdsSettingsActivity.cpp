@@ -15,7 +15,8 @@ namespace fui = freeink::ui;
 namespace {
 // Editable fields: Name, URL, Username, Password, Custom Header 1, Custom
 // Header 2. Existing servers also show a Delete option (BASE_ITEMS + 1).
-constexpr int BASE_ITEMS = 6;
+constexpr int BASE_ITEMS = 7;
+constexpr int FILENAME_FORMAT_INDEX = 6;
 constexpr int CUSTOM_HEADER_1_INDEX = 4;
 constexpr int CUSTOM_HEADER_2_INDEX = 5;
 }  // namespace
@@ -27,7 +28,8 @@ OpdsSettingsActivity::OpdsSettingsActivity(GfxRenderer& renderer, MappedInputMan
   // live), so they're set once here rather than every buildScreen() call.
   static constexpr StrId fieldNames[BASE_ITEMS] = {StrId::STR_SERVER_NAME,     StrId::STR_OPDS_SERVER_URL,
                                                    StrId::STR_USERNAME,        StrId::STR_PASSWORD,
-                                                   StrId::STR_CUSTOM_HEADER_1, StrId::STR_CUSTOM_HEADER_2};
+                                                   StrId::STR_CUSTOM_HEADER_1, StrId::STR_CUSTOM_HEADER_2,
+                                                   StrId::STR_OPDS_FILENAME_FORMAT};
   for (int i = 0; i < BASE_ITEMS; i++) {
     fieldRowItems[i].label = I18N.get(fieldNames[i]);
     fieldRowItems[i].actionValue = static_cast<int16_t>(i);
@@ -170,6 +172,12 @@ void OpdsSettingsActivity::handleSelection() {
     startActivityForResult(
         std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, I18N.get(label), prefill, 160, InputType::Text),
         handler);
+  } else if (nav.selected == FILENAME_FORMAT_INDEX) {
+    const auto old = editServer.filenameFormat;
+    const auto value = static_cast<uint8_t>(old);
+    editServer.filenameFormat = static_cast<OpdsFilenameFormat>((value + 1) % static_cast<uint8_t>(OpdsFilenameFormat::Count));
+    if (!saveServer()) editServer.filenameFormat = old;
+    requestUpdate();
   } else if (nav.selected == BASE_ITEMS && !isNewServer) {
     // Delete flow is only available for existing servers.
     if (!OPDS_STORE.removeServer(static_cast<size_t>(serverIndex))) {
@@ -206,6 +214,9 @@ void OpdsSettingsActivity::buildScreen(UiScreen& screen) {
   fieldRowItems[1].value = editServer.url.empty() ? tr(STR_NOT_SET) : editServer.url.c_str();
   fieldRowItems[2].value = editServer.username.empty() ? tr(STR_NOT_SET) : editServer.username.c_str();
   fieldRowItems[3].value = editServer.password.empty() ? tr(STR_NOT_SET) : "******";
+  fieldRowItems[FILENAME_FORMAT_INDEX].value = editServer.filenameFormat == OpdsFilenameFormat::TitleOnly
+      ? tr(STR_FMT_TITLE) : editServer.filenameFormat == OpdsFilenameFormat::TitleAuthor
+      ? tr(STR_FMT_TITLE_AUTHOR) : tr(STR_FMT_AUTHOR_TITLE);
   for (size_t i = 0; i < OpdsServer::MAX_CUSTOM_HEADERS; i++) {
     headerDisplayBuf[i] = formatHttpHeaderLine(editServer.customHeaders[i], true);
     fieldRowItems[CUSTOM_HEADER_1_INDEX + i].value =

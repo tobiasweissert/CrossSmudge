@@ -16,45 +16,57 @@ class UITheme {
 
  public:
   enum class TextVerticalAlignment { TOP, CENTER, BOTTOM };
-
+  static Rect getContentArea(const GfxRenderer& renderer);
+  Rect getHeaderRect(const GfxRenderer& renderer, bool hasFrontButtonHints = false, bool hasSideButtonHints = false);
+  static void drawCenteredWrappedText(const GfxRenderer& renderer, Rect bounds, int fontId, const char* text,
+                                     int maxLines, bool black = true, EpdFontFamily::Style style = EpdFontFamily::REGULAR,
+                                     TextVerticalAlignment verticalAlignment = TextVerticalAlignment::CENTER);
+  static bool supportsCoverGrid();
+  static bool hasCoverGridHome();
+  static void drawCoverGridHome(CoverGridHomeUi& home);
+  static int getReaderStatusBarHeight();
   UITheme();
   static UITheme& getInstance() { return instance; }
 
   const ThemeMetrics& getMetrics() const;
   const BaseTheme& getTheme() const { return currentTheme ? *currentTheme : fallbackTheme; }
-  // The drawable content area: full screen minus the board's viewable insets
-  // (bezel / rounded-corner clearance from BoardConfig::ACTIVE.viewableInsets,
-  // oriented to the current rotation). THE single place activities should get
-  // their content bounds from so every screen clears the bezel identically.
-  // Zero-inset on rectangular panels, so no visible change there.
-  static Rect getContentArea(const GfxRenderer& renderer);
   Rect getScreenSafeArea(const GfxRenderer& renderer, bool hasFrontButtonHints = false,
                          bool hasSideButtonHints = false);
-  // Header rect for GUI.drawHeader() on a screen laid out in getScreenSafeArea():
-  // clear of the button hints but NOT inset for the bezel, since the header band
-  // applies the board's viewable insets itself.
-  Rect getHeaderRect(const GfxRenderer& renderer, bool hasFrontButtonHints = false, bool hasSideButtonHints = false);
   static void drawCenteredText(const GfxRenderer& renderer, Rect screen, int fontId, int y, const char* text,
                                bool black = true, EpdFontFamily::Style style = EpdFontFamily::REGULAR);
-  // Wraps only overflowing text, then aligns the complete line block within bounds.
-  static void drawCenteredWrappedText(const GfxRenderer& renderer, Rect bounds, int fontId, const char* text,
-                                      int maxLines, bool black = true,
-                                      EpdFontFamily::Style style = EpdFontFamily::REGULAR,
-                                      TextVerticalAlignment verticalAlignment = TextVerticalAlignment::CENTER);
-  static bool supportsCoverGrid();
-  static bool hasCoverGridHome();
-  static void drawCoverGridHome(CoverGridHomeUi& home);
+  // Draw a word-wrapped text block centered within screen. Returns its rendered height.
+  static int drawCenteredWrappedText(const GfxRenderer& renderer, Rect screen, int fontId, int y, const char* text,
+                                     int maxLines, bool black = true,
+                                     EpdFontFamily::Style style = EpdFontFamily::REGULAR, int lineSpacing = 0);
+  // Draw a word-wrapped text block centered around y's line baseline. Returns its rendered height.
+  static int drawCenteredWrappedTextAtCenter(const GfxRenderer& renderer, Rect screen, int fontId, int y,
+                                             const char* text, int maxLines, bool black = true,
+                                             EpdFontFamily::Style style = EpdFontFamily::REGULAR, int lineSpacing = 0);
   void reload();
   void setTheme(CrossPointSettings::UI_THEME type);
-  static std::string getCoverThumbPath(std::string coverBmpPath, int coverHeight);
+  static int getNumberOfItemsPerPage(const GfxRenderer& renderer, bool hasHeader, bool hasTabBar, bool hasButtonHints,
+                                     bool hasSubtitle, int extraReservedHeight = 0);
+  // Returns the cache path for a generated thumbnail using the default 3:5
+  // (width:height) aspect derived from coverHeight. Returns an empty string
+  // when coverHeight is invalid.
+  static std::string getCoverThumbPath(const std::string& coverBmpPath, int coverHeight);
+  // Returns the cache path for a generated thumbnail at the requested cache-key
+  // dimensions. coverBmpPath may be:
+  // - a concrete path with no placeholders, returned unchanged;
+  // - a dimensions template containing one [WIDTH] and one [HEIGHT] placeholder;
+  // - a legacy height-only template containing one [HEIGHT] placeholder.
+  // No scaling is done here. Returns an empty string for invalid dimensions or
+  // unsupported placeholder templates.
+  static std::string getCoverThumbPath(const std::string& coverBmpPath, int width, int height);
   static UIIcon getFileIcon(const std::string& filename);
   static int getStatusBarHeight();
   static int getProgressBarHeight();
-  static int getReaderStatusBarHeight();
+  // Device-specific top offset for the clock, battery, and reserved status-bar lane.
+  static int getTopStatusBarInset(const GfxRenderer& renderer);
 
  private:
   BaseTheme fallbackTheme;
-  const ThemeMetrics* currentMetrics = &BaseMetrics::values;
+  const ThemeMetrics* currentMetrics;
   std::unique_ptr<BaseTheme> currentTheme;
   mutable ThemeMetrics adjustedMetrics;
   mutable bool metricsValid = false;

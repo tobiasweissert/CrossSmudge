@@ -1,80 +1,92 @@
 #pragma once
 
-#include "CrossPointSettings.h"
+#include <FreeInkApp.h>
+#include <FreeInkUIGfxRenderer.h>
+
+#include <atomic>
+#include <vector>
+
+#include "FrontlightPanelModel.h"
 #include "activities/Activity.h"
-#include "components/UiAppHost.h"
+#include "components/OptionPopup.h"
 #include "util/ButtonNavigator.h"
 
-// Top-anchored control center opened by a top-edge down-swipe, a status-bar tap,
-// or a button bound to "Control Center" (iOS Control Center style): a grabber,
-// the frontlight brightness/warmth sliders (on boards with a light), and a row
-// of quick-setting icons — night mode, ghost-cleanup refresh, reading
-// orientation, reader touch controls, and Bluetooth. Enabled toggles have filled
-// rounded squares; all other controls are outlined. The grabber sits
-// along the panel's bottom edge, the edge the sheet is dragged from.
-class FrontlightPanelActivity final : public Activity, private UiAppHost {
+struct Rect;
+
+// Legacy capability-gated frontlight quick panel.
+// Opened globally by the top-edge down-swipe: a top-anchored drop-down (only the
+// upper third of the screen) with brightness and warmth sliders driving the
+// light live, plus an on/off toggle with a frontlight icon. It renders as an overlay —
+// the content underneath stays on screen below the panel, and a tap there
+// dismisses it. State is persisted once on exit (SPIFFS write throttling).
+class FrontlightPanelActivity final : public Activity {
+  // The sun toggle, two sliders, and four -/+ targets need seven interaction
+  // slots. Keep small headroom for the panel's fixed controls.
+  using UiApp = freeink::ui::FreeInkApp<20, 7>;
+
   ButtonNavigator buttonNavigator;
+
+  freeink::ui::GfxRendererTarget uiTarget;  // must precede `app`: the app holds a reference to it
+  UiApp app;
+  std::atomic<bool> uiReady{false};
 
   uint8_t brightness = 60;
   uint8_t warmth = 50;
   bool lightOn = false;
-  // lightOn is seeded from the live hardware state (Frontlight.isOn()), which
-  // legitimately diverges from the saved SETTINGS.frontlightOn preference —
-  // e.g. after a wake with frontlightRestoreOnWake off, the light stays off
-  // live while the saved "was on" preference is deliberately kept (see
-  // main.cpp's restoreLightOn). brightness/warmth have no such divergence
-  // (always restored unconditionally on boot), so only lightOn needs a
-  // touched-by-the-user flag: onExit() must not persist a mirror that never
-  // reflected user intent in the first place.
-  bool lightOnChanged = false;
+  FrontlightPanelContext context;
+  FrontlightDrawerState drawerState{};
+  OptionPopup optionPopup;
+  bool initialInversion = false;
+  bool initialTouchscreenDisabled = false;
+  bool pendingTouchscreenDisabled = false;
+  // Swallow the swipe/tap fallout of a slider drag so its release can't
+  // trigger the back gesture and close the panel mid-adjustment.
   bool draggingSlider = false;
-  // The touch tile toggles SETTINGS.touchReaderControls between off and this
-  // remembered mode, so a Swipe or Inverted Tap user gets their mode back
-  // rather than the Tap default. Seeded from the setting in onEnter().
-  uint8_t touchModeRestore = CrossPointSettings::TOUCH_READER_ON;
+  // Bottom edge of the drop-down (px). Content lays out above it and the
+  // handle occupies its final band. Set by render() before the app lays out.
   int panelBottom = 0;
+  freeink::ui::Rect drawerHandleRect{};
+  std::vector<std::string> readerTitleLines;
 
-  // Quick settings, left to right: night mode, refresh, orientation, touch, Bluetooth.
-  static constexpr int kTileCount = 5;
-
-  // SliderRowProps embeds a StyleSet, so keep it off the render stack.
-  freeink::ui::SliderRowProps rowProps;
-
-  static void panelScreen(UiScreen& screen, void* user);
+  static void panelScreen(UiApp::ScreenType& screen, void* user);
   static void onBrightnessEvent(const freeink::ui::ActionEvent& event, void* user);
   static void onWarmthEvent(const freeink::ui::ActionEvent& event, void* user);
   static void onToggleEvent(const freeink::ui::ActionEvent& event, void* user);
   static void onBrightnessStepEvent(const freeink::ui::ActionEvent& event, void* user);
   static void onWarmthStepEvent(const freeink::ui::ActionEvent& event, void* user);
-  static void onTileEvent(const freeink::ui::ActionEvent& event, void* user);
-
-  void buildPanelScreen(UiScreen& screen);
-  // One slider row: a caption line (name + live percentage) above
-  // [-] [draggable 1-bit capsule] [+], plus a lamp on/off button after the +
-  // when showToggle is set (the brightness row).
-  void addSliderRow(UiScreen& screen, const char* label, uint8_t value, freeink::ui::ActionId sliderAction,
-                    freeink::ui::ActionId stepAction, bool showToggle);
+  static void onQuickActionEvent(const freeink::ui::ActionEvent& event, void* user);
+  static void onDismissEvent(const freeink::ui::ActionEvent& event, void* user);
+  void buildPanelScreen(UiApp::ScreenType& screen);
+  void addStepSlider(UiApp::ScreenType& screen, const freeink::ui::Rect& row, uint8_t value,
+                     freeink::ui::ActionId sliderAction, freeink::ui::ActionId stepAction);
+  Rect homeButtonRect() const;
+  // Height of the drop-down, derived from the content it holds (header +
+  // sliders + toggle). Same layout math as buildPanelScreen so the frame,
+  // content margin, and dismiss threshold all agree.
   int computePanelBottom() const;
+  void prepareReaderDetailsLayout();
+  void drawReaderDetails(freeink::ui::Screen<20>& screen);
   void adjustBrightness(int delta);
   void adjustWarmth(int delta);
   void toggleLight();
-  void runTile(int idx);
-  // Copy the panel's live brightness/warmth/lightOn into SETTINGS and save if
-  // anything actually changed. onExit() runs it on every way out.
-  void persistLightSettings();
+  void toggleReaderTouchscreen();
   void close();
-
-  // One-shot: a tile that rewrote the whole frame (night mode) re-drives it
-  // with the ghost-cleanup waveform on the next render. The "refresh" tile does
-  // not use this — it closes the panel and promotes the repaint underneath
-  // instead (GfxRenderer::promoteNextRefresh).
-  bool cleanRefreshPending = false;
+  void activateQuickAction(int index);
+  void openSyncDialog();
+  void closeSyncDialog();
+  void openReadingStats();
+  void openGlobalSettings();
+  void drawHeader();
 
  public:
-  explicit FrontlightPanelActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
+  explicit FrontlightPanelActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
+                                   FrontlightPanelContext context = {});
   void onEnter() override;
   void onExit() override;
   void loop() override;
   void render(RenderLock&&) override;
+  // From an active reader, Home returns to the library; elsewhere it dismisses
+  // the overlay back to the current screen.
   bool handleHomeGesture() override;
+  bool requiresFreshBackdrop() const override { return true; }
 };

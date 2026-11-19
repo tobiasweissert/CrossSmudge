@@ -3,6 +3,18 @@
 #include <Arduino.h>
 #include <Logging.h>
 
+namespace {
+thread_local const ImageDecodeControl* decodeControl = nullptr;
+}
+bool ImageDecodeControl::stopped() const {
+  return (cancel && cancel->load(std::memory_order_relaxed)) || uint32_t(millis() - start) >= timeout;
+}
+ImageDecodeScope::ImageDecodeScope(const ImageDecodeControl* control) : previous(decodeControl) {
+  decodeControl = control;
+}
+ImageDecodeScope::~ImageDecodeScope() { decodeControl = previous; }
+bool ImageToFramebufferDecoder::cancelled() { return decodeControl && decodeControl->stopped(); }
+
 bool ImageToFramebufferDecoder::validateAndStoreDimensions(const int64_t width, const int64_t height,
                                                            ImageDimensions& out, const char* format) {
   if (width <= 0 || height <= 0) {

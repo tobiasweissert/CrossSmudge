@@ -9,7 +9,16 @@ enum Value : uint8_t { PORTRAIT = 0, LANDSCAPE_CW = 1, INVERTED = 2, LANDSCAPE_C
 }
 
 namespace CrossPointTiltPageTurn {
-enum Value : uint8_t { TILT_OFF = 0, TILT_NORMAL = 1, TILT_INVERTED = 2 };
+enum Value : uint8_t { TILT_OFF = 0, TILT_ON = 1 };
+}
+
+namespace CrossPointTiltPageTurnDirection {
+enum Value : uint8_t {
+  TILT_LEFT_RIGHT = 0,
+  TILT_LEFT_RIGHT_INVERTED = 1,
+  TILT_FORWARD_BACK = 2,
+  TILT_FORWARD_BACK_INVERTED = 3
+};
 }
 
 class HalTiltSensor;
@@ -30,7 +39,11 @@ class HalTiltSensor {
   unsigned long _wakeMs = 0;       // Timestamp of last wake() for stabilization
 
   // Tuning constants
-  static constexpr float RATE_THRESHOLD_DPS = 270.0f;      // Deg/sec speed to trigger flick
+#if defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY
+  static constexpr float RATE_THRESHOLD_DPS = 200.0f;  // Stay below the Sticky IMU's ±245 dps range
+#else
+  static constexpr float RATE_THRESHOLD_DPS = 270.0f;  // Deg/sec speed to trigger flick
+#endif
   static constexpr float NEUTRAL_RATE_DPS = 50.0f;         // Must stop moving below this rate before next trigger
   static constexpr unsigned long COOLDOWN_MS = 600;        // Minimum ms between triggers
   static constexpr unsigned long POLL_INTERVAL_MS = 50;    // 20 Hz polling
@@ -54,7 +67,7 @@ class HalTiltSensor {
   bool isAvailable() const { return _available; }
 
   // Poll the accelerometer and update tilt gesture state.
-  void update(const uint8_t mode, const uint8_t orientation, const bool inReader);
+  void update(const uint8_t enabled, const uint8_t direction, const uint8_t orientation, const bool inReader);
 
   // Returns true once per tilt-forward gesture (next page direction).
   // Consumed on read — subsequent calls return false until next gesture.
