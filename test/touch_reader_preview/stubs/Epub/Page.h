@@ -35,7 +35,16 @@ class TextBlock {
     bool hasSpaceBefore = false;
   };
 
-  explicit TextBlock(std::vector<Word> words, BlockStyle style = {}) : words(std::move(words)), style(style) {}
+  inline static size_t liveInstances = 0;
+  explicit TextBlock(std::vector<Word> words, BlockStyle style = {}) : words(std::move(words)), style(style) {
+    ++liveInstances;
+  }
+  TextBlock(const TextBlock& other) : TextBlock(other.words, other.style) {}
+  ~TextBlock() { --liveInstances; }
+
+  // External rendered-page double. Real TextBlock cloning is qualified by
+  // target-reader-models; this value-owned fixture follows its clone contract.
+  std::unique_ptr<TextBlock> clone() const { return std::make_unique<TextBlock>(*this); }
 
   void render(GfxRenderer& renderer, int fontId, int x, int y, bool foregroundBlack) const {
     for (const auto& word : words)

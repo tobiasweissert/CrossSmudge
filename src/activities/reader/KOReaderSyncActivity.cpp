@@ -363,8 +363,8 @@ void KOReaderSyncActivity::performSync() {
   }
   if (!usedRichPosition) {
     const KOReaderPosition koPos = {remoteProgress.progress, remoteProgress.percentage};
-    remotePosition =
-        ProgressMapper::toCrossPoint(epub, koPos, currentSpineIndex, totalPagesInSpine, remoteCoordinateSpace);
+    remotePosition = ProgressMapper::toCrossPoint(epub, koPos, renderer, currentSpineIndex, totalPagesInSpine,
+                                                  remoteCoordinateSpace);
   }
   if (!remotePosition.valid) {
     {

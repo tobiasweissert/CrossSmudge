@@ -23,6 +23,23 @@ std::shared_ptr<TextBlock> makeLine(std::initializer_list<const char*> words, co
 
 }  // namespace
 
+TEST(TouchReaderPreviewModel, SnapshotDoesNotRetainSourcePageOwnership) {
+  TouchReaderPreviewModel model;
+  GfxRenderer renderer;
+  std::weak_ptr<TextBlock> original;
+  {
+    Page page;
+    auto block = makeLine({"aa"});
+    original = block;
+    page.elements.push_back(std::make_unique<PageLine>(std::move(block), 0, 0));
+    ASSERT_TRUE(model.capture(page, renderer, 1, 100));
+  }
+  EXPECT_TRUE(original.expired());
+  model.renderText(renderer, 2, 0, 0, 40, 100, 0, static_cast<uint8_t>(CssTextAlign::Left), false, false, true);
+  ASSERT_EQ(renderer.drawCalls.size(), 1U);
+  EXPECT_EQ(renderer.drawCalls.front().text, "aa");
+}
+
 TEST(TouchReaderPreviewModel, ReflowsAcrossCapturedLineBreaksBeforeJustifying) {
   Page page;
   page.elements.push_back(std::make_unique<PageLine>(makeLine({"aa", "bb"}), 0, 0));
@@ -160,6 +177,7 @@ TEST(TouchReaderPreviewModel, SourceLayoutSurvivesPageReleaseAndPreviewReflow) {
 TEST(TouchReaderPreviewModel, NextCaptureReleasesPreviousSourceBlocks) {
   GfxRenderer renderer;
   TouchReaderPreviewModel model;
+  const auto baseline = TextBlock::liveInstances;
   std::weak_ptr<TextBlock> previous;
   {
     Page page;
@@ -168,10 +186,12 @@ TEST(TouchReaderPreviewModel, NextCaptureReleasesPreviousSourceBlocks) {
     page.elements.push_back(std::make_unique<PageLine>(block, 0, 0));
     ASSERT_TRUE(model.capture(page, renderer, 1, 100));
   }
-  EXPECT_FALSE(previous.expired());
+  EXPECT_TRUE(previous.expired());
+  EXPECT_EQ(TextBlock::liveInstances, baseline + 1);
   Page empty;
   EXPECT_FALSE(model.capture(empty, renderer, 1, 100));
   EXPECT_TRUE(previous.expired());
+  EXPECT_EQ(TextBlock::liveInstances, baseline);
   model.renderSource(renderer, 1, true);
   EXPECT_TRUE(renderer.drawCalls.empty());
 }

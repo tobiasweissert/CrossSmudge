@@ -320,7 +320,8 @@ bool NearbyBookPositionSyncActivity::mapPeerPosition() {
   const PositionCoordinateSpace coordinateSpace = matchMethod_ == DocumentMatchMethod::FILENAME
                                                       ? PositionCoordinateSpace::SourceDocument
                                                       : PositionCoordinateSpace::CurrentDocument;
-  peerCrossPoint_ = ProgressMapper::toCrossPoint(epub_, koPos, currentSpineIndex_, totalPagesInSpine_, coordinateSpace);
+  peerCrossPoint_ =
+      ProgressMapper::toCrossPoint(epub_, koPos, renderer, currentSpineIndex_, totalPagesInSpine_, coordinateSpace);
   if (!peerCrossPoint_.valid) {
     setError(tr(STR_SYNC_REOPTIMIZE_REQUIRED));
     return false;
@@ -1158,7 +1159,8 @@ bool NearbyBookPositionSyncActivity::mapPeerPosition() {
   const PositionCoordinateSpace coordinateSpace = matchMethod_ == DocumentMatchMethod::FILENAME
                                                       ? PositionCoordinateSpace::SourceDocument
                                                       : PositionCoordinateSpace::CurrentDocument;
-  peerCrossPoint_ = ProgressMapper::toCrossPoint(epub_, koPos, currentSpineIndex_, totalPagesInSpine_, coordinateSpace);
+  peerCrossPoint_ =
+      ProgressMapper::toCrossPoint(epub_, koPos, renderer, currentSpineIndex_, totalPagesInSpine_, coordinateSpace);
   if (!peerCrossPoint_.valid) {
     setError(tr(STR_SYNC_REOPTIMIZE_REQUIRED));
     return false;
