@@ -24,6 +24,8 @@ class Policy(unittest.TestCase):
         self.assertIn('toolchain-manifest.json', text)
         self.assertLess(text.index('name: Seal exact Sticky evidence'), text.index('name: Retain encrypted Sticky evidence'))
         self.assertLess(text.index('name: Retain encrypted Sticky evidence'), text.index('name: Extract firmware stats'))
+        self.assertLess(text.index('name: Retain encrypted Sticky evidence'),
+                        text.index('name: Check portable docs and workflow policy'))
         self.assertNotIn('github.event.repository.private', text)
         self.assertIn('vars.CROSSCUB_ARTIFACT_RECIPIENT_CERT', text)
         self.assertIn("if: always() && steps.seal.outcome == 'success'", text)

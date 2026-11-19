@@ -89,7 +89,7 @@ jobs:
           PY
 
       - name: Run cppcheck
-        run: pio check --fail-on-defect low --fail-on-defect medium --fail-on-defect high
+        run: pio check --verbose --fail-on-defect low --fail-on-defect medium --fail-on-defect high
 
   build:
     # Standard Sticky only; PR/manual/reusable validation never publishes.
@@ -156,9 +156,6 @@ jobs:
 
       - name: Test authenticated artifact sealing
         run: python3 -m unittest discover -s test/crosspoint_migration/ci-sealed-artifacts -v
-
-      - name: Check portable docs and workflow policy
-        run: python3 -m unittest discover -s test/crosspoint_migration/docs-ci -v
 
       - name: Record approved source before build
         run: |
@@ -258,6 +255,11 @@ jobs:
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
+
+      # Keep portable diagnostics after real compilation and evidence retention.
+      # A harness portability defect must not prevent the first firmware build.
+      - name: Check portable docs and workflow policy
+        run: python3 -m unittest discover -s test/crosspoint_migration/docs-ci -v
 
       - name: Extract firmware stats
         run: |

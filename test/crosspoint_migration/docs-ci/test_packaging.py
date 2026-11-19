@@ -34,8 +34,10 @@ class Packaging(unittest.TestCase):
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR', '/root/.hermes/cache/scratch')) as tmp:
+        with tempfile.TemporaryDirectory(dir=os.environ.get('RUNNER_TEMP') or os.environ['TMPDIR']) as tmp:
             root = Path(tmp)
+            expected_temp = Path(os.environ.get('RUNNER_TEMP') or os.environ['TMPDIR'])
+            self.assertEqual(root.parent.resolve(), expected_temp.resolve())
             (root / 'scripts').symlink_to(ROOT / 'scripts', target_is_directory=True)
             build = root / '.pio/build/sticky'
             build.mkdir(parents=True)
@@ -78,6 +80,16 @@ class Packaging(unittest.TestCase):
 
     def test_rejected_image_is_retained_with_failed_report(self):
         self.run_stage(corrupt=True)
+
+    def test_runner_temp_without_host_tmpdir(self):
+        with tempfile.TemporaryDirectory(dir=os.environ['TMPDIR']) as runner_temp:
+            with patch.dict(os.environ, {'RUNNER_TEMP': runner_temp}, clear=True):
+                self.run_stage()
+
+    def test_runner_temp_rejected_image_without_host_tmpdir(self):
+        with tempfile.TemporaryDirectory(dir=os.environ['TMPDIR']) as runner_temp:
+            with patch.dict(os.environ, {'RUNNER_TEMP': runner_temp}, clear=True):
+                self.run_stage(corrupt=True)
 
 
 if __name__ == '__main__':
