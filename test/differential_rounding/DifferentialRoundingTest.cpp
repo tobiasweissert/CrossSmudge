@@ -1,14 +1,14 @@
-#include <cstdio>
-#include "lib/EpdFont/EpdFontFamily.h"
-#include "lib/Utf8/Utf8.h"
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <utility>
 
 #include "lib/EpdFont/EpdFont.h"
 #include "lib/EpdFont/EpdFontData.h"
+#include "lib/EpdFont/EpdFontFamily.h"
+#include "lib/Utf8/Utf8.h"
 
 // ============================================================================
 // Synthetic test font
@@ -610,7 +610,6 @@ static int absoluteGap(int32_t startFP, int32_t advanceFP, int32_t kernFP) {
 }
 
 TEST(DifferentialRoundingOwner, Fp4Basics) {
-
   for (int px = 0; px < 500; px++) {
     ASSERT_EQ(fp4::toPixel(fp4::fromPixel(px)), px);
   }
@@ -628,11 +627,9 @@ TEST(DifferentialRoundingOwner, Fp4Basics) {
   ASSERT_EQ(fp4::toPixel(137 + (-9)), 8);  // 128 = 8.0 exact
   ASSERT_EQ(fp4::toPixel(137 + (-5)), 8);  // 132 = 8.25
   ASSERT_EQ(fp4::toPixel(137 + (-1)), 9);  // 136 = 8.5 (half rounds up)
-
 }
 
 TEST(DifferentialRoundingOwner, OldApproachInconsistency) {
-
   // 'oo' pair: advance=145 (9.0625px), kern=-3 (-0.1875px), combined=142 (8.875px)
   const int32_t advance = 145;
   const int32_t kern = -3;
@@ -650,11 +647,9 @@ TEST(DifferentialRoundingOwner, OldApproachInconsistency) {
   ASSERT_TRUE(maxGap - minGap >= 1);
 
   int diffStep = fp4::toPixel(advance + kern);
-
 }
 
 TEST(DifferentialRoundingOwner, ExhaustiveKernRange) {
-
   const int32_t baseAdvance = 128;
   int checked = 0;
 
@@ -670,7 +665,6 @@ TEST(DifferentialRoundingOwner, ExhaustiveKernRange) {
       checked++;
     }
   }
-
 }
 
 // ============================================================================
@@ -678,7 +672,6 @@ TEST(DifferentialRoundingOwner, ExhaustiveKernRange) {
 // ============================================================================
 
 TEST(DifferentialRoundingOwner, KernLookup) {
-
   ASSERT_EQ(testFont.getKerning('T', 'a'), -5);
   ASSERT_EQ(testFont.getKerning('T', 'o'), -7);
   ASSERT_EQ(testFont.getKerning('o', 'a'), -2);
@@ -687,7 +680,6 @@ TEST(DifferentialRoundingOwner, KernLookup) {
   ASSERT_EQ(testFont.getKerning('x', 'o'), 0);  // 'x' has no left class
   ASSERT_EQ(testFont.getKerning('T', 'x'), 0);  // 'x' has no right class
   ASSERT_EQ(testFont.getKerning('T', 'T'), 0);  // 'T' has no right class
-
 }
 
 namespace {
@@ -730,7 +722,6 @@ TEST(DifferentialRoundingOwner, SparseKernLookupMatchesDense) {
       ASSERT_EQ(sparseFont.getKerning(left, right), testFont.getKerning(left, right));
     }
   }
-
 }
 
 TEST(DifferentialRoundingOwner, SparseKernLookupHandlesMissingEntries) {
@@ -744,7 +735,6 @@ TEST(DifferentialRoundingOwner, SparseKernLookupHandlesMissingEntries) {
   ASSERT_EQ(sparseFont.getKerning('o', 'o'), 0);
   ASSERT_EQ(sparseFont.getKerning('a', 'o'), 0);
   ASSERT_EQ(sparseFont.getKerning('T', 'x'), 0);
-
 }
 
 TEST(DifferentialRoundingOwner, SparseKernLookupHandlesEmptyRow) {
@@ -757,11 +747,9 @@ TEST(DifferentialRoundingOwner, SparseKernLookupHandlesEmptyRow) {
   ASSERT_EQ(sparseFont.getKerning('T', 'a'), 0);
   ASSERT_EQ(sparseFont.getKerning('T', 'o'), 0);
   ASSERT_EQ(sparseFont.getKerning('o', 'a'), -2);
-
 }
 
 TEST(DifferentialRoundingOwner, GlyphLookup) {
-
   ASSERT_TRUE(testFont.getGlyph('T') != nullptr);
   ASSERT_TRUE(testFont.getGlyph('a') != nullptr);
   ASSERT_TRUE(testFont.getGlyph('o') != nullptr);
@@ -774,7 +762,6 @@ TEST(DifferentialRoundingOwner, GlyphLookup) {
   // No U+FFFD in font, so unknown codepoints return nullptr
   ASSERT_TRUE(testFont.getGlyph('Z') == nullptr);
   ASSERT_TRUE(testFont.getGlyph('b') == nullptr);
-
 }
 
 // Known-value regression tests.  Expected widths are computed by hand using
@@ -787,7 +774,6 @@ TEST(DifferentialRoundingOwner, GlyphLookup) {
 // Differential step from glyph A to glyph B:
 //   step = fp4::toPixel(advanceA + kern(A,B))
 TEST(DifferentialRoundingOwner, KnownWidths) {
-
   // "o": single glyph at x=0, width=8
   //   w = 0 + 8 = 8
   ASSERT_EQ(textWidth("o"), 8);
@@ -821,7 +807,6 @@ TEST(DifferentialRoundingOwner, KnownWidths) {
   // "xo": step = toPixel(136 + 0) = toPixel(136) = 9  (no kern: x has no left class)
   //   x at 0, o at 9.  w = 9 + 8 = 17
   ASSERT_EQ(textWidth("xo"), 17);
-
 }
 
 // "oo" pair consistency: the pixel gap between two o's must be the same
@@ -830,7 +815,6 @@ TEST(DifferentialRoundingOwner, KnownWidths) {
 // different oo gap than "oo" because 'x' advance (136 FP) puts the first
 // 'o' at fractional phase 8, crossing the rounding boundary differently.
 TEST(DifferentialRoundingOwner, PairConsistencyViaFont) {
-
   // The oo gap = width(prefix + "oo") - width(prefix + "o")
   // This isolates the pixel distance contributed by the second 'o'.
   const int oo_gap_bare = textWidth("oo") - textWidth("o");
@@ -842,14 +826,12 @@ TEST(DifferentialRoundingOwner, PairConsistencyViaFont) {
   ASSERT_EQ(oo_gap_after_x, oo_gap_bare);
   ASSERT_EQ(oo_gap_after_T, oo_gap_bare);
   ASSERT_EQ(oo_gap_after_o, oo_gap_bare);
-
 }
 
 // Null-glyph handling: when a codepoint has no glyph (and no replacement
 // glyph), the pending advance from the previous glyph must still be flushed.
 // Without the flush fix, the glyph after the null would overlap the one before.
 TEST(DifferentialRoundingOwner, NullGlyphAdvancePreserved) {
-
   // 'Z' (0x5A) is not in our font and there's no U+FFFD, so getGlyph returns null.
   // "oZo" should lay out as: o1 at 0, Z skipped (advance flushed), o2 at 9.
   //   toPixel(145) = 9 (o's advance, no kern since Z resets prevCp).
@@ -867,11 +849,9 @@ TEST(DifferentialRoundingOwner, NullGlyphAdvancePreserved) {
   // Null at start: "Zo" -- no pending advance to flush, o renders at 0.
   w = textWidth("Zo");
   ASSERT_EQ(w, 8);
-
 }
 
 TEST(DifferentialRoundingOwner, FamilyMissingGlyphUsesReplacementFallback) {
-
   // The low-level EpdFont intentionally has no U+FFFD here, mirroring compact UI
   // fonts. The family layer should still resolve unknown characters to a visible
   // synthetic replacement glyph instead of measuring them as blank/null.
@@ -882,11 +862,9 @@ TEST(DifferentialRoundingOwner, FamilyMissingGlyphUsesReplacementFallback) {
 
   ASSERT_EQ(w, 9);
   ASSERT_EQ(h, 12);
-
 }
 
 TEST(DifferentialRoundingOwner, FamilySpaceGlyphsStayBlank) {
-
   // EPUB paragraph indentation uses U+2003 EM SPACE. If the selected reading font
   // lacks that exact glyph, it should stay blank/null like upstream, not become the
   // visible missing-glyph marker or an ASCII space with its own extra width.
@@ -900,19 +878,15 @@ TEST(DifferentialRoundingOwner, FamilySpaceGlyphsStayBlank) {
 
   testFontFamily.getTextDimensions("o\xE2\x80\x83o", &w, &h);
   ASSERT_EQ(w, textWidth("oo"));
-
 }
 
 TEST(DifferentialRoundingOwner, HeightCalculation) {
-
   // 'T' is tallest: top=12, height=12 -> extent [0, 12)
   // 'o' and 'a': top=8, height=8 -> extent [0, 8)
   ASSERT_EQ(textHeight("o"), 8);
   ASSERT_EQ(textHeight("T"), 12);
   ASSERT_EQ(textHeight("To"), 12);
   ASSERT_EQ(textHeight("oo"), 8);
-
 }
 
-
-}
+}  // namespace owner_rounding

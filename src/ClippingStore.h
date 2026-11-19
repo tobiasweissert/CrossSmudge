@@ -146,8 +146,8 @@ class ClippingStore {
   bool readFromFile();
   bool readFromFile(const std::string& path, std::vector<Clipping>& out,
                     std::vector<std::string>* deletions = nullptr) const;
-  bool readVersionedFile(const std::string& path, std::vector<Clipping>& out,
-                         std::vector<std::string>* deletions, bool modernV4) const;
+  bool readVersionedFile(const std::string& path, std::vector<Clipping>& out, std::vector<std::string>* deletions,
+                         bool modernV4) const;
   bool writeToFile(const std::string* replacementText = nullptr, size_t replacementIndex = SIZE_MAX,
                    const std::string* sourcePathOverride = nullptr, bool preserveOnRenameFailure = false);
 };

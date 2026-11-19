@@ -108,7 +108,10 @@ bool streamXtchRenderPass(const Xtc& xtc, const uint32_t pageIndex, const uint16
 
 void XtcReaderActivity::onEnter() {
   Activity::onEnter();
-  if (!xtc && !loadBook()) { finish(); return; }
+  if (!xtc && !loadBook()) {
+    finish();
+    return;
+  }
 
   if (!xtc) {
     return;
@@ -176,18 +179,17 @@ void XtcReaderActivity::openReaderMenu() {
   }
 
   pauseReadingStatsTimer("reader_menu");
-  startActivityForResult(
-      std::make_unique<XtcReaderMenuActivity>(renderer, mappedInput, std::move(title), hasChapters, stats.isCompleted,
-                                            isBookStatsTrackingEnabled()),
-      [this](const ActivityResult& result) {
-        const auto* menu = std::get_if<MenuResult>(&result.data);
-        if (result.isCancelled || menu == nullptr) {
-          resumeReadingStatsTimer("reader_menu_return");
-          requestUpdate();
-          return;
-        }
-        onReaderMenuConfirm(menu->action);
-      });
+  startActivityForResult(std::make_unique<XtcReaderMenuActivity>(renderer, mappedInput, std::move(title), hasChapters,
+                                                                 stats.isCompleted, isBookStatsTrackingEnabled()),
+                         [this](const ActivityResult& result) {
+                           const auto* menu = std::get_if<MenuResult>(&result.data);
+                           if (result.isCancelled || menu == nullptr) {
+                             resumeReadingStatsTimer("reader_menu_return");
+                             requestUpdate();
+                             return;
+                           }
+                           onReaderMenuConfirm(menu->action);
+                         });
 }
 
 void XtcReaderActivity::loop() {
@@ -703,10 +705,10 @@ void XtcReaderActivity::recordForwardPageTurn(const uint32_t seconds, const bool
   globalStats.totalPagesTurned++;
 }
 
-bool XtcReaderActivity::formatTimeLeftLabel(char* buf, const size_t len, const uint32_t pageToRender, uint8_t mode) const {
+bool XtcReaderActivity::formatTimeLeftLabel(char* buf, const size_t len, const uint32_t pageToRender,
+                                            uint8_t mode) const {
   if (mode == 255) mode = SETTINGS.statusBarTimeLeft;
-  if (!buf || len == 0 || !xtc ||
-      mode == CrossPointSettings::STATUS_BAR_TIME_LEFT::TIME_LEFT_HIDE) {
+  if (!buf || len == 0 || !xtc || mode == CrossPointSettings::STATUS_BAR_TIME_LEFT::TIME_LEFT_HIDE) {
     return false;
   }
 
@@ -901,8 +903,13 @@ void XtcReaderActivity::deleteBookCache() {
             if (stats.save(xtc->getCachePath()) && flushQueuedProgress()) {
               cacheDeleted = clearBookCachePreservingUserState(xtc->getPath());
               xtc->setupCacheDir();
-              if (!stats.save(xtc->getCachePath())) { pendingStatsCommit = true; cacheDeleted = false; }
-            } else { pendingStatsCommit = true; }
+              if (!stats.save(xtc->getCachePath())) {
+                pendingStatsCommit = true;
+                cacheDeleted = false;
+              }
+            } else {
+              pendingStatsCommit = true;
+            }
           }
           if (cacheDeleted) {
             drawToast(renderer, tr(STR_BOOK_CACHE_DELETED));
@@ -1132,20 +1139,26 @@ void XtcReaderActivity::renderStatusBarOverlay(const StatusBarOverlayPosition po
   xtc::ChapterInfo chapter{};
   // Without a chapter table the entire fixed document is the current section,
   // retaining the owner's real page counter rather than dropping it on upgrade.
-  values.page = pageInfo.currentPage; values.pages = pageInfo.pageCount;
+  values.page = pageInfo.currentPage;
+  values.pages = pageInfo.pageCount;
   values.chapterPercent = values.pages > 0 ? values.page * 100.0f / values.pages : 0;
   const bool hasChapter = xtc->getChapterForPage(pageToRender, chapter) && chapter.endPage >= chapter.startPage;
   if (hasChapter) {
     values.chapterTitle = chapter.name[0] ? chapter.name : tr(STR_UNNAMED);
   }
   // A fixed image page is a truthful stable page, unlike reflowed TXT pages.
-  values.stablePage = pageToRender + 1; values.stablePages = xtc->getPageCount();
+  values.stablePage = pageToRender + 1;
+  values.stablePages = xtc->getPageCount();
   values.bookPercent = values.stablePages > 0 ? values.stablePage * 100.0f / values.stablePages : 0;
   char label[24] = {};
-  if (formatTimeLeftLabel(label, sizeof(label), pageToRender, CrossPointSettings::TIME_LEFT_BOOK)) values.timeBook = label;
-  if (hasChapter && formatTimeLeftLabel(label, sizeof(label), pageToRender, CrossPointSettings::TIME_LEFT_CHAPTER)) values.timeChapter = label;
-  ReaderChrome::draw(renderer, position == StatusBarOverlayPosition::Top ? ReaderStatusBarPosition::Top : ReaderStatusBarPosition::Bottom,
-                     values, statusBarVisible, true);
+  if (formatTimeLeftLabel(label, sizeof(label), pageToRender, CrossPointSettings::TIME_LEFT_BOOK))
+    values.timeBook = label;
+  if (hasChapter && formatTimeLeftLabel(label, sizeof(label), pageToRender, CrossPointSettings::TIME_LEFT_CHAPTER))
+    values.timeChapter = label;
+  ReaderChrome::draw(
+      renderer,
+      position == StatusBarOverlayPosition::Top ? ReaderStatusBarPosition::Top : ReaderStatusBarPosition::Bottom,
+      values, statusBarVisible, true);
 }
 
 void XtcReaderActivity::renderPage(const uint32_t pageToRender) {
@@ -1428,7 +1441,7 @@ void XtcReaderActivity::commitReadingStatsSession() {
   if (!statsTrackingActive) return;
   recordCurrentPageReadingTime("session_commit");
   BookStatsTracking::commitSession(stats, globalStats, sessionReadingSeconds,
-      hasSessionStartLocalDateTime ? &sessionStartLocalDateTime : nullptr);
+                                   hasSessionStartLocalDateTime ? &sessionStartLocalDateTime : nullptr);
   sessionReadingSeconds = 0;
   hasSessionStartLocalDateTime = getCurrentLocalReadingStatsDateTime(sessionStartLocalDateTime);
   pendingStatsCommit = true;
@@ -1484,8 +1497,10 @@ bool XtcReaderActivity::pageTurn(const bool forward) {
   uint32_t seconds = 0;
   const bool recordPace = forward && forwardPageReadElapsed(seconds, "remote");
   recordCurrentPageReadingTime("remote");
-  if (forward && currentPage < xtc->getPageCount()) ++currentPage;
-  else if (!forward && currentPage > 0) --currentPage;
+  if (forward && currentPage < xtc->getPageCount())
+    ++currentPage;
+  else if (!forward && currentPage > 0)
+    --currentPage;
   const bool changed = currentPage != old;
   if (changed && recordPace) recordForwardPageTurn(seconds, true);
   notePageTurn(forward, changed);
@@ -1522,7 +1537,7 @@ void XtcReaderActivity::refreshStatsAfterOverlay() {
     recordCurrentPageReadingTime("global_reset");
     GlobalReadingStats discarded;
     BookStatsTracking::commitSession(stats, discarded, sessionReadingSeconds,
-        hasSessionStartLocalDateTime ? &sessionStartLocalDateTime : nullptr);
+                                     hasSessionStartLocalDateTime ? &sessionStartLocalDateTime : nullptr);
     sessionReadingSeconds = 0;
     hasSessionStartLocalDateTime = getCurrentLocalReadingStatsDateTime(sessionStartLocalDateTime);
     globalStats = disk;

@@ -28,6 +28,10 @@ add_library(crosspoint_test_common INTERFACE)
 target_include_directories(crosspoint_test_common INTERFACE
   ${REPO_ROOT}
   ${REPO_ROOT}/lib
+  ${REPO_ROOT}/lib/Memory
+  ${REPO_ROOT}/lib/MemoryBudget
+  ${REPO_ROOT}/lib/AsciiText
+  ${REPO_ROOT}/freeink-sdk/libs/font/FreeInkFont/include
 )
 target_compile_options(crosspoint_test_common INTERFACE
   -Wall
@@ -40,6 +44,9 @@ if(CROSSPOINT_HOST_SANITIZE)
   target_compile_options(crosspoint_test_common INTERFACE -fsanitize=address,undefined -fno-omit-frame-pointer)
   target_link_options(crosspoint_test_common INTERFACE -fsanitize=address,undefined)
 endif()
+
+# Shared imported target must be visible to sibling parser/model harnesses.
+find_package(EXPAT REQUIRED)
 
 enable_testing()
 include(GoogleTest)
@@ -104,6 +111,13 @@ add_subdirectory(plugin_picker_layout)
 add_subdirectory(protected_paths)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME HalRetainedOverlayNormal
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/crosspoint_migration/hal-retained-overlay/run.py
+          --mode normal --evidence ${CMAKE_CURRENT_BINARY_DIR}/hal-retained-overlay-normal-evidence)
+add_test(NAME HalRetainedOverlaySanitized
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/crosspoint_migration/hal-retained-overlay/run.py
+          --mode sanitized --evidence ${CMAKE_CURRENT_BINARY_DIR}/hal-retained-overlay-sanitized-evidence)
+set_tests_properties(HalRetainedOverlayNormal HalRetainedOverlaySanitized PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE)
 add_test(NAME translation_spacing COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_translation_spacing.py)
 add_test(NAME TrustedTimeTimezone COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_trusted_time.py)
 add_test(NAME RemoteButtonInputIntegration COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_remote_button_input.py)

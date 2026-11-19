@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
-#include "activities/Activity.h"
 #include "CrossPointSettings.h"
+#include "activities/Activity.h"
 #include "components/UiAppHost.h"
 #include "util/ButtonNavigator.h"
 
@@ -25,8 +25,8 @@ const ReaderStatusBarConfig& config(ReaderStatusBarPosition position, bool xtc =
 int height(const GfxRenderer& renderer, ReaderStatusBarPosition position, bool xtc = false, bool forceText = false);
 Rect band(const GfxRenderer& renderer, ReaderStatusBarPosition position, bool xtc = false, bool forceText = false);
 bool tapped(const GfxRenderer& renderer, int y, bool xtc = false, bool forceFooter = false);
-void draw(const GfxRenderer& renderer, ReaderStatusBarPosition position, const Values& values,
-          bool visible = true, bool xtc = false);
+void draw(const GfxRenderer& renderer, ReaderStatusBarPosition position, const Values& values, bool visible = true,
+          bool xtc = false);
 }  // namespace ReaderChrome
 
 class XtcReaderMenuActivity final : public Activity {

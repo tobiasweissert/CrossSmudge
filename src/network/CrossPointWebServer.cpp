@@ -1,12 +1,4 @@
 #include "CrossPointWebServer.h"
-#include "AppVersion.h"
-#include "activities/apps/lua/AppPackage.h"
-#include "activities/boot_sleep/ImageFolderIndex.h"
-#include "html/ApplicationsPageHtml.generated.h"
-#include "html/LogoPng.generated.h"
-#include "html/StyleCss.generated.h"
-#include "util/StringUtils.h"
-
 
 #include <ArduinoJson.h>
 #include <BoardConfig.h>
@@ -45,6 +37,7 @@
 #include <cstring>
 #include <string_view>
 
+#include "AppVersion.h"
 #include "ClippingStore.h"
 #include "CrossPointSettings.h"
 #include "FontInstaller.h"
@@ -55,12 +48,18 @@
 #include "WebDAVHandler.h"
 #include "WifiCredentialStore.h"
 #include "WifiPowerSaveGuard.h"
+#include "activities/apps/lua/AppPackage.h"
+#include "activities/boot_sleep/ImageFolderIndex.h"
+#include "activities/home/BookActions.h"
+#include "html/ApplicationsPageHtml.generated.h"
 #include "html/FilesPageHtml.generated.h"
 #include "html/FontsPageHtml.generated.h"
 #include "html/HomePageHtml.generated.h"
+#include "html/LogoPng.generated.h"
 #include "html/PluginsPageHtml.generated.h"
 #include "html/RunnerPageHtml.generated.h"
 #include "html/SettingsPageHtml.generated.h"
+#include "html/StyleCss.generated.h"
 #include "html/assets/crosspoint_iconSvg.generated.h"
 #include "html/assets/iconsSvg.generated.h"
 #include "html/assets/webCss.generated.h"
@@ -69,11 +68,11 @@
 #include "html/js/plugin_hostJs.generated.h"
 #include "util/BookCacheUtils.h"
 #include "util/BookMoveUtils.h"
-#include "activities/home/BookActions.h"
 #include "util/DictionaryRegistry.h"
 #include "util/FirmwareIdentity.h"
 #include "util/PluginHttp.h"
 #include "util/PluginLocations.h"
+#include "util/StringUtils.h"
 #include "util/TaskWatchdog.h"
 #include "util/UrlUtils.h"
 
@@ -85,7 +84,8 @@ namespace {
 // canonical-path checks. Prefix matching also protects temp/backup siblings.
 bool networkCredentialPath(const char* path) {
   std::string mapped(path);
-  for (char& c : mapped) if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+  for (char& c : mapped)
+    if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
   const auto mapFamily = [&](const char* from, const char* to) {
     size_t at = 0;
     while ((at = mapped.find(from, at)) != std::string::npos) {
@@ -1670,8 +1670,10 @@ void CrossPointWebServer::handleGetSettings() const {
             break;
           }
         }
-        if (display < 0) doc["value"] = nullptr;
-        else doc["value"] = display;
+        if (display < 0)
+          doc["value"] = nullptr;
+        else
+          doc["value"] = display;
         if (toggle) break;
         JsonArray options = doc["options"].to<JsonArray>();
         if (!s.enumStringValues.empty()) {
@@ -1762,9 +1764,12 @@ void CrossPointWebServer::handlePostSettings() {
         if (!doc[s.key].is<bool>() && !doc[s.key].is<int>()) break;
         const int val = doc[s.key].is<bool>() ? (doc[s.key].as<bool>() ? 1 : 0) : doc[s.key].as<int>();
         if (val != 0 && val != 1) break;
-        if (s.valuePtr) SETTINGS.*(s.valuePtr) = static_cast<uint8_t>(val);
-        else if (s.valueSetter) s.valueSetter(static_cast<uint8_t>(val));
-        else break;
+        if (s.valuePtr)
+          SETTINGS.*(s.valuePtr) = static_cast<uint8_t>(val);
+        else if (s.valueSetter)
+          s.valueSetter(static_cast<uint8_t>(val));
+        else
+          break;
         applied++;
         break;
       }
@@ -1773,11 +1778,15 @@ void CrossPointWebServer::handlePostSettings() {
         const int val = doc[s.key].is<bool>() ? (doc[s.key].as<bool>() ? 1 : 0) : doc[s.key].as<int>();
         const size_t count = settingEnumOptionCount(s);
         if (val < 0 || static_cast<size_t>(val) >= count || val > UINT8_MAX ||
-            (!s.enumRawValues.empty() && s.enumRawValues.size() != count)) break;
+            (!s.enumRawValues.empty() && s.enumRawValues.size() != count))
+          break;
         const uint8_t raw = s.enumRawValues.empty() ? static_cast<uint8_t>(val) : s.enumRawValues[val];
-        if (s.valuePtr) SETTINGS.*(s.valuePtr) = raw;
-        else if (s.valueSetter) s.valueSetter(raw);
-        else break;
+        if (s.valuePtr)
+          SETTINGS.*(s.valuePtr) = raw;
+        else if (s.valueSetter)
+          s.valueSetter(raw);
+        else
+          break;
         applied++;
         break;
       }
@@ -1785,10 +1794,14 @@ void CrossPointWebServer::handlePostSettings() {
         if (!doc[s.key].is<int>()) break;
         const int val = doc[s.key].as<int>();
         if (val < s.valueRange.min || val > s.valueRange.max || !s.valueRange.step ||
-            (val - s.valueRange.min) % s.valueRange.step != 0) break;
-        if (s.value16Ptr) SETTINGS.*(s.value16Ptr) = static_cast<uint16_t>(val);
-        else if (s.valuePtr && val <= UINT8_MAX) SETTINGS.*(s.valuePtr) = static_cast<uint8_t>(val);
-        else break;
+            (val - s.valueRange.min) % s.valueRange.step != 0)
+          break;
+        if (s.value16Ptr)
+          SETTINGS.*(s.value16Ptr) = static_cast<uint16_t>(val);
+        else if (s.valuePtr && val <= UINT8_MAX)
+          SETTINGS.*(s.valuePtr) = static_cast<uint8_t>(val);
+        else
+          break;
         applied++;
         break;
       }
@@ -2855,7 +2868,8 @@ void CrossPointWebServer::handlePluginFsUpload() {
         return;
       }
       const String plugin = server->arg("plugin");
-      if (!safeComponent(plugin) || (!protectedpaths::isPluginPath(st.path) || networkCredentialPath(st.path.c_str()))) {
+      if (!safeComponent(plugin) ||
+          (!protectedpaths::isPluginPath(st.path) || networkCredentialPath(st.path.c_str()))) {
         LOG_ERR("WEB", "Rejected plugin file write: plugin='%s' path='%s'", plugin.c_str(), st.path.c_str());
         fail(400, "bad path");
         return;
@@ -2935,7 +2949,8 @@ void CrossPointWebServer::handleBookKey() {
   const int64_t expires = req["expires"] | static_cast<int64_t>(0);
   uint8_t key[bookkey::MAX_KEY_LEN];
   const int32_t n = freeink::content::base64Decode(keyB64, strlen(keyB64), key, sizeof(key));
-  if ((!protectedpaths::isPluginPath(path) || networkCredentialPath(path.c_str())) || (n != 16 && n != 32) || expires < 0) {
+  if ((!protectedpaths::isPluginPath(path) || networkCredentialPath(path.c_str())) || (n != 16 && n != 32) ||
+      expires < 0) {
     server->send(400, "application/json", "{\"error\":\"bad path/key\"}");
     return;
   }
@@ -3637,7 +3652,7 @@ class FontListJsonWriter {
   size_t length_ = 0;
 };
 
-}
+}  // namespace
 
 // --- Application management handlers ---
 
@@ -3698,9 +3713,9 @@ std::string findAppDirectory(const char* appId) {
 }
 }  // namespace
 
-
 void CrossPointWebServer::handleApplicationsPage() const {
-  sendStaticContent(server.get(), ApplicationsPageHtml, sizeof(ApplicationsPageHtml), ApplicationsPageHtmlETag, "text/html");
+  sendStaticContent(server.get(), ApplicationsPageHtml, sizeof(ApplicationsPageHtml), ApplicationsPageHtmlETag,
+                    "text/html");
 }
 
 void CrossPointWebServer::handleApplicationsList() const {
@@ -4039,7 +4054,6 @@ void CrossPointWebServer::handleStyleCss() const {
   server->sendHeader("Cache-Control", "public, max-age=31536000, immutable");
   server->send_P(200, "text/css", StyleCss, StyleCssCompressedSize);
 }
-
 
 void CrossPointWebServer::handleLogo() const {
   // Raw PNG (already compressed); no Content-Encoding.

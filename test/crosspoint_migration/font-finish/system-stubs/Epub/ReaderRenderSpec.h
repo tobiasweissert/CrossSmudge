@@ -1,2 +1,3 @@
 #pragma once
-enum class EpubRenderMode {CrossSmudgeDefault};struct ReaderRenderSpec {};
+enum class EpubRenderMode { CrossSmudgeDefault };
+struct ReaderRenderSpec {};

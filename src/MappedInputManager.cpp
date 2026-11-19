@@ -143,7 +143,7 @@ size_t buttonIndex(MappedInputManager::Button button) { return static_cast<size_
 }  // namespace
 
 void MappedInputManager::update(const bool deferHomeButtonAction) const {
-  (void)deferHomeButtonAction; // owner deferred-Home state is managed explicitly by its dispatcher
+  (void)deferHomeButtonAction;  // owner deferred-Home state is managed explicitly by its dispatcher
   remoteInput.reset();
 #if CROSSINK_APP_CAP_AIRDROP
   const auto capturedEpoch = airdrop::input::capture.begin();
@@ -188,9 +188,11 @@ bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint
 
   switch (button) {
     case Button::NavNext:
-      return isNavDirectionSwapped() ? (mapButton(Button::Up, fn) || mapButton(Button::Left, fn)) : (mapButton(Button::Down, fn) || mapButton(Button::Right, fn));
+      return isNavDirectionSwapped() ? (mapButton(Button::Up, fn) || mapButton(Button::Left, fn))
+                                     : (mapButton(Button::Down, fn) || mapButton(Button::Right, fn));
     case Button::NavPrevious:
-      return isNavDirectionSwapped() ? (mapButton(Button::Down, fn) || mapButton(Button::Right, fn)) : (mapButton(Button::Up, fn) || mapButton(Button::Left, fn));
+      return isNavDirectionSwapped() ? (mapButton(Button::Down, fn) || mapButton(Button::Right, fn))
+                                     : (mapButton(Button::Up, fn) || mapButton(Button::Left, fn));
     case Button::ScreenLeft:
     case Button::ScreenRight:
     case Button::ScreenUp:
@@ -782,8 +784,12 @@ bool MappedInputManager::wasLightPanelGesture() const { return hasHomeKeyHardwar
 bool MappedInputManager::wasPressed(const Button button) const {
   if (remoteMatches(button)) return true;
   if (button >= Button::ScreenLeft && button <= Button::ScreenDown) return wasPressed(mapScreenDirection(button));
-  if (button == Button::NavNext) return isNavDirectionSwapped() ? (wasPressed(Button::Up) || wasPressed(Button::Left)) : (wasPressed(Button::Down) || wasPressed(Button::Right));
-  if (button == Button::NavPrevious) return isNavDirectionSwapped() ? (wasPressed(Button::Down) || wasPressed(Button::Right)) : (wasPressed(Button::Up) || wasPressed(Button::Left));
+  if (button == Button::NavNext)
+    return isNavDirectionSwapped() ? (wasPressed(Button::Up) || wasPressed(Button::Left))
+                                   : (wasPressed(Button::Down) || wasPressed(Button::Right));
+  if (button == Button::NavPrevious)
+    return isNavDirectionSwapped() ? (wasPressed(Button::Down) || wasPressed(Button::Right))
+                                   : (wasPressed(Button::Up) || wasPressed(Button::Left));
 
 #ifdef SIMULATOR
   if (simulatorPressed[buttonIndex(button)]) {
@@ -825,8 +831,12 @@ bool MappedInputManager::wasReleased(const Button button) const {
   if (remoteMatches(button)) return true;
   if (suppressedReleaseButtons & (1u << static_cast<uint8_t>(button))) return false;
   if (button >= Button::ScreenLeft && button <= Button::ScreenDown) return wasReleased(mapScreenDirection(button));
-  if (button == Button::NavNext) return isNavDirectionSwapped() ? (wasReleased(Button::Up) || wasReleased(Button::Left)) : (wasReleased(Button::Down) || wasReleased(Button::Right));
-  if (button == Button::NavPrevious) return isNavDirectionSwapped() ? (wasReleased(Button::Down) || wasReleased(Button::Right)) : (wasReleased(Button::Up) || wasReleased(Button::Left));
+  if (button == Button::NavNext)
+    return isNavDirectionSwapped() ? (wasReleased(Button::Up) || wasReleased(Button::Left))
+                                   : (wasReleased(Button::Down) || wasReleased(Button::Right));
+  if (button == Button::NavPrevious)
+    return isNavDirectionSwapped() ? (wasReleased(Button::Down) || wasReleased(Button::Right))
+                                   : (wasReleased(Button::Up) || wasReleased(Button::Left));
 
   if (injectedReleases[static_cast<size_t>(button)]) {
     return true;
@@ -913,8 +923,12 @@ bool MappedInputManager::wasReleased(const Button button) const {
 
 bool MappedInputManager::isPressed(const Button button) const {
   if (button >= Button::ScreenLeft && button <= Button::ScreenDown) return isPressed(mapScreenDirection(button));
-  if (button == Button::NavNext) return isNavDirectionSwapped() ? (isPressed(Button::Up) || isPressed(Button::Left)) : (isPressed(Button::Down) || isPressed(Button::Right));
-  if (button == Button::NavPrevious) return isNavDirectionSwapped() ? (isPressed(Button::Down) || isPressed(Button::Right)) : (isPressed(Button::Up) || isPressed(Button::Left));
+  if (button == Button::NavNext)
+    return isNavDirectionSwapped() ? (isPressed(Button::Up) || isPressed(Button::Left))
+                                   : (isPressed(Button::Down) || isPressed(Button::Right));
+  if (button == Button::NavPrevious)
+    return isNavDirectionSwapped() ? (isPressed(Button::Down) || isPressed(Button::Right))
+                                   : (isPressed(Button::Up) || isPressed(Button::Left));
 
 #ifdef SIMULATOR
   if (simulatorHeld[buttonIndex(button)]) {
@@ -944,9 +958,14 @@ bool MappedInputManager::isPressed(const Button button) const {
 }
 
 bool MappedInputManager::isPhysicalPressed(const Button button) const {
-  if (button >= Button::ScreenLeft && button <= Button::ScreenDown) return isPhysicalPressed(mapScreenDirection(button));
-  if (button == Button::NavNext) return isNavDirectionSwapped() ? (isPhysicalPressed(Button::Up) || isPhysicalPressed(Button::Left)) : (isPhysicalPressed(Button::Down) || isPhysicalPressed(Button::Right));
-  if (button == Button::NavPrevious) return isNavDirectionSwapped() ? (isPhysicalPressed(Button::Down) || isPhysicalPressed(Button::Right)) : (isPhysicalPressed(Button::Up) || isPhysicalPressed(Button::Left));
+  if (button >= Button::ScreenLeft && button <= Button::ScreenDown)
+    return isPhysicalPressed(mapScreenDirection(button));
+  if (button == Button::NavNext)
+    return isNavDirectionSwapped() ? (isPhysicalPressed(Button::Up) || isPhysicalPressed(Button::Left))
+                                   : (isPhysicalPressed(Button::Down) || isPhysicalPressed(Button::Right));
+  if (button == Button::NavPrevious)
+    return isNavDirectionSwapped() ? (isPhysicalPressed(Button::Down) || isPhysicalPressed(Button::Right))
+                                   : (isPhysicalPressed(Button::Up) || isPhysicalPressed(Button::Left));
 
 #ifdef SIMULATOR
   if (simulatorHeld[buttonIndex(button)]) {
@@ -1238,17 +1257,23 @@ MappedInputManager::Button MappedInputManager::mapScreenDirection(const Button b
 
 bool MappedInputManager::remoteMatches(const Button button) const {
   switch (remoteInput.button) {
-    case RemoteButton::Confirm: return button == Button::Confirm;
-    case RemoteButton::Back: return button == Button::Back;
-    case RemoteButton::Next: return button == Button::NavNext || button == Button::Right || button == Button::PageForward;
-    case RemoteButton::Previous: return button == Button::NavPrevious || button == Button::Left || button == Button::PageBack;
-    default: return false;
+    case RemoteButton::Confirm:
+      return button == Button::Confirm;
+    case RemoteButton::Back:
+      return button == Button::Back;
+    case RemoteButton::Next:
+      return button == Button::NavNext || button == Button::Right || button == Button::PageForward;
+    case RemoteButton::Previous:
+      return button == Button::NavPrevious || button == Button::Left || button == Button::PageBack;
+    default:
+      return false;
   }
 }
 bool MappedInputManager::injectRemoteClick(const RemoteButton button) {
   // Never combine remote activation with a physical or in-progress screen contact.
-  if (gpio.wasAnyPressed() || gpio.wasAnyReleased() || isScreenContactActive() ||
-      isPhysicalPressed(Button::Confirm) || isPhysicalPressed(Button::Back) || isPhysicalPressed(Button::Power)) return false;
+  if (gpio.wasAnyPressed() || gpio.wasAnyReleased() || isScreenContactActive() || isPhysicalPressed(Button::Confirm) ||
+      isPhysicalPressed(Button::Back) || isPhysicalPressed(Button::Power))
+    return false;
   return remoteInput.click(button);
 }
 bool MappedInputManager::wasLongPressed(const Button button, const unsigned long thresholdMs) const {
@@ -1262,14 +1287,13 @@ bool MappedInputManager::wasLongPressed(const Button button, const unsigned long
 bool MappedInputManager::consumeSuppressedRelease() const {
   bool consumed = false;
   for (uint8_t n = 0; n < BUTTON_COUNT; ++n) {
-    if ((suppressedReleaseButtons & (1u << n)) && mapButton(static_cast<Button>(n), &HalGPIO::wasReleased)) consumed = true;
+    if ((suppressedReleaseButtons & (1u << n)) && mapButton(static_cast<Button>(n), &HalGPIO::wasReleased))
+      consumed = true;
   }
   // Keep the mask for the full frame, just like owner's Back/Confirm/Power suppressions.
   return consumed;
 }
-bool MappedInputManager::wasScreenTouchPressed(int& x, int& y) const {
-  return wasScreenTouchDown(x, y);
-}
+bool MappedInputManager::wasScreenTouchPressed(int& x, int& y) const { return wasScreenTouchDown(x, y); }
 MappedInputManager::SwipeDir MappedInputManager::wasSwipe(int* startX, int* startY) const {
   SwipeDir direction = SwipeDir::None;
   int sx = 0, sy = 0, ex = 0, ey = 0;
@@ -1279,7 +1303,8 @@ MappedInputManager::SwipeDir MappedInputManager::wasSwipe(int* startX, int* star
   return direction;
 }
 MappedInputManager::Labels MappedInputManager::mapDirectionalLabels(const char* back, const char* confirm,
-    const char* left, const char* right, const char* up, const char* down) const {
+                                                                    const char* left, const char* right, const char* up,
+                                                                    const char* down) const {
   const auto forRaw = [&](const Button raw) {
     if (mapScreenDirection(Button::ScreenLeft) == raw) return left;
     if (mapScreenDirection(Button::ScreenRight) == raw) return right;

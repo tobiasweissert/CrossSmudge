@@ -1,7 +1,7 @@
 #pragma once
 #include <Arduino.h>
-#include <EInkDisplay.h>
 #include <BoardConfig.h>
+#include <EInkDisplay.h>
 
 class HalDisplay {
  public:
@@ -103,6 +103,9 @@ class HalDisplay {
   void cleanupGrayscaleBuffers(const uint8_t* bwBuffer);
 
   void displayGrayBuffer(bool turnOffScreen = false);
+
+  // Retained overlay rectangle in physical panel coordinates; SDK owns validation.
+  bool displayRetainedGrayscaleOverlay(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool restore = false);
 
   // Tiled grayscale: stream one band of a plane (lsbPlane selects LSB/MSB RAM)
   // straight to the controller; supportsStripGrayscale() gates the path. See

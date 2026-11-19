@@ -13,5 +13,7 @@ target_include_directories(ZipFileTest PRIVATE
   ${REPO_ROOT}/lib/hal
   ${REPO_ROOT}/lib/miniz/src
 )
+target_include_directories(ZipFileTest PRIVATE ${REPO_ROOT}/lib/MemoryBudget ${REPO_ROOT}/lib/Memory)
+target_include_directories(ZipFileTest PRIVATE ${REPO_ROOT}/test/chapter_html_slim_parser/stubs)
 target_link_libraries(ZipFileTest PRIVATE crosspoint_test_common GTest::gtest_main)
 gtest_discover_tests(ZipFileTest)

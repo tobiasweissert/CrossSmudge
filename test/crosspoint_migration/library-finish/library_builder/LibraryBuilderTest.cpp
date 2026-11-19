@@ -884,9 +884,9 @@ TEST_F(LibraryBuilderTest, EveryAllocationFailureFailsCleanlyOrBuildsTheSameInde
     const bool built = buildLibraryIndex("/", stats, false);
     const bool injected = fake::failureTriggered;
     fake::failAlloc = -1;
-    for (const char* scratch :
-         {"/.crosspoint/crosscub-library-v7.stage", "/.crosspoint/crosscub-library-v7.order", "/.crosspoint/crosscub-library-v7.canon",
-          "/.crosspoint/crosscub-library-v7.authors", "/.crosspoint/crosscub-library-v7.runs", "/.crosspoint/crosscub-library-v7.prior"}) {
+    for (const char* scratch : {"/.crosspoint/crosscub-library-v7.stage", "/.crosspoint/crosscub-library-v7.order",
+                                "/.crosspoint/crosscub-library-v7.canon", "/.crosspoint/crosscub-library-v7.authors",
+                                "/.crosspoint/crosscub-library-v7.runs", "/.crosspoint/crosscub-library-v7.prior"}) {
       EXPECT_FALSE(Storage.exists(scratch)) << failAt << ' ' << scratch;
     }
     if (!built) {

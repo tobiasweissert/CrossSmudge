@@ -14,17 +14,18 @@
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "EpubReaderActivity.h"
-#include "ReaderUtils.h"
 #include "HapticFeedback.h"
+#include "ReaderUtils.h"
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
-#include "XtcReaderActivity.h"
 #include "TxtReaderActivity.h"
+#include "XtcReaderActivity.h"
 #include "util/PluginEvents.h"
 
 ReaderActivity::ReaderActivity(const char* name, GfxRenderer& renderer, MappedInputManager& mappedInput,
                                std::string bookPath, const bool allowFastInitialRefresh)
-    : Activity(name, renderer, mappedInput), bookPath(std::move(bookPath)),
+    : Activity(name, renderer, mappedInput),
+      bookPath(std::move(bookPath)),
       recentUpdateOnRender(!allowFastInitialRefresh) {
   if (allowFastInitialRefresh) {
     const int refreshFrequency = SETTINGS.getRefreshFrequency();
@@ -99,7 +100,7 @@ void ReaderActivity::rememberBookOnceRendered() {
   if (recentUpdateOnRender) {
     const auto thumb = getBookThumbBmpPath();
     RECENT_BOOKS.addOrUpdateBook(bookPath, getBookTitle(), getBookAuthor(), thumb,
-        thumb.empty() ? RecentBook::CoverState::Missing : RecentBook::CoverState::Unknown);
+                                 thumb.empty() ? RecentBook::CoverState::Missing : RecentBook::CoverState::Unknown);
   }
   const pluginevents::Var openVars[] = {{"book", bookPath.c_str()}};
   pluginevents::emit(pluginevents::Event::ReaderOpen, openVars, 1);
@@ -177,7 +178,8 @@ bool ReaderActivity::handleBackNavigation() {
   if (!mappedInput.wasReleased(MappedInputManager::Button::Back)) return false;
   if ((mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) != SETTINGS.backShortToFileBrowser)
     activityManager.goToFileBrowser(bookPath);
-  else onGoHome();
+  else
+    onGoHome();
   return true;
 }
 
@@ -269,7 +271,10 @@ void ReaderActivity::noteRenderedPage() {
 }
 
 bool ReaderActivity::handleForcedRefresh() {
-  { RenderLock lock(*this); if (!prepareManualRefresh()) return false; }
+  {
+    RenderLock lock(*this);
+    if (!prepareManualRefresh()) return false;
+  }
   requestUpdate();
   return true;
 }
@@ -280,7 +285,10 @@ bool ReaderActivity::routeIndependentSideShortcuts() {
                                          [this](const uint8_t action) { return handleSideShortcut(action); });
 }
 bool ReaderActivity::handleSideShortcut(const uint8_t action) {
-  if (action == CrossPointSettings::LIBRARY) { activityManager.goToLibrary(); return true; }
+  if (action == CrossPointSettings::LIBRARY) {
+    activityManager.goToLibrary();
+    return true;
+  }
   if (action == CrossPointSettings::PWR_READER_MENU) return remoteShortcut(true);
   if (action == CrossPointSettings::SIDE_PREVIOUS_CHAPTER) return skipPages(-10);
   if (action == CrossPointSettings::SIDE_NEXT_CHAPTER) return skipPages(10);

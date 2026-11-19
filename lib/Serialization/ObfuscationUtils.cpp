@@ -233,10 +233,10 @@ void selfTest() {
 
 namespace obfuscation {
 std::string deobfuscateFromBase64(const char* encoded, size_t maxDecodedLength, bool* ok, bool* tooLong) {
-  DecodeStatus status=DecodeStatus::INVALID;
-  auto result=deobfuscateFromBase64(encoded,maxDecodedLength,&status);
-  if(ok) *ok=status==DecodeStatus::VALIDATED || status==DecodeStatus::LEGACY;
-  if(tooLong) *tooLong=status==DecodeStatus::TOO_LONG;
+  DecodeStatus status = DecodeStatus::INVALID;
+  auto result = deobfuscateFromBase64(encoded, maxDecodedLength, &status);
+  if (ok) *ok = status == DecodeStatus::VALIDATED || status == DecodeStatus::LEGACY;
+  if (tooLong) *tooLong = status == DecodeStatus::TOO_LONG;
   return result;
 }
-}
+}  // namespace obfuscation

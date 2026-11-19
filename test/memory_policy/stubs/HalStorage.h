@@ -105,8 +105,9 @@ class HalStorage {
   bool rename(const char* from, const char* to) {
     const auto found = files_.find(from);
     if (found == files_.end() || files_.contains(to)) return false;
-    files_[to] = found->second;
+    auto data = found->second;
     files_.erase(found);
+    files_[to] = std::move(data);
     return true;
   }
 

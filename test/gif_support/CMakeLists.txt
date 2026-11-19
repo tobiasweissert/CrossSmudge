@@ -7,11 +7,23 @@ if(NOT ANIMATEDGIF_SOURCE_DIR)
   FetchContent_MakeAvailable(animatedgif)
   set(ANIMATEDGIF_SOURCE_DIR "${animatedgif_SOURCE_DIR}")
 endif()
+option(ANIMATEDGIF_SOURCE_PREPATCHED "Reuse reviewed prepatched AnimatedGIF without modifying it" OFF)
+if(ANIMATEDGIF_SOURCE_PREPATCHED)
+  file(READ "${ANIMATEDGIF_SOURCE_DIR}/src/gif.inl" gif_decoder_source)
+  string(FIND "${gif_decoder_source}" "if (iBytesRead < iOffset + 3*(1<<iColorTableBits))" gif_palette_patch)
+  string(FIND "${gif_decoder_source}" "while (pEnd - buf >= (int)sizeof(BIGUINT))" gif_copy_patch)
+  file(READ "${ANIMATEDGIF_SOURCE_DIR}/src/AnimatedGIF.h" gif_header_source)
+  string(FIND "${gif_header_source}" "#ifndef MAX_WIDTH" gif_width_patch)
+  if(gif_palette_patch EQUAL -1 OR gif_copy_patch EQUAL -1 OR gif_width_patch EQUAL -1)
+    message(FATAL_ERROR "ANIMATEDGIF_SOURCE_PREPATCHED requires the reviewed width/palette/copy patches")
+  endif()
+else()
 execute_process(
   COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/scripts/patch_animatedgif.py ${ANIMATEDGIF_SOURCE_DIR}
   RESULT_VARIABLE gif_patch_result)
 if(NOT gif_patch_result EQUAL 0)
   message(FATAL_ERROR "AnimatedGIF host dependency patch failed")
+endif()
 endif()
 add_library(animatedgif_host STATIC ${ANIMATEDGIF_SOURCE_DIR}/src/AnimatedGIF.cpp)
 target_include_directories(animatedgif_host PUBLIC ${ANIMATEDGIF_SOURCE_DIR}/src)
@@ -19,6 +31,7 @@ target_compile_definitions(animatedgif_host PUBLIC __LINUX__ MAX_WIDTH=3072)
 
 add_executable(GifSupportTest GifSupportTest.cpp PixelCacheTest.cpp GifDecoderTest.cpp)
 target_include_directories(GifSupportTest PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/stubs
   ${REPO_ROOT}/lib/GifSupport
   ${REPO_ROOT}/test/chapter_html_slim_parser/stubs)
 target_link_libraries(GifSupportTest PRIVATE crosspoint_test_common GTest::gtest_main animatedgif_host)

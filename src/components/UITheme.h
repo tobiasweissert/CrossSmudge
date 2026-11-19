@@ -19,8 +19,9 @@ class UITheme {
   static Rect getContentArea(const GfxRenderer& renderer);
   Rect getHeaderRect(const GfxRenderer& renderer, bool hasFrontButtonHints = false, bool hasSideButtonHints = false);
   static void drawCenteredWrappedText(const GfxRenderer& renderer, Rect bounds, int fontId, const char* text,
-                                     int maxLines, bool black = true, EpdFontFamily::Style style = EpdFontFamily::REGULAR,
-                                     TextVerticalAlignment verticalAlignment = TextVerticalAlignment::CENTER);
+                                      int maxLines, bool black = true,
+                                      EpdFontFamily::Style style = EpdFontFamily::REGULAR,
+                                      TextVerticalAlignment verticalAlignment = TextVerticalAlignment::CENTER);
   static bool supportsCoverGrid();
   static bool hasCoverGridHome();
   static void drawCoverGridHome(CoverGridHomeUi& home);

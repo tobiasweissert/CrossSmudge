@@ -8,7 +8,7 @@
 // are deliberately not accepted or persisted as if they affected rasterization.
 struct TtfRenderProfile {
   bool twoBit = true;
-  uint16_t cacheKiB = 1024; // PSRAM reader cache; non-PSRAM fallback stays capped at 32 KiB.
+  uint16_t cacheKiB = 1024;  // PSRAM reader cache; non-PSRAM fallback stays capped at 32 KiB.
   uint16_t maxGlyphs = 4096;
   bool operator==(const TtfRenderProfile&) const = default;
   bool valid() const { return cacheKiB >= 16 && cacheKiB <= 1024 && maxGlyphs >= 128 && maxGlyphs <= 4096; }
@@ -23,8 +23,12 @@ class TtfRenderProfileStore {
   TtfRenderProfile profileFor(const char* family) const;
   bool setProfile(const char* family, const TtfRenderProfile& profile);
   bool resetProfile(const char* family);
+
  private:
-  struct Entry { std::string family; TtfRenderProfile profile; };
+  struct Entry {
+    std::string family;
+    TtfRenderProfile profile;
+  };
   static constexpr size_t MAX_PROFILES = 24;
   std::vector<Entry> entries_;
   bool decode(const char* path, std::vector<Entry>& out) const;

@@ -1,23 +1,23 @@
 #include "XtcReaderMenuActivity.h"
 
 #include <GfxRenderer.h>
-#include <I18n.h>
 #include <HalClock.h>
 #include <HalPowerManager.h>
-#include <cstdio>
+#include <I18n.h>
 
 #include <algorithm>
 #include <array>
+#include <cstdio>
 #include <utility>
 
 #include "CrossPointSettings.h"
 #include "MappedInputManager.h"
+#include "components/HeaderDate.h"
 #include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
 #include "components/UIThemeTokens.h"
 #include "components/UiAppHelpers.h"
 #include "fontIds.h"
-#include "components/HeaderDate.h"
 
 namespace ReaderChrome {
 const ReaderStatusBarConfig& config(const ReaderStatusBarPosition position, const bool xtc) {
@@ -26,13 +26,18 @@ const ReaderStatusBarConfig& config(const ReaderStatusBarPosition position, cons
 }
 
 int height(const GfxRenderer& renderer, const ReaderStatusBarPosition position, const bool xtc, const bool forceText) {
-  if (xtc && ((position == ReaderStatusBarPosition::Top && SETTINGS.xtcStatusBarMode != CrossPointSettings::XTC_STATUS_BAR_TOP) ||
-              (position == ReaderStatusBarPosition::Bottom && SETTINGS.xtcStatusBarMode != CrossPointSettings::XTC_STATUS_BAR_BOTTOM))) return 0;
+  if (xtc && ((position == ReaderStatusBarPosition::Top &&
+               SETTINGS.xtcStatusBarMode != CrossPointSettings::XTC_STATUS_BAR_TOP) ||
+              (position == ReaderStatusBarPosition::Bottom &&
+               SETTINGS.xtcStatusBarMode != CrossPointSettings::XTC_STATUS_BAR_BOTTOM)))
+    return 0;
   const auto& bar = config(position, xtc);
-  const int progress = bar.progressBar == CrossPointSettings::HIDE_PROGRESS ? 0 :
-                       (std::min<int>(bar.progressBarThickness, 2) + 1) * 2 + 2;
-  return readerStatusBarTotalHeight(position, (forceText || bar.hasTextItems(halClock.isAvailable())), progress,
-                                    std::max(renderer.getLineHeight(SMALL_FONT_ID), ReaderStatusBarConfig::BOOKMARK_HEIGHT) + 4);
+  const int progress = bar.progressBar == CrossPointSettings::HIDE_PROGRESS
+                           ? 0
+                           : (std::min<int>(bar.progressBarThickness, 2) + 1) * 2 + 2;
+  return readerStatusBarTotalHeight(
+      position, (forceText || bar.hasTextItems(halClock.isAvailable())), progress,
+      std::max(renderer.getLineHeight(SMALL_FONT_ID), ReaderStatusBarConfig::BOOKMARK_HEIGHT) + 4);
 }
 
 Rect band(const GfxRenderer& renderer, const ReaderStatusBarPosition position, const bool xtc, const bool forceText) {
@@ -51,15 +56,17 @@ bool tapped(const GfxRenderer& renderer, const int y, const bool xtc, const bool
   return false;
 }
 
-void draw(const GfxRenderer& renderer, const ReaderStatusBarPosition position, const Values& values,
-          const bool visible, const bool xtc) {
-  const auto rect = band(renderer, position, xtc, !values.notice.empty() && position == ReaderStatusBarPosition::Bottom);
+void draw(const GfxRenderer& renderer, const ReaderStatusBarPosition position, const Values& values, const bool visible,
+          const bool xtc) {
+  const auto rect =
+      band(renderer, position, xtc, !values.notice.empty() && position == ReaderStatusBarPosition::Bottom);
   if (rect.width <= 0 || rect.height <= 0) return;
   // Fixed image formats must erase their baked-in strip even when hidden.
   renderer.fillRect(rect.x, rect.y, rect.width, rect.height, false);
   if (!visible) return;
   const auto& bar = config(position, xtc);
-  const int bookmarkReserve = position == ReaderStatusBarPosition::Bottom ? ReaderStatusBarConfig::BOOKMARK_WIDTH + 5 : 0;
+  const int bookmarkReserve =
+      position == ReaderStatusBarPosition::Bottom ? ReaderStatusBarConfig::BOOKMARK_WIDTH + 5 : 0;
   if (values.bookmarked && bookmarkReserve) {
     const int bookmarkY = rect.y + std::max(0, (rect.height - ReaderStatusBarConfig::BOOKMARK_HEIGHT) / 2);
     for (int x = 0; x < ReaderStatusBarConfig::BOOKMARK_WIDTH; ++x) {
@@ -72,28 +79,45 @@ void draw(const GfxRenderer& renderer, const ReaderStatusBarPosition position, c
     std::string value;
     switch (bar.slots[slot]) {
       case ReaderStatusBarItem::Clock:
-        if (halClock.isAvailable()) halClock.formatTime(buffer, sizeof(buffer), SETTINGS.clockUtcOffsetQ, SETTINGS.clockFormat == 1);
+        if (halClock.isAvailable())
+          halClock.formatTime(buffer, sizeof(buffer), SETTINGS.clockUtcOffsetQ, SETTINGS.clockFormat == 1);
         break;
-      case ReaderStatusBarItem::Date: formatHeaderDateText(buffer, sizeof(buffer)); break;
+      case ReaderStatusBarItem::Date:
+        formatHeaderDateText(buffer, sizeof(buffer));
+        break;
       case ReaderStatusBarItem::Battery:
-        snprintf(buffer, sizeof(buffer), "%u%%", static_cast<unsigned>(powerManager.getBatteryPercentage())); break;
-      case ReaderStatusBarItem::TimeLeftBook: value = values.timeBook; break;
-      case ReaderStatusBarItem::TimeLeftChapter: value = values.timeChapter; break;
+        snprintf(buffer, sizeof(buffer), "%u%%", static_cast<unsigned>(powerManager.getBatteryPercentage()));
+        break;
+      case ReaderStatusBarItem::TimeLeftBook:
+        value = values.timeBook;
+        break;
+      case ReaderStatusBarItem::TimeLeftChapter:
+        value = values.timeChapter;
+        break;
       case ReaderStatusBarItem::ChapterPageCount:
-        if (values.pages > 0) snprintf(buffer, sizeof(buffer), "%s%d/%d", values.estimated ? "~" : "", values.page, values.pages);
+        if (values.pages > 0)
+          snprintf(buffer, sizeof(buffer), "%s%d/%d", values.estimated ? "~" : "", values.page, values.pages);
         break;
       case ReaderStatusBarItem::StablePageNumber:
-        if (values.stablePages > 0 && values.stablePage > 0) snprintf(buffer, sizeof(buffer), "%d/%d", values.stablePage, values.stablePages);
+        if (values.stablePages > 0 && values.stablePage > 0)
+          snprintf(buffer, sizeof(buffer), "%d/%d", values.stablePage, values.stablePages);
         break;
       case ReaderStatusBarItem::BookProgressPercentage:
         snprintf(buffer, sizeof(buffer), "%.*f%%", std::min<int>(bar.percentageFormat, 2),
-                 static_cast<double>(std::clamp(values.bookPercent, 0.0f, 100.0f))); break;
-      case ReaderStatusBarItem::TitleBook: value = values.bookTitle; break;
-      case ReaderStatusBarItem::TitleChapter: value = values.chapterTitle; break;
-      default: break;
+                 static_cast<double>(std::clamp(values.bookPercent, 0.0f, 100.0f)));
+        break;
+      case ReaderStatusBarItem::TitleBook:
+        value = values.bookTitle;
+        break;
+      case ReaderStatusBarItem::TitleChapter:
+        value = values.chapterTitle;
+        break;
+      default:
+        break;
     }
     if (value.empty()) value = buffer;
-    if (slot == ReaderStatusBarConfig::CENTER && position == ReaderStatusBarPosition::Bottom && !values.notice.empty()) value = values.notice;
+    if (slot == ReaderStatusBarConfig::CENTER && position == ReaderStatusBarPosition::Bottom && !values.notice.empty())
+      value = values.notice;
     const int usable = rect.width - bookmarkReserve;
     const int x = rect.x + bookmarkReserve + usable * static_cast<int>(slot) / 7;
     const int end = rect.x + bookmarkReserve + usable * static_cast<int>(slot + 1) / 7;
@@ -101,7 +125,8 @@ void draw(const GfxRenderer& renderer, const ReaderStatusBarPosition position, c
     renderer.drawText(SMALL_FONT_ID, x + 2, rect.y + 2, label.c_str(), true);
   }
   if (bar.progressBar != CrossPointSettings::HIDE_PROGRESS) {
-    const float progress = bar.progressBar == CrossPointSettings::BOOK_PROGRESS ? values.bookPercent : values.chapterPercent;
+    const float progress =
+        bar.progressBar == CrossPointSettings::BOOK_PROGRESS ? values.bookPercent : values.chapterPercent;
     const int thickness = (std::min<int>(bar.progressBarThickness, 2) + 1) * 2;
     renderer.fillRect(rect.x, rect.y + rect.height - thickness,
                       static_cast<int>(rect.width * std::clamp(progress, 0.0f, 100.0f) / 100.0f), thickness, true);
@@ -120,7 +145,8 @@ constexpr fui::ActionId kActionRow = 1;
 }  // namespace
 
 XtcReaderMenuActivity::XtcReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string title,
-                                             const bool hasChapters, const bool isBookCompleted, const bool statsEnabled)
+                                             const bool hasChapters, const bool isBookCompleted,
+                                             const bool statsEnabled)
     : Activity("XtcReaderMenu", renderer, mappedInput),
       title(std::move(title)),
       items(buildMenuItems(hasChapters, isBookCompleted, mappedInput.hasTouchHardware())),

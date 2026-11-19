@@ -21,7 +21,7 @@ TEST(IsSafePathComponent, RejectsEmptyDotAndPathSeparators) {
   EXPECT_FALSE(FsHelpers::isSafePathComponent("a\\b"sv));
   EXPECT_FALSE(FsHelpers::isSafePathComponent("../x"sv));
 }
-}
+}  // namespace owner_path_admission
 
 namespace {
 

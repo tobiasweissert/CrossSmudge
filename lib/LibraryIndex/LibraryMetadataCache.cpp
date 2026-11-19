@@ -21,61 +21,99 @@ class SourceMetadataReader final : public Print {
       : container(container), service(service), stopped(stopped) {
     parser = XML_ParserCreate(nullptr);
     if (parser) {
-      XML_SetUserData(parser, this); XML_SetElementHandler(parser, start, end);
-      XML_SetCharacterDataHandler(parser, text); XML_SetStartDoctypeDeclHandler(parser, doctype);
+      XML_SetUserData(parser, this);
+      XML_SetElementHandler(parser, start, end);
+      XML_SetCharacterDataHandler(parser, text);
+      XML_SetStartDoctypeDeclHandler(parser, doctype);
       XML_SetParamEntityParsing(parser, XML_PARAM_ENTITY_PARSING_NEVER);
     }
   }
-  ~SourceMetadataReader() override { if (parser) XML_ParserFree(parser); }
+  ~SourceMetadataReader() override {
+    if (parser) XML_ParserFree(parser);
+  }
   size_t write(uint8_t value) override { return write(&value, 1); }
   size_t write(const uint8_t* bytes, size_t size) override {
     if (!parser || done || failed) return 0;
     if (service) service();
-    if ((stopped && stopped()) || size > 256u * 1024u - consumed) { failed = true; return 0; }
+    if ((stopped && stopped()) || size > 256u * 1024u - consumed) {
+      failed = true;
+      return 0;
+    }
     consumed += size;
-    if (XML_Parse(parser, reinterpret_cast<const char*>(bytes), static_cast<int>(size), false) == XML_STATUS_ERROR && !done)
+    if (XML_Parse(parser, reinterpret_cast<const char*>(bytes), static_cast<int>(size), false) == XML_STATUS_ERROR &&
+        !done)
       failed = true;
     return failed ? 0 : size;
   }
   bool valid() const { return parser && done && !failed; }
   std::string rootfile, title, author, series, genre, seriesIndex;
+
  private:
   XML_Parser parser = nullptr;
   bool container, done = false, failed = false;
-  void (*service)(); bool (*stopped)(); size_t consumed = 0;
+  void (*service)();
+  bool (*stopped)();
+  size_t consumed = 0;
   unsigned depth = 0, metadataDepth = 0, captureDepth = 0;
   std::string field, value, property, refines, id;
-  struct Collection { std::string id,title,type,index; };
-  std::array<Collection,8> collections;
-  size_t collectionCount=0;
+  struct Collection {
+    std::string id, title, type, index;
+  };
+  std::array<Collection, 8> collections;
+  size_t collectionCount = 0;
   Collection* collection(const std::string& key) {
-    if(key.empty()) return nullptr;
-    for(size_t i=0;i<collectionCount;++i) if(collections[i].id==key) return &collections[i];
-    if(collectionCount==collections.size()) return nullptr;
-    auto& c=collections[collectionCount++];c.id=key;return &c;
+    if (key.empty()) return nullptr;
+    for (size_t i = 0; i < collectionCount; ++i)
+      if (collections[i].id == key) return &collections[i];
+    if (collectionCount == collections.size()) return nullptr;
+    auto& c = collections[collectionCount++];
+    c.id = key;
+    return &c;
   }
   static std::string clean(const std::string& value) {
-    std::string out;bool space=false;
-    for(char c:value) {
-      if(c==' ' || c=='\t' || c=='\r' || c=='\n') { space=!out.empty();continue; }
-      if(space) out.push_back(' ');
-      space=false;out.push_back(c);
+    std::string out;
+    bool space = false;
+    for (char c : value) {
+      if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+        space = !out.empty();
+        continue;
+      }
+      if (space) out.push_back(' ');
+      space = false;
+      out.push_back(c);
     }
     return out;
   }
-  static const char* local(const char* n) { const char* c = std::strrchr(n, ':'); return c ? c + 1 : n; }
+  static const char* local(const char* n) {
+    const char* c = std::strrchr(n, ':');
+    return c ? c + 1 : n;
+  }
   static const char* attr(const char** a, const char* key) {
-    for (; a && *a; a += 2) if (!std::strcmp(*a, key)) return a[1];
+    for (; a && *a; a += 2)
+      if (!std::strcmp(*a, key)) return a[1];
     return "";
   }
-  static void bounded(std::string& to, const char* from, size_t n) { to.append(from, std::min(n, size_t(255) - to.size())); }
-  void complete() { done = true; XML_StopParser(parser, XML_FALSE); }
+  static void bounded(std::string& to, const char* from, size_t n) {
+    to.append(from, std::min(n, size_t(255) - to.size()));
+  }
+  void complete() {
+    done = true;
+    XML_StopParser(parser, XML_FALSE);
+  }
   static void doctype(void* u, const char*, const char*, const char*, int) {
-    auto& p = *static_cast<SourceMetadataReader*>(u); p.failed = true; XML_StopParser(p.parser, XML_FALSE);
+    auto& p = *static_cast<SourceMetadataReader*>(u);
+    p.failed = true;
+    XML_StopParser(p.parser, XML_FALSE);
   }
   static void start(void* u, const char* name, const char** a) {
-    auto& p = *static_cast<SourceMetadataReader*>(u); ++p.depth; const char* tag = local(name);
-    if (p.depth > 32) { p.failed = true; XML_StopParser(p.parser, XML_FALSE); return; }
+    auto& p = *static_cast<SourceMetadataReader*>(u);
+    ++p.depth;
+    const char* tag = local(name);
+    if (p.depth > 32) {
+      p.failed = true;
+      XML_StopParser(p.parser, XML_FALSE);
+      return;
+    }
     if (p.container) {
       if (!std::strcmp(tag, "rootfile") && p.rootfile.empty() && std::strlen(attr(a, "full-path")) <= 255)
         p.rootfile = attr(a, "full-path");
@@ -83,77 +121,115 @@ class SourceMetadataReader final : public Print {
     }
     if (!std::strcmp(tag, "metadata") && !p.metadataDepth) p.metadataDepth = p.depth;
     if (!p.metadataDepth || p.depth != p.metadataDepth + 1) return;
-    if(std::strlen(tag)>64) {p.failed=true;XML_StopParser(p.parser,XML_FALSE);return;}
-    p.field = tag; p.value.clear(); p.captureDepth = p.depth;
+    if (std::strlen(tag) > 64) {
+      p.failed = true;
+      XML_StopParser(p.parser, XML_FALSE);
+      return;
+    }
+    p.field = tag;
+    p.value.clear();
+    p.captureDepth = p.depth;
     // Validate before copying hostile attribute text into std::string.
     for (const char* key : {"property", "refines", "id"}) {
-      if (std::strlen(attr(a, key)) > 255) { p.failed = true; XML_StopParser(p.parser, XML_FALSE); return; }
+      if (std::strlen(attr(a, key)) > 255) {
+        p.failed = true;
+        XML_StopParser(p.parser, XML_FALSE);
+        return;
+      }
     }
-    p.property = attr(a, "property"); p.refines = attr(a, "refines"); p.id = attr(a, "id");
+    p.property = attr(a, "property");
+    p.refines = attr(a, "refines");
+    p.id = attr(a, "id");
     if (p.field == "meta") {
-      const char* key = attr(a, "name"); const char* content = attr(a, "content");
+      const char* key = attr(a, "name");
+      const char* content = attr(a, "content");
       if (!std::strcmp(key, "calibre:series") && p.series.empty()) bounded(p.series, content, std::strlen(content));
-      if (!std::strcmp(key, "calibre:series_index") && p.seriesIndex.empty()) bounded(p.seriesIndex, content, std::strlen(content));
+      if (!std::strcmp(key, "calibre:series_index") && p.seriesIndex.empty())
+        bounded(p.seriesIndex, content, std::strlen(content));
     }
   }
   static void text(void* u, const char* s, int n) {
-    auto& p = *static_cast<SourceMetadataReader*>(u); if (p.captureDepth) bounded(p.value, s, static_cast<size_t>(n));
+    auto& p = *static_cast<SourceMetadataReader*>(u);
+    if (p.captureDepth) bounded(p.value, s, static_cast<size_t>(n));
   }
   static void end(void* u, const char* name) {
     auto& p = *static_cast<SourceMetadataReader*>(u);
-    if (p.container && !std::strcmp(local(name), "container")) { p.complete(); return; }
+    if (p.container && !std::strcmp(local(name), "container")) {
+      p.complete();
+      return;
+    }
     if (p.captureDepth == p.depth) {
-      p.value=clean(p.value);
+      p.value = clean(p.value);
       if (p.field == "title" && p.title.empty()) p.title = p.value;
       if (p.field == "creator" && !p.value.empty()) {
-        if(!p.author.empty()) bounded(p.author,", ",2);
-        bounded(p.author,p.value.data(),p.value.size());
+        if (!p.author.empty()) bounded(p.author, ", ", 2);
+        bounded(p.author, p.value.data(), p.value.size());
       }
       if (p.field == "subject" && p.genre.empty()) p.genre = p.value;
       if (p.field == "meta") {
         if (p.property == "belongs-to-collection") {
-          if(auto* c=p.collection(p.id)) c->title=p.value;
-        } else if (!p.refines.empty() && p.refines.front()=='#') {
-          if(auto* c=p.collection(p.refines.substr(1))) {
-            if (p.property == "collection-type") c->type=p.value;
-            if (p.property == "group-position") c->index=p.value;
+          if (auto* c = p.collection(p.id)) c->title = p.value;
+        } else if (!p.refines.empty() && p.refines.front() == '#') {
+          if (auto* c = p.collection(p.refines.substr(1))) {
+            if (p.property == "collection-type") c->type = p.value;
+            if (p.property == "group-position") c->index = p.value;
           }
         }
       }
       p.captureDepth = 0;
     }
     if (p.metadataDepth == p.depth && !std::strcmp(local(name), "metadata")) {
-      if(p.series.empty()) for(size_t i=0;i<p.collectionCount;++i) {
-        const auto& c=p.collections[i];
-        if(c.type=="series" && !c.title.empty()) {p.series=c.title;p.seriesIndex=c.index;break;}
-      }
-      p.complete(); return;
+      if (p.series.empty())
+        for (size_t i = 0; i < p.collectionCount; ++i) {
+          const auto& c = p.collections[i];
+          if (c.type == "series" && !c.title.empty()) {
+            p.series = c.title;
+            p.seriesIndex = c.index;
+            break;
+          }
+        }
+      p.complete();
+      return;
     }
     --p.depth;
   }
 };
-} // namespace
+}  // namespace
 
 bool readLibraryMetadataFromSource(const std::string& path, std::string& title, std::string& author,
-                                   std::string& series, std::string& genre, std::string& seriesIndex,
-                                   void (*service)(), bool (*stopped)()) {
-  ZipFile zip(path); if (!zip.open()) return false;
-  auto reader = makeUniqueNoThrow<SourceMetadataReader>(true,service,stopped);
-  if (!reader) { zip.close(); return false; }
+                                   std::string& series, std::string& genre, std::string& seriesIndex, void (*service)(),
+                                   bool (*stopped)()) {
+  ZipFile zip(path);
+  if (!zip.open()) return false;
+  auto reader = makeUniqueNoThrow<SourceMetadataReader>(true, service, stopped);
+  if (!reader) {
+    zip.close();
+    return false;
+  }
   const bool readContainer = zip.readFileToStream("META-INF/container.xml", *reader, 512, true);
   std::string opf = std::move(reader->rootfile);
-  const bool safe = !opf.empty() && opf.front() != '/' && opf.find("..") == std::string::npos && opf.find('\\') == std::string::npos;
-  if (!readContainer || !reader->valid() || !safe) { zip.close(); return false; }
+  const bool safe =
+      !opf.empty() && opf.front() != '/' && opf.find("..") == std::string::npos && opf.find('\\') == std::string::npos;
+  if (!readContainer || !reader->valid() || !safe) {
+    zip.close();
+    return false;
+  }
   // Release the container parser before allocating the OPF parser. Large
   // parser/string state belongs on the fallible heap, not the input-task stack.
   reader.reset();
-  reader = makeUniqueNoThrow<SourceMetadataReader>(false,service,stopped);
-  if (!reader) { zip.close(); return false; }
+  reader = makeUniqueNoThrow<SourceMetadataReader>(false, service, stopped);
+  if (!reader) {
+    zip.close();
+    return false;
+  }
   const bool read = zip.readFileToStream(opf.c_str(), *reader, 512, true);
   const bool closed = zip.close();
   if (!read || !closed || !reader->valid()) return false;
-  title = utf8ComposeNfc(reader->title); author = utf8ComposeNfc(reader->author);
-  series = utf8ComposeNfc(reader->series); genre = utf8ComposeNfc(reader->genre); seriesIndex = reader->seriesIndex;
+  title = utf8ComposeNfc(reader->title);
+  author = utf8ComposeNfc(reader->author);
+  series = utf8ComposeNfc(reader->series);
+  genre = utf8ComposeNfc(reader->genre);
+  seriesIndex = reader->seriesIndex;
   return true;
 }
 

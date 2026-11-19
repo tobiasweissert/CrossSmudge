@@ -21,8 +21,8 @@
 #include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "util/QrUtils.h"
 #include "util/PluginEvents.h"
+#include "util/QrUtils.h"
 
 namespace {
 // AP Mode configuration
@@ -182,7 +182,9 @@ void CrossPointWebServerActivity::onNetworkModeSelected(const NetworkMode mode) 
     // Preserve in-process handoff: this parent must not later restart or tear
     // down a child's radio session. OPDS owns its own saved-network entry.
     airDropHandoff = true;
-    stopWebServer(); stopDnsServer(); MDNS.end();
+    stopWebServer();
+    stopDnsServer();
+    MDNS.end();
     activityManager.goToBrowser();
     return;
   }

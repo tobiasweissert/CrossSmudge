@@ -21,23 +21,21 @@ namespace {
 constexpr fui::ActionId ACTION_ROW = 1;
 
 constexpr NetworkMode menuModes[] = {
-    NetworkMode::JOIN_NETWORK,        NetworkMode::CONNECT_CALIBRE,   NetworkMode::CREATE_HOTSPOT,
+    NetworkMode::JOIN_NETWORK,    NetworkMode::CONNECT_CALIBRE,     NetworkMode::CREATE_HOTSPOT,
 #if CROSSINK_APP_CAP_USB_DRIVE
     NetworkMode::USB_DRIVE,
 #endif
-    NetworkMode::OPDS_BROWSER,
-    NetworkMode::NEARBY_BOOK_RECEIVE, NetworkMode::NEARBY_STATS_SYNC,
+    NetworkMode::OPDS_BROWSER,    NetworkMode::NEARBY_BOOK_RECEIVE, NetworkMode::NEARBY_STATS_SYNC,
 #if CROSSINK_APP_CAP_AIRDROP
     NetworkMode::AIRDROP_RECEIVE,
 #endif
 };
 constexpr StrId menuItems[] = {
-    StrId::STR_JOIN_NETWORK,        StrId::STR_CALIBRE_WIRELESS,  StrId::STR_CREATE_HOTSPOT,
+    StrId::STR_JOIN_NETWORK,  StrId::STR_CALIBRE_WIRELESS,    StrId::STR_CREATE_HOTSPOT,
 #if CROSSINK_APP_CAP_USB_DRIVE
     StrId::STR_USB_DRIVE,
 #endif
-    StrId::STR_OPDS_BROWSER,
-    StrId::STR_RECEIVE_NEARBY_BOOK, StrId::STR_NEARBY_STATS_SYNC,
+    StrId::STR_OPDS_BROWSER,  StrId::STR_RECEIVE_NEARBY_BOOK, StrId::STR_NEARBY_STATS_SYNC,
 #if CROSSINK_APP_CAP_AIRDROP
     StrId::STR_AIRDROP_TITLE,
 #endif
@@ -61,8 +59,7 @@ constexpr UIIcon menuIcons[] = {
 #if CROSSINK_APP_CAP_USB_DRIVE
     UIIcon::Transfer,
 #endif
-    UIIcon::Library,
-    UIIcon::Transfer, UIIcon::Transfer,
+    UIIcon::Library,  UIIcon::Transfer, UIIcon::Transfer,
 #if CROSSINK_APP_CAP_AIRDROP
     UIIcon::Transfer,
 #endif

@@ -4,9 +4,9 @@
 #include <GfxRenderer.h>
 #include <HalGPIO.h>
 #include <I18n.h>
+#include <LibraryBuilder.h>
 #include <Logging.h>
 #include <Memory.h>
-#include <LibraryBuilder.h>
 #include <WiFi.h>
 
 #include <algorithm>
@@ -15,15 +15,15 @@
 #include <cstring>
 #include <iterator>
 
+#include "AboutActivity.h"
 #include "AppCapabilities.h"
 #include "AppVersion.h"
 #include "BackupStatsActivity.h"
+#include "BleSettingsActivity.h"
 #include "ButtonRemapActivity.h"
 #include "ClearCacheActivity.h"
 #include "ClockOffsetActivity.h"
 #include "ClockSettingsActivity.h"
-#include "BleSettingsActivity.h"
-#include "AboutActivity.h"
 #include "ClockSyncActivity.h"
 #include "CrossPointSettings.h"
 #include "FontSelectionActivity.h"
@@ -53,9 +53,9 @@
 #include "components/UiAppHelpers.h"
 #include "components/icons/frontlightHeaderIcons.h"
 #include "fontIds.h"
-#include "util/PluginEvents.h"
 #include "util/DictionaryRegistry.h"
 #include "util/FrontlightSchedule.h"
+#include "util/PluginEvents.h"
 
 namespace fui = freeink::ui;
 
@@ -367,12 +367,13 @@ void SettingsActivity::rebuildSettingsLists() {
   // Keep the owner's grouped UI and append the modern lifecycle entrypoints.
   addSettingByKey(readerFontSettings, allSettings, "characterSpacing");
   addSettingByKey(readerFontSettings, allSettings, "wordSpacingPercent");
-  if (std::none_of(readerFontSettings.begin(), readerFontSettings.end(), [](const SettingInfo& info) {
-        return info.valuePtr == &CrossPointSettings::wordSpacingPercent;
-      })) {
-    readerFontSettings.push_back(SettingInfo::Value(StrId::STR_WORD_SPACING, &CrossPointSettings::wordSpacingPercent,
-        {CrossPointSettings::WORD_SPACING_MIN, CrossPointSettings::WORD_SPACING_MAX, CrossPointSettings::WORD_SPACING_STEP},
-        "wordSpacingPercent", StrId::STR_CAT_READER));
+  if (std::none_of(readerFontSettings.begin(), readerFontSettings.end(),
+                   [](const SettingInfo& info) { return info.valuePtr == &CrossPointSettings::wordSpacingPercent; })) {
+    readerFontSettings.push_back(
+        SettingInfo::Value(StrId::STR_WORD_SPACING, &CrossPointSettings::wordSpacingPercent,
+                           {CrossPointSettings::WORD_SPACING_MIN, CrossPointSettings::WORD_SPACING_MAX,
+                            CrossPointSettings::WORD_SPACING_STEP},
+                           "wordSpacingPercent", StrId::STR_CAT_READER));
   }
   addSettingByKey(readerPageLayoutSettings, allSettings, "paragraphIndentSpaces");
   addSettingByKey(systemFilesCacheSettings, allSettings, "libraryUseMetadata");
@@ -1087,20 +1088,26 @@ void SettingsActivity::toggleCurrentSetting() {
         break;
       case SettingAction::Bluetooth: {
         auto child = makeUniqueNoThrow<BleSettingsActivity>(renderer, mappedInput);
-        if (child) startActivityForResult(std::move(child), resultHandler);
-        else requestUpdate();
+        if (child)
+          startActivityForResult(std::move(child), resultHandler);
+        else
+          requestUpdate();
         break;
       }
       case SettingAction::ClockSettings: {
         auto child = makeUniqueNoThrow<ClockSettingsActivity>(renderer, mappedInput);
-        if (child && halClock.isAvailable()) startActivityForResult(std::move(child), resultHandler);
-        else requestUpdate();
+        if (child && halClock.isAvailable())
+          startActivityForResult(std::move(child), resultHandler);
+        else
+          requestUpdate();
         break;
       }
       case SettingAction::About: {
         auto child = makeUniqueNoThrow<AboutActivity>(renderer, mappedInput);
-        if (child) startActivityForResult(std::move(child), resultHandler);
-        else requestUpdate();
+        if (child)
+          startActivityForResult(std::move(child), resultHandler);
+        else
+          requestUpdate();
         break;
       }
       case SettingAction::RemapFrontButtons:

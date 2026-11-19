@@ -133,12 +133,14 @@ class ContentOpfParser final : public Print {
   std::vector<std::string> cssFiles;  // CSS stylesheet paths
 
   explicit ContentOpfParser(const std::string& cachePath, const std::string& baseContentPath, const size_t xmlSize,
-                            BookMetadataCache* cache, const bool metadataOnly = false, const bool collectCssFiles = true)
+                            BookMetadataCache* cache, const bool metadataOnly = false,
+                            const bool collectCssFiles = true)
       : cachePath(cachePath),
         baseContentPath(baseContentPath),
         remainingSize(xmlSize),
         cache(cache),
-        metadataOnly(metadataOnly), collectCssFiles(collectCssFiles) {}
+        metadataOnly(metadataOnly),
+        collectCssFiles(collectCssFiles) {}
   ~ContentOpfParser() override;
 
   bool setup();

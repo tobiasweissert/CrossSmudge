@@ -333,7 +333,6 @@ bool HalClock::syncSystemTimeFromNTP() {
   return true;
 }
 
-
 void HalClock::setTimezone(const char* posixTz) {
   setenv("TZ", posixTz && *posixTz ? posixTz : "UTC0", 1);
   tzset();

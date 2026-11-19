@@ -95,6 +95,7 @@ using FsFile = HalFile;
 class HalStorage {
  public:
   bool removeDir(const char*) { return true; }
+
  public:
   static HalStorage& getInstance() {
     static HalStorage storage;

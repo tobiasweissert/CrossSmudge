@@ -143,7 +143,8 @@ ReaderSettingsChangeMask classifyReaderSettingsChange(const ReaderLayoutSettings
       before.focusReadingEnabled != after.focusReadingEnabled ||
       before.guideReadingEnabled != after.guideReadingEnabled || before.imageRendering != after.imageRendering ||
       before.epubRenderMode != after.epubRenderMode || before.characterSpacing != after.characterSpacing ||
-      before.wordSpacingPercent != after.wordSpacingPercent || before.paragraphIndentSpaces != after.paragraphIndentSpaces ||
+      before.wordSpacingPercent != after.wordSpacingPercent ||
+      before.paragraphIndentSpaces != after.paragraphIndentSpaces ||
       std::strncmp(before.sdFontFamilyName, after.sdFontFamilyName, sizeof(before.sdFontFamilyName)) != 0) {
     changeMask = changeMask | ReaderSettingsChangeMask::Relayout;
   }
@@ -264,7 +265,8 @@ EpubReaderMenuActivity::TabMenuItems EpubReaderMenuActivity::buildMenuItems(
   }
   mainItems.push_back({MenuAction::AUTO_PAGE_TURN, StrId::STR_AUTO_TURN_INTERVAL_SECONDS});
   mainItems.push_back({MenuAction::READING_STATS, StrId::STR_READING_STATS});
-  if (SETTINGS.shouldTrackReadingStats()) mainItems.push_back({TOGGLE_BOOK_STATS_TRACKING, StrId::STR_TRACK_READING_STATS});
+  if (SETTINGS.shouldTrackReadingStats())
+    mainItems.push_back({TOGGLE_BOOK_STATS_TRACKING, StrId::STR_TRACK_READING_STATS});
   mainItems.push_back({MenuAction::READER_OPTIONS, StrId::STR_READER_OPTIONS});
   bookmarkItems.push_back({MenuAction::SAVE_CLIPPING, StrId::STR_SAVE_CLIPPING});
   if (hasClippings) {

@@ -44,7 +44,7 @@ class KOReaderCredentialStore : public PersistableStore<KOReaderCredentialStore>
   std::string password;
   std::string serverUrl;                                            // Custom sync server URL (empty = default)
   DocumentMatchMethod matchMethod = DocumentMatchMethod::FILENAME;  // Default to filename for compatibility
-  bool sendMetadata = false;                                         // Send document metadata with progress sync
+  bool sendMetadata = false;                                        // Send document metadata with progress sync
   bool syncClippings = false;                                       // Opt-in crosspoint-sync extension
   KOReaderSyncBehavior syncBehavior = KOReaderSyncBehavior::SMART;
   KOReaderServerType serverType = KOReaderServerType::CROSSPOINT;
@@ -68,8 +68,14 @@ class KOReaderCredentialStore : public PersistableStore<KOReaderCredentialStore>
 
   // Credential management
   void setCredentials(const std::string& user, const std::string& pass);
-  const std::string& getUsername() const { ensureLoaded(); return username; }
-  const std::string& getPassword() const { ensureLoaded(); return password; }
+  const std::string& getUsername() const {
+    ensureLoaded();
+    return username;
+  }
+  const std::string& getPassword() const {
+    ensureLoaded();
+    return password;
+  }
 
   // Get MD5 hash of password for API authentication
   std::string getMd5Password() const;
@@ -82,38 +88,68 @@ class KOReaderCredentialStore : public PersistableStore<KOReaderCredentialStore>
 
   // Server URL management
   void setServerUrl(const std::string& url);
-  const std::string& getServerUrl() const { ensureLoaded(); return serverUrl; }
+  const std::string& getServerUrl() const {
+    ensureLoaded();
+    return serverUrl;
+  }
 
   // Get base URL for API calls (with http:// normalization if no protocol, falls back to default)
   std::string getBaseUrl() const;
 
   // Server protocol/capability profile.
   void setServerType(KOReaderServerType type);
-  KOReaderServerType getServerType() const { ensureLoaded(); return serverType; }
-  bool supportsRichProgress() const { ensureLoaded(); return serverType != KOReaderServerType::KOSYNC; }
-  bool supportsExtendedMetadata() const { ensureLoaded(); return serverType == KOReaderServerType::OTHER; }
+  KOReaderServerType getServerType() const {
+    ensureLoaded();
+    return serverType;
+  }
+  bool supportsRichProgress() const {
+    ensureLoaded();
+    return serverType != KOReaderServerType::KOSYNC;
+  }
+  bool supportsExtendedMetadata() const {
+    ensureLoaded();
+    return serverType == KOReaderServerType::OTHER;
+  }
 
   // Compatibility query used by retained owner sync activities.
-  bool usesCrossPointSyncServer() const { ensureLoaded(); return serverType == KOReaderServerType::CROSSPOINT; }
+  bool usesCrossPointSyncServer() const {
+    ensureLoaded();
+    return serverType == KOReaderServerType::CROSSPOINT;
+  }
 
   // Document matching method
   void setMatchMethod(DocumentMatchMethod method);
-  DocumentMatchMethod getMatchMethod() const { ensureLoaded(); return matchMethod; }
+  DocumentMatchMethod getMatchMethod() const {
+    ensureLoaded();
+    return matchMethod;
+  }
 
   // Send metadata setting
   void setSendMetadata(bool enabled);
-  bool getSendMetadata() const { ensureLoaded(); return sendMetadata; }
+  bool getSendMetadata() const {
+    ensureLoaded();
+    return sendMetadata;
+  }
 
   void setSyncClippings(bool enabled) { syncClippings = enabled; }
-  bool getSyncClippings() const { ensureLoaded(); return syncClippings; }
+  bool getSyncClippings() const {
+    ensureLoaded();
+    return syncClippings;
+  }
 
   // Sync behavior
   void setSyncBehavior(KOReaderSyncBehavior behavior);
-  KOReaderSyncBehavior getSyncBehavior() const { ensureLoaded(); return syncBehavior; }
+  KOReaderSyncBehavior getSyncBehavior() const {
+    ensureLoaded();
+    return syncBehavior;
+  }
 
   // Custom headers sent with every sync request (index must be < MAX_CUSTOM_HEADERS)
   void setCustomHeader(size_t index, const std::string& name, const std::string& value);
-  const std::array<HttpHeader, MAX_CUSTOM_HEADERS>& getCustomHeaders() const { ensureLoaded(); return customHeaders; }
+  const std::array<HttpHeader, MAX_CUSTOM_HEADERS>& getCustomHeaders() const {
+    ensureLoaded();
+    return customHeaders;
+  }
 };
 
 // Helper macro to access credential store

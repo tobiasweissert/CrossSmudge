@@ -104,13 +104,12 @@ struct SideShortcutState {
   bool quarantine = false;
 };
 
-template<class Dispatch>
+template <class Dispatch>
 bool routeSideShortcuts(const MappedInputManager& input, SideShortcutState& state, Dispatch dispatch) {
   using Button = MappedInputManager::Button;
   const Button buttons[] = {Button::Up, Button::Down};
-  const bool side = input.isPressed(Button::Up) || input.isPressed(Button::Down) ||
-                    input.wasPressed(Button::Up) || input.wasPressed(Button::Down) ||
-                    input.wasReleased(Button::Up) || input.wasReleased(Button::Down);
+  const bool side = input.isPressed(Button::Up) || input.isPressed(Button::Down) || input.wasPressed(Button::Up) ||
+                    input.wasPressed(Button::Down) || input.wasReleased(Button::Up) || input.wasReleased(Button::Down);
   if (side && (input.isPhysicalPressed(Button::Power) || input.wasReleased(Button::Power))) state.quarantine = true;
   if (state.quarantine) {
     state.active[0] = state.active[1] = false;
@@ -135,7 +134,8 @@ bool routeSideShortcuts(const MappedInputManager& input, SideShortcutState& stat
       dispatch(holdAction);
     }
     if (input.wasReleased(button)) {
-      if (state.active[index] && !state.fired[index] && shortAction != CrossPointSettings::IGNORE) dispatch(shortAction);
+      if (state.active[index] && !state.fired[index] && shortAction != CrossPointSettings::IGNORE)
+        dispatch(shortAction);
       state.active[index] = false;
       state.fired[index] = false;
     }

@@ -11,8 +11,8 @@
 #include <cstring>
 #include <iterator>
 #include <string>
-#include <utility>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "CrossPointSettings.h"
@@ -161,7 +161,7 @@ inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
     constexpr FontFamilyPointSizeRange builtinRange{10, 16};
     allStringValues.push_back(fontFamilyLabel(I18N.get(StrId::STR_LEXEND_DECA), builtinRange));
     allStringValues.push_back(fontFamilyLabel(I18N.get(StrId::STR_BITTER), builtinRange));
-    allStringValues.push_back(fontFamilyLabel(I18N.get(StrId::STR_NOTO_SANS), {12,18}));
+    allStringValues.push_back(fontFamilyLabel(I18N.get(StrId::STR_NOTO_SANS), {12, 18}));
     allStringValues.insert(allStringValues.end(), enumStringValues.begin(), enumStringValues.end());
   }
 
@@ -568,9 +568,8 @@ inline const std::vector<SettingInfo>& getBaseSettingsList() {
   static const std::vector<SettingInfo> list = [] {
     std::vector<SettingInfo> result;
     result.reserve(countBaseSettings());
-    forEachBaseSetting([](void* p, SettingInfo& info) {
-      static_cast<std::vector<SettingInfo>*>(p)->push_back(info);
-    }, &result);
+    forEachBaseSetting([](void* p, SettingInfo& info) { static_cast<std::vector<SettingInfo>*>(p)->push_back(info); },
+                       &result);
     return result;
   }();
   return list;
@@ -1052,19 +1051,25 @@ inline void forEachBaseSetting(Visitor&& visitor) {
 // Modern network callers pass a discovered entry vector; retain the registry
 // overload above for owner device callers. Filtering precedes expensive fonts.
 template <typename Wants, typename Visit>
-inline void forEachSetting(const SdCardFontRegistry* registry,
-                           const std::vector<DictionaryEntry>* dictionaries, Wants wants, Visit visit) {
+inline void forEachSetting(const SdCardFontRegistry* registry, const std::vector<DictionaryEntry>* dictionaries,
+                           Wants wants, Visit visit) {
   bool pending = dictionaries && !dictionaries->empty();
   const auto dictionary = [&] {
     pending = false;
-    if (wants("dictionary")) { auto info = buildDictionarySetting(*dictionaries); visit(info); }
+    if (wants("dictionary")) {
+      auto info = buildDictionarySetting(*dictionaries);
+      visit(info);
+    }
   };
   auto each = [&](SettingInfo& info) {
-    if (pending && (info.category == StrId::STR_CAT_CONTROLS ||
-                    info.valuePtr == &CrossPointSettings::vocabularyHistoryEnabled)) dictionary();
+    if (pending &&
+        (info.category == StrId::STR_CAT_CONTROLS || info.valuePtr == &CrossPointSettings::vocabularyHistoryEnabled))
+      dictionary();
     if (!wants(info.key)) return;
-    if (info.nameId == StrId::STR_FONT_FAMILY) info = buildFontFamilySetting(registry);
-    else if (info.nameId == StrId::STR_FONT_SIZE) info = buildFontSizeSetting(registry);
+    if (info.nameId == StrId::STR_FONT_FAMILY)
+      info = buildFontFamilySetting(registry);
+    else if (info.nameId == StrId::STR_FONT_SIZE)
+      info = buildFontSizeSetting(registry);
     visit(info);
   };
   forEachBaseSetting(each);
@@ -1072,10 +1077,11 @@ inline void forEachSetting(const SdCardFontRegistry* registry,
 }
 
 inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* registry,
-                                               const std::vector<DictionaryEntry>* dictionaries) {
+                                                const std::vector<DictionaryEntry>* dictionaries) {
   std::vector<SettingInfo> result;
   result.reserve(countBaseSettings() + (dictionaries && !dictionaries->empty() ? 1 : 0));
-  forEachSetting(registry, dictionaries, [](const char*) { return true; },
-                 [&](SettingInfo& info) { result.push_back(std::move(info)); });
+  forEachSetting(
+      registry, dictionaries, [](const char*) { return true; },
+      [&](SettingInfo& info) { result.push_back(std::move(info)); });
   return result;
 }

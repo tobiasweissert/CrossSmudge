@@ -113,5 +113,7 @@ std::string sanitizeFilename(const std::string& name, size_t maxBytes) {
 }  // namespace StringUtils
 
 namespace StringUtils {
-std::string sanitizeFilenamePreservingExtension(const std::string& name, size_t maxBytes) { return sanitizeFilename(name,maxBytes); }
+std::string sanitizeFilenamePreservingExtension(const std::string& name, size_t maxBytes) {
+  return sanitizeFilename(name, maxBytes);
 }
+}  // namespace StringUtils

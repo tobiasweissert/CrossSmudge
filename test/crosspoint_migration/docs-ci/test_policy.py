@@ -35,7 +35,7 @@ class Policy(unittest.TestCase):
         self.assertEqual([p.strip() for p in upload_paths[1].splitlines()],
                          ['sticky-sealed/sealed.envelope', 'sticky-sealed/receipt.json'])
         self.assertIn("if: always() && steps.recipient.outcome == 'success' && steps.firmware.outcome != 'skipped'", text)
-        self.assertIn('retention-days: 30', uploads)
+        self.assertIn('retention-days: 31', uploads)
         self.assertNotIn('tee pio-sticky.log', text)
         self.assertNotIn('sticky-evidence/', uploads)
         self.assertNotIn('*.elf', uploads)
@@ -54,6 +54,19 @@ class Policy(unittest.TestCase):
         self.assertNotIn('device: x3-x4', text)
         self.assertNotIn('git push', text)
         self.assertNotIn('--clobber', text)
+
+    def test_pkg_list_matches_pinned_core_cli(self):
+        text = (ROOT / '.github/workflows/ci.yml').read_text()
+        stage = text[text.index('name: Stage exact Sticky BIN ELF and provenance'):]
+        self.assertRegex(stage, r'(?m)^\s+pio pkg list -e sticky > sticky-evidence/resolved-packages\.txt$')
+        self.assertNotIn('pio pkg list -e sticky --json-output', stage)
+
+    def test_cppcheck_declares_compatible_os_and_pcre_runtime(self):
+        text = (ROOT / '.github/workflows/ci.yml').read_text()
+        job = text.split('  cppcheck:', 1)[1].split('  build:', 1)[0]
+        self.assertIn('runs-on: ubuntu-24.04', job)
+        self.assertIn('sudo apt-get install -y --no-install-recommends libpcre3', job)
+        self.assertIn('ctypes.CDLL("libpcre.so.3")', job)
 
     def test_candidate_cannot_publish(self):
         text = (ROOT / '.github/workflows/release_candidate.yml').read_text()

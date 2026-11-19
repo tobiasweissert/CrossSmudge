@@ -17,8 +17,8 @@
 #include "BookStatsTracking.h"
 #include "EndOfBookOptions.h"
 #include "GlobalReadingStats.h"
-#include "ReaderProgressSaveDebouncer.h"
 #include "ReaderActivity.h"
+#include "ReaderProgressSaveDebouncer.h"
 #include "components/OptionPopup.h"
 
 class XtcReaderActivity final : public ReaderActivity {
@@ -100,13 +100,13 @@ class XtcReaderActivity final : public ReaderActivity {
   bool setBookStatsTrackingEnabled(bool enabled);
   explicit XtcReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::unique_ptr<Xtc> xtc,
                              int initialRefreshCountdown, bool skipRecentBookUpdateOnEntry = false)
-      : ReaderActivity("XtcReader", renderer, mappedInput, xtc ? xtc->getPath() : std::string{}, initialRefreshCountdown > 0),
+      : ReaderActivity("XtcReader", renderer, mappedInput, xtc ? xtc->getPath() : std::string{},
+                       initialRefreshCountdown > 0),
         xtc(std::move(xtc)),
         pagesUntilFullRefresh(initialRefreshCountdown),
         skipRecentBookUpdateOnEntry(skipRecentBookUpdateOnEntry) {}
 
-  explicit XtcReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                             std::string path, bool fast)
+  explicit XtcReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string path, bool fast)
       : ReaderActivity("XtcReader", renderer, mappedInput, std::move(path), fast),
         pagesUntilFullRefresh(fast ? std::max(2, static_cast<int>(SETTINGS.getRefreshFrequency())) : 0),
         skipRecentBookUpdateOnEntry(fast) {}

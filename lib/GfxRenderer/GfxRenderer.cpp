@@ -27,7 +27,9 @@ constexpr int32_t scaleSmallCapAdvance(const int32_t advanceFP) {
 }
 }  // namespace
 
-namespace { const char* resolveVisualText(const char*, std::string&, BidiUtils::BidiBaseDir); }
+namespace {
+const char* resolveVisualText(const char*, std::string&, BidiUtils::BidiBaseDir);
+}
 template <typename Sink>
 void forEachShapedRtlToken(const char* text, std::string& tokenScratch, std::string& visualScratch, Sink&& sink) {
   const auto isBreak = [](const char c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; };
@@ -66,7 +68,6 @@ int32_t resolveSdCardAdvanceFP(const SdCardFont& sdFont, const EpdFontFamily& fo
   const EpdGlyph* glyph = font.getGlyph(cp, style);
   return glyph ? glyph->advanceX : 0;
 }
-
 
 constexpr int trackingBetween(const uint32_t leftCp, const uint32_t rightCp, const int8_t tracking) {
   const auto isSpace = [](const uint32_t cp) { return cp == ' ' || cp == 0xA0 || cp == 0x3000; };
@@ -827,7 +828,6 @@ uint32_t smallCapsUppercaseCodepoint(const uint32_t cp) {
   return cp - 0x20;                                    // Cyrillic main block (а-я)
 }
 
-
 // Shared glyph rendering logic for normal and rotated text.
 // Coordinate mapping and cursor advance direction are selected at compile time via the template parameter.
 // Render a glyph scaled by scaleNum/scaleDen: 1/2 for SUP/SUB, 3/4 for small caps.
@@ -971,7 +971,8 @@ void GfxRenderer::drawGlyphBitmap(const uint8_t* bitmap, const int width, const 
   // Apply the logical clip rectangle before rotating, in glyph-local pixels.
   glyphBitmap::Clip clip{0, 0, width, height};
   glyphBitmap::clipToRect(frame, clipLeft_, clipTop_, clipRight_, clipBottom_, clip);
-  if (textClipActive_) glyphBitmap::clipToRect(frame, textClipLeft_, textClipTop_, textClipRight_, textClipBottom_, clip);
+  if (textClipActive_)
+    glyphBitmap::clipToRect(frame, textClipLeft_, textClipTop_, textClipRight_, textClipBottom_, clip);
 
   // Writes go to the framebuffer, or to the strip scratch in tiled grayscale
   // mode; getWriteOriginY()/getWriteRows() bound the rows that exist there.
@@ -1072,7 +1073,8 @@ void GfxRenderer::drawCenteredText(const int fontId, const int y, const char* te
 }
 
 void GfxRenderer::drawText(const int fontId, const int x, const int y, const char* text, const bool black,
-                           const EpdFontFamily::Style style, const BidiUtils::BidiBaseDir baseDir, const int8_t tracking) const {
+                           const EpdFontFamily::Style style, const BidiUtils::BidiBaseDir baseDir,
+                           const int8_t tracking) const {
   // cannot draw a NULL / empty string
   if (text == nullptr || *text == '\0') {
     return;
@@ -1143,7 +1145,8 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
       if (prevScaledSmallCap || scaledSmallCap) {
         kernFP = smallCapsAdvanceFP(kernFP);
       }
-      lastBaseX += fp4::toPixel(prevAdvanceFP + kernFP) + trackingBetween(prevCp,cp,tracking);  // snap 12.4 fixed-point to nearest pixel
+      lastBaseX += fp4::toPixel(prevAdvanceFP + kernFP) +
+                   trackingBetween(prevCp, cp, tracking);  // snap 12.4 fixed-point to nearest pixel
     }
 
     if (!hasRealGlyph && syntheticGlyph::isSpaceFallback(cp)) {
@@ -2564,8 +2567,9 @@ int GfxRenderer::getKerning(const int fontId, const uint32_t leftCp, const uint3
   return fp4::toPixel(kernFP) + trackingBetween(leftCp, rightCp, tracking);  // snap 4.4 fixed-point to nearest pixel
 }
 
-int GfxRenderer::getTextAdvanceXImpl(const int fontId, const char* text, EpdFontFamily::Style style, const int8_t tracking,
-                                 const BidiUtils::BidiBaseDir baseDir, const int mode, const uint32_t followingCp) const {
+int GfxRenderer::getTextAdvanceXImpl(const int fontId, const char* text, EpdFontFamily::Style style,
+                                     const int8_t tracking, const BidiUtils::BidiBaseDir baseDir, const int mode,
+                                     const uint32_t followingCp) const {
   if (!text || !*text) return 0;
   // Match the font drawText would use for non-Latin strings (see resolveTextFontId).
   const int resolvedFontId = resolveTextFontId(fontId, text, style);
@@ -2582,7 +2586,8 @@ int GfxRenderer::getTextAdvanceXImpl(const int fontId, const char* text, EpdFont
   // Snap each advance like drawText. Kerning/ligature data is not resident
   // during layout, so kerned-pair steps can still differ.
   auto sdIt = sdCardFonts_.find(resolvedFontId);
-  if (mode == static_cast<int>(TextMeasureMode::Layout) && sdIt != sdCardFonts_.end() && sdIt->second->hasAdvanceTable()) {
+  if (mode == static_cast<int>(TextMeasureMode::Layout) && sdIt != sdCardFonts_.end() &&
+      sdIt->second->hasAdvanceTable()) {
     int widthPx = 0;
     int32_t prevAdvanceFP = 0;
     uint32_t prevCp = 0;
@@ -2615,8 +2620,8 @@ int GfxRenderer::getTextAdvanceXImpl(const int fontId, const char* text, EpdFont
       prevCp = cp;
     }
     const uint32_t nextCp = (style & EpdFontFamily::SMALL_CAPS) ? utf8SmallCapsUpper(followingCp) : followingCp;
-  const int32_t finalKern = prevCp && nextCp ? font.getKerning(prevCp, nextCp, style) : 0;
-  widthPx += fp4::toPixel(prevAdvanceFP + finalKern);  // final glyph's advance
+    const int32_t finalKern = prevCp && nextCp ? font.getKerning(prevCp, nextCp, style) : 0;
+    widthPx += fp4::toPixel(prevAdvanceFP + finalKern);  // final glyph's advance
     return widthPx;
   }
 
@@ -3675,7 +3680,7 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text, const EpdFo
   return widthPx;
 }
 int GfxRenderer::getTextAdvanceXTracked(int id, const char* text, EpdFontFamily::Style style, int8_t tracking,
-                                       BidiUtils::BidiBaseDir dir, TextMeasureMode mode) const {
+                                        BidiUtils::BidiBaseDir dir, TextMeasureMode mode) const {
   return getTextAdvanceXImpl(id, text, style, tracking, dir, static_cast<int>(mode), 0);
 }
 

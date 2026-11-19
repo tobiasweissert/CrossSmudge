@@ -2327,7 +2327,6 @@ TEST(TextDecorationPosition, UnderlineStaysBelowBaseline) {
   });
 }
 
-
 // Preserved owner regression cases; current-runtime harness above.
 TEST(ParagraphIndentTest, DoesNotInventIndentWithoutSourceCss) {
   GfxRenderer renderer;
@@ -2371,7 +2370,7 @@ TEST_F(ChapterHtmlSlimParserTest, HiddenElementsSuppressContentAndResumeVisibleT
   }
   ChapterHtmlSlimParser::characterData(&parser, "Visible ", 8);
   ASSERT_EQ(parser.currentTextBlock->size(), 1u);
-  EXPECT_EQ(parser.currentTextBlock->words[0], "Visible");
+  EXPECT_EQ(parser.currentTextBlock->wordAt(0), "Visible");
 }
 
 TEST_F(ChapterHtmlSlimParserTest, StablePageOffsetsCollapseClusteredWhitespace) {
@@ -2446,19 +2445,19 @@ TEST_F(ChapterHtmlSlimParserTest, NumbersOrderedListsAndRestartsNestedCounters) 
   ChapterHtmlSlimParser::startElement(&parser, "ol", nullptr);
   ChapterHtmlSlimParser::startElement(&parser, "li", nullptr);
   ASSERT_EQ(parser.currentTextBlock->size(), 1u);
-  EXPECT_EQ(parser.currentTextBlock->words[0], "1.");
+  EXPECT_EQ(parser.currentTextBlock->wordAt(0), "1.");
 
   ChapterHtmlSlimParser::startElement(&parser, "ol", nullptr);
   ChapterHtmlSlimParser::startElement(&parser, "li", nullptr);
   ASSERT_EQ(parser.currentTextBlock->size(), 1u);
-  EXPECT_EQ(parser.currentTextBlock->words[0], "1.");
+  EXPECT_EQ(parser.currentTextBlock->wordAt(0), "1.");
   ChapterHtmlSlimParser::endElement(&parser, "li");
   ChapterHtmlSlimParser::endElement(&parser, "ol");
 
   ChapterHtmlSlimParser::endElement(&parser, "li");
   ChapterHtmlSlimParser::startElement(&parser, "li", nullptr);
   ASSERT_EQ(parser.currentTextBlock->size(), 1u);
-  EXPECT_EQ(parser.currentTextBlock->words[0], "2.");
+  EXPECT_EQ(parser.currentTextBlock->wordAt(0), "2.");
 }
 
 TEST_F(ChapterHtmlSlimParserTest, HonorsOrderedListStartAndItemValue) {
@@ -2466,18 +2465,18 @@ TEST_F(ChapterHtmlSlimParserTest, HonorsOrderedListStartAndItemValue) {
   ChapterHtmlSlimParser::startElement(&parser, "ol", listAttributes);
   ChapterHtmlSlimParser::startElement(&parser, "li", nullptr);
   ASSERT_EQ(parser.currentTextBlock->size(), 1u);
-  EXPECT_EQ(parser.currentTextBlock->words[0], "5.");
+  EXPECT_EQ(parser.currentTextBlock->wordAt(0), "5.");
   ChapterHtmlSlimParser::endElement(&parser, "li");
 
   const XML_Char* itemAttributes[] = {"value", "9", nullptr};
   ChapterHtmlSlimParser::startElement(&parser, "li", itemAttributes);
   ASSERT_EQ(parser.currentTextBlock->size(), 1u);
-  EXPECT_EQ(parser.currentTextBlock->words[0], "9.");
+  EXPECT_EQ(parser.currentTextBlock->wordAt(0), "9.");
   ChapterHtmlSlimParser::endElement(&parser, "li");
 
   ChapterHtmlSlimParser::startElement(&parser, "li", nullptr);
   ASSERT_EQ(parser.currentTextBlock->size(), 1u);
-  EXPECT_EQ(parser.currentTextBlock->words[0], "10.");
+  EXPECT_EQ(parser.currentTextBlock->wordAt(0), "10.");
 }
 
 TEST_F(ChapterHtmlSlimParserTest, SupportsNegativeOrderedListValues) {
@@ -2485,12 +2484,12 @@ TEST_F(ChapterHtmlSlimParserTest, SupportsNegativeOrderedListValues) {
   ChapterHtmlSlimParser::startElement(&parser, "ol", listAttributes);
   ChapterHtmlSlimParser::startElement(&parser, "li", nullptr);
   ASSERT_EQ(parser.currentTextBlock->size(), 1u);
-  EXPECT_EQ(parser.currentTextBlock->words[0], "-2.");
+  EXPECT_EQ(parser.currentTextBlock->wordAt(0), "-2.");
   ChapterHtmlSlimParser::endElement(&parser, "li");
 
   ChapterHtmlSlimParser::startElement(&parser, "li", nullptr);
   ASSERT_EQ(parser.currentTextBlock->size(), 1u);
-  EXPECT_EQ(parser.currentTextBlock->words[0], "-1.");
+  EXPECT_EQ(parser.currentTextBlock->wordAt(0), "-1.");
 }
 
 TEST_F(ChapterHtmlSlimParserTest, SupportsMarkerFreeListsAndContainerInsets) {
@@ -2505,7 +2504,7 @@ TEST_F(ChapterHtmlSlimParserTest, SupportsMarkerFreeListsAndContainerInsets) {
 TEST_F(ChapterHtmlSlimParserTest, HiddenNestedListDoesNotResetOuterCounter) {
   ChapterHtmlSlimParser::startElement(&parser, "ol", nullptr);
   ChapterHtmlSlimParser::startElement(&parser, "li", nullptr);
-  EXPECT_EQ(parser.currentTextBlock->words[0], "1.");
+  EXPECT_EQ(parser.currentTextBlock->wordAt(0), "1.");
   ChapterHtmlSlimParser::endElement(&parser, "li");
 
   const XML_Char* hidden[] = {"hidden", "", nullptr};
@@ -2516,5 +2515,5 @@ TEST_F(ChapterHtmlSlimParserTest, HiddenNestedListDoesNotResetOuterCounter) {
 
   ChapterHtmlSlimParser::startElement(&parser, "li", nullptr);
   ASSERT_EQ(parser.currentTextBlock->size(), 1u);
-  EXPECT_EQ(parser.currentTextBlock->words[0], "2.");
+  EXPECT_EQ(parser.currentTextBlock->wordAt(0), "2.");
 }

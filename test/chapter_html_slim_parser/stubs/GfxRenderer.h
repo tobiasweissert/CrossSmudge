@@ -17,8 +17,31 @@ enum class BidiBaseDir : signed char { AUTO = -1, LTR = 0, RTL = 1 };
 
 enum Color : uint8_t { Clear = 0x00, White = 0x01, LightGray = 0x05, DarkGray = 0x0A, Black = 0x10 };
 
+class FontCacheManager;
 class GfxRenderer {
  public:
+  enum Orientation { Portrait, LandscapeClockwise, PortraitInverted, LandscapeCounterClockwise };
+  enum RenderMode { BW, GRAYSCALE_MSB, GRAYSCALE_LSB };
+  mutable uint8_t framebuffer[48000] = {};
+  uint8_t* getWriteTarget() const { return framebuffer; }
+  int getWriteOriginY() const { return 0; }
+  int getWriteRows() const { return 800; }
+  int getDisplayWidth() const { return 480; }
+  int getDisplayHeight() const { return 800; }
+  int getDisplayWidthBytes() const { return 60; }
+  Orientation getOrientation() const { return Portrait; }
+  RenderMode getRenderMode() const { return BW; }
+  bool grayPlanesAreAbsolute() const { return true; }
+  bool imagesDitheredInBw() const { return false; }
+  bool isStripTargetActive() const { return false; }
+  bool glyphIntersectsStrip(int, int, int, int) const { return true; }
+  void preserveImagePolarity(int, int, int, int) const {}
+  bool releaseSdCardFontForLowMemory(int) const { return true; }
+  FontCacheManager* getFontCacheManager() const { return nullptr; }
+  void drawRect(int, int, int, int, bool) const {}
+  void beginTextClip(int, int, int, int) const {}
+  void endTextClip() const {}
+  void drawLine(int a, int b, int c, int d, bool ink) const { drawLine(a, b, c, d, 1, ink); }
   int boldGlyphAdvance = 8;
   mutable size_t fontPreparations = 0;
   std::function<void()> onFontPrepare;
@@ -104,8 +127,8 @@ class GfxRenderer {
     return getTextAdvanceXTracked(fontId, text, style, 0);
   }
   int getTextAdvanceXTracked(int fontId, const char* text, EpdFontFamily::Style style, int8_t tracking = 0,
-                      BidiUtils::BidiBaseDir = BidiUtils::BidiBaseDir::AUTO,
-                      TextMeasureMode = TextMeasureMode::Layout) const {
+                             BidiUtils::BidiBaseDir = BidiUtils::BidiBaseDir::AUTO,
+                             TextMeasureMode = TextMeasureMode::Layout) const {
     int width = 0;
     uint32_t previous = 0;
     while (const uint32_t cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text))) {

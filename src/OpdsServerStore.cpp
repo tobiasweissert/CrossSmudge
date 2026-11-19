@@ -90,8 +90,8 @@ bool OpdsServerStore::loadFromFile() {
   servers.clear();
   loaded_ = true;
   const bool hasStoreFile = Storage.exists(getFilePath()) ||
-      Storage.exists((std::string(getFilePath()) + ".bak").c_str()) ||
-      Storage.exists((std::string(getFilePath()) + ".tmp").c_str());
+                            Storage.exists((std::string(getFilePath()) + ".bak").c_str()) ||
+                            Storage.exists((std::string(getFilePath()) + ".tmp").c_str());
   if (PersistableStore<OpdsServerStore>::loadFromFile()) {
     return true;
   }

@@ -128,6 +128,11 @@ void HalDisplay::displayGrayBuffer(bool turnOffScreen) {
   einkDisplay.displayGrayBuffer(turnOffScreen);
 }
 
+bool HalDisplay::displayRetainedGrayscaleOverlay(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool restore) {
+  HalSpiBus::Lock spiLock;
+  return einkDisplay.displayRetainedGrayscaleOverlay(x, y, w, h, restore);
+}
+
 void HalDisplay::writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t* rows, uint16_t yStart, uint16_t numRows) {
   HalSpiBus::Lock spiLock;
   einkDisplay.writeGrayscalePlaneStrip(lsbPlane ? EInkDisplay::GRAY_PLANE_LSB : EInkDisplay::GRAY_PLANE_MSB, rows,
@@ -153,4 +158,7 @@ uint16_t HalDisplay::getDisplayWidthBytes() const { return einkDisplay.getDispla
 uint32_t HalDisplay::getBufferSize() const { return einkDisplay.getBufferSize(); }
 
 HalDisplay::Controller HalDisplay::getController() const { return BoardConfig::ACTIVE.displayController; }
-void HalDisplay::controllerIdle() { HalSpiBus::Lock spiLock; einkDisplay.controllerIdle(); }
+void HalDisplay::controllerIdle() {
+  HalSpiBus::Lock spiLock;
+  einkDisplay.controllerIdle();
+}

@@ -6,17 +6,17 @@
 #include <Logging.h>
 #include <Memory.h>
 #include <MemoryBudget.h>
-#include <cstring>
-#include "TtfRenderProfileStore.h"
 #include <TtfEpdFont.h>
 #include <esp_heap_caps.h>
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <iterator>
 
 #include "CrossPointSettings.h"
 #include "ReaderFontSizes.h"
+#include "TtfRenderProfileStore.h"
 #include "fontIds.h"
 
 namespace {
@@ -24,13 +24,14 @@ namespace {
 #if CROSSPOINT_VECTOR_FONTS
 // Stable, non-zero renderer font id for a vector family at a size (FNV-1a of
 // name + size). 0 is the "not found" sentinel, so bump collisions to 1.
-int computeTtfFontId(const char* familyName, uint8_t pointSize, uint32_t identity=0) {
+int computeTtfFontId(const char* familyName, uint8_t pointSize, uint32_t identity = 0) {
   uint32_t hash = 2166136261u;
   for (const char* p = familyName; p && *p; ++p) {
     hash ^= static_cast<uint8_t>(*p);
     hash *= 16777619u;
   }
-  hash ^= identity;hash *= 16777619u;
+  hash ^= identity;
+  hash *= 16777619u;
   hash ^= pointSize;
   hash *= 16777619u;
   hash ^= 0x54544600u;  // "TTF\0" salt to avoid colliding with cpfont ids
@@ -109,54 +110,61 @@ void SdCardFontSystem::begin(GfxRenderer& renderer) {
   releaseRegistry();
 }
 
-
 void SdCardFontSystem::ensureLoaded(GfxRenderer& renderer) {
-  const bool dirty=registryDirty_.load(std::memory_order_acquire) || fontReloadPending_;
+  const bool dirty = registryDirty_.load(std::memory_order_acquire) || fontReloadPending_;
   if (!SETTINGS.sdFontFamilyName[0]) {
     releaseLoadedFont(renderer);
     return;
   }
   ensureRegistry();
   if (registry_.lastDiscoveryFailed()) return;
-  uint8_t size=SETTINGS.getSdFontTargetPointSize();
+  uint8_t size = SETTINGS.getSdFontTargetPointSize();
   if (SETTINGS.legacySdFontSizeStep != UINT8_MAX) {
-    const uint8_t migrated=resolveLegacySizeStep(SETTINGS.sdFontFamilyName,SETTINGS.legacySdFontSizeStep);
-    if (migrated) {size=migrated;SETTINGS.readerFontPointSize=size;SETTINGS.legacySdFontSizeStep=UINT8_MAX;persistSettingsChange();}
+    const uint8_t migrated = resolveLegacySizeStep(SETTINGS.sdFontFamilyName, SETTINGS.legacySdFontSizeStep);
+    if (migrated) {
+      size = migrated;
+      SETTINGS.readerFontPointSize = size;
+      SETTINGS.legacySdFontSizeStep = UINT8_MAX;
+      persistSettingsChange();
+    }
   }
-  if (selectFamily(renderer,SETTINGS.sdFontFamilyName,size,
-                   dirty || loadedRegistryRevision_!=registry_.revision(),true)) {
-    const uint8_t actual=
+  if (selectFamily(renderer, SETTINGS.sdFontFamilyName, size, dirty || loadedRegistryRevision_ != registry_.revision(),
+                   true)) {
+    const uint8_t actual =
 #if CROSSPOINT_VECTOR_FONTS
-      ttf_ ? ttfPointSize_ :
+        ttf_ ? ttfPointSize_ :
 #endif
-      manager_.currentPointSize();
-    if (actual && SETTINGS.readerFontPointSize!=actual) {SETTINGS.readerFontPointSize=actual;persistSettingsChange();}
-    fontReloadPending_=false;loadedRegistryRevision_=registry_.revision();
+             manager_.currentPointSize();
+    if (actual && SETTINGS.readerFontPointSize != actual) {
+      SETTINGS.readerFontPointSize = actual;
+      persistSettingsChange();
+    }
+    fontReloadPending_ = false;
+    loadedRegistryRevision_ = registry_.revision();
   }
 }
-bool SdCardFontSystem::selectFamily(GfxRenderer& renderer,const char* name,uint8_t size,bool dirty,bool ui) {
-  const auto* family=registry_.findFamily(name ? name : "");
-  if (!family) return false; // absence/IO never clears the user's saved selection
+bool SdCardFontSystem::selectFamily(GfxRenderer& renderer, const char* name, uint8_t size, bool dirty, bool ui) {
+  const auto* family = registry_.findFamily(name ? name : "");
+  if (!family) return false;  // absence/IO never clears the user's saved selection
 #if CROSSPOINT_VECTOR_FONTS
   if (family->vector) {
     if (!manager_.currentFamilyName().empty()) unloadCpfonts(renderer);
-    loadTtfFamily(*family,renderer,dirty,size,ui);
-    return ttf_ && ttfFamily_==name && ttfFontId_!=0;
+    loadTtfFamily(*family, renderer, dirty, size, ui);
+    return ttf_ && ttfFamily_ == name && ttfFontId_ != 0;
   }
   if (ttf_) unloadTtf(renderer);
 #endif
-  const auto* file=family->findNearestSize(size);
+  const auto* file = family->findNearestSize(size);
   if (!file) return false;
-  if (!dirty && manager_.currentFamilyName()==name && manager_.currentPointSize()==file->pointSize) {
+  if (!dirty && manager_.currentFamilyName() == name && manager_.currentPointSize() == file->pointSize) {
     if (ui) setupUiFallbacks(renderer);
     return true;
   }
   unloadCpfonts(renderer);
-  if (!manager_.loadFamily(*family,renderer,size)) return false;
+  if (!manager_.loadFamily(*family, renderer, size)) return false;
   if (ui) setupUiFallbacks(renderer);
   return true;
 }
-
 
 void SdCardFontSystem::setupUiFallbacks(GfxRenderer& renderer) {
   const std::string& familyName = manager_.currentFamilyName();
@@ -236,14 +244,20 @@ int SdCardFontSystem::resolveVariant(const int fontId, const float scale) {
   if (!renderer_ || !std::isfinite(scale) || scale <= 0) return 0;
   ensureRegistry();
   if (registry_.lastDiscoveryFailed()) return 0;
-  static constexpr int ownerIds[][4]={{LEXENDDECA_10_FONT_ID,LEXENDDECA_12_FONT_ID,LEXENDDECA_14_FONT_ID,LEXENDDECA_16_FONT_ID},
-    {BITTER_10_FONT_ID,BITTER_12_FONT_ID,BITTER_14_FONT_ID,BITTER_16_FONT_ID}};
-  constexpr uint8_t points[]={10,12,14,16};
-  for(const auto& ids:ownerIds) for(size_t i=0;i<4;++i) if(ids[i]==fontId) {
-    size_t best=scale<1?0:i;float target=points[i]*scale;
-    for(size_t k=0;k<4;++k)if(scale<1 ? points[k]<=target : std::fabs(points[k]-target)<std::fabs(points[best]-target))best=k;
-    return renderer_->getFontMap().count(ids[best]) ? ids[best] : 0;
-  }
+  static constexpr int ownerIds[][4] = {
+      {LEXENDDECA_10_FONT_ID, LEXENDDECA_12_FONT_ID, LEXENDDECA_14_FONT_ID, LEXENDDECA_16_FONT_ID},
+      {BITTER_10_FONT_ID, BITTER_12_FONT_ID, BITTER_14_FONT_ID, BITTER_16_FONT_ID}};
+  constexpr uint8_t points[] = {10, 12, 14, 16};
+  for (const auto& ids : ownerIds)
+    for (size_t i = 0; i < 4; ++i)
+      if (ids[i] == fontId) {
+        size_t best = scale < 1 ? 0 : i;
+        float target = points[i] * scale;
+        for (size_t k = 0; k < 4; ++k)
+          if (scale < 1 ? points[k] <= target : std::fabs(points[k] - target) < std::fabs(points[best] - target))
+            best = k;
+        return renderer_->getFontMap().count(ids[best]) ? ids[best] : 0;
+      }
   if (const int builtin = builtinReaderFontVariant(fontId, scale); builtin != 0) {
     return renderer_->getFontMap().count(builtin) ? builtin : 0;
   }
@@ -387,7 +401,8 @@ bool SdCardFontSystem::loadTtfVariant(const uint8_t pointSize, const int fontId)
     return false;
   }
   // Variants carry headings and inline runs, sharing ttf_'s FreeType faces.
-  if (!font->loadVariantOf(*ttf_, pointSize, TTF_RENDER_PROFILES.profileFor(ttfFamily_.c_str()).twoBit, /*glyphCacheBytes=*/64 * 1024, /*maxGlyphs=*/512))
+  if (!font->loadVariantOf(*ttf_, pointSize, TTF_RENDER_PROFILES.profileFor(ttfFamily_.c_str()).twoBit,
+                           /*glyphCacheBytes=*/64 * 1024, /*maxGlyphs=*/512))
     return false;
   font->build(" ");
   renderer_->insertFont(fontId, font->family());
@@ -423,21 +438,24 @@ void SdCardFontSystem::unloadTtf(GfxRenderer& renderer) {
   ttfFamily_.clear();
   ttfFontId_ = 0;
   ttfPointSize_ = 0;
-  ttfSourceIdentity_=0;ttfProfileIdentity_=0;
+  ttfSourceIdentity_ = 0;
+  ttfProfileIdentity_ = 0;
 }
 
 bool SdCardFontSystem::openTtfSource(const uint8_t style, const std::string& path) {
-  HalFile digestFile=Storage.open(path.c_str());
-  if(!digestFile || digestFile.isDirectory()) return false;
-  uint32_t digest=2166136261u;uint8_t chunk[128];size_t remaining=digestFile.size();
-  while(remaining) {
-    const size_t n=std::min(remaining,sizeof(chunk));
-    if(digestFile.read(chunk,n)!=static_cast<int>(n))return false;
-    for(size_t i=0;i<n;++i)digest=(digest^chunk[i])*16777619u;
-    remaining-=n;
+  HalFile digestFile = Storage.open(path.c_str());
+  if (!digestFile || digestFile.isDirectory()) return false;
+  uint32_t digest = 2166136261u;
+  uint8_t chunk[128];
+  size_t remaining = digestFile.size();
+  while (remaining) {
+    const size_t n = std::min(remaining, sizeof(chunk));
+    if (digestFile.read(chunk, n) != static_cast<int>(n)) return false;
+    for (size_t i = 0; i < n; ++i) digest = (digest ^ chunk[i]) * 16777619u;
+    remaining -= n;
   }
-  if(!digestFile.close())return false;
-  ttfSourceIdentity_=(ttfSourceIdentity_^digest^style)*16777619u;
+  if (!digestFile.close()) return false;
+  ttfSourceIdentity_ = (ttfSourceIdentity_ ^ digest ^ style) * 16777619u;
 
   if (style >= 4) return false;
   HalFile f = Storage.open(path.c_str());
@@ -525,14 +543,15 @@ void SdCardFontSystem::setupTtfUiFallbacks(GfxRenderer& renderer) {
       LOG_ERR("SDFS", "OOM: TtfEpdFont for UI fallback @%upt", ui.pointSize);
       continue;  // built-in bitmap UI fonts keep covering this size
     }
-    const bool ok =
-        f->loadVariantOf(*ttf_, ui.pointSize, TTF_RENDER_PROFILES.profileFor(ttfFamily_.c_str()).twoBit, /*glyphCacheBytes=*/16 * 1024, /*maxGlyphs=*/384);
+    const bool ok = f->loadVariantOf(*ttf_, ui.pointSize, TTF_RENDER_PROFILES.profileFor(ttfFamily_.c_str()).twoBit,
+                                     /*glyphCacheBytes=*/16 * 1024, /*maxGlyphs=*/384);
     if (!ok) continue;
     LOG_DBG("SDFS", "TTF UI fallback @%upt loaded (heap free %u)", ui.pointSize, (unsigned)ESP.getFreeHeap());
     // Distinct id from the reader-size font: a UI size can equal the reader size
     // (e.g. both 12pt), which would collide on computeTtfFontId and be dropped
     // as a duplicate. Salt the UI family name to separate the id spaces.
-    const int id = computeTtfFontId((ttfFamily_ + "\x01ui").c_str(), ui.pointSize,ttfSourceIdentity_^ttfProfileIdentity_);
+    const int id =
+        computeTtfFontId((ttfFamily_ + "\x01ui").c_str(), ui.pointSize, ttfSourceIdentity_ ^ ttfProfileIdentity_);
     renderer.insertFont(id, f->family());
     renderer.registerTtfFont(id, f.get());
     renderer.setFallbackFont(ui.fontId, id);
@@ -543,12 +562,12 @@ void SdCardFontSystem::setupTtfUiFallbacks(GfxRenderer& renderer) {
 
 void SdCardFontSystem::loadTtfFamily(const SdCardFontFamilyInfo& family, GfxRenderer& renderer,
                                      const bool registryWasDirty, uint8_t requestedSize, const bool ui) {
-  const uint8_t size=snapToNearestPointSize(VECTOR_READER_POINT_SIZES,std::size(VECTOR_READER_POINT_SIZES),
-                                             requestedSize ? requestedSize : SETTINGS.fontPointSize);
-  const auto profile=TTF_RENDER_PROFILES.profileFor(family.name.c_str());
-  const uint32_t profileKey=profile.identity();
-  const bool unchanged=!registryWasDirty && profileKey==ttfProfileIdentity_;
-  if(unchanged && ttf_ && ttfFamily_==family.name && ttfPointSize_==size) {
+  const uint8_t size = snapToNearestPointSize(VECTOR_READER_POINT_SIZES, std::size(VECTOR_READER_POINT_SIZES),
+                                              requestedSize ? requestedSize : SETTINGS.fontPointSize);
+  const auto profile = TTF_RENDER_PROFILES.profileFor(family.name.c_str());
+  const uint32_t profileKey = profile.identity();
+  const bool unchanged = !registryWasDirty && profileKey == ttfProfileIdentity_;
+  if (unchanged && ttf_ && ttfFamily_ == family.name && ttfPointSize_ == size) {
     if (ui && ttfUi_.empty()) setupTtfUiFallbacks(renderer);
     return;
   }
@@ -562,7 +581,7 @@ void SdCardFontSystem::loadTtfFamily(const SdCardFontFamilyInfo& family, GfxRend
   // are pure cache hits. Without PSRAM keep the internal-DRAM-safe default.
   const bool havePsram = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) > 0;
   const size_t cacheBytes = havePsram ? size_t(profile.cacheKiB) * 1024 : 32 * 1024;
-  const uint16_t maxGlyphs = havePsram ? profile.maxGlyphs : std::min<uint16_t>(profile.maxGlyphs,768);
+  const uint16_t maxGlyphs = havePsram ? profile.maxGlyphs : std::min<uint16_t>(profile.maxGlyphs, 768);
 
   // Same family, only the reader size changed (size preview): the open style
   // sources and the size-independent UI fallbacks don't need rebuilding — just
@@ -574,7 +593,7 @@ void SdCardFontSystem::loadTtfFamily(const SdCardFontFamilyInfo& family, GfxRend
     renderer.removeFont(ttfFontId_);
     if (ttf_->load(size, profile.twoBit, cacheBytes, maxGlyphs)) {
       ttf_->build(" ");
-      ttfFontId_ = computeTtfFontId(family.name.c_str(), size,ttfSourceIdentity_^profileKey);
+      ttfFontId_ = computeTtfFontId(family.name.c_str(), size, ttfSourceIdentity_ ^ profileKey);
       renderer.insertFont(ttfFontId_, ttf_->family());
       renderer.registerTtfFont(ttfFontId_, ttf_.get());
       ttfPointSize_ = size;
@@ -621,7 +640,7 @@ void SdCardFontSystem::loadTtfFamily(const SdCardFontFamilyInfo& family, GfxRend
     freeTtfSources();
     return;
   }
-  ttfProfileIdentity_=profileKey;
+  ttfProfileIdentity_ = profileKey;
   addTtfSources(*ttf_);
   const bool ok = ttf_->load(size, profile.twoBit, cacheBytes, maxGlyphs);
   if (!ok) {
@@ -637,14 +656,14 @@ void SdCardFontSystem::loadTtfFamily(const SdCardFontFamilyInfo& family, GfxRend
   // Seed the regular face's glyph cache; other styles + glyphs fault on demand.
   ttf_->build(" ");
 
-  ttfFontId_ = computeTtfFontId(family.name.c_str(), size,ttfSourceIdentity_^profileKey);
+  ttfFontId_ = computeTtfFontId(family.name.c_str(), size, ttfSourceIdentity_ ^ profileKey);
   renderer.insertFont(ttfFontId_, ttf_->family());
   renderer.registerTtfFont(ttfFontId_, ttf_.get());
   ttfFamily_ = family.name;
   ttfPointSize_ = size;
   LOG_DBG("SDFS", "Reader TTF face loaded (heap free %u, max block %u)", (unsigned)ESP.getFreeHeap(),
           (unsigned)ESP.getMaxAllocHeap());
-  if(ui) setupTtfUiFallbacks(renderer);  // CJK/script UI fallback at the built-in UI sizes
+  if (ui) setupTtfUiFallbacks(renderer);  // CJK/script UI fallback at the built-in UI sizes
   LOG_DBG("SDFS", "Loaded TTF font: %s @ %upt (id %d)", family.name.c_str(), size, ttfFontId_);
 }
 
@@ -701,45 +720,54 @@ void SdCardFontSystem::releaseForNetwork(GfxRenderer& renderer) {
   releaseLoadedFont(renderer);
   releaseRegistry();
 }
-uint8_t SdCardFontSystem::resolveLegacySizeStep(const char* name,uint8_t step) {
-  ensureRegistry();if(registry_.lastDiscoveryFailed()) return 0;
-  const auto* family=registry_.findFamily(name ? name : "");if(!family)return 0;
-  auto sizes=family->availableSizes();if(sizes.empty())return 0;
-  return sizes[std::min<size_t>(step,sizes.size()-1)];
+uint8_t SdCardFontSystem::resolveLegacySizeStep(const char* name, uint8_t step) {
+  ensureRegistry();
+  if (registry_.lastDiscoveryFailed()) return 0;
+  const auto* family = registry_.findFamily(name ? name : "");
+  if (!family) return 0;
+  auto sizes = family->availableSizes();
+  if (sizes.empty()) return 0;
+  return sizes[std::min<size_t>(step, sizes.size() - 1)];
 }
-bool SdCardFontSystem::changeReaderFontSize(bool larger,FontSizeStepMode mode) {
-  if(SETTINGS.sdFontFamilyName[0]) {
-    ensureRegistry();if(registry_.lastDiscoveryFailed())return false;
-    const auto* family=registry_.findFamily(SETTINGS.sdFontFamilyName);
-    if(family) {
-      if(family->vector) return changeReaderFontSizeStep(VECTOR_READER_POINT_SIZES,std::size(VECTOR_READER_POINT_SIZES),SETTINGS.readerFontPointSize,larger,mode);
-      auto sizes=family->availableSizes();
-      if(!sizes.empty())return changeReaderFontSizeStep(sizes.data(),sizes.size(),SETTINGS.readerFontPointSize,larger,mode);
+bool SdCardFontSystem::changeReaderFontSize(bool larger, FontSizeStepMode mode) {
+  if (SETTINGS.sdFontFamilyName[0]) {
+    ensureRegistry();
+    if (registry_.lastDiscoveryFailed()) return false;
+    const auto* family = registry_.findFamily(SETTINGS.sdFontFamilyName);
+    if (family) {
+      if (family->vector)
+        return changeReaderFontSizeStep(VECTOR_READER_POINT_SIZES, std::size(VECTOR_READER_POINT_SIZES),
+                                        SETTINGS.readerFontPointSize, larger, mode);
+      auto sizes = family->availableSizes();
+      if (!sizes.empty())
+        return changeReaderFontSizeStep(sizes.data(), sizes.size(), SETTINGS.readerFontPointSize, larger, mode);
     }
   }
-  return SETTINGS.changeReaderFontSize(larger,mode);
+  return SETTINGS.changeReaderFontSize(larger, mode);
 }
-DictionaryFontActivation SdCardFontSystem::activateDictionaryFont(GfxRenderer& renderer,const char* name,uint8_t size) {
-  if ((!name || !*name) && size && SETTINGS.sdFontFamilyName[0]) name=SETTINGS.sdFontFamilyName;
-  if (!name || !*name) return {restoreReaderFont(renderer),false};
+DictionaryFontActivation SdCardFontSystem::activateDictionaryFont(GfxRenderer& renderer, const char* name,
+                                                                  uint8_t size) {
+  if ((!name || !*name) && size && SETTINGS.sdFontFamilyName[0]) name = SETTINGS.sdFontFamilyName;
+  if (!name || !*name) return {restoreReaderFont(renderer), false};
   ensureRegistry();
-  if(registry_.lastDiscoveryFailed()) return {restoreReaderFont(renderer),false};
-  if(!registry_.findFamily(name)) {
-    if (SETTINGS.dictionarySdFontFamilyName[0] && strcmp(name,SETTINGS.dictionarySdFontFamilyName))
-      return activateDictionaryFont(renderer,SETTINGS.dictionarySdFontFamilyName,SETTINGS.dictionaryFontPointSize);
-    return {restoreReaderFont(renderer),false};
+  if (registry_.lastDiscoveryFailed()) return {restoreReaderFont(renderer), false};
+  if (!registry_.findFamily(name)) {
+    if (SETTINGS.dictionarySdFontFamilyName[0] && strcmp(name, SETTINGS.dictionarySdFontFamilyName))
+      return activateDictionaryFont(renderer, SETTINGS.dictionarySdFontFamilyName, SETTINGS.dictionaryFontPointSize);
+    return {restoreReaderFont(renderer), false};
   }
-  if(!size) size=SETTINGS.getSdFontTargetPointSize();
-  if(auto* caches=renderer.getFontCacheManager()) caches->releaseSdFontCaches();
+  if (!size) size = SETTINGS.getSdFontTargetPointSize();
+  if (auto* caches = renderer.getFontCacheManager()) caches->releaseSdFontCaches();
   if (!MemoryBudget::hasHeapForDictionarySdFont(MemoryBudget::snapshot())) releaseLoadedFont(renderer);
-  if (!MemoryBudget::hasHeapForDictionarySdFont(MemoryBudget::snapshot())) return {restoreReaderFont(renderer),false};
-  if(selectFamily(renderer,name,size,false,false)) {
-    const int id=resolveFontId(name,size);return {id,id!=0};
+  if (!MemoryBudget::hasHeapForDictionarySdFont(MemoryBudget::snapshot())) return {restoreReaderFont(renderer), false};
+  if (selectFamily(renderer, name, size, false, false)) {
+    const int id = resolveFontId(name, size);
+    return {id, id != 0};
   }
-  return {restoreReaderFont(renderer),false};
+  return {restoreReaderFont(renderer), false};
 }
 int SdCardFontSystem::restoreReaderFont(GfxRenderer& renderer) {
   ensureLoaded(renderer);
-  const int id=resolveFontId(SETTINGS.sdFontFamilyName,SETTINGS.getSdFontTargetPointSize());
+  const int id = resolveFontId(SETTINGS.sdFontFamilyName, SETTINGS.getSdFontTargetPointSize());
   return id ? id : SETTINGS.getBuiltInReaderFontId();
 }

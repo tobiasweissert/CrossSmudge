@@ -12,6 +12,13 @@ enum class BidiBaseDir : signed char { AUTO = -1, LTR = 0, RTL = 1 };
 
 class GfxRenderer {
  public:
+  enum class TextMeasureMode { Layout, Rendered };
+  bool ensureFontLoaded(int) const { return true; }
+  bool getCodepointMetrics(int id, uint32_t, EpdFontFamily::Style, int32_t& advance, int& height) const {
+    advance = (6 + id) << 4;
+    height = 8 + id;
+    return true;
+  }
   int getFontAscenderSize(int id) const { return 12 + id; }
   int getLineHeight(int id) const { return 16 + id; }
   static int characters(const char* text) {
@@ -27,8 +34,19 @@ class GfxRenderer {
   int getTextAdvanceX(int id, const char* text, EpdFontFamily::Style style, uint32_t = 0) const {
     return getTextWidth(id, text, style);
   }
+  int getTextAdvanceXTracked(int id, const char* text, EpdFontFamily::Style style, int8_t tracking = 0,
+                             BidiUtils::BidiBaseDir = BidiUtils::BidiBaseDir::AUTO,
+                             TextMeasureMode = TextMeasureMode::Layout) const {
+    const int count = characters(text);
+    return getTextWidth(id, text, style) + (count ? count - 1 : 0) * tracking;
+  }
+  bool ensureSdCardFontReady(int, const char* const*, const size_t*, size_t, bool, bool, uint8_t, bool = false) const {
+    return true;
+  }
   int getSpaceWidth(int id, EpdFontFamily::Style) const { return 3 + id; }
-  int getKerning(int, uint32_t, uint32_t, EpdFontFamily::Style) const { return 0; }
+  int getKerning(int, uint32_t left, uint32_t right, EpdFontFamily::Style, int8_t tracking = 0) const {
+    return left && left != ' ' && right != ' ' ? tracking : 0;
+  }
   int getSpaceAdvance(int id, uint32_t, uint32_t, EpdFontFamily::Style) const { return 3 + id; }
   bool isFontCacheScanning() const { return false; }
   template <class... Args>

@@ -5,8 +5,8 @@
 #include <vector>
 
 #include "CrossPointSettings.h"
-#include "ReaderProgressSaveDebouncer.h"
 #include "ReaderActivity.h"
+#include "ReaderProgressSaveDebouncer.h"
 #include "components/OptionPopup.h"
 #if CROSSINK_APP_CAP_TOUCH
 #include "activities/reader/ReaderPinchGesture.h"
@@ -81,7 +81,8 @@ class TxtReaderActivity final : public ReaderActivity {
  public:
   explicit TxtReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::unique_ptr<Txt> txt,
                              int initialRefreshCountdown, bool skipRecentBookUpdateOnEntry = false)
-      : ReaderActivity("TxtReader", renderer, mappedInput, txt ? txt->getPath() : std::string{}, initialRefreshCountdown > 0),
+      : ReaderActivity("TxtReader", renderer, mappedInput, txt ? txt->getPath() : std::string{},
+                       initialRefreshCountdown > 0),
         txt(std::move(txt)),
         pagesUntilFullRefresh(initialRefreshCountdown),
         skipRecentBookUpdateOnEntry(skipRecentBookUpdateOnEntry) {}

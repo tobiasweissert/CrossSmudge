@@ -48,6 +48,7 @@ class HalDisplay {
   void writeGrayscalePlaneStrip(bool, const uint8_t*, uint16_t, uint16_t) {}
   bool shouldSkipImageBlanking() const { return false; }
   bool supportsStripGrayscale() const { return true; }
+  bool displayRetainedGrayscaleOverlay(int, int, int, int, bool) { return false; }
   void cleanupGrayscaleBuffers(const uint8_t* buffer) {
     if (!buffer) ++canceled;
   }

@@ -3,12 +3,28 @@
 #include <HalStorage.h>
 #include <gtest/gtest.h>
 
+#include <new>
+
+// Bounded CSS storage now uses nothrow arrays rather than capability slabs.
+namespace {
+bool failCssArrays = false;
+}
+void* operator new[](size_t size, const std::nothrow_t&) noexcept {
+  if (failCssArrays) return nullptr;
+  try {
+    return ::operator new[](size);
+  } catch (...) {
+    return nullptr;
+  }
+}
+
 struct CssArenaBackingTest : testing::Test {
   void SetUp() override {
     fakeheap::reset();
     Storage.reset();
   }
   void TearDown() override {
+    failCssArrays = false;
     EXPECT_TRUE(fakeheap::live.empty());
     Storage.reset();
   }
@@ -20,14 +36,15 @@ struct CssArenaBackingTest : testing::Test {
     FsFile file;
     ASSERT_TRUE(Storage.openFileForRead("test", "input.css", file));
     CssParser css("book");
-    ASSERT_TRUE(css.loadFromStream(file));
+    ASSERT_EQ(css.loadFromStream(file), CssParser::ParseResult::Complete);
     file.close();
-    ASSERT_TRUE(css.saveToCache());
+    ASSERT_TRUE(css.saveToCache(true));
   }
   void checkStyle(CssParser& css) {
     EXPECT_FALSE(css.empty());
     EXPECT_EQ(css.ruleCount(), 3u);
-    const auto style = css.resolveStyle("p", "em", {{0, "div", ""}});
+    const auto ancestor = CssParser::makeAncestor("div", "", "");
+    const auto style = css.resolveStyle("p", "em", "", &ancestor, 1);
     EXPECT_TRUE(style.hasFontWeight());
     EXPECT_TRUE(style.hasFontStyle());
     EXPECT_TRUE(style.hasTextAlign());
@@ -47,7 +64,7 @@ TEST_F(CssArenaBackingTest, IdenticalStylesForDefaultExternalAndDiskFallback) {
     createCache();
     CssParser css("book");
     if (mode == 2) fakeheap::external.fail = 1;
-    ASSERT_TRUE(css.loadFromCache());
+    ASSERT_EQ(css.loadFromCache(), CssParser::CacheLoadResult::Complete);
     checkStyle(css);
     if (mode == 2)
       EXPECT_TRUE(fakeheap::live.empty());
@@ -69,7 +86,7 @@ TEST_F(CssArenaBackingTest, ExternalHydrationPreservesInternalAndExternalReserve
       fakeheap::internal.free = 79 * 1024;
     else
       fakeheap::external.free = 128 * 1024;
-    ASSERT_TRUE(css.loadFromCache());
+    ASSERT_EQ(css.loadFromCache(), CssParser::CacheLoadResult::Complete);
     checkStyle(css);
     EXPECT_TRUE(fakeheap::live.empty());
   }
@@ -90,25 +107,26 @@ TEST_F(CssArenaBackingTest, LargeStreamPreservesHiddenRulesThroughCache) {
   FsFile file;
   ASSERT_TRUE(Storage.openFileForRead("test", "large.css", file));
   CssParser css("book");
-  ASSERT_TRUE(css.loadFromStream(file));
+  ASSERT_EQ(css.loadFromStream(file), CssParser::ParseResult::Complete);
   file.close();
   EXPECT_EQ(css.resolveStyle("div", "modal").display, CssDisplay::None);
-  ASSERT_TRUE(css.saveToCache());
+  ASSERT_TRUE(css.saveToCache(true));
   css.clear();
-  ASSERT_TRUE(css.loadFromCache());
+  ASSERT_EQ(css.loadFromCache(), CssParser::CacheLoadResult::Complete);
   EXPECT_EQ(css.resolveStyle("div", "modal").display, CssDisplay::None);
 }
 
 TEST_F(CssArenaBackingTest, PreviousCacheVersionIsInvalidated) {
   CssParser css("book");
-  ASSERT_TRUE(css.saveToCache());
+  ASSERT_TRUE(css.saveToCache(true));
   FsFile file;
   // Obtain a valid empty cache, then mark it as the prior cache revision.
   ASSERT_TRUE(Storage.openFileForRead("test", "book/css_rules.cache", file));
   std::vector<uint8_t> bytes(file.size());
   ASSERT_EQ(file.read(bytes.data(), bytes.size()), static_cast<int>(bytes.size()));
   file.close();
-  bytes[4] = 16;
+  ASSERT_FALSE(bytes.empty());
+  bytes[0] = 16;
   Storage.put("book/css_rules.cache", bytes);
   EXPECT_EQ(css.inspectCache(), CssParser::CacheStatus::Invalid);
 }
@@ -119,7 +137,7 @@ TEST_F(CssArenaBackingTest, PsramParsingMergesSelectorsAndReleasesAllSlabs) {
   FsFile file;
   ASSERT_TRUE(Storage.openFileForRead("test", "input.css", file));
   CssParser css("book");
-  ASSERT_TRUE(css.loadFromStream(file));
+  ASSERT_EQ(css.loadFromStream(file), CssParser::ParseResult::Complete);
   file.close();
   EXPECT_EQ(css.ruleCount(), 1u);
   EXPECT_EQ(css.resolveStyle("div", "modal").display, CssDisplay::None);
@@ -137,7 +155,10 @@ TEST_F(CssArenaBackingTest, PsramParsingAllocationFailureStopsSafely) {
   ASSERT_TRUE(Storage.openFileForRead("test", "input.css", file));
   CssParser css("book");
   fakeheap::external.fail = 1;
-  EXPECT_FALSE(css.loadFromStream(file));
+  failCssArrays = true;
+  const auto result = css.loadFromStream(file);
+  failCssArrays = false;
+  EXPECT_NE(result, CssParser::ParseResult::Complete);
   file.close();
   EXPECT_TRUE(css.empty());
   EXPECT_TRUE(fakeheap::live.empty());
@@ -151,14 +172,14 @@ TEST_F(CssArenaBackingTest, ManyRulesSurviveArenaGrowthAndCacheRoundTrip) {
   FsFile file;
   ASSERT_TRUE(Storage.openFileForRead("test", "input.css", file));
   CssParser css("book");
-  ASSERT_TRUE(css.loadFromStream(file));
+  ASSERT_EQ(css.loadFromStream(file), CssParser::ParseResult::Complete);
   file.close();
   ASSERT_EQ(css.ruleCount(), 1303u);
   for (int i = 0; i < 1303; ++i)
     EXPECT_EQ(css.resolveStyle("div", "rule" + std::to_string(i)).display, CssDisplay::None);
-  ASSERT_TRUE(css.saveToCache());
+  ASSERT_TRUE(css.saveToCache(true));
   css.clear();
-  ASSERT_TRUE(css.loadFromCache());
+  ASSERT_EQ(css.loadFromCache(), CssParser::CacheLoadResult::Complete);
   ASSERT_EQ(css.ruleCount(), 1303u);
   for (int i = 0; i < 1303; ++i)
     EXPECT_EQ(css.resolveStyle("div", "rule" + std::to_string(i)).display, CssDisplay::None);

@@ -461,8 +461,7 @@ bool JpegToFramebufferConverter::decodeToFramebuffer(const std::string& imagePat
   return decode(imagePath, &renderer, config);
 }
 namespace {
-bool decodeJpeg(const std::string& imagePath, GfxRenderer* renderer, const RenderConfig& config,
-                bool& cacheWritten) {
+bool decodeJpeg(const std::string& imagePath, GfxRenderer* renderer, const RenderConfig& config, bool& cacheWritten) {
   cacheWritten = false;
   if (ImageToFramebufferDecoder::cancelled() || (!renderer && !config.cacheOnly)) return false;
   HeapObject<JPEGDEC> jpeg;
@@ -487,7 +486,9 @@ bool decodeJpeg(const std::string& imagePath, GfxRenderer* renderer, const Rende
   }
 
   ImageDimensions sourceDimensions;
-  if (!ImageToFramebufferDecoder::validateAndStoreDimensions(jpeg->getWidth(), jpeg->getHeight(), sourceDimensions, "JPEG")) return false;
+  if (!ImageToFramebufferDecoder::validateAndStoreDimensions(jpeg->getWidth(), jpeg->getHeight(), sourceDimensions,
+                                                             "JPEG"))
+    return false;
   const int srcWidth = sourceDimensions.width;
   const int srcHeight = sourceDimensions.height;
   const float cropX = std::clamp(config.sourceCropX, 0.0f, 0.99f);

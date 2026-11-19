@@ -3,13 +3,13 @@
 #include <ArduinoJson.h>
 #include <HalMemory.h>
 #include <Logging.h>
-#include "network/HttpDownloader.h"
-#include "network/HttpRedirectPolicy.h"
-#include <cstring>
 
+#include <cstring>
 #include <string>
 
 #include "KOReaderCredentialStore.h"
+#include "network/HttpDownloader.h"
+#include "network/HttpRedirectPolicy.h"
 
 int KOReaderSyncClient::lastHttpCode = 0;
 
@@ -19,27 +19,37 @@ namespace {
 class SyncHttpClient {
   std::string url_, response_;
   std::vector<HttpDownloader::Header> headers_;
+
  public:
   bool begin(const std::string& url) {
     HttpRedirectPolicy::Url parsed;
     if (!HttpRedirectPolicy::parseUrl(url, parsed)) return false;
-    url_ = url; return true;
+    url_ = url;
+    return true;
   }
   void addHeader(const std::string& key, const std::string& value) { headers_.emplace_back(key, value); }
   int GET() { return exchange("GET", nullptr); }
   int sendRequest(const char* method, const std::string& body) { return exchange(method, &body); }
   const std::string& getString() const { return response_; }
   void end() { headers_.clear(); }
+
  private:
   int exchange(const char* method, const std::string* body) {
     response_.clear();
     HttpDownloader::DownloadOptions options;
-    options.headers = headers_; options.body = body; options.method = method;
-    int status = 0; options.statusOut = &status;
-    const auto result = HttpDownloader::streamUrl(url_, [&](const uint8_t* data, size_t len) {
-      if (len > 32768 - response_.size()) return false;
-      response_.append(reinterpret_cast<const char*>(data), len); return true;
-    }, nullptr, "", "", std::move(options));
+    options.headers = headers_;
+    options.body = body;
+    options.method = method;
+    int status = 0;
+    options.statusOut = &status;
+    const auto result = HttpDownloader::streamUrl(
+        url_,
+        [&](const uint8_t* data, size_t len) {
+          if (len > 32768 - response_.size()) return false;
+          response_.append(reinterpret_cast<const char*>(data), len);
+          return true;
+        },
+        nullptr, "", "", std::move(options));
     if (result != HttpDownloader::OK && result != HttpDownloader::UNAUTHORIZED) return -1;
     return status;
   }
@@ -307,7 +317,6 @@ KOReaderSyncClient::Error KOReaderSyncClient::updateProgress(const KOReaderProgr
 
   std::string body;
   serializeJson(doc, body);
-
 
   SyncHttpClient http;
   if (!http.begin(url)) {

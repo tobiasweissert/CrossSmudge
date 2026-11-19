@@ -7,6 +7,24 @@
 
 #include <cstdlib>
 #include <fstream>
+#include <new>
+
+// The current WordStore uses ordinary nothrow arrays, not heap_caps buffers.
+// Inject at that real boundary; leave normal allocations sanitizer-visible.
+namespace {
+bool failLayoutArrays = false;
+}
+void* operator new[](size_t size, const std::nothrow_t&) noexcept {
+  if (failLayoutArrays) return nullptr;
+  try {
+    return ::operator new[](size);
+  } catch (...) {
+    return nullptr;
+  }
+}
+
+bool isExplicitHyphen(uint32_t cp) { return cp == '-' || cp == 0x2010; }
+bool isSoftHyphen(uint32_t cp) { return cp == 0xAD; }
 
 // Hyphen dictionary availability is outside allocation policy. Exercise the
 // production non-hyphenating layout, real bidi, TextBlock and serialization.
@@ -18,6 +36,7 @@ struct TextLayoutBackingTest : testing::Test {
     Storage.reset();
   }
   void TearDown() override {
+    failLayoutArrays = false;
     EXPECT_TRUE(fakeheap::live.empty());
     Storage.reset();
   }
@@ -39,17 +58,18 @@ struct TextLayoutBackingTest : testing::Test {
             : std::vector<std::string>{"A", "paragraph", "with", "different", "word", "lengths", "and", "punctuation."};
     for (int i = 0; i < 400; ++i)
       text.addWord(words[i % words.size()], i % 3 ? EpdFontFamily::REGULAR : EpdFontFamily::BOLD, false, scenario == 2,
-                   false, 0, i * 8);
+                   i * 8, 0, 0, scenario == 2);
     if (scenario == 2) text.setRubyGroupAt(0, 2, "にほん");
     FsFile output;
     EXPECT_TRUE(Storage.openFileForWrite("test", "layout", output));
     GfxRenderer renderer;
-    bool ok = text.layoutAndExtractLines(renderer, font, 240,
-                                         [&](std::shared_ptr<TextBlock> block, uint32_t offset, uint32_t) {
-                                           EXPECT_TRUE(block->valid());
-                                           EXPECT_TRUE(block->serialize(output));
-                                           EXPECT_EQ(output.write(&offset, sizeof(offset)), sizeof(offset));
-                                         });
+    if (!text.hadDroppedWords())
+      text.layoutAndExtractLines(renderer, font, 240, [&](std::unique_ptr<TextBlock> block, uint32_t offset) {
+        EXPECT_TRUE(block->valid());
+        EXPECT_TRUE(block->serialize(output));
+        EXPECT_EQ(output.write(&offset, sizeof(offset)), sizeof(offset));
+      });
+    const bool ok = !text.hadDroppedWords();
     output.close();
     if (result)
       *result = ok;
@@ -82,7 +102,9 @@ TEST_F(TextLayoutBackingTest, AllocationFailureReturnsWithoutPartialLinesOrLeaks
   fakeheap::external.fail = 1000;
   fakeheap::internal.largest = 1;
   bool ok = true;
+  failLayoutArrays = true;
   auto output = layout(0, 0, &ok);
+  failLayoutArrays = false;
   EXPECT_FALSE(ok);
   EXPECT_TRUE(output.empty());
   EXPECT_TRUE(fakeheap::live.empty());

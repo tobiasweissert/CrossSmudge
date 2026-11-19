@@ -1,11 +1,12 @@
 #pragma once
 
+#include <Print.h>
+
 #include <cstdint>
 #include <cstdio>
-#include <string>
 #include <filesystem>
+#include <string>
 #include <utility>
-#include <Print.h>
 
 namespace HalFileTest {
 inline bool failNextWrite = false;
@@ -23,7 +24,11 @@ class HalFile : public Print {
   explicit HalFile(const char* path) { open(path, "wb"); }
   ~HalFile() { close(); }
   HalFile(HalFile&& other) noexcept : file_(std::exchange(other.file_, nullptr)) {}
-  HalFile& operator=(HalFile&& other) noexcept { close(); file_ = std::exchange(other.file_, nullptr); return *this; }
+  HalFile& operator=(HalFile&& other) noexcept {
+    close();
+    file_ = std::exchange(other.file_, nullptr);
+    return *this;
+  }
   bool sync() { return flush(); }
   size_t fileSize() const { return size(); }
   uint64_t fileSize64() const { return size(); }
@@ -91,14 +96,26 @@ class HalStorage {
     static HalStorage instance;
     return instance;
   }
-  bool mkdir(const char* p) { std::error_code e; std::filesystem::create_directories(p,e); return !e; }
-  bool removeDir(const char* p) { std::error_code e; std::filesystem::remove_all(p,e); return !e; }
+  bool mkdir(const char* p) {
+    std::error_code e;
+    std::filesystem::create_directories(p, e);
+    return !e;
+  }
+  bool removeDir(const char* p) {
+    std::error_code e;
+    std::filesystem::remove_all(p, e);
+    return !e;
+  }
   int readOpens = 0;
   std::string dictionaryTempPath;
   std::string resolvePath(const std::string& path) const {
     return path == "/.crosspoint/dicthtml.tmp" && !dictionaryTempPath.empty() ? dictionaryTempPath : path;
   }
-  HalFile open(const char* path, int mode) { HalFile f; f.open(resolvePath(path).c_str(), mode == O_RDWR ? "r+b" : mode == O_RDONLY ? "rb" : "wb"); return f; }
+  HalFile open(const char* path, int mode) {
+    HalFile f;
+    f.open(resolvePath(path).c_str(), mode == O_RDWR ? "r+b" : mode == O_RDONLY ? "rb" : "wb");
+    return f;
+  }
   bool openFileForRead(const char*, const std::string& path, HalFile& file) {
     readOpens++;
     return file.open(resolvePath(path).c_str(), "rb");

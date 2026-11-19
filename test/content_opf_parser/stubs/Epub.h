@@ -18,6 +18,13 @@ class HalFile {
     return true;
   }
   size_t position() const { return position_; }
+  size_t size() const { return 0; }
+  bool seekCur(size_t distance) { return seek(position_ + distance); }
+  int read(void*, size_t) { return 0; }
+  size_t write(const uint8_t*, size_t length) {
+    position_ += length;
+    return length;
+  }
   int available() const { return 0; }
   void markOpen() {
     initialized_ = true;

@@ -6,19 +6,18 @@
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <I18n.h>
+#include <LibraryBuilder.h>
 #include <Logging.h>
 #include <Txt.h>
 #include <Xtc.h>
 
 #include <cstdio>
 
-#include <LibraryBuilder.h>
-
-#include "FileActionPaths.h"
 #include "BookmarkStore.h"
 #include "ClippingStore.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "FileActionPaths.h"
 #include "RecentBooksStore.h"
 #include "activities/reader/BookReadingStats.h"
 #include "activities/reader/EpubReaderActivity.h"
@@ -80,8 +79,8 @@ bool canSendNearby(const std::string& path) {
 }
 
 bool deleteFile(const std::string& fullPath) {
-  if (!FileActionPaths::isUserPath(fullPath) ||
-      Storage.exists("/.crosspoint/book-move.pending") || Storage.exists("/.crosspoint/clippings/move.pending"))
+  if (!FileActionPaths::isUserPath(fullPath) || Storage.exists("/.crosspoint/book-move.pending") ||
+      Storage.exists("/.crosspoint/clippings/move.pending"))
     return false;
   // Never touch user metadata following a negative physical FAT acknowledgement.
   if (!Storage.remove(fullPath.c_str())) return false;
@@ -115,8 +114,7 @@ bool clearFileMetadata(const std::string& fullPath) {
     const auto modern = Epub::cachePathForFilePath(fullPath, "/.crosspoint");
     const auto legacy = Txt(fullPath, "/.crosspoint").getCachePath();
     if (Storage.exists(modern.c_str())) ok = Epub(fullPath, "/.crosspoint").clearCache();
-    if (modern != legacy && Storage.exists(legacy.c_str()))
-      ok = Txt(fullPath, "/.crosspoint").clearCache() && ok;
+    if (modern != legacy && Storage.exists(legacy.c_str())) ok = Txt(fullPath, "/.crosspoint").clearCache() && ok;
     BookmarkStore::deleteForFilePath(fullPath, "epub");
     BookmarkStore::deleteForFilePath(fullPath, "txt");
     ok = ClippingStore::deleteForFilePath(fullPath, "epub") && ok;
@@ -262,7 +260,6 @@ bool toggleBookCompleted(const std::string& fullPath, const std::string& display
       APP_STATE.hasPendingAlert.store(true, std::memory_order_release);
       return true;
     }
-
   }
 
   return true;

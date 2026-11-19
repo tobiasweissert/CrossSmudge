@@ -13,10 +13,12 @@ class PixelCacheTest : public ::testing::Test {
                .string();
     HalFileTest::failNextWrite = false;
     HalFileTest::failNextClose = false;
+    HalFileTest::failNextSync = false;
   }
   void TearDown() override {
     HalFileTest::failNextWrite = false;
     HalFileTest::failNextClose = false;
+    HalFileTest::failNextSync = false;
     Storage.remove(path);
   }
 };
@@ -32,6 +34,14 @@ TEST_F(PixelCacheTest, RejectsFinalWriteFailure) {
   ASSERT_TRUE(cache.begin(path, 4, 1, 0, 0, 1));
   HalFileTest::failNextWrite = true;
   EXPECT_FALSE(cache.finalize());
+  EXPECT_FALSE(Storage.exists(path.c_str()));
+}
+TEST_F(PixelCacheTest, RejectsSyncFailure) {
+  PixelCache cache;
+  ASSERT_TRUE(cache.begin(path, 4, 1, 0, 0, 1));
+  HalFileTest::failNextSync = true;
+  EXPECT_FALSE(cache.finalize());
+  EXPECT_FALSE(HalFileTest::failNextSync);
   EXPECT_FALSE(Storage.exists(path.c_str()));
 }
 TEST_F(PixelCacheTest, RejectsCloseFailure) {

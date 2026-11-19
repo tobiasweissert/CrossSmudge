@@ -40,8 +40,13 @@ class LibraryActivity : public Activity {
   void simulatorRefresh() { refreshLibrary(); }
   bool simulatorCollapseGroup(int row) { return collapseGroups(row); }
   void simulatorExpandGroup(int row) { expandGroup(row); }
-  void simulatorSwipeDelete(int x,int y) { handleInput({LibraryInputBuffer::Type::SwipeLeft,static_cast<int16_t>(x),static_cast<int16_t>(y)}); }
-  void simulatorPromptDelete(int row) { RecentBook book;if(readBook(row,book)) promptDeleteBook(book); }
+  void simulatorSwipeDelete(int x, int y) {
+    handleInput({LibraryInputBuffer::Type::SwipeLeft, static_cast<int16_t>(x), static_cast<int16_t>(y)});
+  }
+  void simulatorPromptDelete(int row) {
+    RecentBook book;
+    if (readBook(row, book)) promptDeleteBook(book);
+  }
 #endif
 
  private:

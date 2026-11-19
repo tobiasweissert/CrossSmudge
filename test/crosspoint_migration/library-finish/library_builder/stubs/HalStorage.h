@@ -244,7 +244,9 @@ class HalStorage {
     if (file && (oflag & O_TRUNC) != 0) file.node->bytes.clear();
     return file;
   }
-  bool openFileForRead(const char* module, const std::string& path, HalFile& file) {return openFileForRead(module,path.c_str(),file);}
+  bool openFileForRead(const char* module, const std::string& path, HalFile& file) {
+    return openFileForRead(module, path.c_str(), file);
+  }
   bool openFileForRead(const char*, const char* path, HalFile& file) {
     file = open(path);
     return bool(file);
@@ -257,7 +259,7 @@ class HalStorage {
   bool openFileForWrite(const char* module, const std::string& path, HalFile& file) {
     return openFileForWrite(module, path.c_str(), file);
   }
-  bool remove(const char* path) { return fake::failRemovePath==path ? false : fake::files.erase(path) != 0; }
+  bool remove(const char* path) { return fake::failRemovePath == path ? false : fake::files.erase(path) != 0; }
   bool removeDir(const char* path) {
     if (!exists(path)) return false;
     const std::string prefix = std::string(path) + "/";

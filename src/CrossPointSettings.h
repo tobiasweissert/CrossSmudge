@@ -1,22 +1,20 @@
 #pragma once
 #include <ArduinoJson.h>
+#include <BlePageTurner.h>
+#include <BlePageTurnerJson.h>
 #include <Epub/ReaderRenderSpec.h>
 #include <HalStorage.h>
 #include <PersistableStore.h>
 
+#include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <iosfwd>
 #include <mutex>
 
 #include "ReaderFontSizeStep.h"
-#include <BlePageTurner.h>
-#include <BlePageTurnerJson.h>
-#include <cstring>
-
-#include <algorithm>
-#include <array>
-#include <cstdint>
 
 enum class ReaderStatusBarPosition : uint8_t { Top, Bottom };
 
@@ -150,11 +148,7 @@ constexpr ReaderStatusBarConfig migrateBottomStatusBar(const LegacyReaderStatusB
   return result;
 }
 
-
-
 #include <ArduinoJson.h>
-
-
 
 inline bool readDisplayStatusBarJson(const JsonVariantConst source, DisplayStatusBarConfig& config,
                                      const bool clockAvailable) {
@@ -251,7 +245,6 @@ inline bool repairReaderStatusBarJson(const JsonVariantConst source, ReaderStatu
   config = repaired;
   return true;
 }
-
 
 class CrossPointSettings : public PersistableStore<CrossPointSettings> {
  private:
@@ -392,8 +385,13 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   };
 
   enum SIDE_BUTTON_ACTION : uint8_t {
-    SIDE_PREVIOUS_CHAPTER=64, SIDE_NEXT_CHAPTER, SIDE_INCREASE_FONT,
-    SIDE_DECREASE_FONT, SIDE_ROTATE_COUNTERCLOCKWISE, SIDE_ROTATE_CLOCKWISE, SIDE_ROTATE_FLIP,
+    SIDE_PREVIOUS_CHAPTER = 64,
+    SIDE_NEXT_CHAPTER,
+    SIDE_INCREASE_FONT,
+    SIDE_DECREASE_FONT,
+    SIDE_ROTATE_COUNTERCLOCKWISE,
+    SIDE_ROTATE_CLOCKWISE,
+    SIDE_ROTATE_FLIP,
   };
   enum FRONT_BUTTON_ORIENTATION_AWARE {
     FRONT_ORIENTATION_AWARE_OFF = 0,
@@ -522,9 +520,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     SHORT_PWRBTN_COUNT
   };
 
-  static constexpr uint8_t SIDE_FLIP_ORIENTATION=SIDE_ROTATE_FLIP;
-  static constexpr uint8_t SIDE_OPEN_LIBRARY=LIBRARY;
-  static constexpr uint8_t PWR_BOOKMARK=TOGGLE_BOOKMARK, PWR_SYNC=SYNC_PROGRESS, PWR_FRONTLIGHT=TOGGLE_FRONTLIGHT;
+  static constexpr uint8_t SIDE_FLIP_ORIENTATION = SIDE_ROTATE_FLIP;
+  static constexpr uint8_t SIDE_OPEN_LIBRARY = LIBRARY;
+  static constexpr uint8_t PWR_BOOKMARK = TOGGLE_BOOKMARK, PWR_SYNC = SYNC_PROGRESS, PWR_FRONTLIGHT = TOGGLE_FRONTLIGHT;
 
   // Power + Up side-button chord actions. Keep this order aligned with
   // ButtonShortcutController::ChordAction because the runtime casts the
@@ -602,7 +600,13 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   enum RECENT_BOOKS_VIEW { RECENT_BOOKS_LIST = 0, RECENT_BOOKS_GRID = 1, RECENT_BOOKS_VIEW_COUNT };
 
   // Image rendering in EPUB reader
-  enum IMAGE_RENDERING { IMAGES_DISPLAY = 0, IMAGES_PLACEHOLDER = 1, IMAGES_SUPPRESS = 2, IMAGES_DISPLAY_BW = 3, IMAGE_RENDERING_COUNT };
+  enum IMAGE_RENDERING {
+    IMAGES_DISPLAY = 0,
+    IMAGES_PLACEHOLDER = 1,
+    IMAGES_SUPPRESS = 2,
+    IMAGES_DISPLAY_BW = 3,
+    IMAGE_RENDERING_COUNT
+  };
   enum TOUCH_READER_CONTROLS { TOUCH_READER_OFF = 0, TOUCH_READER_ON = 1, TOUCH_READER_CONTROLS_COUNT };
   enum PAGE_TURN_GESTURE {
     TAP_AND_SWIPE = 0,
@@ -893,48 +897,79 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Public opt-out; pace/history are not reset by this preference.
   uint8_t trackReadingStats = 1;
 
-
   // CrossPoint additions coexist with owner values; never reinterpret owner enum IDs.
-  enum STATUS_BAR_CLOCK_MODE { STATUS_BAR_CLOCK_HIDE=0, STATUS_BAR_CLOCK_RIGHT=1, STATUS_BAR_CLOCK_LEFT=2, STATUS_BAR_CLOCK_MODE_COUNT };
-  enum CLOCK_DST_MODE { CLOCK_DST_AUTO=0, CLOCK_DST_ON=1, CLOCK_DST_OFF=2, CLOCK_DST_MODE_COUNT };
-  enum LONG_PRESS_MENU_FUNCTION { LP_MENU_KOSYNC=0, LP_MENU_DISABLED=1, LP_MENU_BOOKMARK=2, LP_MENU_DICTIONARY=3, LP_MENU_READER_MENU=4, LP_MENU_CREATE_CLIPPING=5, LP_MENU_FOOTNOTES=6, LONG_PRESS_MENU_FUNCTION_COUNT };
-  enum READER_MENU_STYLE { READER_MENU_LIST=0, READER_MENU_TOOLBAR=1, READER_MENU_STYLE_COUNT };
-  enum VIBRATION { VIBRATION_TOUCH=0, VIBRATION_TOUCH_PAGE=1, VIBRATION_OFF=2 };
-  enum HAPTIC_INTENSITY { HAPTIC_LOW=0, HAPTIC_MEDIUM=1, HAPTIC_HIGH=2 };
-  enum SLIDE_SWITCH_ACTION : uint8_t { SLIDE_SWITCH_FRONTLIGHT=0, SLIDE_SWITCH_NIGHT_MODE=1, SLIDE_SWITCH_TOUCH_CONTROLS=2 };
-  enum SHOW_READER_MENU { READER_MENU_OFF=0, READER_MENU_TAP=1, READER_MENU_SWIPE_UP=2, SHOW_READER_MENU_COUNT };
-  enum MODERN_LINE_COMPRESSION { LINE_SPACING_100=0, LINE_SPACING_110=1, LINE_SPACING_120=2, LINE_SPACING_130=3, LINE_SPACING_145=4, LINE_SPACING_160=5, LINE_SPACING_175=6 };
-  static constexpr uint8_t DEFAULT_FONT_POINT_SIZE=14, LEGACY_FONT_SIZE_MAX=3;
-  static constexpr uint8_t CHARACTER_SPACING_OFFSET=2, WORD_SPACING_MIN=50, WORD_SPACING_MAX=200, WORD_SPACING_STEP=25;
-  static constexpr uint8_t SCREEN_MARGIN_MIN=5, SCREEN_MARGIN_MAX=40, SCREEN_MARGIN_STEP=5;
-  uint8_t& screenMargin=screenMarginHorizontal;
-  uint8_t characterSpacing=CHARACTER_SPACING_OFFSET;
-  int8_t getCharacterSpacing() const { return static_cast<int8_t>(characterSpacing)-CHARACTER_SPACING_OFFSET; }
-  uint8_t wordSpacingPercent=100;
-  uint8_t statusBarClock=STATUS_BAR_CLOCK_HIDE, clockTimezone=255, clockDst=CLOCK_DST_AUTO, clockShowInHeader=0;
-  uint8_t paragraphIndentSpaces=2, doublePwrBtn=IGNORE, longPressMenuFunction=LP_MENU_DISABLED;
-  uint8_t frontButtonFollowOrientation=0, sideButtonFollowOrientation=0;
-  uint8_t pluginsEnabled=0, pluginHubPromptHidden=0, vocabularyHistoryEnabled=0;
-  uint8_t showFileExtensions=1, libraryUseMetadata=1, libraryRecentOpenedOnly=0, backShortToFileBrowser=0;
-  uint8_t opdsFilenameFormat=0, vibration=VIBRATION_OFF, hapticIntensity=HAPTIC_HIGH;
-  uint8_t readerMenuStyle=READER_MENU_LIST, showReaderMenu=READER_MENU_TAP, slideSwitchAction=SLIDE_SWITCH_FRONTLIGHT;
-  char dictionaryName[32]={};
+  enum STATUS_BAR_CLOCK_MODE {
+    STATUS_BAR_CLOCK_HIDE = 0,
+    STATUS_BAR_CLOCK_RIGHT = 1,
+    STATUS_BAR_CLOCK_LEFT = 2,
+    STATUS_BAR_CLOCK_MODE_COUNT
+  };
+  enum CLOCK_DST_MODE { CLOCK_DST_AUTO = 0, CLOCK_DST_ON = 1, CLOCK_DST_OFF = 2, CLOCK_DST_MODE_COUNT };
+  enum LONG_PRESS_MENU_FUNCTION {
+    LP_MENU_KOSYNC = 0,
+    LP_MENU_DISABLED = 1,
+    LP_MENU_BOOKMARK = 2,
+    LP_MENU_DICTIONARY = 3,
+    LP_MENU_READER_MENU = 4,
+    LP_MENU_CREATE_CLIPPING = 5,
+    LP_MENU_FOOTNOTES = 6,
+    LONG_PRESS_MENU_FUNCTION_COUNT
+  };
+  enum READER_MENU_STYLE { READER_MENU_LIST = 0, READER_MENU_TOOLBAR = 1, READER_MENU_STYLE_COUNT };
+  enum VIBRATION { VIBRATION_TOUCH = 0, VIBRATION_TOUCH_PAGE = 1, VIBRATION_OFF = 2 };
+  enum HAPTIC_INTENSITY { HAPTIC_LOW = 0, HAPTIC_MEDIUM = 1, HAPTIC_HIGH = 2 };
+  enum SLIDE_SWITCH_ACTION : uint8_t {
+    SLIDE_SWITCH_FRONTLIGHT = 0,
+    SLIDE_SWITCH_NIGHT_MODE = 1,
+    SLIDE_SWITCH_TOUCH_CONTROLS = 2
+  };
+  enum SHOW_READER_MENU { READER_MENU_OFF = 0, READER_MENU_TAP = 1, READER_MENU_SWIPE_UP = 2, SHOW_READER_MENU_COUNT };
+  enum MODERN_LINE_COMPRESSION {
+    LINE_SPACING_100 = 0,
+    LINE_SPACING_110 = 1,
+    LINE_SPACING_120 = 2,
+    LINE_SPACING_130 = 3,
+    LINE_SPACING_145 = 4,
+    LINE_SPACING_160 = 5,
+    LINE_SPACING_175 = 6
+  };
+  static constexpr uint8_t DEFAULT_FONT_POINT_SIZE = 14, LEGACY_FONT_SIZE_MAX = 3;
+  static constexpr uint8_t CHARACTER_SPACING_OFFSET = 2, WORD_SPACING_MIN = 50, WORD_SPACING_MAX = 200,
+                           WORD_SPACING_STEP = 25;
+  static constexpr uint8_t SCREEN_MARGIN_MIN = 5, SCREEN_MARGIN_MAX = 40, SCREEN_MARGIN_STEP = 5;
+  uint8_t& screenMargin = screenMarginHorizontal;
+  uint8_t characterSpacing = CHARACTER_SPACING_OFFSET;
+  int8_t getCharacterSpacing() const { return static_cast<int8_t>(characterSpacing) - CHARACTER_SPACING_OFFSET; }
+  uint8_t wordSpacingPercent = 100;
+  uint8_t statusBarClock = STATUS_BAR_CLOCK_HIDE, clockTimezone = 255, clockDst = CLOCK_DST_AUTO, clockShowInHeader = 0;
+  uint8_t paragraphIndentSpaces = 2, doublePwrBtn = IGNORE, longPressMenuFunction = LP_MENU_DISABLED;
+  uint8_t frontButtonFollowOrientation = 0, sideButtonFollowOrientation = 0;
+  uint8_t pluginsEnabled = 0, pluginHubPromptHidden = 0, vocabularyHistoryEnabled = 0;
+  uint8_t showFileExtensions = 1, libraryUseMetadata = 1, libraryRecentOpenedOnly = 0, backShortToFileBrowser = 0;
+  uint8_t opdsFilenameFormat = 0, vibration = VIBRATION_OFF, hapticIntensity = HAPTIC_HIGH;
+  uint8_t readerMenuStyle = READER_MENU_LIST, showReaderMenu = READER_MENU_TAP,
+          slideSwitchAction = SLIDE_SWITCH_FRONTLIGHT;
+  char dictionaryName[32] = {};
   bleturner::Config ble;
-  uint8_t sideButtonUpShort=PREVIOUS_PAGE, sideButtonDownShort=PAGE_TURN;
-  uint8_t sideButtonUpLong=SIDE_PREVIOUS_CHAPTER, sideButtonDownLong=SIDE_NEXT_CHAPTER;
-  uint8_t leftEdgeUp=0, leftEdgeDown=0, rightEdgeUp=0, rightEdgeDown=0;
-  uint8_t librarySortMethod=4, librarySortDescending=1, libraryListExpanded=1;
-  uint8_t libraryShowSeries=1, libraryShowGenre=1, libraryShowEpub=1, libraryShowXtc=1;
-  uint8_t libraryShowTxt=1, libraryShowMarkdown=1, libraryHideFinishedBooks=0, swapLibraryFileBrowser=0;
-  bool supportsLibraryFileBrowserSwap() const { return uiTheme==MINIMAL || uiTheme==DASHBOARD; }
+  uint8_t sideButtonUpShort = PREVIOUS_PAGE, sideButtonDownShort = PAGE_TURN;
+  uint8_t sideButtonUpLong = SIDE_PREVIOUS_CHAPTER, sideButtonDownLong = SIDE_NEXT_CHAPTER;
+  uint8_t leftEdgeUp = 0, leftEdgeDown = 0, rightEdgeUp = 0, rightEdgeDown = 0;
+  uint8_t librarySortMethod = 4, librarySortDescending = 1, libraryListExpanded = 1;
+  uint8_t libraryShowSeries = 1, libraryShowGenre = 1, libraryShowEpub = 1, libraryShowXtc = 1;
+  uint8_t libraryShowTxt = 1, libraryShowMarkdown = 1, libraryHideFinishedBooks = 0, swapLibraryFileBrowser = 0;
+  bool supportsLibraryFileBrowserSwap() const { return uiTheme == MINIMAL || uiTheme == DASHBOARD; }
   bool isLibraryFileBrowserSwapped() const { return supportsLibraryFileBrowserSwap() && swapLibraryFileBrowser; }
-  ReaderStatusBarConfig topReaderStatusBar{}, bottomReaderStatusBar=migrateBottomStatusBar({true,false,true,1,0,true,0,2,1});
-  uint8_t legacyXtcTopUsesBottom=0;
+  ReaderStatusBarConfig topReaderStatusBar{},
+      bottomReaderStatusBar = migrateBottomStatusBar({true, false, true, 1, 0, true, 0, 2, 1});
+  uint8_t legacyXtcTopUsesBottom = 0;
   DisplayStatusBarConfig displayStatusBar;
   static bool hasPowerDoubleClick() { return true; }
   static uint8_t defaultDoublePwrBtn() { return IGNORE; }
-  static bool fadingFixSupported() { return false; } // Sticky product
-  void clearSdFontFamily() { sdFontFamilyName[0]='\0'; saveToFile(); }
+  static bool fadingFixSupported() { return false; }  // Sticky product
+  void clearSdFontFamily() {
+    sdFontFamilyName[0] = '\0';
+    saveToFile();
+  }
 
   // Called after legacy owner parsing. Manually persisted modern fields are not
   // coupled to a board-dependent SettingsList option count.
@@ -1067,205 +1102,256 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   int getRefreshFrequency() const;
 };
 
-
 inline void CrossPointSettings::writeCompatibilitySettings(JsonDocument& doc) const {
-  doc["clockTimezone"]=clockTimezone;
-  doc["clockDst"]=clockDst;
-  doc["clockShowInHeader"]=clockShowInHeader;
-  doc["statusBarClock"]=statusBarClock;
-  doc["paragraphIndentSpaces"]=paragraphIndentSpaces;
-  doc["doublePwrBtn"]=doublePwrBtn;
-  doc["longPressMenuFunction"]=longPressMenuFunction;
-  doc["frontButtonFollowOrientation"]=frontButtonFollowOrientation;
-  doc["sideButtonFollowOrientation"]=sideButtonFollowOrientation;
-  doc["pluginsEnabled"]=pluginsEnabled;
-  doc["pluginHubPromptHidden"]=pluginHubPromptHidden;
-  doc["vocabularyHistoryEnabled"]=vocabularyHistoryEnabled;
-  doc["showFileExtensions"]=showFileExtensions;
-  doc["libraryUseMetadata"]=libraryUseMetadata;
-  doc["libraryRecentOpenedOnly"]=libraryRecentOpenedOnly;
-  doc["backShortToFileBrowser"]=backShortToFileBrowser;
-  doc["opdsFilenameFormat"]=opdsFilenameFormat;
-  doc["vibration"]=vibration;
-  doc["hapticIntensity"]=hapticIntensity;
-  doc["readerMenuStyle"]=readerMenuStyle;
-  doc["showReaderMenu"]=showReaderMenu;
-  doc["slideSwitchAction"]=slideSwitchAction;
-  doc["trackReadingStats"]=trackReadingStats;
-  doc["sideButtonUpShort"]=sideButtonUpShort;
-  doc["sideButtonDownShort"]=sideButtonDownShort;
-  doc["sideButtonUpLong"]=sideButtonUpLong;
-  doc["sideButtonDownLong"]=sideButtonDownLong;
-  doc["leftEdgeUp"]=leftEdgeUp;
-  doc["leftEdgeDown"]=leftEdgeDown;
-  doc["rightEdgeUp"]=rightEdgeUp;
-  doc["rightEdgeDown"]=rightEdgeDown;
-  doc["librarySortMethod"]=librarySortMethod;
-  doc["librarySortDescending"]=librarySortDescending;
-  doc["libraryListExpanded"]=libraryListExpanded;
-  doc["libraryShowSeries"]=libraryShowSeries;
-  doc["libraryShowGenre"]=libraryShowGenre;
-  doc["libraryShowEpub"]=libraryShowEpub;
-  doc["libraryShowXtc"]=libraryShowXtc;
-  doc["libraryShowTxt"]=libraryShowTxt;
-  doc["libraryShowMarkdown"]=libraryShowMarkdown;
-  doc["libraryHideFinishedBooks"]=libraryHideFinishedBooks;
-  doc["swapLibraryFileBrowser"]=swapLibraryFileBrowser;
-  doc["characterSpacing"]=characterSpacing;
-  doc["wordSpacingPercent"]=wordSpacingPercent;
-  doc["dictionaryName"]=dictionaryName;
-  doc["settingsCompatibilityVersion"]=1;
-  auto bars=doc["readerStatusBars"].to<JsonObject>();
-  bars["version"]=1;
-  writeReaderStatusBarJson(bars["top"].to<JsonObject>(),topReaderStatusBar);
-  writeReaderStatusBarJson(bars["bottom"].to<JsonObject>(),bottomReaderStatusBar);
-  bars["xtcMode"]=xtcStatusBarMode;
-  bars["legacyXtcTopUsesBottom"]=legacyXtcTopUsesBottom!=0;
-  bleturner::writeJson(ble,doc);
+  doc["clockTimezone"] = clockTimezone;
+  doc["clockDst"] = clockDst;
+  doc["clockShowInHeader"] = clockShowInHeader;
+  doc["statusBarClock"] = statusBarClock;
+  doc["paragraphIndentSpaces"] = paragraphIndentSpaces;
+  doc["doublePwrBtn"] = doublePwrBtn;
+  doc["longPressMenuFunction"] = longPressMenuFunction;
+  doc["frontButtonFollowOrientation"] = frontButtonFollowOrientation;
+  doc["sideButtonFollowOrientation"] = sideButtonFollowOrientation;
+  doc["pluginsEnabled"] = pluginsEnabled;
+  doc["pluginHubPromptHidden"] = pluginHubPromptHidden;
+  doc["vocabularyHistoryEnabled"] = vocabularyHistoryEnabled;
+  doc["showFileExtensions"] = showFileExtensions;
+  doc["libraryUseMetadata"] = libraryUseMetadata;
+  doc["libraryRecentOpenedOnly"] = libraryRecentOpenedOnly;
+  doc["backShortToFileBrowser"] = backShortToFileBrowser;
+  doc["opdsFilenameFormat"] = opdsFilenameFormat;
+  doc["vibration"] = vibration;
+  doc["hapticIntensity"] = hapticIntensity;
+  doc["readerMenuStyle"] = readerMenuStyle;
+  doc["showReaderMenu"] = showReaderMenu;
+  doc["slideSwitchAction"] = slideSwitchAction;
+  doc["trackReadingStats"] = trackReadingStats;
+  doc["sideButtonUpShort"] = sideButtonUpShort;
+  doc["sideButtonDownShort"] = sideButtonDownShort;
+  doc["sideButtonUpLong"] = sideButtonUpLong;
+  doc["sideButtonDownLong"] = sideButtonDownLong;
+  doc["leftEdgeUp"] = leftEdgeUp;
+  doc["leftEdgeDown"] = leftEdgeDown;
+  doc["rightEdgeUp"] = rightEdgeUp;
+  doc["rightEdgeDown"] = rightEdgeDown;
+  doc["librarySortMethod"] = librarySortMethod;
+  doc["librarySortDescending"] = librarySortDescending;
+  doc["libraryListExpanded"] = libraryListExpanded;
+  doc["libraryShowSeries"] = libraryShowSeries;
+  doc["libraryShowGenre"] = libraryShowGenre;
+  doc["libraryShowEpub"] = libraryShowEpub;
+  doc["libraryShowXtc"] = libraryShowXtc;
+  doc["libraryShowTxt"] = libraryShowTxt;
+  doc["libraryShowMarkdown"] = libraryShowMarkdown;
+  doc["libraryHideFinishedBooks"] = libraryHideFinishedBooks;
+  doc["swapLibraryFileBrowser"] = swapLibraryFileBrowser;
+  doc["characterSpacing"] = characterSpacing;
+  doc["wordSpacingPercent"] = wordSpacingPercent;
+  doc["dictionaryName"] = dictionaryName;
+  doc["settingsCompatibilityVersion"] = 1;
+  auto bars = doc["readerStatusBars"].to<JsonObject>();
+  bars["version"] = 1;
+  writeReaderStatusBarJson(bars["top"].to<JsonObject>(), topReaderStatusBar);
+  writeReaderStatusBarJson(bars["bottom"].to<JsonObject>(), bottomReaderStatusBar);
+  bars["xtcMode"] = xtcStatusBarMode;
+  bars["legacyXtcTopUsesBottom"] = legacyXtcTopUsesBottom != 0;
+  bleturner::writeJson(ble, doc);
 }
 
 inline bool CrossPointSettings::readCompatibilitySettings(JsonVariantConst doc, bool importingCrossPoint) {
-  bool changed=false;
-  const auto load=[&](const char* key,uint8_t& field,int count) { if(doc[key].isNull()) return; if(doc[key].is<int>() && doc[key].as<int>()>=0 && doc[key].as<int>()<count) field=doc[key].as<int>(); else changed=true; };
-  if(doc["clockTimezone"].is<uint8_t>()) clockTimezone=doc["clockTimezone"].as<uint8_t>();
-  load("clockDst",clockDst,3);
-  load("clockShowInHeader",clockShowInHeader,2);
-  load("statusBarClock",statusBarClock,3);
-  load("paragraphIndentSpaces",paragraphIndentSpaces,6);
-  load("doublePwrBtn",doublePwrBtn,SHORT_PWRBTN_COUNT);
-  load("longPressMenuFunction",longPressMenuFunction,7);
-  load("frontButtonFollowOrientation",frontButtonFollowOrientation,2);
-  load("sideButtonFollowOrientation",sideButtonFollowOrientation,2);
-  load("pluginsEnabled",pluginsEnabled,2);
-  load("pluginHubPromptHidden",pluginHubPromptHidden,2);
-  load("vocabularyHistoryEnabled",vocabularyHistoryEnabled,2);
-  load("showFileExtensions",showFileExtensions,2);
-  load("libraryUseMetadata",libraryUseMetadata,2);
-  load("libraryRecentOpenedOnly",libraryRecentOpenedOnly,2);
-  load("backShortToFileBrowser",backShortToFileBrowser,2);
-  load("opdsFilenameFormat",opdsFilenameFormat,3);
-  load("vibration",vibration,3);
-  load("hapticIntensity",hapticIntensity,3);
-  load("readerMenuStyle",readerMenuStyle,2);
-  load("showReaderMenu",showReaderMenu,3);
-  load("slideSwitchAction",slideSwitchAction,3);
-  load("trackReadingStats",trackReadingStats,2);
-  if(!doc["sideButtonUpShort"].isNull()) {
-    const int action=doc["sideButtonUpShort"] | -1;
-    if(doc["sideButtonUpShort"].is<int>() && ((action>=0 && action<SHORT_PWRBTN_COUNT) || (action>=SIDE_PREVIOUS_CHAPTER && action<=SIDE_ROTATE_FLIP))) sideButtonUpShort=action;
-    else changed=true;
+  bool changed = false;
+  const auto load = [&](const char* key, uint8_t& field, int count) {
+    if (doc[key].isNull()) return;
+    if (doc[key].is<int>() && doc[key].as<int>() >= 0 && doc[key].as<int>() < count)
+      field = doc[key].as<int>();
+    else
+      changed = true;
+  };
+  if (doc["clockTimezone"].is<uint8_t>()) clockTimezone = doc["clockTimezone"].as<uint8_t>();
+  load("clockDst", clockDst, 3);
+  load("clockShowInHeader", clockShowInHeader, 2);
+  load("statusBarClock", statusBarClock, 3);
+  load("paragraphIndentSpaces", paragraphIndentSpaces, 6);
+  load("doublePwrBtn", doublePwrBtn, SHORT_PWRBTN_COUNT);
+  load("longPressMenuFunction", longPressMenuFunction, 7);
+  load("frontButtonFollowOrientation", frontButtonFollowOrientation, 2);
+  load("sideButtonFollowOrientation", sideButtonFollowOrientation, 2);
+  load("pluginsEnabled", pluginsEnabled, 2);
+  load("pluginHubPromptHidden", pluginHubPromptHidden, 2);
+  load("vocabularyHistoryEnabled", vocabularyHistoryEnabled, 2);
+  load("showFileExtensions", showFileExtensions, 2);
+  load("libraryUseMetadata", libraryUseMetadata, 2);
+  load("libraryRecentOpenedOnly", libraryRecentOpenedOnly, 2);
+  load("backShortToFileBrowser", backShortToFileBrowser, 2);
+  load("opdsFilenameFormat", opdsFilenameFormat, 3);
+  load("vibration", vibration, 3);
+  load("hapticIntensity", hapticIntensity, 3);
+  load("readerMenuStyle", readerMenuStyle, 2);
+  load("showReaderMenu", showReaderMenu, 3);
+  load("slideSwitchAction", slideSwitchAction, 3);
+  load("trackReadingStats", trackReadingStats, 2);
+  if (!doc["sideButtonUpShort"].isNull()) {
+    const int action = doc["sideButtonUpShort"] | -1;
+    if (doc["sideButtonUpShort"].is<int>() && ((action >= 0 && action < SHORT_PWRBTN_COUNT) ||
+                                               (action >= SIDE_PREVIOUS_CHAPTER && action <= SIDE_ROTATE_FLIP)))
+      sideButtonUpShort = action;
+    else
+      changed = true;
   }
-  if(!doc["sideButtonDownShort"].isNull()) {
-    const int action=doc["sideButtonDownShort"] | -1;
-    if(doc["sideButtonDownShort"].is<int>() && ((action>=0 && action<SHORT_PWRBTN_COUNT) || (action>=SIDE_PREVIOUS_CHAPTER && action<=SIDE_ROTATE_FLIP))) sideButtonDownShort=action;
-    else changed=true;
+  if (!doc["sideButtonDownShort"].isNull()) {
+    const int action = doc["sideButtonDownShort"] | -1;
+    if (doc["sideButtonDownShort"].is<int>() && ((action >= 0 && action < SHORT_PWRBTN_COUNT) ||
+                                                 (action >= SIDE_PREVIOUS_CHAPTER && action <= SIDE_ROTATE_FLIP)))
+      sideButtonDownShort = action;
+    else
+      changed = true;
   }
-  if(!doc["sideButtonUpLong"].isNull()) {
-    const int action=doc["sideButtonUpLong"] | -1;
-    if(doc["sideButtonUpLong"].is<int>() && ((action>=0 && action<SHORT_PWRBTN_COUNT) || (action>=SIDE_PREVIOUS_CHAPTER && action<=SIDE_ROTATE_FLIP))) sideButtonUpLong=action;
-    else changed=true;
+  if (!doc["sideButtonUpLong"].isNull()) {
+    const int action = doc["sideButtonUpLong"] | -1;
+    if (doc["sideButtonUpLong"].is<int>() && ((action >= 0 && action < SHORT_PWRBTN_COUNT) ||
+                                              (action >= SIDE_PREVIOUS_CHAPTER && action <= SIDE_ROTATE_FLIP)))
+      sideButtonUpLong = action;
+    else
+      changed = true;
   }
-  if(!doc["sideButtonDownLong"].isNull()) {
-    const int action=doc["sideButtonDownLong"] | -1;
-    if(doc["sideButtonDownLong"].is<int>() && ((action>=0 && action<SHORT_PWRBTN_COUNT) || (action>=SIDE_PREVIOUS_CHAPTER && action<=SIDE_ROTATE_FLIP))) sideButtonDownLong=action;
-    else changed=true;
+  if (!doc["sideButtonDownLong"].isNull()) {
+    const int action = doc["sideButtonDownLong"] | -1;
+    if (doc["sideButtonDownLong"].is<int>() && ((action >= 0 && action < SHORT_PWRBTN_COUNT) ||
+                                                (action >= SIDE_PREVIOUS_CHAPTER && action <= SIDE_ROTATE_FLIP)))
+      sideButtonDownLong = action;
+    else
+      changed = true;
   }
-  load("leftEdgeUp",leftEdgeUp,9);
-  load("leftEdgeDown",leftEdgeDown,9);
-  load("rightEdgeUp",rightEdgeUp,9);
-  load("rightEdgeDown",rightEdgeDown,9);
-  load("librarySortMethod",librarySortMethod,7);
-  load("librarySortDescending",librarySortDescending,2);
-  load("libraryListExpanded",libraryListExpanded,2);
-  load("libraryShowSeries",libraryShowSeries,2);
-  load("libraryShowGenre",libraryShowGenre,2);
-  load("libraryShowEpub",libraryShowEpub,2);
-  load("libraryShowXtc",libraryShowXtc,2);
-  load("libraryShowTxt",libraryShowTxt,2);
-  load("libraryShowMarkdown",libraryShowMarkdown,2);
-  load("libraryHideFinishedBooks",libraryHideFinishedBooks,2);
-  load("swapLibraryFileBrowser",swapLibraryFileBrowser,2);
-  load("characterSpacing",characterSpacing,5);
-  if(doc["wordSpacingPercent"].is<int>()) { const int v=doc["wordSpacingPercent"].as<int>(); if(v>=50 && v<=200) wordSpacingPercent=v; else changed=true; }
-  if(doc["dictionaryName"].is<const char*>()) {
-    const char* value=doc["dictionaryName"].as<const char*>();
-    const size_t length=std::min(std::strlen(value),sizeof(dictionaryName)-1);
-    std::memmove(dictionaryName,value,length);
-    dictionaryName[length]='\0';
+  load("leftEdgeUp", leftEdgeUp, 9);
+  load("leftEdgeDown", leftEdgeDown, 9);
+  load("rightEdgeUp", rightEdgeUp, 9);
+  load("rightEdgeDown", rightEdgeDown, 9);
+  load("librarySortMethod", librarySortMethod, 7);
+  load("librarySortDescending", librarySortDescending, 2);
+  load("libraryListExpanded", libraryListExpanded, 2);
+  load("libraryShowSeries", libraryShowSeries, 2);
+  load("libraryShowGenre", libraryShowGenre, 2);
+  load("libraryShowEpub", libraryShowEpub, 2);
+  load("libraryShowXtc", libraryShowXtc, 2);
+  load("libraryShowTxt", libraryShowTxt, 2);
+  load("libraryShowMarkdown", libraryShowMarkdown, 2);
+  load("libraryHideFinishedBooks", libraryHideFinishedBooks, 2);
+  load("swapLibraryFileBrowser", swapLibraryFileBrowser, 2);
+  load("characterSpacing", characterSpacing, 5);
+  if (doc["wordSpacingPercent"].is<int>()) {
+    const int v = doc["wordSpacingPercent"].as<int>();
+    if (v >= 50 && v <= 200)
+      wordSpacingPercent = v;
+    else
+      changed = true;
+  }
+  if (doc["dictionaryName"].is<const char*>()) {
+    const char* value = doc["dictionaryName"].as<const char*>();
+    const size_t length = std::min(std::strlen(value), sizeof(dictionaryName) - 1);
+    std::memmove(dictionaryName, value, length);
+    dictionaryName[length] = '\0';
   }
   // The generic fallback may itself contain an older owner document. Owner
   // keys identify its enum domain even when it lives at the generic filename.
-  const bool upstream=importingCrossPoint && doc["lineHeightPercent"].isNull() && doc["longPwrBtn"].isNull() && doc["forceParagraphIndents"].isNull();
-  if(upstream) {
-    const uint8_t font=doc["fontFamily"] | uint8_t(1);
-    fontFamily=NOTOSANS;
-    if(sdFontFamilyName[0]=='\0' && font!=1) {
-      const char* family=font==0?"NotoSerif":font==2?"OpenDyslexic":"";
-      std::strncpy(sdFontFamilyName,family,sizeof(sdFontFamilyName)-1);
+  const bool upstream = importingCrossPoint && doc["lineHeightPercent"].isNull() && doc["longPwrBtn"].isNull() &&
+                        doc["forceParagraphIndents"].isNull();
+  if (upstream) {
+    const uint8_t font = doc["fontFamily"] | uint8_t(1);
+    fontFamily = NOTOSANS;
+    if (sdFontFamilyName[0] == '\0' && font != 1) {
+      const char* family = font == 0 ? "NotoSerif" : font == 2 ? "OpenDyslexic" : "";
+      std::strncpy(sdFontFamilyName, family, sizeof(sdFontFamilyName) - 1);
     }
-    const int size=doc["fontSize"] | 14;
-    readerFontPointSize=size>=0 && size<=3?12+size*2:size>=8 && size<=255?size:14;
-    const int sleep=doc["sleepScreen"] | 0;
-    constexpr uint8_t sleeps[]={DARK,LIGHT,CUSTOM,COVER,COVER_CUSTOM,BLANK,QUICK_RESUME,TRANSPARENT_CUSTOM,COVER_TRANSPARENT};
-    if(sleep>=0 && sleep<9) sleepScreen=sleeps[sleep];
-    if(doc["uiTheme"]==4) uiTheme=COVER_GRID;
-    const int power=doc["shortPwrBtn"] | 0;
-    constexpr uint8_t actions[]={IGNORE,SLEEP,PAGE_TURN,FORCE_REFRESH,FOOTNOTES,PWR_CONFIRM,CREATE_CLIPPING,TOGGLE_BOOKMARK,SYNC_PROGRESS,PWR_READER_MENU,TOGGLE_FRONTLIGHT};
-    shortPwrBtn=power>=0 && power<11?actions[power]:uint8_t(IGNORE);
-    const int dbl=doc["doublePwrBtn"] | 0;
-    doublePwrBtn=dbl>=0 && dbl<11?actions[dbl]:uint8_t(IGNORE);
-    constexpr uint8_t heights[]={100,110,120,130,145,160,175};
-    const int height=doc["lineHeight"] | -1;
-    if(height>=0 && height<7) lineHeightPercent=heights[height];
-    else if(doc["lineSpacing"].is<int>()) {const int old=doc["lineSpacing"].as<int>();if(old>=0 && old<4) lineHeightPercent=heights[old+1];}
-    const int spacing=doc["wordSpacing"] | 100;
-    if(spacing>=50 && spacing<=200) wordSpacingPercent=spacing;
-    wordSpacing=0;
-    changed=true;
+    const int size = doc["fontSize"] | 14;
+    readerFontPointSize = size >= 0 && size <= 3 ? 12 + size * 2 : size >= 8 && size <= 255 ? size : 14;
+    const int sleep = doc["sleepScreen"] | 0;
+    constexpr uint8_t sleeps[] = {
+        DARK, LIGHT, CUSTOM, COVER, COVER_CUSTOM, BLANK, QUICK_RESUME, TRANSPARENT_CUSTOM, COVER_TRANSPARENT};
+    if (sleep >= 0 && sleep < 9) sleepScreen = sleeps[sleep];
+    if (doc["uiTheme"] == 4) uiTheme = COVER_GRID;
+    const int power = doc["shortPwrBtn"] | 0;
+    constexpr uint8_t actions[] = {IGNORE,        SLEEP,           PAGE_TURN,        FORCE_REFRESH,
+                                   FOOTNOTES,     PWR_CONFIRM,     CREATE_CLIPPING,  TOGGLE_BOOKMARK,
+                                   SYNC_PROGRESS, PWR_READER_MENU, TOGGLE_FRONTLIGHT};
+    shortPwrBtn = power >= 0 && power < 11 ? actions[power] : uint8_t(IGNORE);
+    const int dbl = doc["doublePwrBtn"] | 0;
+    doublePwrBtn = dbl >= 0 && dbl < 11 ? actions[dbl] : uint8_t(IGNORE);
+    constexpr uint8_t heights[] = {100, 110, 120, 130, 145, 160, 175};
+    const int height = doc["lineHeight"] | -1;
+    if (height >= 0 && height < 7)
+      lineHeightPercent = heights[height];
+    else if (doc["lineSpacing"].is<int>()) {
+      const int old = doc["lineSpacing"].as<int>();
+      if (old >= 0 && old < 4) lineHeightPercent = heights[old + 1];
+    }
+    const int spacing = doc["wordSpacing"] | 100;
+    if (spacing >= 50 && spacing <= 200) wordSpacingPercent = spacing;
+    wordSpacing = 0;
+    changed = true;
   }
-  if(!upstream) {
+  if (!upstream) {
     // These appended raw choices are valid even before a board-specific menu
     // learns to display them. Never let that menu reset a durable choice.
-    const int power=doc["shortPwrBtn"] | -1;
-    if(power>=LIBRARY && power<SHORT_PWRBTN_COUNT) shortPwrBtn=power;
-    if(doc["imageRendering"]==static_cast<int>(IMAGES_DISPLAY_BW)) imageRendering=IMAGES_DISPLAY_BW;
+    const int power = doc["shortPwrBtn"] | -1;
+    if (power >= LIBRARY && power < SHORT_PWRBTN_COUNT) shortPwrBtn = power;
+    if (doc["imageRendering"] == static_cast<int>(IMAGES_DISPLAY_BW)) imageRendering = IMAGES_DISPLAY_BW;
   }
-  if(doc["showFileExtensions"].isNull()) showFileExtensions=!hideFileExtension;
-  else hideFileExtension=!showFileExtensions;
-  if(doc["frontButtonFollowOrientation"].isNull()) frontButtonFollowOrientation=frontButtonOrientationAware!=0;
-  if(doc["sideButtonFollowOrientation"].isNull()) sideButtonFollowOrientation=sideButtonOrientationAware;
-  if(doc["statusBarClock"].isNull()) statusBarClock=hideClock==HIDE_CLOCK_NEVER?STATUS_BAR_CLOCK_RIGHT:STATUS_BAR_CLOCK_HIDE;
-  if(doc["paragraphIndentSpaces"].isNull() && !upstream) paragraphIndentSpaces=forceParagraphIndents?2:0;
-  const uint8_t up=sideButtonLayout==NEXT_PREV || sideButtonLayout==NEXT_NEXT?PAGE_TURN:sideButtonLayout==SIDE_BUTTONS_DISABLED?IGNORE:PREVIOUS_PAGE;
-  const uint8_t down=sideButtonLayout==NEXT_PREV || sideButtonLayout==PREV_PREV?PREVIOUS_PAGE:sideButtonLayout==SIDE_BUTTONS_DISABLED?IGNORE:PAGE_TURN;
-  if(doc["sideButtonUpShort"].isNull()) sideButtonUpShort=up;
-  if(doc["sideButtonDownShort"].isNull()) sideButtonDownShort=down;
-  const auto hold=[&](bool isUp) -> uint8_t {
-    if(sideButtonLayout==SIDE_BUTTONS_DISABLED) return IGNORE;
-    switch(sideButtonLongPress) {
-      case SIDE_LONG_CHAPTER_SKIP:return isUp?SIDE_PREVIOUS_CHAPTER:SIDE_NEXT_CHAPTER;
-      case SIDE_LONG_FONT_SIZE:return isUp?SIDE_INCREASE_FONT:SIDE_DECREASE_FONT;
-      case SIDE_LONG_ORIENTATION_CHANGE:return isUp?SIDE_ROTATE_COUNTERCLOCKWISE:SIDE_ROTATE_CLOCKWISE;
-      default:return IGNORE;
+  if (doc["showFileExtensions"].isNull())
+    showFileExtensions = !hideFileExtension;
+  else
+    hideFileExtension = !showFileExtensions;
+  if (doc["frontButtonFollowOrientation"].isNull()) frontButtonFollowOrientation = frontButtonOrientationAware != 0;
+  if (doc["sideButtonFollowOrientation"].isNull()) sideButtonFollowOrientation = sideButtonOrientationAware;
+  if (doc["statusBarClock"].isNull())
+    statusBarClock = hideClock == HIDE_CLOCK_NEVER ? STATUS_BAR_CLOCK_RIGHT : STATUS_BAR_CLOCK_HIDE;
+  if (doc["paragraphIndentSpaces"].isNull() && !upstream) paragraphIndentSpaces = forceParagraphIndents ? 2 : 0;
+  const uint8_t up = sideButtonLayout == NEXT_PREV || sideButtonLayout == NEXT_NEXT ? PAGE_TURN
+                     : sideButtonLayout == SIDE_BUTTONS_DISABLED                    ? IGNORE
+                                                                                    : PREVIOUS_PAGE;
+  const uint8_t down = sideButtonLayout == NEXT_PREV || sideButtonLayout == PREV_PREV ? PREVIOUS_PAGE
+                       : sideButtonLayout == SIDE_BUTTONS_DISABLED                    ? IGNORE
+                                                                                      : PAGE_TURN;
+  if (doc["sideButtonUpShort"].isNull()) sideButtonUpShort = up;
+  if (doc["sideButtonDownShort"].isNull()) sideButtonDownShort = down;
+  const auto hold = [&](bool isUp) -> uint8_t {
+    if (sideButtonLayout == SIDE_BUTTONS_DISABLED) return IGNORE;
+    switch (sideButtonLongPress) {
+      case SIDE_LONG_CHAPTER_SKIP:
+        return isUp ? SIDE_PREVIOUS_CHAPTER : SIDE_NEXT_CHAPTER;
+      case SIDE_LONG_FONT_SIZE:
+        return isUp ? SIDE_INCREASE_FONT : SIDE_DECREASE_FONT;
+      case SIDE_LONG_ORIENTATION_CHANGE:
+        return isUp ? SIDE_ROTATE_COUNTERCLOCKWISE : SIDE_ROTATE_CLOCKWISE;
+      default:
+        return IGNORE;
     }
   };
-  if(doc["sideButtonUpLong"].isNull()) sideButtonUpLong=hold(true);
-  if(doc["sideButtonDownLong"].isNull()) sideButtonDownLong=hold(false);
-  const auto bars=doc["readerStatusBars"];
-  if(bars["version"]!=1) {
-    bottomReaderStatusBar=migrateBottomStatusBar({statusBarChapterPageCount!=0,stablePageNumbers!=0,statusBarBookProgressPercentage!=0,statusBarTitle,statusBarTimeLeft,statusBarBattery!=0,statusBarBookPercentageFormat,statusBarProgressBar,statusBarProgressBarThickness});
-    topReaderStatusBar={};
-    if(hideClock==HIDE_CLOCK_NEVER) topReaderStatusBar.slots[ReaderStatusBarConfig::CENTER]=ReaderStatusBarItem::Clock;
-    legacyXtcTopUsesBottom=xtcStatusBarMode==XTC_STATUS_BAR_TOP;
-    changed=true;
+  if (doc["sideButtonUpLong"].isNull()) sideButtonUpLong = hold(true);
+  if (doc["sideButtonDownLong"].isNull()) sideButtonDownLong = hold(false);
+  const auto bars = doc["readerStatusBars"];
+  if (bars["version"] != 1) {
+    bottomReaderStatusBar = migrateBottomStatusBar(
+        {statusBarChapterPageCount != 0, stablePageNumbers != 0, statusBarBookProgressPercentage != 0, statusBarTitle,
+         statusBarTimeLeft, statusBarBattery != 0, statusBarBookPercentageFormat, statusBarProgressBar,
+         statusBarProgressBarThickness});
+    topReaderStatusBar = {};
+    if (hideClock == HIDE_CLOCK_NEVER)
+      topReaderStatusBar.slots[ReaderStatusBarConfig::CENTER] = ReaderStatusBarItem::Clock;
+    legacyXtcTopUsesBottom = xtcStatusBarMode == XTC_STATUS_BAR_TOP;
+    changed = true;
   } else {
-    changed|=repairReaderStatusBarJson(bars["top"],topReaderStatusBar,true,BOOK_PERCENTAGE_FORMAT_COUNT,STATUS_BAR_PROGRESS_BAR_COUNT,STATUS_BAR_PROGRESS_BAR_THICKNESS_COUNT);
-    changed|=repairReaderStatusBarJson(bars["bottom"],bottomReaderStatusBar,true,BOOK_PERCENTAGE_FORMAT_COUNT,STATUS_BAR_PROGRESS_BAR_COUNT,STATUS_BAR_PROGRESS_BAR_THICKNESS_COUNT);
-    legacyXtcTopUsesBottom=bars["legacyXtcTopUsesBottom"] | false;
-    const int xtc=bars["xtcMode"] | -1;
-    if(xtc>=0 && xtc<XTC_STATUS_BAR_MODE_COUNT) xtcStatusBarMode=xtc; else changed=true;
+    changed |= repairReaderStatusBarJson(bars["top"], topReaderStatusBar, true, BOOK_PERCENTAGE_FORMAT_COUNT,
+                                         STATUS_BAR_PROGRESS_BAR_COUNT, STATUS_BAR_PROGRESS_BAR_THICKNESS_COUNT);
+    changed |= repairReaderStatusBarJson(bars["bottom"], bottomReaderStatusBar, true, BOOK_PERCENTAGE_FORMAT_COUNT,
+                                         STATUS_BAR_PROGRESS_BAR_COUNT, STATUS_BAR_PROGRESS_BAR_THICKNESS_COUNT);
+    legacyXtcTopUsesBottom = bars["legacyXtcTopUsesBottom"] | false;
+    const int xtc = bars["xtcMode"] | -1;
+    if (xtc >= 0 && xtc < XTC_STATUS_BAR_MODE_COUNT)
+      xtcStatusBarMode = xtc;
+    else
+      changed = true;
   }
-  changed|=!bleturner::readJson(ble,doc);
+  changed |= !bleturner::readJson(ble, doc);
   return changed;
 }
 

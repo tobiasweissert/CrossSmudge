@@ -6,10 +6,10 @@
 #include <LibraryBuilder.h>
 #include <Logging.h>
 
-#include "activities/home/BookActions.h"
-#include "util/BookMoveUtils.h"
 #include "ProtectedPaths.h"
+#include "activities/home/BookActions.h"
 #include "util/BookCacheUtils.h"
+#include "util/BookMoveUtils.h"
 #include "util/TaskWatchdog.h"
 
 namespace {
@@ -17,7 +17,8 @@ namespace {
 // canonical-path checks. Prefix matching also protects temp/backup siblings.
 bool networkCredentialPath(const char* path) {
   std::string mapped(path);
-  for (char& c : mapped) if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+  for (char& c : mapped)
+    if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
   const auto mapFamily = [&](const char* from, const char* to) {
     size_t at = 0;
     while ((at = mapped.find(from, at)) != std::string::npos) {
@@ -93,7 +94,10 @@ void WebDAVHandler::raw(WebServer& server, const String& uri, HTTPRaw& raw) {
 
     // Write to a temp file to avoid destroying the original on failed upload
     String tempPath = _putPath + ".davtmp";
-    if (Storage.exists(tempPath.c_str())) { _putOk = false; return; }
+    if (Storage.exists(tempPath.c_str())) {
+      _putOk = false;
+      return;
+    }
     _putOk = Storage.openFileForWrite("DAV", tempPath, _putFile);
     LOG_DBG("DAV", "PUT START: %s", _putPath.c_str());
 

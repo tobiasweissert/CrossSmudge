@@ -148,7 +148,8 @@ struct CssPropertyFlags {
         shaded(0),
         floatLeft(0),
         initialLetter(0),
-        whiteSpace(0), backgroundBlack(0) {}
+        whiteSpace(0),
+        backgroundBlack(0) {}
 
   [[nodiscard]] bool anySet() const {
     return textAlign || fontStyle || fontWeight || textDecoration || textIndent || marginTop || marginBottom ||
@@ -197,9 +198,9 @@ struct CssStyle {
   uint8_t borderWidthsDefined = 0;  // one bit per side, top/right/bottom/left
   uint8_t borderStylesDefined = 0;
   bool backgroundBlack = false;  // Owner dark-image background contract
-  bool shaded = false;        // light background-color, drawn as a gray fill
-  bool floatLeft = false;     // float: left (marks drop-cap spans and ::first-letter rules)
-  uint8_t initialLetter = 0;  // initial-letter: lines a drop cap spans, 0 = normal
+  bool shaded = false;           // light background-color, drawn as a gray fill
+  bool floatLeft = false;        // float: left (marks drop-cap spans and ::first-letter rules)
+  uint8_t initialLetter = 0;     // initial-letter: lines a drop cap spans, 0 = normal
 
   bool preserveWhitespace = false;  // white-space: pre, pre-wrap or break-spaces
 

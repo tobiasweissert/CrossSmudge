@@ -153,9 +153,11 @@ TEST_F(SectionPersistenceTest, FailedCommitKeepsThePreviousReadableCache) {
 }
 
 TEST_F(SectionPersistenceTest, RejectsCachesFromPreviousLayoutRevisions) {
-  for (const uint8_t staleVersion : {kPreviousFullVersion, kPreviousPartialVersion, uint8_t(75), uint8_t(0xCF), uint8_t(77), uint8_t(83), uint8_t(0xF3), uint8_t(0xC4)}) {
-    const std::vector<std::string> durable = {"/cache/progress", "/cache/bookmarks", "/cache/clippings", "/cache/stats", "/settings/reader"};
-    const std::vector<uint8_t> sentinel = {0x53,0x41,0x56,0x45};
+  for (const uint8_t staleVersion : {kPreviousFullVersion, kPreviousPartialVersion, uint8_t(75), uint8_t(0xCF),
+                                     uint8_t(77), uint8_t(83), uint8_t(0xF3), uint8_t(0xC4)}) {
+    const std::vector<std::string> durable = {"/cache/progress", "/cache/bookmarks", "/cache/clippings", "/cache/stats",
+                                              "/settings/reader"};
+    const std::vector<uint8_t> sentinel = {0x53, 0x41, 0x56, 0x45};
     for (const auto& path : durable) Storage.put(path, sentinel);
     SectionHarness harness;
     harness.begin();
@@ -166,7 +168,10 @@ TEST_F(SectionPersistenceTest, RejectsCachesFromPreviousLayoutRevisions) {
     Section reopened(harness.epub, 0, harness.renderer);
     EXPECT_FALSE(reopened.loadSectionFile(harness.spec));
     EXPECT_FALSE(Storage.exists(harness.section.filePath.c_str()));
-    for (const auto& path : durable) { ASSERT_TRUE(Storage.exists(path.c_str())); EXPECT_EQ(Storage.bytes(path),sentinel); }
+    for (const auto& path : durable) {
+      ASSERT_TRUE(Storage.exists(path.c_str()));
+      EXPECT_EQ(Storage.bytes(path), sentinel);
+    }
   }
 }
 }  // namespace

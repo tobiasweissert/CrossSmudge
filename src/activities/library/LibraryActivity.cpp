@@ -2,7 +2,6 @@
 
 #include <Arduino.h>
 #include <Bitmap.h>
-
 #include <Epub.h>
 #include <FsHelpers.h>
 #include <HalStorage.h>
@@ -24,7 +23,6 @@
 #include "activities/home/FileBrowserActionActivity.h"
 #include "activities/home/RecentBookProgress.h"
 #include "activities/library/LibrarySettingsActivity.h"
-
 #include "activities/reader/EpubReaderActivity.h"
 #include "activities/util/ConfirmationActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
@@ -40,21 +38,40 @@ namespace fui = freeink::ui;
 namespace {
 // Local adapter: the selected CrossPoint SDK has no Ink DateFormatting.h.
 // Consume the persisted owner date ordinals rather than inventing a new schema.
-bool formatDateParts(char* out, size_t size, unsigned year, unsigned month, unsigned day,
-                     uint8_t format, char separator) {
+bool formatDateParts(char* out, size_t size, unsigned year, unsigned month, unsigned day, uint8_t format,
+                     char separator) {
   if (month < 1 || month > 12 || day < 1 || day > 31) return false;
-  static constexpr const char* months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+  static constexpr const char* months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
   int n = 0;
   switch (format) {
-    case 0: n = snprintf(out,size,"%s %02u, %04u",months[month-1],day,year); break;
-    case 1: n = snprintf(out,size,"%02u %s %04u",day,months[month-1],year); break;
-    case 2: n = snprintf(out,size,"%02u%c%02u%c%04u",month,separator,day,separator,year); break;
-    case 3: n = snprintf(out,size,"%02u%c%02u%c%04u",day,separator,month,separator,year); break;
-    case 5: n = snprintf(out,size,"%02u%c%02u",month,separator,day); break;
-    case 6: n = snprintf(out,size,"%02u%c%02u",day,separator,month); break;
-    case 7: n = snprintf(out,size,"%s %02u",months[month-1],day); break;
-    case 8: n = snprintf(out,size,"%02u %s",day,months[month-1]); break;
-    default:n = snprintf(out,size,"%04u%c%02u%c%02u",year,separator,month,separator,day); break;
+    case 0:
+      n = snprintf(out, size, "%s %02u, %04u", months[month - 1], day, year);
+      break;
+    case 1:
+      n = snprintf(out, size, "%02u %s %04u", day, months[month - 1], year);
+      break;
+    case 2:
+      n = snprintf(out, size, "%02u%c%02u%c%04u", month, separator, day, separator, year);
+      break;
+    case 3:
+      n = snprintf(out, size, "%02u%c%02u%c%04u", day, separator, month, separator, year);
+      break;
+    case 5:
+      n = snprintf(out, size, "%02u%c%02u", month, separator, day);
+      break;
+    case 6:
+      n = snprintf(out, size, "%02u%c%02u", day, separator, month);
+      break;
+    case 7:
+      n = snprintf(out, size, "%s %02u", months[month - 1], day);
+      break;
+    case 8:
+      n = snprintf(out, size, "%02u %s", day, months[month - 1]);
+      break;
+    default:
+      n = snprintf(out, size, "%04u%c%02u%c%02u", year, separator, month, separator, day);
+      break;
   }
   return n >= 0 && static_cast<size_t>(n) < size;
 }
@@ -132,8 +149,9 @@ void LibraryActivity::onEnter() {
     // the existing launcher into an empty shelf merely because Ink's default
     // preference is Recently opened. This visit-only fallback never rewrites
     // the stored choice or durable recent history.
-    if (sort==Sort::RecentlyRead && RECENT_BOOKS.getBooks().empty()) {
-      sort=Sort::DateAdded;descending=true;
+    if (sort == Sort::RecentlyRead && RECENT_BOOKS.getBooks().empty()) {
+      sort = Sort::DateAdded;
+      descending = true;
     }
     app.on(ACTION_ROW, &LibraryActivity::onRowEvent, this);
     app.on(ACTION_CONTROL, &LibraryActivity::onControlEvent, this);
@@ -322,9 +340,13 @@ void LibraryActivity::resolveRecents() {
   for (size_t row = 0; row < books.size() && recentCount < 18u; ++row) {
     const auto& book = books[row];
     if (!library::isLibraryBookFile(book.path)) continue;
-    bool duplicate=false;
-    for(size_t i=0;i<recentCount;++i) if(books[recentRows[i]].path==book.path) {duplicate=true;break;}
-    if(duplicate) continue;
+    bool duplicate = false;
+    for (size_t i = 0; i < recentCount; ++i)
+      if (books[recentRows[i]].path == book.path) {
+        duplicate = true;
+        break;
+      }
+    if (duplicate) continue;
     if ((library::fileTypeFor(book.path) & visibleTypes) == 0) continue;
     if (!needle.empty()) {
       readRecentBook(row, rowScratch);
@@ -399,76 +421,102 @@ void LibraryActivity::resolvePinned() {
   // Owner history is 18 rows; batch against the index's smaller public limit.
   for (size_t base = 0; base < recentCount; base += library::LibraryIndexFile::MAX_IDENTITY_LOOKUPS) {
     library::BookIdentity identities[library::LibraryIndexFile::MAX_IDENTITY_LOOKUPS]{};
-    const size_t count = std::min(recentCount-base, library::LibraryIndexFile::MAX_IDENTITY_LOOKUPS);
-    for (size_t i=0;i<count;++i) {
-      const auto& path = RECENT_BOOKS.getBooks()[recentRows[base+i]].path;
-      identities[i].pathHash = library::clixPathHash(path.data(),path.size());
+    const size_t count = std::min(recentCount - base, library::LibraryIndexFile::MAX_IDENTITY_LOOKUPS);
+    for (size_t i = 0; i < count; ++i) {
+      const auto& path = RECENT_BOOKS.getBooks()[recentRows[base + i]].path;
+      identities[i].pathHash = library::clixPathHash(path.data(), path.size());
     }
-    if (!index.recentRowsFor(identities,count,pinnedAscRows+base)) {
-      filterFailed = true; recentCount = 0; overlapCount = 0; return;
+    if (!index.recentRowsFor(identities, count, pinnedAscRows + base)) {
+      filterFailed = true;
+      recentCount = 0;
+      overlapCount = 0;
+      return;
     }
   }
-  for (size_t i=0;i<recentCount;++i) if (pinnedAscRows[i] != UINT16_MAX)
-    overlapRows[overlapCount++] = index.bookCount()-1-pinnedAscRows[i];
-  std::sort(overlapRows,overlapRows+overlapCount);
+  for (size_t i = 0; i < recentCount; ++i)
+    if (pinnedAscRows[i] != UINT16_MAX) overlapRows[overlapCount++] = index.bookCount() - 1 - pinnedAscRows[i];
+  std::sort(overlapRows, overlapRows + overlapCount);
   // Keep the SDK's signed row/action values representable at the format
   // ceiling. Unindexed history remains available in Recently opened mode.
-  for(size_t i=recentCount; i>0 && index.bookCount()+recentCount-overlapCount>library::CLIX_MAX_RECORDS;) {
-    --i;if(pinnedAscRows[i]!=UINT16_MAX) continue;
-    for(size_t j=i;j+1<recentCount;++j) {recentRows[j]=recentRows[j+1];pinnedAscRows[j]=pinnedAscRows[j+1];}
+  for (size_t i = recentCount; i > 0 && index.bookCount() + recentCount - overlapCount > library::CLIX_MAX_RECORDS;) {
+    --i;
+    if (pinnedAscRows[i] != UINT16_MAX) continue;
+    for (size_t j = i; j + 1 < recentCount; ++j) {
+      recentRows[j] = recentRows[j + 1];
+      pinnedAscRows[j] = pinnedAscRows[j + 1];
+    }
     --recentCount;
   }
 }
 
 std::string LibraryActivity::collapseKey(const int row) {
   library::ClixRecord record{};
-  if (!index.readRecord(ordinalForRow(row),record)) return {};
+  if (!index.readRecord(ordinalForRow(row), record)) return {};
   if (sort == Sort::Title) {
     std::string key;
-    const auto initial=library::foldedGroupInitial(std::string_view(record.fold,record.foldLen));
-    utf8AppendCodepoint(initial ? (initial>='a' && initial<='z' ? initial-'a'+'A':initial):'#',key);
+    const auto initial = library::foldedGroupInitial(std::string_view(record.fold, record.foldLen));
+    utf8AppendCodepoint(initial ? (initial >= 'a' && initial <= 'z' ? initial - 'a' + 'A' : initial) : '#', key);
     return key;
   }
   std::string key;
-  if (sort==Sort::Series) index.readSeries(record,key);
-  else if (sort==Sort::Genre) index.readGenre(record,key);
-  else { index.readAuthor(record,key); if(sort==Sort::AuthorLast) key=library::surnameKey(key); }
-  return key.empty()?"-":key;
+  if (sort == Sort::Series)
+    index.readSeries(record, key);
+  else if (sort == Sort::Genre)
+    index.readGenre(record, key);
+  else {
+    index.readAuthor(record, key);
+    if (sort == Sort::AuthorLast) key = library::surnameKey(key);
+  }
+  return key.empty() ? "-" : key;
 }
 
 bool LibraryActivity::collapseGroups(const int bookRow) {
-  if (groupsCollapsed) { expandGroup(bookRow); return true; }
-  const int count=rowCount();
-  if (recentOnly() || sort==Sort::DateAdded || hasActiveFilter() || index.ranksDegraded() || count<=0 || count>512)
-    return false;
-  if (!groupStarts) groupStarts=makeUniqueNoThrow<uint16_t[]>(512);
-  if (!groupStarts) return false;
-  groupCount=0;
-  std::string previous;
-  for(int row=0;row<count;++row) {
-    const auto key=library::fold(collapseKey(row));
-    if(row==0 || key!=previous) groupStarts[groupCount++]=row;
-    previous=key;
+  if (groupsCollapsed) {
+    expandGroup(bookRow);
+    return true;
   }
-  expandedSelection=selection; expandedTop=topIndex;
-  int group=0;
-  while(group+1<groupCount && groupStarts[group+1]<=bookRow) ++group;
-  groupsCollapsed=true;selection=CONTROL_COUNT+group;topIndex=0;
-  listNav.reset(group);uiReady=false;requestUpdate();return true;
+  const int count = rowCount();
+  if (recentOnly() || sort == Sort::DateAdded || hasActiveFilter() || index.ranksDegraded() || count <= 0 ||
+      count > 512)
+    return false;
+  if (!groupStarts) groupStarts = makeUniqueNoThrow<uint16_t[]>(512);
+  if (!groupStarts) return false;
+  groupCount = 0;
+  std::string previous;
+  for (int row = 0; row < count; ++row) {
+    const auto key = library::fold(collapseKey(row));
+    if (row == 0 || key != previous) groupStarts[groupCount++] = row;
+    previous = key;
+  }
+  expandedSelection = selection;
+  expandedTop = topIndex;
+  int group = 0;
+  while (group + 1 < groupCount && groupStarts[group + 1] <= bookRow) ++group;
+  groupsCollapsed = true;
+  selection = CONTROL_COUNT + group;
+  topIndex = 0;
+  listNav.reset(group);
+  uiReady = false;
+  requestUpdate();
+  return true;
 }
 
 void LibraryActivity::expandGroup(const int groupRow) {
   if (!groupsCollapsed) return;
-  const int row=groupRow>=0 && groupRow<groupCount ? groupStarts[groupRow] : expandedSelection-CONTROL_COUNT;
-  groupsCollapsed=false;selection=CONTROL_COUNT+row;
-  topIndex=groupRow>=0 ? row : expandedTop;
-  listNav.reset(row);listNav.top=topIndex;uiReady=false;requestUpdate();
+  const int row = groupRow >= 0 && groupRow < groupCount ? groupStarts[groupRow] : expandedSelection - CONTROL_COUNT;
+  groupsCollapsed = false;
+  selection = CONTROL_COUNT + row;
+  topIndex = groupRow >= 0 ? row : expandedTop;
+  listNav.reset(row);
+  listNav.top = topIndex;
+  uiReady = false;
+  requestUpdate();
 }
 
 int LibraryActivity::rowCount() const {
   if (groupsCollapsed) return groupCount;
   if (recentOnly()) return static_cast<int>(recentCount);
-  if (pinnedShelf()) return index.bookCount()+recentCount-overlapCount;
+  if (pinnedShelf()) return index.bookCount() + recentCount - overlapCount;
   if (hasActiveFilter()) return filteredCount;
   return index.bookCount();
 }
@@ -496,13 +544,15 @@ void LibraryActivity::loadGridProgress() {
 
 uint16_t LibraryActivity::ordinalForRow(const int row) {
   if (recentOnly() || row < 0 || row >= rowCount()) return UINT16_MAX;
-  if (groupsCollapsed) return index.ordinalForRow(indexOrder(),groupStarts[row]);
+  if (groupsCollapsed) return index.ordinalForRow(indexOrder(), groupStarts[row]);
   if (pinnedShelf()) {
-    if (static_cast<size_t>(row)<recentCount) return pinnedAscRows[row] == UINT16_MAX ? UINT16_MAX :
-        index.ordinalForRow(library::SortOrder::RecentAsc,pinnedAscRows[row]);
-    uint16_t source = static_cast<uint16_t>(row-recentCount);
-    for (uint8_t i=0;i<overlapCount;++i) if (overlapRows[i] <= source) ++source;
-    return index.ordinalForRow(indexOrder(),source);
+    if (static_cast<size_t>(row) < recentCount)
+      return pinnedAscRows[row] == UINT16_MAX ? UINT16_MAX
+                                              : index.ordinalForRow(library::SortOrder::RecentAsc, pinnedAscRows[row]);
+    uint16_t source = static_cast<uint16_t>(row - recentCount);
+    for (uint8_t i = 0; i < overlapCount; ++i)
+      if (overlapRows[i] <= source) ++source;
+    return index.ordinalForRow(indexOrder(), source);
   }
   if (hasActiveFilter()) {
     const uint16_t sourceRow = filteredSourceRow(static_cast<uint16_t>(row));
@@ -529,7 +579,7 @@ uint16_t LibraryActivity::filteredSourceRow(const uint16_t row) const {
 }
 
 bool LibraryActivity::readBook(const int row, RecentBook& book, const bool fullPath) {
-  if (recentOnly() || (pinnedShelf() && row >= 0 && static_cast<size_t>(row)<recentCount)) {
+  if (recentOnly() || (pinnedShelf() && row >= 0 && static_cast<size_t>(row) < recentCount)) {
     const uint16_t historyRow =
         library::recentHistoryRow(row, RECENT_BOOKS.getCount(), recentRows, recentCount, descending);
     if (historyRow == UINT16_MAX) {
@@ -562,7 +612,10 @@ void LibraryActivity::applyFilter() {
     resolveRecents();
     return;
   }
-  if (pinnedShelf() && index.isOpen()) { resolvePinned(); return; }
+  if (pinnedShelf() && index.isOpen()) {
+    resolvePinned();
+    return;
+  }
   if (!hasActiveFilter() || !index.isOpen() || index.bookCount() == 0) return;
   const uint16_t sourceCount = index.bookCount();
   filterOrder = indexOrder();
@@ -595,7 +648,8 @@ void LibraryActivity::applyFilter() {
   path.reserve(256);
   cachePath.reserve(64);
   std::string series, genre;
-  series.reserve(UINT8_MAX);genre.reserve(UINT8_MAX);
+  series.reserve(UINT8_MAX);
+  genre.reserve(UINT8_MAX);
   combined.reserve(4 * UINT8_MAX + 3);
   folded.reserve(4 * UINT8_MAX + 3);
   const auto readIndexedPath = [&](const library::ClixRecord& record) {
@@ -634,11 +688,15 @@ void LibraryActivity::applyFilter() {
       combined.assign(title);
       combined.push_back(' ');
       combined.append(author);
-      if (!index.readSeries(record,series) || !index.readGenre(record,genre)) {
-        filterFailed=true;filteredCount=0;break;
+      if (!index.readSeries(record, series) || !index.readGenre(record, genre)) {
+        filterFailed = true;
+        filteredCount = 0;
+        break;
       }
-      combined.push_back(' ');combined.append(series);
-      combined.push_back(' ');combined.append(genre);
+      combined.push_back(' ');
+      combined.append(series);
+      combined.push_back(' ');
+      combined.append(genre);
       library::foldInto(combined, folded);
     }
     // Only matching books need their completion state read from the SD card.
@@ -646,7 +704,11 @@ void LibraryActivity::applyFilter() {
     if (SETTINGS.libraryHideFinishedBooks) {
       // One durable-state owner: do not reconstruct owner cache names or decode
       // its stats format here. The Files/Recent helper owns that contract.
-      if (!readIndexedPath(record)) { filterFailed = true; filteredCount = 0; break; }
+      if (!readIndexedPath(record)) {
+        filterFailed = true;
+        filteredCount = 0;
+        break;
+      }
       if (BookActions::isBookCompleted(path)) continue;
     }
     filterBits[row / 8] |= static_cast<uint8_t>(1u << (row % 8));
@@ -701,7 +763,10 @@ void LibraryActivity::openDialog(std::unique_ptr<Activity>&& child, ActivityResu
 }
 
 void LibraryActivity::openBook(const int row) {
-  if (groupsCollapsed) { expandGroup(row); return; }
+  if (groupsCollapsed) {
+    expandGroup(row);
+    return;
+  }
   RecentBook book;
   if (!readBook(row, book)) return;
   app.clearTapFlash();
@@ -710,17 +775,13 @@ void LibraryActivity::openBook(const int row) {
 }
 
 void LibraryActivity::openSortPicker(const int selectedIndex) {
-  const char* choices[] = {"Date added",
-                                      "Title",
-                                      "Author last name",
-                                      "Author first name",
-                                      "Recently opened",
-                                      "Series",
-                                      "Genre"};
+  const char* choices[] = {"Date added", "Title", "Author last name", "Author first name", "Recently opened",
+                           "Series",     "Genre"};
   const bool buttonOnly = !mappedInput.hasTouchHardware();
   auto onSelect = [this, buttonOnly](const int selected) {
-    const Sort previousSort=sort;const bool previousDirection=descending;
-    const auto storedSort=SETTINGS.librarySortMethod,storedDirection=SETTINGS.librarySortDescending;
+    const Sort previousSort = sort;
+    const bool previousDirection = descending;
+    const auto storedSort = SETTINGS.librarySortMethod, storedDirection = SETTINGS.librarySortDescending;
     if (buttonOnly && selected == 0) {
       descending = !descending;
     } else {
@@ -732,9 +793,12 @@ void LibraryActivity::openSortPicker(const int selectedIndex) {
     SETTINGS.librarySortMethod = static_cast<uint8_t>(sort);
     SETTINGS.librarySortDescending = descending;
     if (!SETTINGS.saveToFile()) {
-      SETTINGS.librarySortMethod=storedSort;SETTINGS.librarySortDescending=storedDirection;
-      sort=previousSort;descending=previousDirection;
-      LOG_ERR("LIB", "Cannot save Library sort");GUI.drawPopup(renderer,"Cannot save Library sort");
+      SETTINGS.librarySortMethod = storedSort;
+      SETTINGS.librarySortDescending = storedDirection;
+      sort = previousSort;
+      descending = previousDirection;
+      LOG_ERR("LIB", "Cannot save Library sort");
+      GUI.drawPopup(renderer, "Cannot save Library sort");
     }
     refreshIndexIfNeeded(true);
     resetViewport();
@@ -742,9 +806,8 @@ void LibraryActivity::openSortPicker(const int selectedIndex) {
   };
   actionPopup.setDismissOnOutsideTouchDown(true);
   if (buttonOnly) {
-    const char* options[] = {descending ? "Z-A" : "A-Z", choices[0], choices[1],
-                             choices[2],       choices[3], choices[4],
-                             choices[5],       choices[6]};
+    const char* options[] = {
+        descending ? "Z-A" : "A-Z", choices[0], choices[1], choices[2], choices[3], choices[4], choices[5], choices[6]};
     actionPopup.show("Sort by", options, 8, selectedIndex < 0 ? 0 : selectedIndex, std::move(onSelect));
     // Shared owner popup keeps its established option geometry.
   } else {
@@ -804,12 +867,14 @@ void LibraryActivity::activateControl(const int control) {
   if (control == 2) openSettings();
   if (control == 3) openSortPicker();
   if (control == 4) {
-    const auto storedDirection=SETTINGS.librarySortDescending;
+    const auto storedDirection = SETTINGS.librarySortDescending;
     descending = !descending;
     SETTINGS.librarySortDescending = descending;
     if (!SETTINGS.saveToFile()) {
-      SETTINGS.librarySortDescending=storedDirection;descending=!descending;
-      LOG_ERR("LIB", "Cannot save Library sort direction");GUI.drawPopup(renderer,"Cannot save Library sort direction");
+      SETTINGS.librarySortDescending = storedDirection;
+      descending = !descending;
+      LOG_ERR("LIB", "Cannot save Library sort direction");
+      GUI.drawPopup(renderer, "Cannot save Library sort direction");
     }
     applyFilter();
     topIndex = 0;
@@ -825,11 +890,10 @@ void LibraryActivity::onRowEvent(const fui::ActionEvent& event, void* user) {
   self->showSelection = false;
   if (self->routingSwipeDelete) {
     RecentBook book;
-    if (!self->groupsCollapsed && self->readBook(event.value,book)) self->promptDeleteBook(book);
+    if (!self->groupsCollapsed && self->readBook(event.value, book)) self->promptDeleteBook(book);
   } else if (event.longPress) {
     if (!self->collapseGroups(event.value)) self->showBookActionMenu(event.value);
-  }
-  else
+  } else
     self->openBook(event.value);
 }
 
@@ -929,7 +993,7 @@ void LibraryActivity::latchInput() {
     ignoreBackRelease = false;
   }
   if (mappedInput.hasTouchHardware()) {
-    buttonNavigator.onRelease(ButtonNavigator::getNextButtons(),[&] { queueInput(Type::Next); });
+    buttonNavigator.onRelease(ButtonNavigator::getNextButtons(), [&] { queueInput(Type::Next); });
     buttonNavigator.onPreviousRelease([&] { queueInput(Type::Previous); });
     buttonNavigator.onNextContinuous([&] { queueInput(Type::NextPage); });
     buttonNavigator.onPreviousContinuous([&] { queueInput(Type::PreviousPage); });
@@ -984,9 +1048,15 @@ void LibraryActivity::handleInput(const LibraryInputBuffer::Event& input) {
     if (input.y < header.y + header.height && input.x >= back.x && input.x < back.x + back.width && input.y >= back.y &&
         input.y < back.y + back.height) {
       pendingInput.clear();
-      if (groupsCollapsed) expandGroup(-1);
-      else if (!query.empty()) { query.clear(); applyFilter(); resetViewport(); requestUpdate(); }
-      else onGoHome();
+      if (groupsCollapsed)
+        expandGroup(-1);
+      else if (!query.empty()) {
+        query.clear();
+        applyFilter();
+        resetViewport();
+        requestUpdate();
+      } else
+        onGoHome();
       return;
     }
   }
@@ -994,9 +1064,9 @@ void LibraryActivity::handleInput(const LibraryInputBuffer::Event& input) {
     pendingInput.clear();
     ignoreConfirmRelease = mappedInput.isPressed(MappedInputManager::Button::Confirm);
     if (selection >= CONTROL_COUNT && rowCount() > 0) {
-      if (!collapseGroups(selection-CONTROL_COUNT)) showBookActionMenu(selection - CONTROL_COUNT, ignoreConfirmRelease);
-    }
-    else
+      if (!collapseGroups(selection - CONTROL_COUNT))
+        showBookActionMenu(selection - CONTROL_COUNT, ignoreConfirmRelease);
+    } else
       activateControl(selection);
     return;
   }
@@ -1036,16 +1106,23 @@ void LibraryActivity::handleInput(const LibraryInputBuffer::Event& input) {
       onGoHome();
     return;
   }
-  if (input.type==Type::SwipeLeft && !gridEnabled() && !groupsCollapsed && uiReady && input.x>=0 && input.y>=0) {
+  if (input.type == Type::SwipeLeft && !gridEnabled() && !groupsCollapsed && uiReady && input.x >= 0 && input.y >= 0) {
     // Route through the SDK's published row hit table. Never infer a target
     // from a stale selection or recompute unpainted geometry. Deletion still
     // requires the existing explicit ConfirmationActivity.
     // SDK swipeLeft is a global findFirst(InputSwipeLeft), NOT a coordinate
     // hit-test. Reuse its published long-press row region as a coordinate
     // lookup while routingSwipeDelete selects this gesture's confirmed action.
-    fui::InputSnapshot snap{};snap.touchReleased=true;snap.longPress=true;snap.touchX=input.x;snap.touchY=input.y;
-    routingSwipeDelete=true;app.route(snap);routingSwipeDelete=false;
-    pendingInput.clear();return;
+    fui::InputSnapshot snap{};
+    snap.touchReleased = true;
+    snap.longPress = true;
+    snap.touchX = input.x;
+    snap.touchY = input.y;
+    routingSwipeDelete = true;
+    app.route(snap);
+    routingSwipeDelete = false;
+    pendingInput.clear();
+    return;
   }
   const auto swipe = input.type == Type::SwipeUp      ? MappedInputManager::SwipeDir::Up
                      : input.type == Type::SwipeDown  ? MappedInputManager::SwipeDir::Down
@@ -1138,8 +1215,9 @@ void LibraryActivity::listScreen(UiApp::ScreenType& screen, void* user) {
 void LibraryActivity::provideRow(void* user, const uint16_t row, fui::ListItem& item) {
   auto* self = static_cast<LibraryActivity*>(user);
   if (self->groupsCollapsed) {
-    self->groupHeading=self->collapseKey(row);
-    item.label=self->groupHeading.c_str();item.actionValue=static_cast<int16_t>(row);
+    self->groupHeading = self->collapseKey(row);
+    item.label = self->groupHeading.c_str();
+    item.actionValue = static_cast<int16_t>(row);
     return;
   }
   if (!self->readBook(row, self->rowScratch, false)) {
@@ -1176,10 +1254,10 @@ void LibraryActivity::provideRow(void* user, const uint16_t row, fui::ListItem& 
   item.icon = listIconFor(UITheme::getFileIcon(self->rowScratch.path), 32);
   item.actionValue = static_cast<int16_t>(row);
   if (!SETTINGS.libraryListExpanded) return;
-  if (self->pinnedShelf() && row<self->recentCount) {
-    if(row==0) item.sectionHeading="Recently opened";
-  } else if (self->pinnedShelf() && row==self->recentCount) {
-    item.sectionHeading="Recently added";
+  if (self->pinnedShelf() && row < self->recentCount) {
+    if (row == 0) item.sectionHeading = "Recently opened";
+  } else if (self->pinnedShelf() && row == self->recentCount) {
+    item.sectionHeading = "Recently added";
   } else if (self->sort == Sort::DateAdded) {
     const uint16_t date = self->dateGroupForRow(row);
     if (row == 0 || date != self->dateGroupForRow(row - 1)) {
@@ -1260,8 +1338,8 @@ void LibraryActivity::buildSortHeader(UiApp::ScreenType& screen) {
   const int16_t margin = UITheme::getInstance().getMetrics().contentSidePadding;
   auto labelStyle = screen.theme().bodyText;
   labelStyle.bold = true;
-  const int16_t labelWidth = std::min<int16_t>(
-      band.width / 3, uiTarget.measureText(labelStyle.font, "Sort by", labelStyle).width);
+  const int16_t labelWidth =
+      std::min<int16_t>(band.width / 3, uiTarget.measureText(labelStyle.font, "Sort by", labelStyle).width);
   // The 32px glyph sits inside a wider selection box with even side padding.
   const int16_t iconWidth = 48;
   const int16_t methodWidth = std::min<int16_t>(
@@ -1582,10 +1660,9 @@ void LibraryActivity::render(RenderLock&&) {
   const char* confirmLabel = !mappedInput.hasTouchHardware() && rowCount() == 0 ? ""
                              : selection < CONTROL_COUNT                        ? tr(STR_SELECT)
                                                                                 : tr(STR_OPEN);
-  const auto labels =
-      mappedInput.mapLabels(mappedInput.withBackArrow(query.empty() ? tr(STR_HOME) : tr(STR_BACK)), confirmLabel,
-                            mappedInput.hasTouchHardware() ? tr(STR_DIR_UP) : "Sort",
-                            mappedInput.hasTouchHardware() ? tr(STR_DIR_DOWN) : tr(STR_MENU));
+  const auto labels = mappedInput.mapLabels(mappedInput.withBackArrow(query.empty() ? tr(STR_HOME) : tr(STR_BACK)),
+                                            confirmLabel, mappedInput.hasTouchHardware() ? tr(STR_DIR_UP) : "Sort",
+                                            mappedInput.hasTouchHardware() ? tr(STR_DIR_DOWN) : tr(STR_MENU));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   char footer[32];
   snprintf(footer, sizeof(footer), "%u books", static_cast<unsigned>(rowCount()));
@@ -1614,8 +1691,8 @@ void LibraryActivity::promptDeleteBook(const RecentBook& book) {
     // do not replay either operation or mutate durable state locally.
     const bool deleted = BookActions::deleteFile(path);
     if (!deleted) {
-      LOG_ERR("LIB","Book deletion refused or cleanup needs recovery");
-      GUI.drawPopup(renderer,"Book deletion refused or cleanup needs recovery");
+      LOG_ERR("LIB", "Book deletion refused or cleanup needs recovery");
+      GUI.drawPopup(renderer, "Book deletion refused or cleanup needs recovery");
     }
     library::invalidateLibraryIndex();
     scanCancelledThisVisit = false;
@@ -1764,7 +1841,7 @@ void LibraryActivity::showBookActionMenu(const size_t bookIndex, const bool igno
                  case FileBrowserAction::DeleteBookmarks:
                  case FileBrowserAction::DeleteClippings:
                  case FileBrowserAction::Rename:
-                case FileBrowserAction::Move:
+                 case FileBrowserAction::Move:
                    return;
                }
              });

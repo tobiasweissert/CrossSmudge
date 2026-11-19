@@ -13,5 +13,4 @@ struct EspHostStub {
 };
 
 inline EspHostStub ESP;
-inline uint32_t millis() { return 0; }
-inline void delay(uint32_t) {}
+inline void vTaskDelay(uint32_t) {}

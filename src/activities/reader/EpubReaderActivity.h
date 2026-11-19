@@ -19,8 +19,8 @@
 #include "EpubReaderMenuActivity.h"
 #include "GlobalReadingStats.h"
 #include "ManualPageTurnQueue.h"
-#include "ReaderProgressSaveDebouncer.h"
 #include "ReaderActivity.h"
+#include "ReaderProgressSaveDebouncer.h"
 #include "components/OptionPopup.h"
 #if CROSSSMUDGE_APP_CAP_TOUCH || CROSSINK_APP_CAP_TOUCH
 #include "activities/reader/ReaderPinchGesture.h"
@@ -485,15 +485,15 @@ class EpubReaderActivity final : public ReaderActivity {
   explicit EpubReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::unique_ptr<Epub> epub,
                               const BookReaderSettingsData& readerSettings, int initialRefreshCountdown,
                               bool cleanImageBaseOnEntry = false, bool skipRecentBookUpdateOnEntry = false)
-      : ReaderActivity("EpubReader", renderer, mappedInput, epub ? epub->getPath() : std::string{}, initialRefreshCountdown > 0),
+      : ReaderActivity("EpubReader", renderer, mappedInput, epub ? epub->getPath() : std::string{},
+                       initialRefreshCountdown > 0),
         epub(std::move(epub)),
         initialBookReaderSettings(readerSettings),
         pagesUntilFullRefresh(initialRefreshCountdown),
         cleanImageBasePending(cleanImageBaseOnEntry),
         skipRecentBookUpdateOnEntry(skipRecentBookUpdateOnEntry) {}
 
-  explicit EpubReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                              std::string path, bool fast)
+  explicit EpubReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string path, bool fast)
       : ReaderActivity("EpubReader", renderer, mappedInput, std::move(path), fast),
         pagesUntilFullRefresh(fast ? std::max(2, static_cast<int>(SETTINGS.getRefreshFrequency())) : 0),
         skipRecentBookUpdateOnEntry(fast) {}
@@ -503,7 +503,9 @@ class EpubReaderActivity final : public ReaderActivity {
   bool loadBook() override;
   std::string getBookTitle() const override { return epub ? epub->getTitle() : ""; }
   std::string getBookAuthor() const override { return epub ? epub->getAuthor() : ""; }
-  std::string getBookThumbBmpPath() const override { return epub && epub->hasCoverImage() ? epub->getThumbBmpPath() : ""; }
+  std::string getBookThumbBmpPath() const override {
+    return epub && epub->hasCoverImage() ? epub->getThumbBmpPath() : "";
+  }
   bool pageTurn(bool forward) override;
   bool skipPages(int amount) override;
   bool isAtEndOfBook() const override;

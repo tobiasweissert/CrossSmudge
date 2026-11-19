@@ -181,9 +181,9 @@ inline ClixValidity validateHeaderStructure(const ClixHeader& h, const uint64_t 
   for (size_t i = 0; i < sizeof(CLIX_MAGIC); i++) {
     if (h.magic[i] != CLIX_MAGIC[i]) return ClixValidity::BadMagic;
   }
-  if (h.formatVersion != CLIX_FORMAT_VERSION && !(acceptPrevious && (h.formatVersion == 2 || h.formatVersion == 3 ||
-                                                                     h.formatVersion == 4 || h.formatVersion == 5 ||
-                                                                     h.formatVersion == 6)))
+  if (h.formatVersion != CLIX_FORMAT_VERSION &&
+      !(acceptPrevious && (h.formatVersion == 2 || h.formatVersion == 3 || h.formatVersion == 4 ||
+                           h.formatVersion == 5 || h.formatVersion == 6)))
     return ClixValidity::UnknownFormatVersion;
   if (h.bookCount > CLIX_MAX_RECORDS) return ClixValidity::CountOutOfRange;
   if (h.metadataEnabled > 1) return ClixValidity::SectionsInconsistent;

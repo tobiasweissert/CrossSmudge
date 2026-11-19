@@ -212,5 +212,7 @@ TEST(KOReaderXPathResolver, ProgressEndExcludesTrailingWhitespaceInsideRun) {
 }
 
 TEST(KOReaderXPathResolver, PreservesDirectBodyTextAnchor) {
-  EXPECT_EQ(ChapterXPathResolver::findXPathForVisibleTextOffset(epubWith("<html><body>Direct text</body></html>"), 0, 0), "/body/DocFragment[1]/body/text()[1].0");
+  EXPECT_EQ(
+      ChapterXPathResolver::findXPathForVisibleTextOffset(epubWith("<html><body>Direct text</body></html>"), 0, 0),
+      "/body/DocFragment[1]/body/text()[1].0");
 }

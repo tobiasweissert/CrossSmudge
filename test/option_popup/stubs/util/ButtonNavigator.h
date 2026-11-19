@@ -1,9 +1,24 @@
 #pragma once
 
+#include <initializer_list>
+
 #include "MappedInputManager.h"
 
 class ButtonNavigator {
  public:
+  static std::initializer_list<MappedInputManager::Button> getNextButtons() {
+    static const std::initializer_list<MappedInputManager::Button> buttons = {MappedInputManager::Button::NavNext};
+    return buttons;
+  }
+  template <typename Callback>
+  void onRelease(std::initializer_list<MappedInputManager::Button> buttons, Callback&& callback) {
+    for (auto button : buttons) {
+      if (button == MappedInputManager::Button::NavNext)
+        onNextRelease(std::forward<Callback>(callback));
+      else if (button == MappedInputManager::Button::NavPrevious)
+        onPreviousRelease(std::forward<Callback>(callback));
+    }
+  }
   template <typename Callback>
   void onPreviousRelease(Callback&& callback) {
     if (previousRelease) {

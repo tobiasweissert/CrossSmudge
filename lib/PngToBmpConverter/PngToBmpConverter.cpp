@@ -429,8 +429,10 @@ static void convertScanlineToGray(const PngDecodeContext& ctx, uint8_t* grayRow)
     switch (ctx.colorType) {
       case PNG_COLOR_GRAYSCALE: {
         uint16_t sample;
-        if (ctx.bitDepth == 16) sample = be16(src + x * 2);
-        else if (ctx.bitDepth == 8) sample = src[x];
+        if (ctx.bitDepth == 16)
+          sample = be16(src + x * 2);
+        else if (ctx.bitDepth == 8)
+          sample = src[x];
         else {
           const unsigned bit = x * ctx.bitDepth;
           sample = (src[bit / 8] >> (8 - ctx.bitDepth - bit % 8)) & ((1u << ctx.bitDepth) - 1);
@@ -451,8 +453,9 @@ static void convertScanlineToGray(const PngDecodeContext& ctx, uint8_t* grayRow)
         if (channels == 4) {
           maximum = wide ? 65535 : 255;
           alpha = wide ? be16(p + 6) : p[3];
-        } else if (ctx.hasTransparency && rgb[0] == ctx.transparentRgb[0] &&
-                   rgb[1] == ctx.transparentRgb[1] && rgb[2] == ctx.transparentRgb[2]) alpha = 0;
+        } else if (ctx.hasTransparency && rgb[0] == ctx.transparentRgb[0] && rgb[1] == ctx.transparentRgb[1] &&
+                   rgb[2] == ctx.transparentRgb[2])
+          alpha = 0;
         break;
       }
       case PNG_COLOR_PALETTE: {
@@ -466,9 +469,12 @@ static void convertScanlineToGray(const PngDecodeContext& ctx, uint8_t* grayRow)
       }
       case PNG_COLOR_GRAYSCALE_ALPHA:
         if (ctx.bitDepth == 16) {
-          gray = src[x * 4]; alpha = be16(src + x * 4 + 2); maximum = 65535;
+          gray = src[x * 4];
+          alpha = be16(src + x * 4 + 2);
+          maximum = 65535;
         } else {
-          gray = src[x * 2]; alpha = src[x * 2 + 1];
+          gray = src[x * 2];
+          alpha = src[x * 2 + 1];
         }
         break;
     }
@@ -531,12 +537,13 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(FsFile& pngFile, Print& bmpOu
   }
 
   // Reject the complete illegal color/depth matrix before row allocation or shifts.
-  const bool legalDepth = colorType == PNG_COLOR_GRAYSCALE
-      ? (bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8 || bitDepth == 16)
+  const bool legalDepth =
+      colorType == PNG_COLOR_GRAYSCALE
+          ? (bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8 || bitDepth == 16)
       : colorType == PNG_COLOR_PALETTE
           ? (bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8)
-          : (colorType == PNG_COLOR_RGB || colorType == PNG_COLOR_GRAYSCALE_ALPHA || colorType == PNG_COLOR_RGBA)
-              && (bitDepth == 8 || bitDepth == 16);
+          : (colorType == PNG_COLOR_RGB || colorType == PNG_COLOR_GRAYSCALE_ALPHA || colorType == PNG_COLOR_RGBA) &&
+                (bitDepth == 8 || bitDepth == 16);
   if (!legalDepth) return false;
 
   // Calculate bytes per pixel and raw row bytes
@@ -617,8 +624,8 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(FsFile& pngFile, Print& bmpOu
     uint8_t chunkType[4];
     if (pngFile.read(chunkType, 4) != 4) break;
 
-    if (pngFile.position() > pngFile.size() ||
-        uint64_t(chunkLen) + 4 > pngFile.size() - pngFile.position()) return false;
+    if (pngFile.position() > pngFile.size() || uint64_t(chunkLen) + 4 > pngFile.size() - pngFile.position())
+      return false;
     if (memcmp(chunkType, "PLTE", 4) == 0) {
       if (!chunkLen || chunkLen % 3 || chunkLen > sizeof(ctx.palette) || ctx.paletteSize) return false;
       ctx.paletteSize = chunkLen / 3;
@@ -628,15 +635,18 @@ bool PngToBmpConverter::pngFileToBmpStreamInternal(FsFile& pngFile, Print& bmpOu
       ctx.hasTransparency = true;
       if (colorType == PNG_COLOR_PALETTE) {
         if (!chunkLen || chunkLen > unsigned(ctx.paletteSize) ||
-            pngFile.read(ctx.paletteAlpha, chunkLen) != int(chunkLen)) return false;
+            pngFile.read(ctx.paletteAlpha, chunkLen) != int(chunkLen))
+          return false;
       } else {
         uint8_t key[6];
-        if ((colorType != PNG_COLOR_GRAYSCALE || chunkLen != 2) &&
-            (colorType != PNG_COLOR_RGB || chunkLen != 6)) return false;
+        if ((colorType != PNG_COLOR_GRAYSCALE || chunkLen != 2) && (colorType != PNG_COLOR_RGB || chunkLen != 6))
+          return false;
         if (pngFile.read(key, chunkLen) != int(chunkLen)) return false;
         const auto readKey = [](const uint8_t* p) { return uint16_t((uint16_t(p[0]) << 8) | p[1]); };
-        if (colorType == PNG_COLOR_GRAYSCALE) ctx.transparentGray = readKey(key);
-        else for (unsigned c = 0; c < 3; ++c) ctx.transparentRgb[c] = readKey(key + c * 2);
+        if (colorType == PNG_COLOR_GRAYSCALE)
+          ctx.transparentGray = readKey(key);
+        else
+          for (unsigned c = 0; c < 3; ++c) ctx.transparentRgb[c] = readKey(key + c * 2);
       }
       if (!pngFile.seekCur(4)) return false;
     } else if (memcmp(chunkType, "IDAT", 4) == 0) {

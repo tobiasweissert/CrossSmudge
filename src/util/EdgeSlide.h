@@ -12,7 +12,8 @@ inline int bandWidth(const int screenWidth) { return std::max(32, screenWidth * 
 
 inline Direction directionFor(const int startX, const int startY, const int endX, const int endY, const int screenWidth,
                               const int screenHeight) {
-  if (screenWidth < 2 || screenHeight < 2 || startY < 0 || startY >= screenHeight || endY < 0 || endY >= screenHeight) return Direction::None;
+  if (screenWidth < 2 || screenHeight < 2 || startY < 0 || startY >= screenHeight || endY < 0 || endY >= screenHeight)
+    return Direction::None;
   const int band = bandWidth(screenWidth);
   const bool left = startX >= 0 && startX < band && endX >= 0 && endX < band;
   const bool right =

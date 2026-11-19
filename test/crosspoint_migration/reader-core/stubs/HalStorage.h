@@ -102,8 +102,11 @@ class HalStorage {
   bool mkdir(const char*, bool = true) { return true; }
   bool removeDir(const char* path) {
     std::string prefix = std::string(path) + "/";
-    for (auto it=files_.begin(); it!=files_.end();) {
-      if (it->first==path || it->first.starts_with(prefix)) it=files_.erase(it); else ++it;
+    for (auto it = files_.begin(); it != files_.end();) {
+      if (it->first == path || it->first.starts_with(prefix))
+        it = files_.erase(it);
+      else
+        ++it;
     }
     return true;
   }

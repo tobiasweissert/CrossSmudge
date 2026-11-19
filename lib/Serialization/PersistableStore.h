@@ -62,6 +62,7 @@ class PersistableStoreBase {
   // Reads path and parses it into doc. Returns false silently when the file
   // does not exist (expected on first boot); logs on read/parse failure.
   static bool readDocFromFile(const char* path, JsonDocument& doc);
+
  protected:
   static std::string extractPassword(JsonVariantConst doc, bool& needsResave);
   static std::string extractPassword(JsonVariantConst doc, bool& needsResave, size_t maxLength, bool& valid);

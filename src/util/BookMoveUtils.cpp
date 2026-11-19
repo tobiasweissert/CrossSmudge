@@ -1,22 +1,21 @@
 #include "BookMoveUtils.h"
 
 #include <Epub.h>
+#include <FsHelpers.h>
 #include <HalStorage.h>
+#include <LibraryBuilder.h>
 #include <Logging.h>
 #include <Txt.h>
 #include <Xtc.h>
+#include <fcntl.h>
 
 #include <cstring>
-#include <fcntl.h>
-#include <FsHelpers.h>
-#include <LibraryBuilder.h>
-
-#include "activities/home/FileActionPaths.h"
 
 #include "BookmarkStore.h"
 #include "ClippingStore.h"
 #include "CrossPointState.h"
 #include "RecentBooksStore.h"
+#include "activities/home/FileActionPaths.h"
 
 namespace {
 constexpr char READ_FOLDER[] = "/Read";
@@ -26,11 +25,13 @@ constexpr char BOOK_MOVE_PENDING[] = "/.crosspoint/book-move.pending";
 
 bool writeMoveIntent(const std::string& from, const std::string& to) {
   for (const auto* path : {&from, &to})
-    for (const unsigned char c : *path) if (c < 0x20 || c == 0x7f) return false;
+    for (const unsigned char c : *path)
+      if (c < 0x20 || c == 0x7f) return false;
   const std::string intent = "CPBOOKMOVE1\n" + from + "\n" + to + "\n";
   HalFile marker = Storage.open(BOOK_MOVE_PENDING, O_WRONLY | O_CREAT | O_EXCL);
   if (!marker || marker.write(reinterpret_cast<const uint8_t*>(intent.data()), intent.size()) != intent.size() ||
-      !marker.sync() || !marker.close()) return false;
+      !marker.sync() || !marker.close())
+    return false;
   HalFile verify;
   if (!Storage.openFileForRead("BookMove", BOOK_MOVE_PENDING, verify) || verify.size() != intent.size()) return false;
   std::string bytes(intent.size(), '\0');
@@ -57,8 +58,9 @@ namespace BookMoveUtils {
 RenameMigrationResult moveFile(const std::string& oldPath, const std::string& newPath) {
   if (Storage.exists(BOOK_MOVE_PENDING) || Storage.exists("/.crosspoint/clippings/move.pending"))
     return RenameMigrationResult::Uncertain;
-  if (!FileActionPaths::isUserPath(oldPath) || !FileActionPaths::isUserPath(newPath) ||
-      oldPath == newPath || Storage.exists(newPath.c_str())) return RenameMigrationResult::RolledBack;
+  if (!FileActionPaths::isUserPath(oldPath) || !FileActionPaths::isUserPath(newPath) || oldPath == newPath ||
+      Storage.exists(newPath.c_str()))
+    return RenameMigrationResult::RolledBack;
   auto file = Storage.open(oldPath.c_str());
   if (!file || file.isDirectory()) return RenameMigrationResult::RolledBack;
   if (!file.close()) return RenameMigrationResult::Uncertain;
@@ -78,25 +80,38 @@ RenameMigrationResult moveFile(const std::string& oldPath, const std::string& ne
     const auto modern = Epub::cachePathForFilePath(oldPath, "/.crosspoint");
     const auto legacy = Txt(oldPath, "/.crosspoint").getCachePath();
     if (Storage.exists(Epub::cachePathForFilePath(newPath, "/.crosspoint").c_str()) ||
-        Storage.exists(Txt(newPath, "/.crosspoint").getCachePath().c_str())) return RenameMigrationResult::RolledBack;
+        Storage.exists(Txt(newPath, "/.crosspoint").getCachePath().c_str()))
+      return RenameMigrationResult::RolledBack;
     if (Storage.exists(modern.c_str())) {
       if (modern != legacy && Storage.exists(legacy.c_str())) return RenameMigrationResult::RolledBack;
-      cache = modern; type = "epub";
-    } else { cache = legacy; type = "txt"; }
+      cache = modern;
+      type = "epub";
+    } else {
+      cache = legacy;
+      type = "txt";
+    }
   }
   if (type) {
     std::string title = oldPath.substr(oldPath.rfind('/') + 1), author;
     for (const auto& book : RECENT_BOOKS.getBooks()) {
       if (book.path != oldPath) continue;
-      title = book.title; author = book.author; break;
+      title = book.title;
+      author = book.author;
+      break;
     }
     return migrateRenamedBookState(oldPath, newPath, cache, title, author, type, true);
   }
   if (!writeMoveIntent(oldPath, newPath)) return RenameMigrationResult::Uncertain;
   if (!Storage.rename(oldPath.c_str(), newPath.c_str())) return RenameMigrationResult::Uncertain;
   bool changed = false;
-  if (APP_STATE.favoriteSleepImagePath == oldPath) { APP_STATE.favoriteSleepImagePath = newPath; changed = true; }
-  if (APP_STATE.favoriteBootImagePath == oldPath) { APP_STATE.favoriteBootImagePath = newPath; changed = true; }
+  if (APP_STATE.favoriteSleepImagePath == oldPath) {
+    APP_STATE.favoriteSleepImagePath = newPath;
+    changed = true;
+  }
+  if (APP_STATE.favoriteBootImagePath == oldPath) {
+    APP_STATE.favoriteBootImagePath = newPath;
+    changed = true;
+  }
   if (changed && !APP_STATE.saveToFile()) return RenameMigrationResult::Uncertain;
   if (!Storage.remove(BOOK_MOVE_PENDING)) return RenameMigrationResult::Uncertain;
   return RenameMigrationResult::Success;

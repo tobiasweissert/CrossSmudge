@@ -11,6 +11,7 @@ class PopupTouchHarness {
   explicit PopupTouchHarness(MappedInputManager& input) : input(input) {}
 
   void touchPopup(OptionPopup& popup, const int optionY, const std::function<void()>& requestUpdate) {
+    popup.render(input.getRenderer());
     input.injectTouchDown(400, optionY);
     ASSERT_TRUE(popup.handleInput(input, requestUpdate));
     input.injectTouchRelease(400, optionY);
@@ -20,6 +21,27 @@ class PopupTouchHarness {
  private:
   MappedInputManager& input;
 };
+
+TEST(OptionPopup, InputWaitsForPublishedPaintAndRenderUnlock) {
+  GfxRenderer renderer;
+  HalGPIO gpio;
+  MappedInputManager input(gpio, renderer);
+  OptionPopup popup;
+  const char* options[] = {"Action"};
+  int selected = 0;
+  popup.show("Quick actions", options, 1, 0, [&](int) { ++selected; });
+  input.injectPowerConfirmPress();
+  EXPECT_TRUE(popup.handleInput(input, [] {}));
+  EXPECT_EQ(selected, 0);
+  popup.render(renderer);
+  RenderLock::held = true;
+  EXPECT_TRUE(popup.handleInput(input, [] {}));
+  EXPECT_EQ(selected, 0);
+  RenderLock::held = false;
+  EXPECT_TRUE(popup.handleInput(input, [] {}));
+  EXPECT_EQ(selected, 1);
+  EXPECT_FALSE(popup.isActive());
+}
 
 TEST(OptionPopup, ConsecutiveTouchSelectionsDoNotLoseSecondRelease) {
   GfxRenderer renderer;
@@ -66,6 +88,7 @@ TEST(OptionPopup, PowerConfirmSelectionSuppressesItsPowerRelease) {
     ++selections;
   });
 
+  popup.render(renderer);
   input.injectPowerConfirmPress();
   EXPECT_TRUE(popup.handleInput(input, [] {}));
 
@@ -80,6 +103,7 @@ TEST(OptionPopup, PowerConfirmSelectionSuppressesItsPowerRelease) {
   EXPECT_FALSE(input.wasReleased(MappedInputManager::Button::Power));
 
   input.advanceInputFrame();
+  popup.render(renderer);
   input.injectPowerConfirmPress();
   input.injectPowerConfirmRelease();
   EXPECT_TRUE(input.wasReleased(MappedInputManager::Button::Power));
@@ -112,6 +136,7 @@ TEST(OptionPopup, OutsideTouchDismissesWhenEnabled) {
   popup.show("Image actions", options, 1, 0, [](const int) {});
   popup.setDismissOnOutsideTouchDown(true);
 
+  popup.render(renderer);
   input.injectTouchDown(0, 0);
   EXPECT_TRUE(popup.handleInput(input, [] {}));
   EXPECT_FALSE(popup.isActive());
@@ -133,8 +158,10 @@ TEST(OptionPopup, ButtonNavigationSkipsDisabledOptions) {
   popup.show("Sync & Transfer", options, 3, 2, [&](const int index) { selectedIndex = index; });
   popup.setDisabledOptions({true, true, false});
 
+  popup.render(renderer);
   ButtonNavigator::injectNextRelease();
   EXPECT_TRUE(popup.handleInput(input, [] {}));
+  popup.render(renderer);
   input.injectPowerConfirmPress();
   EXPECT_TRUE(popup.handleInput(input, [] {}));
   EXPECT_EQ(selectedIndex, 2);
@@ -152,6 +179,7 @@ TEST(OptionPopup, SwipeMovesByAVisiblePage) {
   for (int i = 0; i < 25; ++i) options.push_back(std::to_string(i));
   popup.show("Long popup", options, 0, [&](const int index) { selectedIndex = index; });
 
+  popup.render(renderer);
   input.injectSwipe(MappedInputManager::SwipeDir::Up);
   EXPECT_TRUE(popup.handleInput(input, [] {}));
   popup.render(renderer);
@@ -160,6 +188,7 @@ TEST(OptionPopup, SwipeMovesByAVisiblePage) {
   EXPECT_EQ(selectedIndex, 10);
 
   popup.show("Long popup", options, 24, [&](const int index) { selectedIndex = index; });
+  popup.render(renderer);
   input.injectSwipe(MappedInputManager::SwipeDir::Down);
   EXPECT_TRUE(popup.handleInput(input, [] {}));
   popup.render(renderer);
@@ -180,11 +209,13 @@ TEST(OptionPopup, SwipeDoesNotHighlightTheTouchDownOption) {
 
   // The second visible row is a tentative touch target. Do not redraw it as
   // selected until the contact completes as a tap rather than a swipe.
+  popup.render(renderer);
   input.injectTouchDown(400, 116);
   EXPECT_TRUE(popup.handleInput(input, [] {}));
   popup.render(renderer);
   EXPECT_EQ(GUI.getLastSelectedIndex(), 0);
 
+  popup.render(renderer);
   input.injectSwipe(MappedInputManager::SwipeDir::Up);
   EXPECT_TRUE(popup.handleInput(input, [] {}));
   popup.render(renderer);
@@ -207,6 +238,7 @@ TEST(OptionPopup, SwipeKeepsDisabledDestinationUnselectableWithoutWrapping) {
   disabled[10] = true;
   popup.setDisabledOptions(std::move(disabled));
 
+  popup.render(renderer);
   input.injectSwipe(MappedInputManager::SwipeDir::Up);
   EXPECT_TRUE(popup.handleInput(input, [] {}));
   touch.touchPopup(popup, 80, [] {});

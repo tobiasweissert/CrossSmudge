@@ -68,8 +68,9 @@ const char* ReleaseJsonParser::getFirmwareSha256() const { return firmwareSha256
 
 void ReleaseJsonParser::commitAsset() {
   const bool matchesFirmware =
-      exactAssetName ? firmwareAssetName[0] && strcmp(currentAssetName, firmwareAssetName) == 0 :
-      (assetMatcher != nullptr ? assetMatcher(currentAssetName) : strcmp(currentAssetName, "firmware.bin") == 0);
+      exactAssetName
+          ? firmwareAssetName[0] && strcmp(currentAssetName, firmwareAssetName) == 0
+          : (assetMatcher != nullptr ? assetMatcher(currentAssetName) : strcmp(currentAssetName, "firmware.bin") == 0);
   if (!firmwareFound && !invalidAsset && matchesFirmware) {
     memcpy(firmwareUrl, currentAssetUrl, sizeof(firmwareUrl));
     memcpy(firmwareSha256, currentAssetSha256, sizeof(firmwareSha256));
@@ -125,10 +126,17 @@ void ReleaseJsonParser::sOnString(void* ctx, const char* value, size_t len) {
   if (self->position == Position::IN_ASSET_OBJECT && self->assetDepth == 1) {
     size_t cap = 0;
     switch (self->lastKey) {
-      case LastKey::ASSET_NAME: cap = sizeof(self->currentAssetName); break;
-      case LastKey::ASSET_URL: cap = sizeof(self->currentAssetUrl); break;
-      case LastKey::ASSET_SHA256: cap = sizeof(self->currentAssetSha256); break;
-      default: break;
+      case LastKey::ASSET_NAME:
+        cap = sizeof(self->currentAssetName);
+        break;
+      case LastKey::ASSET_URL:
+        cap = sizeof(self->currentAssetUrl);
+        break;
+      case LastKey::ASSET_SHA256:
+        cap = sizeof(self->currentAssetSha256);
+        break;
+      default:
+        break;
     }
     if (memchr(value, 0, len) || (cap && len >= cap)) self->invalidAsset = true;
   }

@@ -1,6 +1,6 @@
 #include "BookStatsActivity.h"
-#include <Arduino.h>
 
+#include <Arduino.h>
 #include <I18n.h>
 
 #include "BookStatsView.h"
@@ -91,8 +91,8 @@ void BookStatsActivity::saveStats() {
     dateEditGlobalStatsSnapshot = globalStats;
     didChangeStatsBeforeDateEdit = true;
     renderer.clearScreen();
-    UITheme::drawCenteredWrappedText(renderer, Rect{12, 12, renderer.getScreenWidth() - 24,
-                                                   renderer.getScreenHeight() - 24},
+    UITheme::drawCenteredWrappedText(renderer,
+                                     Rect{12, 12, renderer.getScreenWidth() - 24, renderer.getScreenHeight() - 24},
                                      UI_10_FONT_ID, "Could not save reading statistics. Please retry.", 4);
     renderer.displayBuffer();
     delay(1500);

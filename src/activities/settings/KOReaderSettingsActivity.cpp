@@ -1,8 +1,8 @@
 #include "KOReaderSettingsActivity.h"
 
 #include <GfxRenderer.h>
-#include <I18n.h>
 #include <HttpHeader.h>
+#include <I18n.h>
 
 #include <cstring>
 
@@ -21,10 +21,10 @@ namespace fui = freeink::ui;
 
 namespace {
 constexpr int MENU_ITEMS = 11;
-const StrId menuNames[MENU_ITEMS] = {StrId::STR_USERNAME,          StrId::STR_PASSWORD,      StrId::STR_SYNC_SERVER_URL,
-                                     StrId::STR_DOCUMENT_MATCHING, StrId::STR_SEND_METADATA, StrId::STR_SYNC_BEHAVIOR,
-                                     StrId::STR_SIGN_UP,           StrId::STR_AUTHENTICATE,
-                                     StrId::STR_SERVER_TYPE, StrId::STR_CUSTOM_HEADER_1, StrId::STR_CUSTOM_HEADER_2};
+const StrId menuNames[MENU_ITEMS] = {
+    StrId::STR_USERNAME,      StrId::STR_PASSWORD,        StrId::STR_SYNC_SERVER_URL, StrId::STR_DOCUMENT_MATCHING,
+    StrId::STR_SEND_METADATA, StrId::STR_SYNC_BEHAVIOR,   StrId::STR_SIGN_UP,         StrId::STR_AUTHENTICATE,
+    StrId::STR_SERVER_TYPE,   StrId::STR_CUSTOM_HEADER_1, StrId::STR_CUSTOM_HEADER_2};
 constexpr fui::ActionId ACTION_ROW = 1;
 }  // namespace
 
@@ -121,15 +121,16 @@ void KOReaderSettingsActivity::handleSelection() {
                            });
   } else if (selectedIndex == 1) {
     // Password
-    startActivityForResult(std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_KOREADER_PASSWORD),
-                                                                   KOREADER_STORE.getPassword(), 64, InputType::Password),
-                           [this](const ActivityResult& result) {
-                             if (!result.isCancelled) {
-                               const auto& kb = std::get<KeyboardResult>(result.data);
-                               KOREADER_STORE.setCredentials(KOREADER_STORE.getUsername(), kb.text);
-                               KOREADER_STORE.saveToFile();
-                             }
-                           });
+    startActivityForResult(
+        std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_KOREADER_PASSWORD),
+                                                KOREADER_STORE.getPassword(), 64, InputType::Password),
+        [this](const ActivityResult& result) {
+          if (!result.isCancelled) {
+            const auto& kb = std::get<KeyboardResult>(result.data);
+            KOREADER_STORE.setCredentials(KOREADER_STORE.getUsername(), kb.text);
+            KOREADER_STORE.saveToFile();
+          }
+        });
   } else if (selectedIndex == 2) {
     // Sync Server URL - prefill with https:// if empty to save typing
     const std::string currentUrl = KOREADER_STORE.getServerUrl();
@@ -182,16 +183,17 @@ void KOReaderSettingsActivity::handleSelection() {
   } else if (selectedIndex == 8) {
     const auto old = KOREADER_STORE.getServerType();
     const auto next = old == KOReaderServerType::CROSSPOINT ? KOReaderServerType::KOSYNC
-                       : old == KOReaderServerType::KOSYNC ? KOReaderServerType::OTHER
-                                                         : KOReaderServerType::CROSSPOINT;
+                      : old == KOReaderServerType::KOSYNC   ? KOReaderServerType::OTHER
+                                                            : KOReaderServerType::CROSSPOINT;
     KOREADER_STORE.setServerType(next);
     if (!KOREADER_STORE.saveToFile()) KOREADER_STORE.setServerType(old);
     requestUpdate();
   } else if (selectedIndex == 9 || selectedIndex == 10) {
     const size_t slot = selectedIndex - 9;
     const std::string prefill = formatHttpHeaderLine(KOREADER_STORE.getCustomHeaders()[slot]);
-    startActivityForResult(std::make_unique<KeyboardEntryActivity>(renderer, mappedInput,
-        I18N.get(menuNames[selectedIndex]), prefill, 160, InputType::Text),
+    startActivityForResult(
+        std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, I18N.get(menuNames[selectedIndex]), prefill, 160,
+                                                InputType::Text),
         [this, slot](const ActivityResult& result) {
           if (result.isCancelled) return;
           const auto old = KOREADER_STORE.getCustomHeaders()[slot];
@@ -243,7 +245,8 @@ void KOReaderSettingsActivity::buildListScreen(UiApp::ScreenType& screen) {
     } else if (i == 8) {
       const auto type = KOREADER_STORE.getServerType();
       values[i] = type == KOReaderServerType::CROSSPOINT ? tr(STR_CROSSPOINT)
-                   : type == KOReaderServerType::KOSYNC ? tr(STR_KOSYNC_SERVER) : tr(STR_OTHER);
+                  : type == KOReaderServerType::KOSYNC   ? tr(STR_KOSYNC_SERVER)
+                                                         : tr(STR_OTHER);
     } else if (i == 9 || i == 10) {
       values[i] = formatHttpHeaderLine(KOREADER_STORE.getCustomHeaders()[i - 9], true);
     } else {

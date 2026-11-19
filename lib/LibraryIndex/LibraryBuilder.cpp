@@ -2,7 +2,6 @@
 
 #include <Arduino.h>
 #include <BufferedFile.h>
-
 #include <FsHelpers.h>
 #include <HalStorage.h>
 #include <Logging.h>
@@ -19,7 +18,6 @@
 #include <cstring>
 #include <limits>
 #include <optional>
-
 
 #include "LibraryFileTypes.h"
 #include "LibraryIndexFile.h"
@@ -593,7 +591,8 @@ bool findPrior(WalkState& st, const uint64_t pathHash, uint32_t& position, uint1
   const bool priorFound = findPrior(st, entry.pathHash, priorPosition, priorOrdinal);
   if (st.failed) return false;
 
-  const bool extractionExpected = st.readMetadata && (FsHelpers::hasEpubExtension(name) || FsHelpers::hasXtcExtension(name));
+  const bool extractionExpected =
+      st.readMetadata && (FsHelpers::hasEpubExtension(name) || FsHelpers::hasXtcExtension(name));
   const uint8_t expectedStatus = extractionExpected ? CLIX_METADATA_EXTRACTED : CLIX_METADATA_NOT_ATTEMPTED;
   bool reuseMetadata = false;
   ClixRecord priorRecord{};
@@ -677,10 +676,13 @@ bool findPrior(WalkState& st, const uint64_t pathHash, uint32_t& position, uint1
     if (FsHelpers::hasXtcExtension(name)) {
       Xtc xtc(fullPath, CACHE_DIR);
       loaded = xtc.load();
-      if (loaded) { bookTitle = xtc.getTitle(); author = xtc.getAuthor(); }
+      if (loaded) {
+        bookTitle = xtc.getTitle();
+        author = xtc.getAuthor();
+      }
     } else {
-      loaded = readLibraryMetadataFromSource(fullPath, bookTitle, author, series, genre, seriesIndex,
-                                             &serviceSort, &buildCancelled);
+      loaded = readLibraryMetadataFromSource(fullPath, bookTitle, author, series, genre, seriesIndex, &serviceSort,
+                                             &buildCancelled);
     }
     if (loaded) {
       entry.record.metadataStatus = CLIX_METADATA_EXTRACTED;
@@ -854,7 +856,7 @@ void walk(WalkState& st, const std::string& path, const int depth) {
       }
       continue;
     }
-    if (!isBookName(name) || !isLibraryBookFile(joinLibraryPath(path,name))) continue;
+    if (!isBookName(name) || !isLibraryBookFile(joinLibraryPath(path, name))) continue;
 
     // A zero-length book is a dangling directory entry: the name enumerates but
     // the contents do not exist. Counted rather than silently dropped.
@@ -1672,9 +1674,7 @@ bool writeTitleOrder(const uint16_t n) {
 
 const char* libraryIndexPath() { return INDEX_PATH; }
 
-const char* libraryRetainedIndexPath() {
-  return Storage.exists(INDEX_PATH) ? INDEX_PATH : LEGACY_INDEX_PATH;
-}
+const char* libraryRetainedIndexPath() { return Storage.exists(INDEX_PATH) ? INDEX_PATH : LEGACY_INDEX_PATH; }
 
 bool isLibraryBookFile(const std::string_view path) {
   size_t start = 0;
@@ -1684,7 +1684,7 @@ bool isLibraryBookFile(const std::string_view path) {
     if (!part.empty() && part != "." && (part.front() == '.' || excludedDirectory(part))) return false;
     if (end == std::string_view::npos) {
       std::string folded(part);
-      for (auto& c:folded) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      for (auto& c : folded) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
       if (folded == "my clippings.txt" || folded == "crash_report.txt") return false;
       break;
     }
@@ -1870,7 +1870,10 @@ std::atomic<bool> indexDirty{true};
 
 void invalidateLibraryIndex() { indexDirty.store(true, std::memory_order_relaxed); }
 
-bool markLibraryIndexDirty() { invalidateLibraryIndex(); return true; }
+bool markLibraryIndexDirty() {
+  invalidateLibraryIndex();
+  return true;
+}
 bool isLibraryIndexDirty() { return libraryIndexNeedsRefresh(); }
 
 bool libraryIndexNeedsRefresh() { return indexDirty.load(std::memory_order_relaxed); }

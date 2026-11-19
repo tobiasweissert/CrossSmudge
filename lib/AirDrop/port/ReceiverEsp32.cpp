@@ -7,8 +7,8 @@
 #include <AllocationBudget.h>
 #include <Arduino.h>
 #include <HalAirDropRadio.h>
-#include <Logging.h>
 #include <LibraryBuilder.h>
+#include <Logging.h>
 #include <Memory.h>
 #include <errno.h>
 #include <esp_heap_caps.h>

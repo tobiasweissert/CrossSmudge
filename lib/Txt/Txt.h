@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Print.h>
 #include <HalStorage.h>
+#include <Print.h>
 
 #include <memory>
 #include <string>

@@ -5,7 +5,6 @@
 #include <Epub.h>
 #include <Epub/converters/PngToFramebufferConverter.h>
 #include <FontCacheManager.h>
-#include <Memory.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalClock.h>
@@ -13,6 +12,7 @@
 #include <HalGPIO.h>
 #include <HalStorage.h>
 #include <I18n.h>
+#include <Memory.h>
 #include <PNGdec.h>
 #include <Xtc.h>
 
@@ -643,11 +643,9 @@ bool selectRandomSleepFile(const char* firstDirPath, const char* secondDirPath, 
   return true;
 }
 
-
 void releaseSdFontCachesForDecode(GfxRenderer& renderer) {
   if (auto* cache = renderer.getFontCacheManager()) cache->releaseSdFontCaches();
 }
-
 
 bool sleepCoverFilterInvertsGeneratedScreen() {
   return SETTINGS.sleepScreenCoverFilter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::INVERTED_BLACK_AND_WHITE;
@@ -1128,8 +1126,7 @@ void SleepActivity::onEnter() {
     if (frameWasInverted) renderer.invertScreen();
     renderer.setOrientation(GfxRenderer::Orientation::Portrait);
     releaseSdFontCachesForDecode(renderer);
-    if (sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::COVER_TRANSPARENT)
-      return renderCoverSleepScreen();
+    if (sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::COVER_TRANSPARENT) return renderCoverSleepScreen();
     return renderTransparentCustomSleepScreen();
   }
 
@@ -1870,7 +1867,6 @@ void SleepActivity::renderOverlaySleepScreen() const {
   renderer.setRenderMode(GfxRenderer::BW);
   renderer.restoreBwBuffer();
 }
-
 
 void SleepActivity::renderModernBitmapSleepScreen(Bitmap& bitmap, const bool preserveBackground) const {
   const auto pageWidth = renderer.getScreenWidth();

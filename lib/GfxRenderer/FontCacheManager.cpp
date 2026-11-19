@@ -44,8 +44,8 @@ void FontCacheManager::releaseSdFontCaches() {
 bool FontCacheManager::prewarmCache(int fontId, const char* utf8Text, uint8_t styleMask, bool accumulate) {
   return prewarmCache(fontId, utf8Text, styleMask, PreparationPolicy::Normal, accumulate);
 }
-bool FontCacheManager::prewarmCache(int fontId, const char* utf8Text, uint8_t styleMask,
-                                    PreparationPolicy policy, bool accumulate) {
+bool FontCacheManager::prewarmCache(int fontId, const char* utf8Text, uint8_t styleMask, PreparationPolicy policy,
+                                    bool accumulate) {
   // TTF (vector) font prewarm path. This is the single dispatch every draw path
   // funnels through (reader endScanAndPrewarm, the settings preview, UI text),
   // so building here covers them all. For TTF, build() maintains an accumulating
@@ -68,7 +68,8 @@ bool FontCacheManager::prewarmCache(int fontId, const char* utf8Text, uint8_t st
   // SD card font prewarm path: prewarm all requested styles in one call
   auto it = sdCardFonts_.find(fontId);
   if (it != sdCardFonts_.end()) {
-    int missed = it->second->prewarm(utf8Text, styleMask, /*metadataOnly=*/false, /*loadKernLig=*/policy == PreparationPolicy::Normal, accumulate);
+    int missed = it->second->prewarm(utf8Text, styleMask, /*metadataOnly=*/false,
+                                     /*loadKernLig=*/policy == PreparationPolicy::Normal, accumulate);
     if (missed > 0) {
       LOG_DBG("FCM", "prewarmCache(SD): %d glyph(s) not found (styleMask=0x%02X)", missed, styleMask);
     }
@@ -221,7 +222,8 @@ bool FontCacheManager::PrewarmScope::endScanAndPrewarm() {
     const uint8_t fontSlot = static_cast<uint8_t>(group) / 4;
     const uint8_t style = static_cast<uint8_t>(group) & 0x03;
     // This group is the complete glyph set for one font/style in this render.
-    const bool stepOk = manager_->prewarmCache(manager_->scanFontIds_[fontSlot], utf8Text, 1 << style, policy_, accumulate_);
+    const bool stepOk =
+        manager_->prewarmCache(manager_->scanFontIds_[fontSlot], utf8Text, 1 << style, policy_, accumulate_);
     ok = ok && stepOk;
   }
 
@@ -248,7 +250,9 @@ FontCacheManager::PrewarmScope FontCacheManager::createPrewarmScope(const bool a
 }
 
 FontCacheManager::PrewarmScope::PrewarmScope(FontCacheManager& manager, PreparationPolicy policy)
-    : PrewarmScope(manager, false) { policy_ = policy; }
+    : PrewarmScope(manager, false) {
+  policy_ = policy;
+}
 FontCacheManager::PrewarmScope FontCacheManager::createPrewarmScope(PreparationPolicy policy) {
   return PrewarmScope(*this, policy);
 }

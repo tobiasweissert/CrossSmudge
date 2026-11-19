@@ -8,7 +8,9 @@ add_executable(SdFontRegistryTest
 target_include_directories(SdFontRegistryTest PRIVATE
   ${REPO_ROOT}/lib/EpdFont
   ${REPO_ROOT}/lib/Memory
+  ${CMAKE_CURRENT_SOURCE_DIR}/stubs
   ${REPO_ROOT}/test/library_builder/stubs
 )
+target_include_directories(SdFontRegistryTest PRIVATE ${REPO_ROOT}/test/chapter_html_slim_parser/stubs)
 target_link_libraries(SdFontRegistryTest PRIVATE crosspoint_test_common GTest::gtest_main)
 gtest_discover_tests(SdFontRegistryTest)

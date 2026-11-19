@@ -23,10 +23,13 @@ class Epub {
   std::string path;
 
  public:
-  bool load(bool=true,bool=true){return bookMetadata[path].success;}
-  template<class...T>bool generateThumbBmp(T&&...){return true;}
-  std::string getThumbBmpPath(){return "";}
-  bool hasCoverImage(){return false;}
+  bool load(bool = true, bool = true) { return bookMetadata[path].success; }
+  template <class... T>
+  bool generateThumbBmp(T&&...) {
+    return true;
+  }
+  std::string getThumbBmpPath() { return ""; }
+  bool hasCoverImage() { return false; }
   Epub(const std::string& path, const char*) : path(path) {}
 
   std::string getCachePath() const { return "/.crosspoint/cache_" + path.substr(1); }

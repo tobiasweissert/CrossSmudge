@@ -404,9 +404,13 @@ bool interpretOwnerBackgroundBlack(const std::string_view value, bool& out) {
   forEachDelimitedToken(value, isAsciiWhitespace, [&](std::string_view token) {
     black = black || iequalsAscii(token, "black") || token == "#000" || token == "#000000";
     explicitNonBlack = explicitNonBlack || iequalsAscii(token, "white") || iequalsAscii(token, "#fff") ||
-                       iequalsAscii(token, "#ffffff") || iequalsAscii(token, "transparent") || iequalsAscii(token, "none");
+                       iequalsAscii(token, "#ffffff") || iequalsAscii(token, "transparent") ||
+                       iequalsAscii(token, "none");
   });
-  if (black) { out = true; return true; }
+  if (black) {
+    out = true;
+    return true;
+  }
   char compact[256];
   size_t length = 0;
   for (char c : value) {
@@ -416,8 +420,14 @@ bool interpretOwnerBackgroundBlack(const std::string_view value, bool& out) {
   }
   const std::string_view text(compact, length);
   if (text.find("rgb(0,0,0)") != text.npos || text.find("rgba(0,0,0,1)") != text.npos ||
-      text.find("rgba(0,0,0,1.0)") != text.npos) { out = true; return true; }
-  if (explicitNonBlack) { out = false; return true; }
+      text.find("rgba(0,0,0,1.0)") != text.npos) {
+    out = true;
+    return true;
+  }
+  if (explicitNonBlack) {
+    out = false;
+    return true;
+  }
   return false;
 }
 
@@ -1385,7 +1395,10 @@ CssParser::ParseResult CssParser::loadFromStream(HalFile& source) {
 
   char buffer[READ_BUFFER_SIZE];
   while (source.available()) {
-    if (totalRead >= maxSourceBytes()) { inputTruncated = true; break; }
+    if (totalRead >= maxSourceBytes()) {
+      inputTruncated = true;
+      break;
+    }
     const size_t wanted = std::min(sizeof(buffer), maxSourceBytes() - totalRead);
     int bytesRead = source.read(buffer, wanted);
     if (bytesRead <= 0) return ParseResult::Error;

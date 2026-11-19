@@ -6,27 +6,8 @@
 #include <new>
 #include <string>
 
-namespace {
-size_t failNextArraySize = 0;
-}  // namespace
-
-// Fail one nothrow array allocation of exactly failNextArraySize bytes; the
-// registry copies a non-canonical filename through makeUniqueNoThrow<char[]>.
-void* operator new[](size_t size, const std::nothrow_t&) noexcept {
-  if (failNextArraySize != 0 && size == failNextArraySize) {
-    failNextArraySize = 0;
-    return nullptr;
-  }
-  return std::malloc(size == 0 ? 1 : size);
-}
-void* operator new[](size_t size) {
-  void* allocation = std::malloc(size == 0 ? 1 : size);
-  if (!allocation) std::abort();
-  return allocation;
-}
-void operator delete[](void* allocation) noexcept { std::free(allocation); }
-void operator delete[](void* allocation, size_t) noexcept { std::free(allocation); }
-void operator delete[](void* allocation, const std::nothrow_t&) noexcept { std::free(allocation); }
+// Allocation failure now surfaces as an incomplete directory enumeration,
+// not a removed compact-filename new[] allocation.
 
 namespace {
 
@@ -43,7 +24,7 @@ class SdFontRegistryTest : public ::testing::Test {
   SdCardFontRegistry registry;
 };
 
-TEST_F(SdFontRegistryTest, CanonicalNamesStoreNoFileString) {
+TEST_F(SdFontRegistryTest, CanonicalNamesHydrateExactPaths) {
   fake::add("/.fonts/Bitter/Bitter_12.cpfont");
   fake::add("/.fonts/Bitter/Bitter_14.cpfont");
 
@@ -51,8 +32,9 @@ TEST_F(SdFontRegistryTest, CanonicalNamesStoreNoFileString) {
   const auto* family = registry.findFamily("Bitter");
   ASSERT_NE(family, nullptr);
   EXPECT_STREQ(family->root, SdCardFontRegistry::FONTS_DIR_HIDDEN);
+  ASSERT_TRUE(family->ensureDetails());
   ASSERT_EQ(family->files.size(), 2u);
-  for (const auto& file : family->files) EXPECT_EQ(file.name, nullptr);
+  for (const auto& file : family->files) EXPECT_EQ(file.path, pathOf(*family, file));
 
   const auto* file14 = family->findFile(14);
   ASSERT_NE(file14, nullptr);
@@ -71,12 +53,12 @@ TEST_F(SdFontRegistryTest, OtherStemsAndZeroPaddedSizesKeepTheirFilename) {
 
   const auto* file14 = family->findFile(14);
   ASSERT_NE(file14, nullptr);
-  EXPECT_STREQ(file14->name.get(), "Bookerly-SD_14.cpfont");
+  EXPECT_EQ(file14->path, "/fonts/Bookerly/Bookerly-SD_14.cpfont");
   EXPECT_EQ(pathOf(*family, *file14), "/fonts/Bookerly/Bookerly-SD_14.cpfont");
 
   const auto* file16 = family->findFile(16);
   ASSERT_NE(file16, nullptr);
-  EXPECT_STREQ(file16->name.get(), "Bookerly_016.cpfont");
+  EXPECT_EQ(file16->path, "/fonts/Bookerly/Bookerly_016.cpfont");
   EXPECT_EQ(pathOf(*family, *file16), "/fonts/Bookerly/Bookerly_016.cpfont");
 }
 
@@ -96,17 +78,21 @@ TEST_F(SdFontRegistryTest, HiddenRootWinsAndKeepsItsOwnRoot) {
   EXPECT_EQ(pathOf(*inter, inter->files[0]), "/fonts/Inter/Inter_14.cpfont");
 }
 
-TEST_F(SdFontRegistryTest, OutOfMemoryNameCopySkipsOnlyThatFile) {
+TEST_F(SdFontRegistryTest, IncompleteDirectoryAllocationRefusesPartialIndexAndRetries) {
   fake::add("/.fonts/Bookerly/Bookerly-SD_14.cpfont");
   fake::add("/.fonts/Bookerly/Bookerly_16.cpfont");
-
-  failNextArraySize = sizeof("Bookerly-SD_14.cpfont");
+  fake::failNextDirectoryEntry = true;
+  EXPECT_FALSE(registry.discover());
+  EXPECT_FALSE(fake::failNextDirectoryEntry);
+  EXPECT_TRUE(registry.lastDiscoveryFailed());
+  EXPECT_EQ(registry.getFamilyCount(), 0);
   ASSERT_TRUE(registry.discover());
-  EXPECT_EQ(failNextArraySize, 0u);
+  EXPECT_FALSE(registry.lastDiscoveryFailed());
   const auto* family = registry.findFamily("Bookerly");
   ASSERT_NE(family, nullptr);
-  EXPECT_EQ(family->findFile(14), nullptr);
+  ASSERT_NE(family->findFile(14), nullptr);
   ASSERT_NE(family->findFile(16), nullptr);
+  EXPECT_EQ(pathOf(*family, *family->findFile(14)), "/.fonts/Bookerly/Bookerly-SD_14.cpfont");
   EXPECT_EQ(pathOf(*family, *family->findFile(16)), "/.fonts/Bookerly/Bookerly_16.cpfont");
 }
 
@@ -124,6 +110,7 @@ TEST_F(SdFontRegistryTest, OverlongPathsAreSkippedAtDiscovery) {
   EXPECT_EQ(registry.findFamily(onlyLong), nullptr);  // no loadable file left
   const auto* family = registry.findFamily(longName);
   ASSERT_NE(family, nullptr);
+  ASSERT_TRUE(family->ensureDetails());
   ASSERT_EQ(family->files.size(), 1u);
   EXPECT_EQ(family->findFile(14), nullptr);
   const auto* nearest = family->findNearestSize(14);
@@ -138,6 +125,7 @@ TEST_F(SdFontRegistryTest, FilePathReportsTruncation) {
   const auto* family = registry.findFamily("Bitter");
   ASSERT_NE(family, nullptr);
 
+  ASSERT_TRUE(family->ensureDetails());
   char tiny[16];
   EXPECT_FALSE(family->filePath(family->files[0], tiny, sizeof(tiny)));
   EXPECT_EQ(tiny[sizeof(tiny) - 1], '\0');

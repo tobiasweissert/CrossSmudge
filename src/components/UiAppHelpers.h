@@ -1,13 +1,13 @@
 #pragma once
-#include <FreeInkApp.h>
 #include <BoardConfig.h>
-#include "HapticFeedback.h"
+#include <FreeInkApp.h>
 #include <FreeInkUIGfxRenderer.h>
 #include <FreeInkUIIcon.h>
 
 #include <atomic>
 #include <cstdint>
 
+#include "HapticFeedback.h"
 #include "MappedInputManager.h"
 #include "components/UIScale.h"
 #include "components/UITheme.h"
@@ -104,14 +104,14 @@ inline freeink::ui::BitmapRef listIconFor(const UIIcon icon, const int size = 24
       case UIIcon::Library:
         return freeink::ui::bitmapFromIcon(icon_lyra_library_32);
       case UIIcon::Plugins:
-      return freeink::ui::bitmapFromIcon(icon_blocks_24);
-    case UIIcon::Blocks:
-      return freeink::ui::bitmapFromIcon(icon_blocks_24);
-    case UIIcon::Usb:
-      return freeink::ui::bitmapFromIcon(icon_usb_24);
-    case UIIcon::Bookmark:
-      return freeink::ui::bitmapFromIcon(icon_bookmark_24);
-    case UIIcon::Hotspot:
+        return freeink::ui::bitmapFromIcon(icon_blocks_24);
+      case UIIcon::Blocks:
+        return freeink::ui::bitmapFromIcon(icon_blocks_24);
+      case UIIcon::Usb:
+        return freeink::ui::bitmapFromIcon(icon_usb_24);
+      case UIIcon::Bookmark:
+        return freeink::ui::bitmapFromIcon(icon_bookmark_24);
+      case UIIcon::Hotspot:
         return freeink::ui::bitmapFromIcon(icon_radio_tower_32);
       default:
         return {};
@@ -253,9 +253,7 @@ inline freeink::ui::InputSnapshot touchSnapshotFrom(const MappedInputManager& ma
   return snap;
 }
 
-inline std::atomic<const freeink::ui::ThemeTokens*>& sharedUiThemeCell() {
-  return UiAppThemeDetail::publishedTokens();
-}
+inline std::atomic<const freeink::ui::ThemeTokens*>& sharedUiThemeCell() { return UiAppThemeDetail::publishedTokens(); }
 inline const freeink::ui::ThemeTokens& refreshSharedUiThemeTokens(const freeink::ui::GfxRendererTarget& target) {
   auto& cell = sharedUiThemeCell();
   const auto* current = cell.load(std::memory_order_acquire);

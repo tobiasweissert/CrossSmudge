@@ -7,13 +7,13 @@
 
 #include <atomic>
 
+#include "CrossPointSettings.h"
 #include "activities/Activity.h"
+#include "activities/home/FileMutationInputGate.h"
 #include "components/OptionPopup.h"
 #include "components/UIThemeTokens.h"
 #include "components/UiAppHelpers.h"
 #include "util/ButtonNavigator.h"
-#include "CrossPointSettings.h"
-#include "activities/home/FileMutationInputGate.h"
 
 // Reader status bar configuration activity
 class StatusBarSettingsActivity final : public Activity {

@@ -166,7 +166,6 @@ TEST(FontCacheManagerTest, IdleLookaheadDefaultsToOneForNonTtfFonts) {
   EXPECT_EQ(1, manager.getIdleLookaheadPages(7));
 }
 
-
 // Preserved owner regression cases; current-runtime harness above.
 TEST(FontCacheManagerTest, ReleasesEveryRebuildableFontCacheBeforeMemoryHeavyWork) {
   SdCardFont readerFont;

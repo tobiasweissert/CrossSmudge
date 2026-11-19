@@ -49,7 +49,9 @@ bool isRedirect(const int status) {
   return status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
 }
 
-struct ResponseHeaders { std::string location, authenticate; };
+struct ResponseHeaders {
+  std::string location, authenticate;
+};
 
 esp_err_t captureLocationHeader(esp_http_client_event_t* evt) {
   auto* headers = static_cast<ResponseHeaders*>(evt->user_data);
@@ -136,7 +138,6 @@ void logTlsError(esp_http_client_handle_t client, const char* phase) {
   }
 }
 
-
 HttpDownloader::DownloadError runGetDefault(const std::string& url, const std::string& username,
                                             const std::string& password,
                                             const HttpRedirectPolicy::Url& credentialOrigin, const bool hasCredentials,
@@ -176,17 +177,19 @@ HttpDownloader::DownloadError runGetDefault(const std::string& url, const std::s
     const auto* options = sink.options;
     const bool same = HttpRedirectPolicy::sameOrigin(currentOrigin, credentialOrigin);
     if (same && options) {
-      for (const auto& header : options->headers) esp_http_client_set_header(client, header.first.c_str(), header.second.c_str());
+      for (const auto& header : options->headers)
+        esp_http_client_set_header(client, header.first.c_str(), header.second.c_str());
       if (!options->bearer.empty()) {
         const std::string auth = "Bearer " + options->bearer;
         esp_http_client_set_header(client, "Authorization", auth.c_str());
       }
     }
     if (options && !options->accept.empty()) esp_http_client_set_header(client, "Accept", options->accept.c_str());
-    if (options && !options->acceptLanguage.empty()) esp_http_client_set_header(client, "Accept-Language", options->acceptLanguage.c_str());
+    if (options && !options->acceptLanguage.empty())
+      esp_http_client_set_header(client, "Accept-Language", options->acceptLanguage.c_str());
     const bool post = options && options->body;
-    if (post) esp_http_client_set_method(client,
-        strcmp(options->method, "PUT") == 0 ? HTTP_METHOD_PUT : HTTP_METHOD_POST);
+    if (post)
+      esp_http_client_set_method(client, strcmp(options->method, "PUT") == 0 ? HTTP_METHOD_PUT : HTTP_METHOD_POST);
     const size_t bodySize = post ? options->body->size() : 0;
     esp_err_t err = esp_http_client_open(client, bodySize);
     if (err != ESP_OK) {
@@ -200,9 +203,15 @@ HttpDownloader::DownloadError runGetDefault(const std::string& url, const std::s
     if (post) {
       size_t sent = 0;
       while (sent < bodySize) {
-        if (isCancelRequested(sink.cancelFlag, sink.shouldCancel)) { esp_http_client_cleanup(client); return HttpDownloader::ABORTED; }
-        const int n = esp_http_client_write(client, options->body->data()+sent, bodySize-sent);
-        if (n <= 0) { esp_http_client_cleanup(client); return HttpDownloader::HTTP_ERROR; }
+        if (isCancelRequested(sink.cancelFlag, sink.shouldCancel)) {
+          esp_http_client_cleanup(client);
+          return HttpDownloader::ABORTED;
+        }
+        const int n = esp_http_client_write(client, options->body->data() + sent, bodySize - sent);
+        if (n <= 0) {
+          esp_http_client_cleanup(client);
+          return HttpDownloader::HTTP_ERROR;
+        }
         sent += static_cast<size_t>(n);
       }
     }
@@ -220,7 +229,10 @@ HttpDownloader::DownloadError runGetDefault(const std::string& url, const std::s
     }
 
     if (isRedirect(status)) {
-      if (post) { esp_http_client_cleanup(client); return HttpDownloader::HTTP_ERROR; }
+      if (post) {
+        esp_http_client_cleanup(client);
+        return HttpDownloader::HTTP_ERROR;
+      }
       if (responseHeaders.location.empty()) {
         LOG_ERR("HTTP", "Redirect missing Location header");
         logNetworkState("Redirect missing Location");
@@ -357,8 +369,7 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
                                      const HttpDownloader::Transport transport) {
   HttpRedirectPolicy::Url credentialOrigin;
   const std::string_view credentialUrl = authorizationOrigin.empty() ? std::string_view(url) : authorizationOrigin;
-  const bool hasCredentials =
-      !username.empty() && !password.empty();
+  const bool hasCredentials = !username.empty() && !password.empty();
   if (!HttpRedirectPolicy::parseUrl(credentialUrl, credentialOrigin)) return HttpDownloader::HTTP_ERROR;
   g_lastStatus = 0;
   g_lastRedirected = false;
@@ -510,19 +521,25 @@ HttpDownloader::DownloadError HttpDownloader::downloadToFile(const std::string& 
   return OK;
 }
 
-
 int HttpDownloader::lastStatus() { return g_lastStatus; }
 bool HttpDownloader::lastAnswerRedirected() { return g_lastRedirected; }
 bool HttpDownloader::fetchUrl(const std::string& url, const DataCallback& cb, const std::string& user,
-                             const std::string& password, const std::vector<Header>& headers) {
-  FetchOptions options; options.username = user; options.password = password; options.headers = headers;
+                              const std::string& password, const std::vector<Header>& headers) {
+  FetchOptions options;
+  options.username = user;
+  options.password = password;
+  options.headers = headers;
   return fetchUrl(url, cb, options);
 }
 bool HttpDownloader::fetchUrl(const std::string& url, const DataCallback& cb, const FetchOptions& options) {
   DownloadOptions d;
-  d.headers = options.headers; d.bearer = options.bearer; d.accept = options.accept;
-  d.acceptLanguage = options.acceptLanguage; d.statusOut = options.statusOut;
-  d.wwwAuthenticateOut = options.wwwAuthenticateOut; d.captureErrorBody = options.captureErrorBody;
+  d.headers = options.headers;
+  d.bearer = options.bearer;
+  d.accept = options.accept;
+  d.acceptLanguage = options.acceptLanguage;
+  d.statusOut = options.statusOut;
+  d.wwwAuthenticateOut = options.wwwAuthenticateOut;
+  d.captureErrorBody = options.captureErrorBody;
   if (d.statusOut) *d.statusOut = 0;
   if (d.wwwAuthenticateOut) d.wwwAuthenticateOut->clear();
   const auto result = streamUrl(url, cb, nullptr, options.username, options.password, d);
@@ -530,13 +547,19 @@ bool HttpDownloader::fetchUrl(const std::string& url, const DataCallback& cb, co
 }
 bool HttpDownloader::postForm(const std::string& url, const std::string& body, std::string& response, int* statusOut) {
   response.clear();
-  DownloadOptions d; d.body = &body; d.statusOut = statusOut;
+  DownloadOptions d;
+  d.body = &body;
+  d.statusOut = statusOut;
   d.headers.emplace_back("Content-Type", "application/x-www-form-urlencoded");
   if (statusOut) *statusOut = 0;
-  return streamUrl(url, [&](const uint8_t* data, size_t len) {
-    if (len > 4096 - response.size()) return false;
-    response.append(reinterpret_cast<const char*>(data), len); return true;
-  }, nullptr, "", "", d) == OK;
+  return streamUrl(
+             url,
+             [&](const uint8_t* data, size_t len) {
+               if (len > 4096 - response.size()) return false;
+               response.append(reinterpret_cast<const char*>(data), len);
+               return true;
+             },
+             nullptr, "", "", d) == OK;
 }
 
 // Publication v1: no overwrite, retain both roots after ambiguous FAT rename.
@@ -550,22 +573,28 @@ static HttpDownloader::DownloadError publishDownload(const std::string& part, co
   return acknowledged && closed ? HttpDownloader::OK : HttpDownloader::PUBLICATION_UNCERTAIN;
 }
 HttpDownloader::DownloadError HttpDownloader::downloadToFile(const std::string& url, const std::string& dest,
-    ProgressCallback progress, const bool* cancelFlag, const std::string& user, const std::string& password,
-    const std::vector<Header>& headers, bool downgradeRedirectsToHttp) {
-  (void)downgradeRedirectsToHttp; // API compatibility is not permission to downgrade HTTPS.
+                                                             ProgressCallback progress, const bool* cancelFlag,
+                                                             const std::string& user, const std::string& password,
+                                                             const std::vector<Header>& headers,
+                                                             bool downgradeRedirectsToHttp) {
+  (void)downgradeRedirectsToHttp;  // API compatibility is not permission to downgrade HTTPS.
   const std::string part = dest + ".part";
   if (Storage.exists(dest.c_str()) || Storage.exists(part.c_str())) return FILE_ERROR;
-  DownloadOptions d; d.headers = headers;
+  DownloadOptions d;
+  d.headers = headers;
   d.shouldCancel = [cancelFlag] { return cancelFlag && *cancelFlag; };
   const auto result = downloadToFile(url, part, std::move(progress), nullptr, user, password, d);
   if (result != OK) return result;
   return publishDownload(part, dest);
 }
 HttpDownloader::DownloadError HttpDownloader::postToFile(const std::string& url, const std::string& body,
-    const std::string& type, const std::string& dest, ProgressCallback progress, const bool* cancelFlag) {
+                                                         const std::string& type, const std::string& dest,
+                                                         ProgressCallback progress, const bool* cancelFlag) {
   const std::string part = dest + ".part";
   if (Storage.exists(dest.c_str()) || Storage.exists(part.c_str())) return FILE_ERROR;
-  DownloadOptions d; d.body = &body; d.headers.emplace_back("Content-Type", type);
+  DownloadOptions d;
+  d.body = &body;
+  d.headers.emplace_back("Content-Type", type);
   d.shouldCancel = [cancelFlag] { return cancelFlag && *cancelFlag; };
   const auto result = downloadToFile(url, part, std::move(progress), nullptr, "", "", d);
   if (result != OK) return result;

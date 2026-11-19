@@ -106,7 +106,8 @@ bool hasValidXtchSourceCache(const std::string& path, const xtc::PageInfo& pageI
   return valid;
 }
 
-bool ensureXtchSourceCache(const Xtc& xtc, xtc::XtcParser& parser, const xtc::PageInfo& pageInfo, std::string& sourcePath) {
+bool ensureXtchSourceCache(const Xtc& xtc, xtc::XtcParser& parser, const xtc::PageInfo& pageInfo,
+                           std::string& sourcePath) {
   const size_t rowBytes = (static_cast<size_t>(pageInfo.width) + 3) / 4;
   const size_t payloadBytes = rowBytes * pageInfo.height;
   if (rowBytes * XTCH_SOURCE_BAND_ROWS > XTCH_STREAM_CHUNK_SIZE) {
@@ -191,7 +192,8 @@ bool ensureXtchSourceCache(const Xtc& xtc, xtc::XtcParser& parser, const xtc::Pa
   return true;
 }
 
-bool openXtchSourceCache(const Xtc& xtc, xtc::XtcParser& parser, const xtc::PageInfo& pageInfo, FsFile& source, size_t& rowBytes) {
+bool openXtchSourceCache(const Xtc& xtc, xtc::XtcParser& parser, const xtc::PageInfo& pageInfo, FsFile& source,
+                         size_t& rowBytes) {
   std::string sourcePath;
   if (!ensureXtchSourceCache(xtc, parser, pageInfo, sourcePath)) return false;
   rowBytes = (static_cast<size_t>(pageInfo.width) + 3) / 4;

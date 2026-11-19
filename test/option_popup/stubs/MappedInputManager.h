@@ -5,7 +5,7 @@ class HalGPIO;
 
 class MappedInputManager {
  public:
-  enum class Button { Back, Confirm, Left, Right, Up, Down, Power };
+  enum class Button { Back, Confirm, Left, Right, Up, Down, Power, NavNext, NavPrevious };
   enum class SwipeDir { None, Left, Right, Up, Down };
   struct Labels {
     const char* btn1;

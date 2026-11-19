@@ -1,3 +1,4 @@
+#include <bits/stdc++.h>
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -16,8 +17,8 @@
 #include <GfxRenderer.h>
 
 namespace {
-constexpr uint8_t kFullVersion = 77;
-constexpr uint8_t kPartialVersion = 0xF3;
+constexpr uint8_t kFullVersion = 84;
+constexpr uint8_t kPartialVersion = 0xC5;
 constexpr uint8_t kPreviousFullVersion = 76;
 constexpr uint8_t kPreviousPartialVersion = 0xF5;
 
@@ -49,7 +50,7 @@ struct SectionHarness {
         [](std::unique_ptr<Page>, uint16_t, uint16_t, uint32_t, uint32_t) {}, spec.embeddedStyle, "", "",
         spec.imageRendering, std::vector<std::string>{}, nullptr, nullptr, spec.renderMode);
     ASSERT_NE(context->parser, nullptr);
-    context->parser->anchorData = anchors;
+    context->parser->anchorData.assign(anchors.begin(), anchors.end());
     section.build_ = std::move(context);
     ASSERT_TRUE(Storage.openFileForWrite("TEST", section.build_->tmpSectionPath, section.file));
     ASSERT_TRUE(section.writeSectionFileHeader(spec));

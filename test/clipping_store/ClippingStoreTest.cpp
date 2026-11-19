@@ -69,7 +69,7 @@ TEST(ClippingStore, CountLimitAndHeaderLimitsRoundTrip) {
   EXPECT_EQ(store.clippingCount(), CLIPPING_MAX_PER_BOOK);
   const auto original = fake::files.at(storePath())->bytes;
   store.unload();
-  ASSERT_TRUE(store.loadForBook("/book.epub", std::string(4097, 'x'), "Author", "epub"));
+  ASSERT_FALSE(store.loadForBook("/book.epub", std::string(CLIPPING_TEXT_MAX + 1, 'x'), "Author", "epub"));
   EXPECT_FALSE(store.removeClippingAt(0));
   store.unload();
   EXPECT_EQ(fake::files.at(storePath())->bytes, original);

@@ -27,9 +27,19 @@ class HalFile : public Print {
   explicit HalFile(std::shared_ptr<HostFileData> data) : data_(std::move(data)) {}
 
   void flush() {}
+  bool isDirectory() const { return false; }
+  const char* name() const { return "fixture"; }
+  int read() {
+    uint8_t c;
+    return read(&c, 1) == 1 ? c : -1;
+  }
+  int peek() { return data_ && cursor_ < data_->bytes.size() ? data_->bytes[cursor_] : -1; }
+  bool seekCur(int offset) { return seek(cursor_ + offset); }
   size_t size() const { return data_ ? data_->bytes.size() : 0; }
   size_t fileSize() const { return size(); }
-  int available() const { return data_ && cursor_ < data_->bytes.size(); }
+  int available() const {
+    return data_ ? static_cast<int>(data_->bytes.size() - std::min(cursor_, data_->bytes.size())) : 0;
+  }
   size_t position() const { return cursor_; }
 
   int read(void* output, const size_t length) {
@@ -121,3 +131,6 @@ class HalStorage {
 };
 
 #define Storage HalStorage::getInstance()
+
+inline uint32_t millis() { return 0; }
+inline void delay(uint32_t) {}

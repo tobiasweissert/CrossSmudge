@@ -1,10 +1,5 @@
 #include <Arduino.h>
 #include <BlePageTurner.h>
-#include <HalMemory.h>
-#include <TrustedTime.h>
-#include <WiFi.h>
-#include "WifiCredentialStore.h"
-#include "util/PluginEvents.h"
 #include <BoardConfig.h>
 #include <CrossInkHalFrontlight.h>
 #include <FontCacheManager.h>
@@ -16,6 +11,7 @@
 #include <HalClock.h>
 #include <HalDisplay.h>
 #include <HalGPIO.h>
+#include <HalMemory.h>
 #include <HalPowerManager.h>
 #include <HalStorage.h>
 #include <HalSystem.h>
@@ -24,10 +20,14 @@
 #include <Logging.h>
 #include <Memory.h>
 #include <SPI.h>
+#include <TrustedTime.h>
+#include <WiFi.h>
 #include <builtinFonts/all.h>
 #include <uzlib.h>
 
 #include "AppCapabilities.h"
+#include "WifiCredentialStore.h"
+#include "util/PluginEvents.h"
 
 #ifdef SIMULATOR
 using esp_reset_reason_t = int;
@@ -1018,8 +1018,10 @@ bool deliver(const bleturner::Action action) {
   return false;
 }
 
-bool yieldForRadio() { return !radioStorageBusy.load(); }        // the reader keeps no parser alive between pages
-bool fileTransferActive() { return radioStorageBusy.load(); }  // file transfer is a screen of its own: the radio is off there
+bool yieldForRadio() { return !radioStorageBusy.load(); }  // the reader keeps no parser alive between pages
+bool fileTransferActive() {
+  return radioStorageBusy.load();
+}  // file transfer is a screen of its own: the radio is off there
 void restartIntoBook() {
   // Never reboot underneath a modal/consent or radio/storage owner.
   if (!radioStorageBusy.load() && activityManager.isRemoteReaderContext()) silentRestartToReader();
@@ -1092,7 +1094,10 @@ static void deliverSleepPluginEvents(const bool allowNetwork) {
   const auto cred = WIFI_STORE.findCredential(WIFI_STORE.getLastConnectedSsid());
   if (!cred) return;
 
-  { RenderLock lock; GUI.drawPopup(renderer, tr(STR_LOADING_POPUP)); }
+  {
+    RenderLock lock;
+    GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
+  }
   WiFi.mode(WIFI_STA);
   WiFi.begin(cred->ssid.c_str(), cred->password.c_str());
   const unsigned long joinStarted = millis();
@@ -1706,15 +1711,20 @@ void loop() {
   // Tick before ALL early-return paths. Callbacks use only this atomic snapshot
   // on the start task, never dereference mutable activities there.
   pageturner::radioStorageBusy.store(activityManager.requiresExclusiveStorageLoop() ||
-      activityManager.blocksGlobalInput() || WiFi.getMode() != WIFI_MODE_NULL);
-  activityManager.setRadioInputAllowed(!pageturner::radioStorageBusy.load() && !buttonShortcutController.isQuickLocked());
+                                     activityManager.blocksGlobalInput() || WiFi.getMode() != WIFI_MODE_NULL);
+  activityManager.setRadioInputAllowed(!pageturner::radioStorageBusy.load() &&
+                                       !buttonShortcutController.isQuickLocked());
   bleturner::Scene scene{};
   const bool homeShown = activityManager.isForegroundHomeShown() && !buttonShortcutController.isQuickLocked();
   const bool remoteContext = activityManager.isRemoteReaderContext() && !buttonShortcutController.isQuickLocked();
-  scene.where = remoteContext ? bleturner::Where::Reader : homeShown ? bleturner::Where::Home : bleturner::Where::Elsewhere;
-  scene.visit = activityManager.visit(); scene.pageShown = homeShown || remoteContext;
+  scene.where = remoteContext ? bleturner::Where::Reader
+                : homeShown   ? bleturner::Where::Home
+                              : bleturner::Where::Elsewhere;
+  scene.visit = activityManager.visit();
+  scene.pageShown = homeShown || remoteContext;
   scene.storageBusy = pageturner::radioStorageBusy.load();
-  scene.wifiOn = WiFi.getMode() != WIFI_MODE_NULL; scene.sleeping = deepSleepInProgress;
+  scene.wifiOn = WiFi.getMode() != WIFI_MODE_NULL;
+  scene.sleeping = deepSleepInProgress;
   scene.localKey = gpio.wasAnyPressed() || gpio.wasAnyReleased() || gpio.wasTouchActivity();
   const bool remoteActed = bleturner::tick(scene);
   if (exclusivePowerActionPending) {

@@ -148,11 +148,13 @@ bool SdCardFontManager::loadFamilyFile(const char* path, const char* familyName,
   loadedPointSize_ = size;
   return true;
 }
-int SdCardFontManager::loadFamilyExtraFile(const char* path, const char* familyName, uint8_t size, GfxRenderer& renderer) {
+int SdCardFontManager::loadFamilyExtraFile(const char* path, const char* familyName, uint8_t size,
+                                           GfxRenderer& renderer) {
   if (!path || !*path || !familyName || !*familyName || !size) return 0;
   if (!loadedFamilyName_.empty() && loadedFamilyName_ != familyName) return 0;
   if (int id = getFontId(familyName, size)) return id;
-  SdCardFontFamilyInfo family; family.name = familyName;
+  SdCardFontFamilyInfo family;
+  family.name = familyName;
   SdCardFontFileInfo file{path, size, 0};
   return loadFile(family, file, renderer);
 }

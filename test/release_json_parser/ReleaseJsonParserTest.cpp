@@ -655,18 +655,20 @@ namespace owner_regressions {
 TEST(ReleaseJsonParserCombined, UnicodeSurrogateAndEscapedExactName) {
   ReleaseJsonParser p([](const char*) { return false; });
   p.setFirmwareAssetName("firmware-\xC3\xA9-\xF0\x9F\x98\x80.bin");
-  const char* json = R"({"tag_name":"v\u00e9","assets":[{"name":"firmware-\u00e9-\ud83d\ude00.bin","browser_download_url":"https://fixture/fw.bin","size":12,"digest":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}]})";
-  for (size_t i=0; i<strlen(json); ++i) p.feed(json+i, 1);
+  const char* json =
+      R"({"tag_name":"v\u00e9","assets":[{"name":"firmware-\u00e9-\ud83d\ude00.bin","browser_download_url":"https://fixture/fw.bin","size":12,"digest":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}]})";
+  for (size_t i = 0; i < strlen(json); ++i) p.feed(json + i, 1);
   ASSERT_TRUE(p.foundFirmware());
   EXPECT_STREQ(p.getTagName(), "v\xC3\xA9");
   EXPECT_STREQ(p.getFirmwareSha256(), "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
 }
 TEST(ReleaseJsonParserCombined, InvalidOrIncompleteDocumentsNeverAdmitFirmware) {
-  for (const char* json : {
-      R"({"assets":[{"name":"firmware.bin","browser_download_url":"https://fixture/fw.bin","size":1}])",
-      R"({"assets":[{"name":"firmware.bin\u0000evil","browser_download_url":"https://fixture/fw.bin","size":1}]})",
-      R"({"assets":[{"name":"firmware.bin","browser_download_url":"https://fixture/fw.bin","size":1.5}]})",
-      R"({"assets":[{"name":"firmware.bin","browser_download_url":"https://fixture/fw.bin","size":184467440737095516160}]})"}) {
+  for (
+      const char* json :
+      {R"({"assets":[{"name":"firmware.bin","browser_download_url":"https://fixture/fw.bin","size":1}])",
+       R"({"assets":[{"name":"firmware.bin\u0000evil","browser_download_url":"https://fixture/fw.bin","size":1}]})",
+       R"({"assets":[{"name":"firmware.bin","browser_download_url":"https://fixture/fw.bin","size":1.5}]})",
+       R"({"assets":[{"name":"firmware.bin","browser_download_url":"https://fixture/fw.bin","size":184467440737095516160}]})"}) {
     ReleaseJsonParser p;
     p.feed(json, strlen(json));
     EXPECT_FALSE(p.foundFirmware()) << json;
@@ -675,8 +677,9 @@ TEST(ReleaseJsonParserCombined, InvalidOrIncompleteDocumentsNeverAdmitFirmware) 
 TEST(ReleaseJsonParserCombined, ResetRetainsExactOverrideRatherThanRestoringMatcher) {
   ReleaseJsonParser p([](const char*) { return true; });
   p.setFirmwareAssetName("exact.bin");
-  const char* json=R"({"assets":[{"name":"other.bin","browser_download_url":"https://fixture/other","size":4},{"name":"exact.bin","browser_download_url":"https://fixture/exact","size":8}]})";
-  for (int i=0;i<2;++i) {
+  const char* json =
+      R"({"assets":[{"name":"other.bin","browser_download_url":"https://fixture/other","size":4},{"name":"exact.bin","browser_download_url":"https://fixture/exact","size":8}]})";
+  for (int i = 0; i < 2; ++i) {
     p.feed(json, strlen(json));
     ASSERT_TRUE(p.foundFirmware());
     EXPECT_STREQ(p.getFirmwareUrl(), "https://fixture/exact");
@@ -804,7 +807,6 @@ static bool isX3X4FirmwareAsset(const char* assetName) { return strcmp(assetName
 // ============================================================================
 
 TEST(ReleaseJsonParserOwner, RealisticPrettyPrinted) {
-
   ReleaseJsonParser p;
   p.feed(kRealisticPretty, strlen(kRealisticPretty));
 
@@ -815,11 +817,9 @@ TEST(ReleaseJsonParserOwner, RealisticPrettyPrinted) {
                "https://github.com/crosspoint-reader/crosspoint-reader/releases/download/v2.4.1/firmware.bin");
   ASSERT_EQ(p.getFirmwareSize(), 1572864u);
   ASSERT_STREQ(p.getFirmwareSha256(), "");
-
 }
 
 TEST(ReleaseJsonParserOwner, RealisticMinified) {
-
   ReleaseJsonParser p;
   p.feed(kRealisticMinified, strlen(kRealisticMinified));
 
@@ -829,11 +829,9 @@ TEST(ReleaseJsonParserOwner, RealisticMinified) {
   ASSERT_STREQ(p.getFirmwareUrl(),
                "https://github.com/crosspoint-reader/crosspoint-reader/releases/download/v2.4.1/firmware.bin");
   ASSERT_EQ(p.getFirmwareSize(), 1572864u);
-
 }
 
 TEST(ReleaseJsonParserOwner, PrettyAndMinifiedAgree) {
-
   ReleaseJsonParser pretty;
   pretty.feed(kRealisticPretty, strlen(kRealisticPretty));
 
@@ -843,11 +841,9 @@ TEST(ReleaseJsonParserOwner, PrettyAndMinifiedAgree) {
   ASSERT_STREQ(pretty.getTagName(), minified.getTagName());
   ASSERT_STREQ(pretty.getFirmwareUrl(), minified.getFirmwareUrl());
   ASSERT_EQ(pretty.getFirmwareSize(), minified.getFirmwareSize());
-
 }
 
 TEST(ReleaseJsonParserOwner, FirmwareNotFirstAsset) {
-
   // firmware.bin is the third of four assets
   const char* json = R"({
       "tag_name": "v1.0.0",
@@ -867,11 +863,9 @@ TEST(ReleaseJsonParserOwner, FirmwareNotFirstAsset) {
   ASSERT_STREQ(p.getTagName(), "v1.0.0");
   ASSERT_STREQ(p.getFirmwareUrl(), "https://example.com/firmware.bin");
   ASSERT_EQ(p.getFirmwareSize(), 987654u);
-
 }
 
 TEST(ReleaseJsonParserOwner, FieldOrderUrlBeforeName) {
-
   const char* json = R"({
       "tag_name": "v3.0",
       "assets": [{
@@ -887,11 +881,9 @@ TEST(ReleaseJsonParserOwner, FieldOrderUrlBeforeName) {
   ASSERT_TRUE(p.foundFirmware());
   ASSERT_STREQ(p.getFirmwareUrl(), "https://example.com/fw.bin");
   ASSERT_EQ(p.getFirmwareSize(), 2222u);
-
 }
 
 TEST(ReleaseJsonParserOwner, FieldOrderSizeBeforeUrl) {
-
   const char* json = R"({
       "tag_name": "v3.1",
       "assets": [{
@@ -907,11 +899,9 @@ TEST(ReleaseJsonParserOwner, FieldOrderSizeBeforeUrl) {
   ASSERT_TRUE(p.foundFirmware());
   ASSERT_STREQ(p.getFirmwareUrl(), "https://example.com/fw2.bin");
   ASSERT_EQ(p.getFirmwareSize(), 3333u);
-
 }
 
 TEST(ReleaseJsonParserOwner, FieldOrderNameFirst) {
-
   const char* json = R"({
       "tag_name": "v3.2",
       "assets": [{
@@ -927,11 +917,9 @@ TEST(ReleaseJsonParserOwner, FieldOrderNameFirst) {
   ASSERT_TRUE(p.foundFirmware());
   ASSERT_STREQ(p.getFirmwareUrl(), "https://example.com/fw3.bin");
   ASSERT_EQ(p.getFirmwareSize(), 4444u);
-
 }
 
 TEST(ReleaseJsonParserOwner, FirmwareSha256) {
-
   const char* json = R"({
       "tag_name": "v3.3",
       "assets": [{
@@ -949,11 +937,9 @@ TEST(ReleaseJsonParserOwner, FirmwareSha256) {
   ASSERT_STREQ(p.getFirmwareUrl(), "https://example.com/fw4.bin");
   ASSERT_EQ(p.getFirmwareSize(), 5555u);
   ASSERT_STREQ(p.getFirmwareSha256(), "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
-
 }
 
 TEST(ReleaseJsonParserOwner, FirmwareGithubDigestSha256) {
-
   const char* json = R"({
       "tag_name": "v3.4",
       "assets": [{
@@ -971,11 +957,9 @@ TEST(ReleaseJsonParserOwner, FirmwareGithubDigestSha256) {
   ASSERT_STREQ(p.getFirmwareUrl(), "https://example.com/fw5.bin");
   ASSERT_EQ(p.getFirmwareSize(), 6666u);
   ASSERT_STREQ(p.getFirmwareSha256(), "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210");
-
 }
 
 TEST(ReleaseJsonParserOwner, FirmwareNonSha256DigestIgnored) {
-
   const char* json = R"({
       "tag_name": "v3.5",
       "assets": [{
@@ -993,11 +977,9 @@ TEST(ReleaseJsonParserOwner, FirmwareNonSha256DigestIgnored) {
   ASSERT_STREQ(p.getFirmwareUrl(), "https://example.com/fw6.bin");
   ASSERT_EQ(p.getFirmwareSize(), 7777u);
   ASSERT_STREQ(p.getFirmwareSha256(), "");
-
 }
 
 TEST(ReleaseJsonParserOwner, CustomAssetMatcher) {
-
   const char* json = R"({
       "tag_name": "v2.4.1",
       "assets": [
@@ -1014,11 +996,9 @@ TEST(ReleaseJsonParserOwner, CustomAssetMatcher) {
   ASSERT_STREQ(p.getTagName(), "v2.4.1");
   ASSERT_STREQ(p.getFirmwareUrl(), "https://example.com/x3-x4.bin");
   ASSERT_EQ(p.getFirmwareSize(), 4321u);
-
 }
 
 TEST(ReleaseJsonParserOwner, AssetsBeforeTagName) {
-
   // tag_name appears after assets in the JSON
   const char* json = R"({
       "name": "Release",
@@ -1038,11 +1018,9 @@ TEST(ReleaseJsonParserOwner, AssetsBeforeTagName) {
   ASSERT_STREQ(p.getTagName(), "v4.0");
   ASSERT_STREQ(p.getFirmwareUrl(), "https://example.com/fw.bin");
   ASSERT_EQ(p.getFirmwareSize(), 5555u);
-
 }
 
 TEST(ReleaseJsonParserOwner, ChunkedFeedingRealisticSmallChunks) {
-
   // Simulate HTTP chunked transfer with small chunks (64 bytes)
   ReleaseJsonParser p;
   feedChunked(p, kRealisticPretty, 64);
@@ -1053,11 +1031,9 @@ TEST(ReleaseJsonParserOwner, ChunkedFeedingRealisticSmallChunks) {
   ASSERT_STREQ(p.getFirmwareUrl(),
                "https://github.com/crosspoint-reader/crosspoint-reader/releases/download/v2.4.1/firmware.bin");
   ASSERT_EQ(p.getFirmwareSize(), 1572864u);
-
 }
 
 TEST(ReleaseJsonParserOwner, ChunkedFeedingByteByByte) {
-
   ReleaseJsonParser p;
   feedChunked(p, kRealisticMinified, 1);
 
@@ -1065,11 +1041,9 @@ TEST(ReleaseJsonParserOwner, ChunkedFeedingByteByByte) {
   ASSERT_TRUE(p.foundFirmware());
   ASSERT_STREQ(p.getTagName(), "v2.4.1");
   ASSERT_EQ(p.getFirmwareSize(), 1572864u);
-
 }
 
 TEST(ReleaseJsonParserOwner, ChunkedFeedingVariousChunkSizes) {
-
   for (size_t chunkSize : {3, 7, 13, 31, 97, 128, 256, 512, 1024}) {
     ReleaseJsonParser p;
     feedChunked(p, kRealisticPretty, chunkSize);
@@ -1079,11 +1053,9 @@ TEST(ReleaseJsonParserOwner, ChunkedFeedingVariousChunkSizes) {
     ASSERT_STREQ(p.getTagName(), "v2.4.1");
     ASSERT_EQ(p.getFirmwareSize(), 1572864u);
   }
-
 }
 
 TEST(ReleaseJsonParserOwner, MissingTagName) {
-
   const char* json = R"({
       "name": "Some Release",
       "draft": false,
@@ -1100,11 +1072,9 @@ TEST(ReleaseJsonParserOwner, MissingTagName) {
   ASSERT_TRUE(!p.foundTag());
   ASSERT_TRUE(p.foundFirmware());
   ASSERT_STREQ(p.getTagName(), "");
-
 }
 
 TEST(ReleaseJsonParserOwner, MissingFirmwareBinAsset) {
-
   const char* json = R"({
       "tag_name": "v1.0.0",
       "assets": [
@@ -1121,11 +1091,9 @@ TEST(ReleaseJsonParserOwner, MissingFirmwareBinAsset) {
   ASSERT_STREQ(p.getTagName(), "v1.0.0");
   ASSERT_STREQ(p.getFirmwareUrl(), "");
   ASSERT_EQ(p.getFirmwareSize(), 0u);
-
 }
 
 TEST(ReleaseJsonParserOwner, EmptyAssetsArray) {
-
   const char* json = R"({"tag_name": "v1.0.0", "assets": []})";
 
   ReleaseJsonParser p;
@@ -1133,11 +1101,9 @@ TEST(ReleaseJsonParserOwner, EmptyAssetsArray) {
 
   ASSERT_TRUE(p.foundTag());
   ASSERT_TRUE(!p.foundFirmware());
-
 }
 
 TEST(ReleaseJsonParserOwner, NoAssetsKey) {
-
   const char* json = R"({"tag_name": "v1.0.0", "name": "Release"})";
 
   ReleaseJsonParser p;
@@ -1145,11 +1111,9 @@ TEST(ReleaseJsonParserOwner, NoAssetsKey) {
 
   ASSERT_TRUE(p.foundTag());
   ASSERT_TRUE(!p.foundFirmware());
-
 }
 
 TEST(ReleaseJsonParserOwner, TruncatedBeforeTagValue) {
-
   const char* json = R"({"tag_name": )";
 
   ReleaseJsonParser p;
@@ -1157,22 +1121,18 @@ TEST(ReleaseJsonParserOwner, TruncatedBeforeTagValue) {
 
   ASSERT_TRUE(!p.foundTag());
   ASSERT_TRUE(!p.foundFirmware());
-
 }
 
 TEST(ReleaseJsonParserOwner, TruncatedInsideTagValue) {
-
   const char* json = R"({"tag_name": "v2.4)";
 
   ReleaseJsonParser p;
   p.feed(json, strlen(json));
 
   ASSERT_TRUE(!p.foundTag());
-
 }
 
 TEST(ReleaseJsonParserOwner, TruncatedInsideAssetsArray) {
-
   const char* json = R"({"tag_name": "v2.4.1", "assets": [{"name": "firm)";
 
   ReleaseJsonParser p;
@@ -1181,11 +1141,9 @@ TEST(ReleaseJsonParserOwner, TruncatedInsideAssetsArray) {
   ASSERT_TRUE(p.foundTag());
   ASSERT_STREQ(p.getTagName(), "v2.4.1");
   ASSERT_TRUE(!p.foundFirmware());
-
 }
 
 TEST(ReleaseJsonParserOwner, TruncatedAfterFirmwareName) {
-
   // Found the name but connection dropped before URL/size
   const char* json = R"({"tag_name":"v1.0","assets":[{"name":"firmware.bin","browser_dow)";
 
@@ -1194,11 +1152,9 @@ TEST(ReleaseJsonParserOwner, TruncatedAfterFirmwareName) {
 
   ASSERT_TRUE(p.foundTag());
   ASSERT_TRUE(!p.foundFirmware());
-
 }
 
 TEST(ReleaseJsonParserOwner, TruncatedRealisticJson) {
-
   // Truncate the realistic JSON at various points; none should crash
   std::string full(kRealisticPretty);
   for (size_t cutPoint : {10u, 50u, 100u, 200u, 500u, 1000u, 1500u, 2000u}) {
@@ -1210,11 +1166,9 @@ TEST(ReleaseJsonParserOwner, TruncatedRealisticJson) {
     (void)p.foundTag();
     (void)p.foundFirmware();
   }
-
 }
 
 TEST(ReleaseJsonParserOwner, NestedObjectsInAsset) {
-
   // Asset with deeply nested "uploader" object -- should not confuse depth tracking
   const char* json = R"({
       "tag_name": "v5.0",
@@ -1236,11 +1190,9 @@ TEST(ReleaseJsonParserOwner, NestedObjectsInAsset) {
   ASSERT_TRUE(p.foundFirmware());
   ASSERT_STREQ(p.getFirmwareUrl(), "https://example.com/fw5.bin");
   ASSERT_EQ(p.getFirmwareSize(), 8888u);
-
 }
 
 TEST(ReleaseJsonParserOwner, NestedObjectsAtTopLevel) {
-
   // Multiple nested objects at the top level before/after tag_name and assets
   const char* json = R"({
       "author": {"login": "dev", "id": 1, "nested": {"deep": true}},
@@ -1257,11 +1209,9 @@ TEST(ReleaseJsonParserOwner, NestedObjectsAtTopLevel) {
   ASSERT_TRUE(p.foundFirmware());
   ASSERT_STREQ(p.getTagName(), "v6.0");
   ASSERT_EQ(p.getFirmwareSize(), 1111u);
-
 }
 
 TEST(ReleaseJsonParserOwner, ArraysAtTopLevel) {
-
   // A non-assets array at the top level should not interfere
   const char* json = R"({
       "tag_name": "v7.0",
@@ -1276,11 +1226,9 @@ TEST(ReleaseJsonParserOwner, ArraysAtTopLevel) {
   ASSERT_TRUE(p.foundFirmware());
   ASSERT_STREQ(p.getTagName(), "v7.0");
   ASSERT_EQ(p.getFirmwareSize(), 7070u);
-
 }
 
 TEST(ReleaseJsonParserOwner, ResetAndReuse) {
-
   ReleaseJsonParser p;
 
   const char* json1 =
@@ -1303,11 +1251,9 @@ TEST(ReleaseJsonParserOwner, ResetAndReuse) {
   ASSERT_STREQ(p.getFirmwareUrl(), "https://b");
   ASSERT_EQ(p.getFirmwareSize(), 2u);
   ASSERT_STREQ(p.getFirmwareSha256(), "");
-
 }
 
 TEST(ReleaseJsonParserOwner, ResetClearsState) {
-
   ReleaseJsonParser p;
 
   const char* json =
@@ -1324,11 +1270,9 @@ TEST(ReleaseJsonParserOwner, ResetClearsState) {
   ASSERT_STREQ(p.getFirmwareUrl(), "");
   ASSERT_EQ(p.getFirmwareSize(), 0u);
   ASSERT_STREQ(p.getFirmwareSha256(), "");
-
 }
 
 TEST(ReleaseJsonParserOwner, PartialAssetNameMatch) {
-
   // "firmware.bin.bak" should NOT match "firmware.bin"
   const char* json = R"({
       "tag_name": "v1.0",
@@ -1343,11 +1287,9 @@ TEST(ReleaseJsonParserOwner, PartialAssetNameMatch) {
 
   ASSERT_TRUE(p.foundTag());
   ASSERT_TRUE(!p.foundFirmware());
-
 }
 
 TEST(ReleaseJsonParserOwner, FirmwareBinExactMatch) {
-
   // Only exact "firmware.bin" matches, not similar names
   const char* json = R"({
       "tag_name": "v1.0",
@@ -1364,11 +1306,9 @@ TEST(ReleaseJsonParserOwner, FirmwareBinExactMatch) {
   ASSERT_TRUE(p.foundFirmware());
   ASSERT_STREQ(p.getFirmwareUrl(), "https://exact");
   ASSERT_EQ(p.getFirmwareSize(), 200u);
-
 }
 
 TEST(ReleaseJsonParserOwner, LargeSize) {
-
   // 16MB firmware (maximum flash size)
   const char* json =
       R"({"tag_name":"v1.0","assets":[{"name":"firmware.bin","browser_download_url":"https://fw","size":16777216}]})";
@@ -1377,11 +1317,9 @@ TEST(ReleaseJsonParserOwner, LargeSize) {
   p.feed(json, strlen(json));
 
   ASSERT_EQ(p.getFirmwareSize(), 16777216u);
-
 }
 
 TEST(ReleaseJsonParserOwner, SizeZero) {
-
   const char* json =
       R"({"tag_name":"v1.0","assets":[{"name":"firmware.bin","browser_download_url":"https://fw","size":0}]})";
 
@@ -1390,11 +1328,9 @@ TEST(ReleaseJsonParserOwner, SizeZero) {
 
   ASSERT_TRUE(p.foundFirmware());
   ASSERT_EQ(p.getFirmwareSize(), 0u);
-
 }
 
 TEST(ReleaseJsonParserOwner, MinimalValidJson) {
-
   const char* json = R"({"tag_name":"v0","assets":[{"name":"firmware.bin","browser_download_url":"u","size":1}]})";
 
   ReleaseJsonParser p;
@@ -1405,11 +1341,9 @@ TEST(ReleaseJsonParserOwner, MinimalValidJson) {
   ASSERT_STREQ(p.getTagName(), "v0");
   ASSERT_STREQ(p.getFirmwareUrl(), "u");
   ASSERT_EQ(p.getFirmwareSize(), 1u);
-
 }
 
 TEST(ReleaseJsonParserOwner, ChunkedRealisticEveryBoundary) {
-
   // Two-chunk split at every byte boundary on a compact JSON
   const char* json =
       R"({"tag_name":"v2.0","assets":[{"name":"firmware.bin","browser_download_url":"https://example.com/fw","size":9999}]})";
@@ -1426,10 +1360,8 @@ TEST(ReleaseJsonParserOwner, ChunkedRealisticEveryBoundary) {
     ASSERT_STREQ(p.getFirmwareUrl(), "https://example.com/fw");
     ASSERT_EQ(p.getFirmwareSize(), 9999u);
   }
-
 }
 
 // ============================================================================
 
-
-}
+}  // namespace owner_regressions

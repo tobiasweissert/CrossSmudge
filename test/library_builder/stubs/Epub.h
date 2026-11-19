@@ -2,6 +2,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include "HalStorage.h"
 
@@ -9,9 +10,11 @@ struct FakeMetadata {
   std::string title = "Title";
   std::string author = "Author";
   bool success = true;
+  std::string series, genre, seriesIndex;
 };
 
 inline std::map<std::string, FakeMetadata> bookMetadata;
+inline std::vector<bool> metadataCacheUse;
 
 class Epub {
   std::string path;

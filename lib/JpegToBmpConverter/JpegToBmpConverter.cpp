@@ -407,9 +407,10 @@ static uint32_t interpolatedSourceFp(const int outIndex, const int outSize, cons
 
 static void scaleRowLinear(BmpConvertCtx* ctx, const uint8_t* srcRow, uint8_t* dstRow) {
   for (int outX = 0; outX < ctx->outWidth; outX++) {
-    const uint64_t srcX_fp = ctx->smoothFullImage
-        ? interpolatedSourceFp(outX, ctx->outWidth, ctx->srcWidth, interpolationStep(ctx->srcWidth, ctx->outWidth))
-        : static_cast<uint64_t>(ctx->srcXOffset_fp) + static_cast<uint64_t>(outX) * ctx->scaleX_fp;
+    const uint64_t srcX_fp =
+        ctx->smoothFullImage
+            ? interpolatedSourceFp(outX, ctx->outWidth, ctx->srcWidth, interpolationStep(ctx->srcWidth, ctx->outWidth))
+            : static_cast<uint64_t>(ctx->srcXOffset_fp) + static_cast<uint64_t>(outX) * ctx->scaleX_fp;
     const int x0 = std::min(ctx->srcWidth - 1, static_cast<int>(srcX_fp >> 16));
     const int x1 = (x0 + 1 < ctx->srcWidth) ? (x0 + 1) : x0;
     const uint32_t fx = static_cast<uint32_t>(srcX_fp & (FP_ONE - 1));
@@ -446,10 +447,11 @@ static void processSmoothSourceRow(BmpConvertCtx* ctx, const uint8_t* srcRow, co
   }
 
   while (ctx->smoothNextOutY < ctx->outHeight) {
-    const uint64_t srcY_fp = ctx->smoothFullImage
-        ? interpolatedSourceFp(ctx->smoothNextOutY, ctx->outHeight, ctx->srcHeight,
-                               interpolationStep(ctx->srcHeight, ctx->outHeight))
-        : static_cast<uint64_t>(ctx->srcYOffset_fp) + static_cast<uint64_t>(ctx->smoothNextOutY) * ctx->scaleY_fp;
+    const uint64_t srcY_fp =
+        ctx->smoothFullImage
+            ? interpolatedSourceFp(ctx->smoothNextOutY, ctx->outHeight, ctx->srcHeight,
+                                   interpolationStep(ctx->srcHeight, ctx->outHeight))
+            : static_cast<uint64_t>(ctx->srcYOffset_fp) + static_cast<uint64_t>(ctx->smoothNextOutY) * ctx->scaleY_fp;
     const int y0 = std::min(ctx->srcHeight - 1, static_cast<int>(srcY_fp >> 16));
     const int y1 = (y0 + 1 < ctx->srcHeight) ? (y0 + 1) : y0;
     if (y1 > srcY) break;

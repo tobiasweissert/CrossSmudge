@@ -1,13 +1,13 @@
 #pragma once
 #include <ArduinoJson.h>
+#include <HttpHeader.h>
 #include <PersistableStore.h>
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-#include <HttpHeader.h>
-#include <array>
 #include "network/HttpDownloader.h"
 #include "util/OpdsFilename.h"
 

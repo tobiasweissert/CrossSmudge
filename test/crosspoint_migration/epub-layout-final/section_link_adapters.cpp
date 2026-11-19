@@ -5,14 +5,15 @@
 bool isExplicitHyphen(uint32_t cp) { return cp == '-' || cp == 0x2010; }
 bool isSoftHyphen(uint32_t cp) { return cp == 0xad; }
 std::vector<Hyphenator::BreakInfo> Hyphenator::breakOffsets(const std::string&, bool) { return {}; }
-bool ImageDecoderFactory::isFormatSupported(const std::string& path) {
- return path.ends_with(".gif");
-}
+bool ImageDecoderFactory::isFormatSupported(const std::string& path) { return path.ends_with(".gif"); }
 ImageToFramebufferDecoder* ImageDecoderFactory::getDecoder(const std::string&) { return nullptr; }
 
 Epub::Epub(std::string path, const std::string& cacheDir) : filepath(std::move(path)), cachePath(cacheDir) {}
 const std::string& Epub::getCachePath() const { return cachePath; }
-const std::string& Epub::getLanguage() const { static const std::string value = "en"; return value; }
+const std::string& Epub::getLanguage() const {
+  static const std::string value = "en";
+  return value;
+}
 BookMetadataCache::SpineEntry Epub::getSpineItem(int) const { return {}; }
 BookMetadataCache::TocEntry Epub::getTocItem(int) const { return {}; }
 int Epub::getTocItemsCount() const { return 0; }

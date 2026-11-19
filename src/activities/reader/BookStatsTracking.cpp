@@ -19,10 +19,10 @@ void commitSession(BookReadingStats& book, GlobalReadingStats& global, const uin
     if (global.totalSessions < UINT32_MAX) ++global.totalSessions;
   }
   if (seconds < 10) return;
-  book.totalReadingSeconds = seconds > UINT32_MAX - book.totalReadingSeconds
-                                 ? UINT32_MAX : book.totalReadingSeconds + seconds;
-  global.totalReadingSeconds = seconds > UINT32_MAX - global.totalReadingSeconds
-                                   ? UINT32_MAX : global.totalReadingSeconds + seconds;
+  book.totalReadingSeconds =
+      seconds > UINT32_MAX - book.totalReadingSeconds ? UINT32_MAX : book.totalReadingSeconds + seconds;
+  global.totalReadingSeconds =
+      seconds > UINT32_MAX - global.totalReadingSeconds ? UINT32_MAX : global.totalReadingSeconds + seconds;
   if (start && start->isValid()) {
     book.recordReadingSpan(*start, seconds);
     global.recordReadingSpan(*start, seconds);
@@ -37,8 +37,8 @@ void importEdits(BookReadingStats& live, const BookReadingStats& disk) {
   live.finishedDate = disk.finishedDate;
 }
 bool isBookEnabled(const std::string& cachePath) {
-  return cachePath.empty() || (!Storage.exists(markerPath(cachePath).c_str()) &&
-                               !Storage.exists((markerPath(cachePath) + ".tmp").c_str()));
+  return cachePath.empty() ||
+         (!Storage.exists(markerPath(cachePath).c_str()) && !Storage.exists((markerPath(cachePath) + ".tmp").c_str()));
 }
 
 bool isEnabled(const std::string& cachePath) { return SETTINGS.shouldTrackReadingStats() && isBookEnabled(cachePath); }

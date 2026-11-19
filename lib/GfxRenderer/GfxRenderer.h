@@ -15,15 +15,16 @@ class FontCacheManager;
 class SdCardFont;
 class TtfEpdFont;
 
-#include <array>
-#include <type_traits>
-#include <cassert>
-#include <deque>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+
+#include <array>
+#include <cassert>
 #include <cstring>
+#include <deque>
 #include <map>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "Bitmap.h"
@@ -181,12 +182,19 @@ class GfxRenderer {
 
  public:
   explicit GfxRenderer(HalDisplay& halDisplay)
-      : display(halDisplay), renderMode(BW), orientation(Portrait), fadingFix(false), bitmapScratchMutex_(xSemaphoreCreateMutex()) {
+      : display(halDisplay),
+        renderMode(BW),
+        orientation(Portrait),
+        fadingFix(false),
+        bitmapScratchMutex_(xSemaphoreCreateMutex()) {
     assert(bitmapScratchMutex_);
   }
   GfxRenderer(const GfxRenderer&) = delete;
   GfxRenderer& operator=(const GfxRenderer&) = delete;
-  ~GfxRenderer() { freeBwBufferChunks(); freeBitmapScratchBuffers(); }
+  ~GfxRenderer() {
+    freeBwBufferChunks();
+    freeBitmapScratchBuffers();
+  }
 
   static constexpr int VIEWABLE_MARGIN_TOP = 9;
   static constexpr int VIEWABLE_MARGIN_RIGHT = 3;
@@ -203,7 +211,10 @@ class GfxRenderer {
     sdCardFonts_.erase(fontId);
     ttfFonts_.erase(fontId);
     for (auto it = fallbackFontMap_.begin(); it != fallbackFontMap_.end();) {
-      if (it->first == fontId || it->second == fontId) it = fallbackFontMap_.erase(it); else ++it;
+      if (it->first == fontId || it->second == fontId)
+        it = fallbackFontMap_.erase(it);
+      else
+        ++it;
     }
   }
   void setFontCacheManager(FontCacheManager* m) { fontCacheManager_ = m; }
@@ -264,10 +275,10 @@ class GfxRenderer {
 
   void ensureSdCardFontReady(int fontId, const std::deque<std::string>& words, bool includeHyphen,
                              uint8_t styleMask = 0x0F) const;
-  void ensureSdCardFontReady(int fontId, const uint32_t* cps, uint32_t count, bool includeSpace,
-                             bool includeHyphen, uint8_t styleMask = 0x0F) const;
+  void ensureSdCardFontReady(int fontId, const uint32_t* cps, uint32_t count, bool includeSpace, bool includeHyphen,
+                             uint8_t styleMask = 0x0F) const;
   bool collectSdCardFontShapedRtlCodepoints(const char* text, uint32_t* cps, uint16_t& count, uint16_t capacity,
-                                           std::string& tokenScratch, std::string& visualScratch) const;
+                                            std::string& tokenScratch, std::string& visualScratch) const;
   bool releaseSdCardFontForLowMemory(int fontId, bool preserveAdvanceTable = false) const;
   // Orientation control (affects logical width/height and coordinate transforms)
   void setOrientation(const Orientation o) { orientation = o; }
@@ -424,11 +435,12 @@ class GfxRenderer {
   int getTextAdvanceX(int fontId, const char* text, EpdFontFamily::Style style, uint32_t followingCp = 0) const;
   // A byte-sized fourth argument is a legacy tracking call, not a Unicode scalar.
   // Reject it rather than silently interpreting spacing as a following codepoint.
-  template <typename T> requires(std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>)
+  template <typename T>
+    requires(std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>)
   int getTextAdvanceX(int, const char*, EpdFontFamily::Style, T) const = delete;
   int getTextAdvanceXTracked(int fontId, const char* text, EpdFontFamily::Style style, int8_t tracking = 0,
-                      BidiUtils::BidiBaseDir baseDir = BidiUtils::BidiBaseDir::AUTO,
-                      TextMeasureMode mode = TextMeasureMode::Layout) const;
+                             BidiUtils::BidiBaseDir baseDir = BidiUtils::BidiBaseDir::AUTO,
+                             TextMeasureMode mode = TextMeasureMode::Layout) const;
   int getFontAscenderSize(int fontId) const;
   int getLineHeight(int fontId) const;
   // Explicit line spacing scales font size; the one-argument form returns font metrics.
@@ -463,7 +475,8 @@ class GfxRenderer {
   // Display the framebuffer as the base frame for a grayscale overlay that
   // follows (X3: OEM differential base waveform; others: plain display with
   // `fallback`).
-  void displayGrayscaleBase(HalDisplay::RefreshMode fallback = HalDisplay::HALF_REFRESH, bool turnOffScreen = false) const;
+  void displayGrayscaleBase(HalDisplay::RefreshMode fallback = HalDisplay::HALF_REFRESH,
+                            bool turnOffScreen = false) const;
   bool displayGrayscaleBase(HalDisplay::GrayscaleMode mode,
                             HalDisplay::RefreshMode fallback = HalDisplay::HALF_REFRESH) const;
   void copyGrayscaleLsbBuffers() const;

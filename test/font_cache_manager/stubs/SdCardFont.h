@@ -14,7 +14,10 @@ class SdCardFont {
   void clearCache() {}
   void releaseResidentCaches() { ++releaseResidentCachesCallCount; }
   int releaseResidentCachesCallCount = 0;
-  void releaseForLowMemory(bool preserveAdvanceTable) { ++releaseForLowMemoryCallCount; lastPreserveAdvanceTable = preserveAdvanceTable; }
+  void releaseForLowMemory(bool preserveAdvanceTable) {
+    ++releaseForLowMemoryCallCount;
+    lastPreserveAdvanceTable = preserveAdvanceTable;
+  }
   bool lastPrewarmFailed() const { return false; }
   int prewarm(const char* text, uint8_t styleMask, bool, bool, bool accumulate) {
     auto& call = prewarmCalls[prewarmCallCount++];

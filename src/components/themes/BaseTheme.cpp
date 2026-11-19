@@ -1,9 +1,6 @@
-#include "components/icons/cover.h"
-#include "components/UiAppHelpers.h"
-#include "clippings/SelectionGeometry.h"
-#include <BoardConfig.h>
 #include "BaseTheme.h"
 
+#include <BoardConfig.h>
 #include <FreeInkUIGfxRenderer.h>
 #include <GfxRenderer.h>
 #include <HalClock.h>
@@ -23,11 +20,14 @@
 #include "I18n.h"
 #include "RecentBooksStore.h"
 #include "activities/reader/BookReadingStats.h"
+#include "clippings/SelectionGeometry.h"
 #include "components/TouchActionButtons.h"
 #include "components/TouchRegistry.h"
 #include "components/UIScale.h"
 #include "components/UITheme.h"
 #include "components/UIThemeTokens.h"
+#include "components/UiAppHelpers.h"
+#include "components/icons/cover.h"
 #include "fontIds.h"
 
 // Internal constants
@@ -1482,7 +1482,8 @@ void BaseTheme::applyHeaderStatus(const GfxRenderer& renderer, freeink::ui::Head
   // the clock's left reserve opt out via headerShowsClock.
   static char clockText[10];
   if (metrics.headerShowsClock && SETTINGS.clockShowInHeader && halClock.isAvailable() &&
-      halClock.formatTime(clockText, sizeof(clockText), static_cast<uint8_t>(SETTINGS.clockUtcOffsetQ), SETTINGS.clockFormat == 1)) {
+      halClock.formatTime(clockText, sizeof(clockText), static_cast<uint8_t>(SETTINGS.clockUtcOffsetQ),
+                          SETTINGS.clockFormat == 1)) {
     status.clockText = clockText;
   }
 }

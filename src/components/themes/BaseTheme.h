@@ -4,11 +4,16 @@
 #include <cstdint>
 #include <functional>
 #include <string>
-#include <vector>
 #include <type_traits>
+#include <vector>
 
 class Bitmap;
-namespace freeink::ui { struct HeaderProps; struct Rect; struct BitmapRef; struct ListItem; }
+namespace freeink::ui {
+struct HeaderProps;
+struct Rect;
+struct BitmapRef;
+struct ListItem;
+}  // namespace freeink::ui
 class GfxRenderer;
 struct RecentBook;
 struct BookReadingStats;
@@ -254,15 +259,15 @@ class BaseTheme {
   static void setCheckboxRow(freeink::ui::ListItem& item, bool checked);
   static void drawCoverPlaceholder(const GfxRenderer& renderer, Rect rect);
   static bool drawCoverThumbFill(const GfxRenderer& renderer, const Bitmap& bitmap, Rect slot, int xOffset = 0);
-  static void drawHintLabel(const GfxRenderer& renderer, int fontId, const char* label, int x, int boxWidth,
-                            int boxTop, int boxHeight);
+  static void drawHintLabel(const GfxRenderer& renderer, int fontId, const char* label, int x, int boxWidth, int boxTop,
+                            int boxHeight);
   static void applyHeaderStatus(const GfxRenderer& renderer, freeink::ui::HeaderProps& props);
-  static freeink::ui::Rect headerBand(const GfxRenderer& renderer, freeink::ui::Rect rect, freeink::ui::HeaderProps& props);
+  static freeink::ui::Rect headerBand(const GfxRenderer& renderer, freeink::ui::Rect rect,
+                                      freeink::ui::HeaderProps& props);
   static int headerStatusInset();
   static void drawSelectionHandle(const GfxRenderer& renderer, Rect rect, bool left);
   static void drawSelectionActions(const GfxRenderer& renderer, Rect rect, int count = 3, int firstAction = 0);
   virtual int homeCoverThumbHeight(const GfxRenderer&) const { return 0; }
-
 
   template <typename LabelFn>
     requires std::is_same_v<std::invoke_result_t<LabelFn, int>, std::string>
@@ -340,8 +345,7 @@ class BaseTheme {
   virtual bool showsFileIcons() const { return false; }
   virtual bool usesCompactFileBrowserRows() const { return false; }
   virtual int compactFileBrowserRowHeight(const GfxRenderer&) const { return BaseMetrics::values.listRowHeight; }
-  virtual void drawCarouselBorder(GfxRenderer&, Rect, const std::vector<RecentBook>&,
-                                  int, bool) const {}
+  virtual void drawCarouselBorder(GfxRenderer&, Rect, const std::vector<RecentBook>&, int, bool) const {}
 
   // Shared constants and helpers for battery drawing (used by all themes)
   static constexpr int batteryPercentSpacing = 4;

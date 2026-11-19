@@ -249,13 +249,16 @@ class HalStorage {
     std::vector<std::string> out;
     const std::string prefix = std::string(directory) + "/";
     for (const auto& [name, node] : fake::files)
-      if (name.starts_with(prefix) && name.find('/', prefix.size()) == std::string::npos) out.push_back(name.substr(prefix.size()));
+      if (name.starts_with(prefix) && name.find('/', prefix.size()) == std::string::npos)
+        out.push_back(name.substr(prefix.size()));
     return out;
   }
   bool rename(const char* from, const char* to) {
     if (fake::aliasRenameFailure && fake::failRename == 0 && exists(from) && !exists(to)) {
-      fake::failRename = -1; fake::failureTriggered = true;
-      fake::files[to] = fake::files[from]; return false;
+      fake::failRename = -1;
+      fake::failureTriggered = true;
+      fake::files[to] = fake::files[from];
+      return false;
     }
     if (fake::fail(fake::failRename) || !exists(from) || exists(to)) return false;
     std::vector<std::pair<std::string, std::shared_ptr<fake::Node>>> moved;

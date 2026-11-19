@@ -24,7 +24,13 @@ void testFree(void* ptr) {
 }
 }  // namespace
 
-// Intercept only InflateStream's allocations, leaving the test runner untouched.
+// Intercept production Memory.h allocation helpers as well as the stream.
+// Include all standard headers before enabling the narrow allocation macros.
+namespace std {
+inline void* testMalloc(size_t n) { return ::testMalloc(n); }
+inline void testFree(void* p) { ::testFree(p); }
+}  // namespace std
+// Intercept only the production inline helper definitions, leaving the runner untouched.
 #define malloc testMalloc
 #define free testFree
 #include "../../lib/miniz/src/InflateStream.cpp"

@@ -10,11 +10,12 @@
 #include <UsbMassStorage.h>
 #endif
 
+#include <esp_heap_caps.h>
+
 #include <cassert>
+#include <climits>
 #include <cstdlib>
 #include <new>
-#include <climits>
-#include <esp_heap_caps.h>
 
 #include "HalSpiBus.h"
 
@@ -515,7 +516,6 @@ HalFile HalFile::openNextFile() {
 bool HalFile::isOpen() const { return impl != nullptr && impl->file.isOpen(); }  // already thread-safe, no need to wrap
 HalFile::operator bool() const { return isOpen(); }
 
-
 bool HalStorage::sdUsedBytes(uint64_t& usedBytes) { HAL_STORAGE_WRAPPED_CALL(sdUsedBytes, usedBytes); }
 bool HalStorage::replaceFile(const char* tmpPath, const char* path) {
   HAL_STORAGE_WRAPPED_CALL(replaceFile, tmpPath, path);
@@ -527,11 +527,15 @@ bool HalStorage::readFileToString(const char* moduleName, const std::string& pat
   if (!openFileForRead(moduleName, path, file) || file.isDirectory()) return false;
   const size_t size = file.fileSize();
   if (size == 0 || size > cap || size > static_cast<size_t>(INT_MAX) ||
-      heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < size + 512u) return false;
+      heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < size + 512u)
+    return false;
   out.resize(size);
   const bool readOk = file.read(out.data(), size) == static_cast<int>(size);
   const bool closeOk = file.close();
-  if (!readOk || !closeOk) { out.clear(); return false; }
+  if (!readOk || !closeOk) {
+    out.clear();
+    return false;
+  }
   return true;
 }
 

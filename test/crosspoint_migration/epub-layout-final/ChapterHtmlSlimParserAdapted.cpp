@@ -2327,7 +2327,6 @@ TEST(TextDecorationPosition, UnderlineStaysBelowBaseline) {
   });
 }
 
-
 // Preserved owner regression cases; current-runtime harness above.
 TEST(ParagraphIndentTest, DoesNotInventIndentWithoutSourceCss) {
   GfxRenderer renderer;

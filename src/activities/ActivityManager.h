@@ -13,9 +13,9 @@
 #include "CrossPointSettings.h"
 #include "GfxRenderer.h"
 #include "MappedInputManager.h"
-#include "util/QuickLockTrigger.h"
 #include "settings/SettingsSection.h"
 #include "util/EdgeSlide.h"
+#include "util/QuickLockTrigger.h"
 #include "util/ScreenshotInfo.h"
 
 #ifndef portMUX_INITIALIZER_UNLOCKED

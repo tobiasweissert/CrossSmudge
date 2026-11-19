@@ -3,11 +3,11 @@
 #include <Stream.h>
 
 #include <cstdint>
-#include <vector>
 #include <functional>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 /**
  * HTTP client utility for fetching content and downloading files.
@@ -125,12 +125,12 @@ class HttpDownloader {
   static bool postForm(const std::string& url, const std::string& formBody, std::string& outResponse,
                        int* statusOut = nullptr);
 
-
   static bool fetchUrl(const std::string& url, const DataCallback& onData, const std::string& username,
                        const std::string& password, const std::vector<Header>& headers);
-  static DownloadError downloadToFile(const std::string& url, const std::string& destPath,
-      ProgressCallback progress, const bool* cancelFlag, const std::string& username, const std::string& password,
-      const std::vector<Header>& headers, bool downgradeRedirectsToHttp = false);
+  static DownloadError downloadToFile(const std::string& url, const std::string& destPath, ProgressCallback progress,
+                                      const bool* cancelFlag, const std::string& username, const std::string& password,
+                                      const std::vector<Header>& headers, bool downgradeRedirectsToHttp = false);
   static DownloadError postToFile(const std::string& url, const std::string& body, const std::string& contentType,
-      const std::string& destPath, ProgressCallback progress = nullptr, const bool* cancelFlag = nullptr);
+                                  const std::string& destPath, ProgressCallback progress = nullptr,
+                                  const bool* cancelFlag = nullptr);
 };

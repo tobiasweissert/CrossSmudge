@@ -108,7 +108,7 @@ void collectCodepoints(const char* text, LowestCodepoints& collected, const bool
   while (*p) {
     const uint32_t cp = utf8NextCodepoint(&p);
     if (cp == 0) break;
-      if (utf8IsVariationSelector(cp)) continue;
+    if (utf8IsVariationSelector(cp)) continue;
     if (wanted(cp)) collected.add(cp);
     if (includeSmallCaps) {
       const uint32_t upper = utf8SmallCapsUpper(cp);
@@ -162,8 +162,10 @@ SdCardFont::~SdCardFont() { freeAll(); }
 bool SdCardFont::ensureBitmapCapacity(PerStyle& s, const uint32_t needed) {
   if (s.miniBitmap && s.miniBitmapCapacity >= needed) return true;
   s.miniData.bitmap = nullptr;
-  HeapByteBufferDeleter{}(s.miniBitmap); s.miniBitmap = nullptr;
-  s.miniBitmapCapacity = 0; s.miniBitmapUsed = 0;
+  HeapByteBufferDeleter{}(s.miniBitmap);
+  s.miniBitmap = nullptr;
+  s.miniBitmapCapacity = 0;
+  s.miniBitmapUsed = 0;
   const size_t bytes = needed ? needed : 1;
   HeapByteBuffer buffer;
   if (psramHeapAvailable()) {
@@ -171,9 +173,11 @@ bool SdCardFont::ensureBitmapCapacity(PerStyle& s, const uint32_t needed) {
     if (!buffer && MemoryBudget::canAllocateInternal(bytes, MemoryBudget::EPUB_FONT_INTERNAL_RESERVE,
                                                      MINI_RETAIN_MIN_MAX_ALLOC_HEAP))
       buffer = makeInternalByteBufferNoThrow(bytes);
-  } else buffer = makeDefaultByteBufferNoThrow(bytes);
+  } else
+    buffer = makeDefaultByteBufferNoThrow(bytes);
   if (!buffer) return false;
-  s.miniBitmap = buffer.release(); s.miniBitmapCapacity = needed;
+  s.miniBitmap = buffer.release();
+  s.miniBitmapCapacity = needed;
   return true;
 }
 
@@ -908,13 +912,19 @@ bool SdCardFont::load(const char* path) {
 
   // Header-only identities miss same-size changes to advances, coverage and ink.
   // Hash once at admission, streaming bounded scratch rather than retaining the file.
-  if (!file.seekSet(0)) { freeAll(); return false; }
+  if (!file.seekSet(0)) {
+    freeAll();
+    return false;
+  }
   uint32_t fullHash = FNV_OFFSET;
   uint8_t digestChunk[128];
   size_t remaining = fileSize_;
   while (remaining) {
     const size_t bytes = std::min(remaining, sizeof(digestChunk));
-    if (file.read(digestChunk, bytes) != static_cast<int>(bytes)) { freeAll(); return false; }
+    if (file.read(digestChunk, bytes) != static_cast<int>(bytes)) {
+      freeAll();
+      return false;
+    }
     fullHash = fnv1a(digestChunk, bytes, fullHash);
     remaining -= bytes;
   }
@@ -981,7 +991,10 @@ int SdCardFont::prewarm(const char* utf8Text, uint8_t styleMask, bool metadataOn
 int SdCardFont::prewarm(TextGetter getter, const void* ctx, uint32_t textCount, uint8_t styleMask, bool metadataOnly,
                         bool loadKernLig, bool accumulate) {
   lastPrewarmFailed_ = false;
-  if (!loaded_ || getter == nullptr) { lastPrewarmFailed_ = true; return -1; }
+  if (!loaded_ || getter == nullptr) {
+    lastPrewarmFailed_ = true;
+    return -1;
+  }
   styleMask = resolveStyleMask(styleMask);
   if (styleMask == 0) return 0;
 
@@ -1021,7 +1034,10 @@ int SdCardFont::prewarm(TextGetter getter, const void* ctx, uint32_t textCount, 
       }
     }
   }
-  if (cpBudget == 0) { lastPrewarmFailed_ = true; return -1; }
+  if (cpBudget == 0) {
+    lastPrewarmFailed_ = true;
+    return -1;
+  }
 
   // Step 1: Extract unique codepoints from the UTF-8 texts (shared across all styles).
   // Dedup uses O(n^2) linear scan — worst case is MAX_PAGE_GLYPHS (512) unique codepoints
@@ -1204,9 +1220,12 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
       if (!metadataOnly && loadStyleLigatures(s)) {
         applyKernLigaturePointers(s, s.miniData);
         if (!loadKernLig) {
-          s.miniData.kernLeftClasses = nullptr; s.miniData.kernRightClasses = nullptr;
-          s.miniData.kernLeftEntryCount = 0; s.miniData.kernRightEntryCount = 0;
-          s.miniData.kernLeftClassCount = 0; s.miniData.kernRightClassCount = 0;
+          s.miniData.kernLeftClasses = nullptr;
+          s.miniData.kernRightClasses = nullptr;
+          s.miniData.kernLeftEntryCount = 0;
+          s.miniData.kernRightEntryCount = 0;
+          s.miniData.kernLeftClassCount = 0;
+          s.miniData.kernRightClassCount = 0;
           s.miniData.kernMatrix = nullptr;
         }
       }
@@ -2067,7 +2086,6 @@ const uint8_t* SdCardFont::getOverflowBitmap(const EpdGlyph* glyph) const {
 
 SdCardFont* SdCardFont::fromMissCtx(void* ctx) { return static_cast<OverflowContext*>(ctx)->self; }
 
-
 bool SdCardFont::readAdvance(uint32_t codepoint, uint8_t style, uint16_t* outAdvance) const {
   if (!outAdvance || !loaded_) return false;
 
@@ -2118,18 +2136,22 @@ void SdCardFont::releaseForLowMemory(const bool preserveAdvanceTable) {
     applyGlyphMissCallback(i);
   }
 }
-int SdCardFont::buildAdvanceTable(const std::deque<std::string>& words, bool includeHyphen,
-                                 uint8_t styleMask, const char* extraText) {
+int SdCardFont::buildAdvanceTable(const std::deque<std::string>& words, bool includeHyphen, uint8_t styleMask,
+                                  const char* extraText) {
   // Each segment is a single terminated word, borrowed for this synchronous call.
   std::vector<const char*> segments;
   std::vector<size_t> lengths;
-  segments.reserve(words.size()); lengths.reserve(words.size());
-  for (const auto& word : words) { segments.push_back(word.c_str()); lengths.push_back(word.size() + 1); }
-  return buildAdvanceTablePacked(segments.data(), lengths.data(), segments.size(), true, includeHyphen,
-                                 styleMask, extraText);
+  segments.reserve(words.size());
+  lengths.reserve(words.size());
+  for (const auto& word : words) {
+    segments.push_back(word.c_str());
+    lengths.push_back(word.size() + 1);
+  }
+  return buildAdvanceTablePacked(segments.data(), lengths.data(), segments.size(), true, includeHyphen, styleMask,
+                                 extraText);
 }
 int SdCardFont::buildAdvanceTableForCodepoints(const uint32_t* codepoints, uint32_t count, bool includeSpace,
-                                              bool includeHyphen, uint8_t styleMask) {
+                                               bool includeHyphen, uint8_t styleMask) {
   if (count && !codepoints) return static_cast<int>(count);
   auto cps = makeUniqueNoThrow<uint32_t[]>(count + 2);
   if (!cps) return static_cast<int>(count + 1);

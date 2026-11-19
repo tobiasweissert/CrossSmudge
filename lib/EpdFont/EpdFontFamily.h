@@ -34,15 +34,19 @@ class EpdFontFamily {
         bold(bold),
         italic(italic),
         boldItalic(boldItalic),
-        sizeInPixels(pointSize * FONT_RASTER_DPI / 72.0f), fallback(fallback) {}
+        sizeInPixels(pointSize * FONT_RASTER_DPI / 72.0f),
+        fallback(fallback) {}
 
   // Legacy bitmap callers lack point metadata. Infer an em from ascent+descent;
   // reader/CSS callers should use the point-size constructor above.
-  explicit EpdFontFamily(const EpdFont* regular, const EpdFont* bold = nullptr,
-                         const EpdFont* italic = nullptr, const EpdFont* boldItalic = nullptr,
-                         const EpdFont* fallback = nullptr)
-      : regular(regular), bold(bold), italic(italic), boldItalic(boldItalic),
-        sizeInPixels(regular ? regular->data->ascender - regular->data->descender : 0), fallback(fallback) {}
+  explicit EpdFontFamily(const EpdFont* regular, const EpdFont* bold = nullptr, const EpdFont* italic = nullptr,
+                         const EpdFont* boldItalic = nullptr, const EpdFont* fallback = nullptr)
+      : regular(regular),
+        bold(bold),
+        italic(italic),
+        boldItalic(boldItalic),
+        sizeInPixels(regular ? regular->data->ascender - regular->data->descender : 0),
+        fallback(fallback) {}
   ~EpdFontFamily() = default;
   float getSizeInPixels() const { return sizeInPixels; }
   void getTextDimensions(const char* string, int* w, int* h, Style style = REGULAR) const;

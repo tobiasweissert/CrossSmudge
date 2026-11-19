@@ -2350,8 +2350,9 @@ void HomeActivity::onReadingStatsOpen() {
   const std::string bookTitle =
       highlightedBookIdx >= 0 ? recentBooks[highlightedBookIdx].title : std::string(tr(STR_READING_STATS));
   const std::string bookPath = getCurrentBookPath();
-  const std::string cachePath =
-      FsHelpers::hasReflowableBookExtension(bookPath) ? Epub::cachePathForFilePath(bookPath, "/.crosspoint") : std::string{};
+  const std::string cachePath = FsHelpers::hasReflowableBookExtension(bookPath)
+                                    ? Epub::cachePathForFilePath(bookPath, "/.crosspoint")
+                                    : std::string{};
   if (showAllDevicesStats) {
     startActivityForResult(std::make_unique<BookStatsActivity>(renderer, mappedInput, bookTitle, cachePath,
                                                                currentBookStats, currentBookProgressPercent, false, 0,

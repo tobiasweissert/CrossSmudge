@@ -783,7 +783,8 @@ bool CrossPointSettings::loadFromFile() {
 
   auto loadJsonSettings = [this](const char* path, bool migrateToCurrentPath) -> JsonLoadStatus {
     if (!Storage.exists(path) && !Storage.exists((std::string(path) + ".bak").c_str()) &&
-        !Storage.exists((std::string(path) + ".tmp").c_str())) return JsonLoadStatus::MissingOrEmpty;
+        !Storage.exists((std::string(path) + ".tmp").c_str()))
+      return JsonLoadStatus::MissingOrEmpty;
 
     JsonDocument doc;
     if (PersistableStoreBase::readDocFromFile(path, doc)) {

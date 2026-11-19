@@ -1,15 +1,12 @@
 #include "FsHelpers.h"
 
+#include <HalStorage.h>
+#include <Logging.h>
 #include <Utf8.h>
 
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
-#include <HalStorage.h>
-#include <Logging.h>
-
-#include <algorithm>
-#include <cctype>
 #include <cstdio>
 #include <cstring>
 #include <string_view>

@@ -8,15 +8,15 @@
 #include <ZipFile.h>
 
 #include <deque>
+#include <limits>
 #include <mutex>
 #include <optional>
-#include <limits>
 
 #include "FsHelpers.h"
 
 namespace {
 constexpr uint32_t BOOK_CACHE_MAGIC = 0x425843FF;  // bytes: 0xFF, "CXB"
-constexpr uint8_t BOOK_CACHE_VERSION = 11;          // v11: union metadata format; explicit-start guide semantics
+constexpr uint8_t BOOK_CACHE_VERSION = 11;         // v11: union metadata format; explicit-start guide semantics
 constexpr char bookBinFile[] = "/book.bin";
 constexpr char tmpSpineBinFile[] = "/spine.bin.tmp";
 constexpr char tmpTocBinFile[] = "/toc.bin.tmp";

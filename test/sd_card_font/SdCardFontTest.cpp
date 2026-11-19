@@ -16,6 +16,15 @@ size_t failNextArraySize = 0;
 size_t nothrowArrayAllocations = 0;
 }  // namespace
 
+extern "C" void* __real_malloc(size_t);
+extern "C" void* __wrap_malloc(size_t size) {
+  if (failNextArraySize && size == failNextArraySize) {
+    failNextArraySize = 0;
+    return nullptr;
+  }
+  return __real_malloc(size);
+}
+
 // Keep array allocation and deletion paired, including arrays allocated by the test framework.
 void* operator new[](size_t size) {
   void* allocation = std::malloc(size == 0 ? 1 : size);

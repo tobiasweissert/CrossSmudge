@@ -38,6 +38,7 @@ class HalFile : public Print {
     return seek(next);
   }
 
+  size_t position() const { return position_; }
   explicit operator bool() const { return true; }
 
   size_t write(uint8_t) override { return 0; }

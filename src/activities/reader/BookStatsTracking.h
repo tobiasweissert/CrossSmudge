@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+
 #include "BookReadingStats.h"
 #include "GlobalReadingStats.h"
 

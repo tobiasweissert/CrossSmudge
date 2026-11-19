@@ -1,6 +1,9 @@
 add_executable(ChapterHtmlSlimParserTest
   ChapterHtmlSlimParserTest.cpp
   ParserLinkStubs.cpp
+  ${REPO_ROOT}/test/crosspoint_migration/epub-layout-final/MigrationTest.cpp
+  ${REPO_ROOT}/test/crosspoint_migration/epub-layout-final/CompactFallbackTest.cpp
+  ${REPO_ROOT}/lib/Epub/Epub/blocks/ImageBlock.cpp
   DictionaryHtmlPagesTest.cpp
   ${REPO_ROOT}/src/util/DictHtmlPages.cpp
   ${REPO_ROOT}/lib/Epub/Epub/Page.cpp
@@ -37,6 +40,10 @@ target_include_directories(ChapterHtmlSlimParserTest PRIVATE
   ${REPO_ROOT}/lib/MiniBidi
   ${REPO_ROOT}/lib/FsHelpers
   ${REPO_ROOT}/lib/XmlParserUtils
+  ${REPO_ROOT}/test/crosspoint_migration/epub-finish/stubs
+  ${REPO_ROOT}/test/crosspoint_migration/font-finish/renderer-stubs
+  ${REPO_ROOT}/lib/GfxRenderer
+  ${REPO_ROOT}/lib/Bitmap
 )
 
 target_link_libraries(ChapterHtmlSlimParserTest PRIVATE

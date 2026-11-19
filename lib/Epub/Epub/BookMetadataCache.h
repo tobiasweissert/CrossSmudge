@@ -119,7 +119,8 @@ class BookMetadataCache {
         tocCount(0),
         loaded(false),
         buildMode(false),
-        cacheCumulativeSizes(cacheCumulativeSizes), spineHrefIndex(spineHrefIndexArena) {}
+        cacheCumulativeSizes(cacheCumulativeSizes),
+        spineHrefIndex(spineHrefIndexArena) {}
   ~BookMetadataCache() = default;
 
   // Building phase (stream to disk immediately)

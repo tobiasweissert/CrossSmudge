@@ -1,11 +1,18 @@
 #include <HalStorage.h>
 #include <SdCardFont.h>
+
 #include <cassert>
 #include <cstring>
 #include <deque>
 #include <string>
-static void put16(size_t p,uint16_t v){ sdFontTestFile[p]=v;sdFontTestFile[p+1]=v>>8; }
-static void put32(size_t p,uint32_t v){put16(p,v);put16(p+2,v>>16);}
+static void put16(size_t p, uint16_t v) {
+  sdFontTestFile[p] = v;
+  sdFontTestFile[p + 1] = v >> 8;
+}
+static void put32(size_t p, uint32_t v) {
+  put16(p, v);
+  put16(p + 2, v >> 16);
+}
 void makeKerningFont(uint16_t extraEntries = 0, uint8_t classCount = 2, uint8_t extraClass = 2, bool ligature = false) {
   constexpr uint32_t KERN_GLYPHS = 7;
   constexpr size_t GLYPH_OFFSET = 64 + 24;
@@ -66,35 +73,70 @@ void makeKerningFont(uint16_t extraEntries = 0, uint8_t classCount = 2, uint8_t 
     put32(ligatureOffset + 4, 'A');
   }
 }
-int main(){
-  constexpr size_t off=88, bitmap=off+3*sizeof(EpdGlyph);
-  sdFontTestFile.assign(bitmap+3,0);
-  memcpy(sdFontTestFile.data(),"CPFONT\0\0",8); put16(8,CPFONT_VERSION);
-  sdFontTestFile[12]=1; put32(36,2);put32(40,3); sdFontTestFile[44]=8;put16(45,8);put32(56,64);
-  put32(64,'A');put32(68,'B');put32(76,0xFFFD);put32(80,0xFFFD);put32(84,2);
-  for(unsigned i=0;i<3;++i){EpdGlyph g{};g.width=2;g.height=2;g.top=2;g.advanceX=72+i*16;g.dataOffset=i;g.dataLength=1;memcpy(sdFontTestFile.data()+off+i*sizeof(g),&g,sizeof(g));sdFontTestFile[bitmap+i]=0xF0+i;}
-  SdCardFont font; assert(font.load("/font.cpfont"));
-  uint16_t advance=0;assert(font.readAdvance('A',0,&advance)&&advance==72);
-  const char packed[]="A\0B\0";const char* seg[]={packed};size_t len[]={4};
-  assert(font.buildAdvanceTablePacked(seg,len,1,false,false,1)==0);
-  assert(font.getAdvance('B',0)==88);
-  assert(font.prewarm("AB",1)==0);assert(!font.lastPrewarmFailed());
-  const auto* data=font.getEpdFont()->data;assert(data->bitmap&&data->bitmap[0]==0xF0);
-  font.releaseForLowMemory(true); assert(font.hasAdvanceTable());
-  assert(font.readAdvance('B',0,&advance)&&advance==88);
-  assert(font.prewarm("A",1,false,false)==0);
-  font.releaseResidentCaches();assert(!font.hasAdvanceTable());
-  assert(font.prewarm("B",1)==0);assert(font.getEpdFont()->findGlyph('B'));
-  std::deque<std::string> words={"A","B"}; assert(font.buildAdvanceTable(words,false,1)==0);
-  makeKerningFont(0,2,2,true);SdCardFont lean;assert(lean.load("/lean.cpfont"));
-  assert(lean.prewarm("EFAB",1,false,false)==0);
-  assert(lean.getEpdFont()->data->ligaturePairCount==1);
-  assert(lean.getEpdFont()->data->kernLeftEntryCount==0);
-  assert(lean.prewarm("EFAB",1,false,true)==0);
-  assert(lean.getEpdFont()->data->kernLeftEntryCount>0);
-  assert(lean.prewarm("EFAB",1,false,false)==0);
-  assert(lean.getEpdFont()->data->kernLeftEntryCount==0);
-  assert(lean.getEpdFont()->data->ligaturePairCount==1);
-  const auto beforeHash=lean.contentHash();sdFontTestFile.back()^=0x01;
-  SdCardFont replacement;assert(replacement.load("/lean.cpfont"));assert(replacement.contentHash()!=beforeHash);
+int main() {
+  constexpr size_t off = 88, bitmap = off + 3 * sizeof(EpdGlyph);
+  sdFontTestFile.assign(bitmap + 3, 0);
+  memcpy(sdFontTestFile.data(), "CPFONT\0\0", 8);
+  put16(8, CPFONT_VERSION);
+  sdFontTestFile[12] = 1;
+  put32(36, 2);
+  put32(40, 3);
+  sdFontTestFile[44] = 8;
+  put16(45, 8);
+  put32(56, 64);
+  put32(64, 'A');
+  put32(68, 'B');
+  put32(76, 0xFFFD);
+  put32(80, 0xFFFD);
+  put32(84, 2);
+  for (unsigned i = 0; i < 3; ++i) {
+    EpdGlyph g{};
+    g.width = 2;
+    g.height = 2;
+    g.top = 2;
+    g.advanceX = 72 + i * 16;
+    g.dataOffset = i;
+    g.dataLength = 1;
+    memcpy(sdFontTestFile.data() + off + i * sizeof(g), &g, sizeof(g));
+    sdFontTestFile[bitmap + i] = 0xF0 + i;
+  }
+  SdCardFont font;
+  assert(font.load("/font.cpfont"));
+  uint16_t advance = 0;
+  assert(font.readAdvance('A', 0, &advance) && advance == 72);
+  const char packed[] = "A\0B\0";
+  const char* seg[] = {packed};
+  size_t len[] = {4};
+  assert(font.buildAdvanceTablePacked(seg, len, 1, false, false, 1) == 0);
+  assert(font.getAdvance('B', 0) == 88);
+  assert(font.prewarm("AB", 1) == 0);
+  assert(!font.lastPrewarmFailed());
+  const auto* data = font.getEpdFont()->data;
+  assert(data->bitmap && data->bitmap[0] == 0xF0);
+  font.releaseForLowMemory(true);
+  assert(font.hasAdvanceTable());
+  assert(font.readAdvance('B', 0, &advance) && advance == 88);
+  assert(font.prewarm("A", 1, false, false) == 0);
+  font.releaseResidentCaches();
+  assert(!font.hasAdvanceTable());
+  assert(font.prewarm("B", 1) == 0);
+  assert(font.getEpdFont()->findGlyph('B'));
+  std::deque<std::string> words = {"A", "B"};
+  assert(font.buildAdvanceTable(words, false, 1) == 0);
+  makeKerningFont(0, 2, 2, true);
+  SdCardFont lean;
+  assert(lean.load("/lean.cpfont"));
+  assert(lean.prewarm("EFAB", 1, false, false) == 0);
+  assert(lean.getEpdFont()->data->ligaturePairCount == 1);
+  assert(lean.getEpdFont()->data->kernLeftEntryCount == 0);
+  assert(lean.prewarm("EFAB", 1, false, true) == 0);
+  assert(lean.getEpdFont()->data->kernLeftEntryCount > 0);
+  assert(lean.prewarm("EFAB", 1, false, false) == 0);
+  assert(lean.getEpdFont()->data->kernLeftEntryCount == 0);
+  assert(lean.getEpdFont()->data->ligaturePairCount == 1);
+  const auto beforeHash = lean.contentHash();
+  sdFontTestFile.back() ^= 0x01;
+  SdCardFont replacement;
+  assert(replacement.load("/lean.cpfont"));
+  assert(replacement.contentHash() != beforeHash);
 }

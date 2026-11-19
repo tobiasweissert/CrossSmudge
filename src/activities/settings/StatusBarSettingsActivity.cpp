@@ -22,8 +22,10 @@ ReaderStatusBarConfig settingsReaderStatusBar(ReaderStatusBarPosition position) 
 }
 
 void setSettingsReaderStatusBar(ReaderStatusBarPosition position, const ReaderStatusBarConfig& config) {
-  if (position == ReaderStatusBarPosition::Top) SETTINGS.topReaderStatusBar = config;
-  else SETTINGS.bottomReaderStatusBar = config;
+  if (position == ReaderStatusBarPosition::Top)
+    SETTINGS.topReaderStatusBar = config;
+  else
+    SETTINGS.bottomReaderStatusBar = config;
 }
 
 enum BarItem {
@@ -561,7 +563,8 @@ void StatusBarSettingsActivity::render(RenderLock&&) {
   if (mappedInput.hasTouchHardware()) {
     TouchHeaderBackButton::draw(renderer, uiTarget, header, headerTitle, readerContext);
   } else {
-    GUI.drawHeader(renderer, Rect{contentX, header.y, contentWidth, header.height}, headerTitle, nullptr, readerContext);
+    GUI.drawHeader(renderer, Rect{contentX, header.y, contentWidth, header.height}, headerTitle, nullptr,
+                   readerContext);
   }
   uiReady = false;
   app.render();
@@ -577,23 +580,44 @@ void StatusBarSettingsActivity::render(RenderLock&&) {
     renderer.drawText(UI_10_FONT_ID, contentX + metrics.contentSidePadding, labelY, tr(STR_PREVIEW));
     // Configuration preview only. The reader owns final slot collision/layout
     // and must consume the same persisted config before device acceptance.
-    const auto config = displayContext ? SETTINGS.displayStatusBar.asReaderConfig()
-                                       : settingsReaderStatusBar(selectedPosition());
+    const auto config =
+        displayContext ? SETTINGS.displayStatusBar.asReaderConfig() : settingsReaderStatusBar(selectedPosition());
     const int cellWidth = contentWidth / ReaderStatusBarConfig::SLOT_COUNT;
     for (unsigned slot = 0; slot < ReaderStatusBarConfig::SLOT_COUNT; ++slot) {
       const char* sample = "";
       switch (config.slots[slot]) {
-        case ReaderStatusBarItem::Clock: sample = "12:34"; break;
-        case ReaderStatusBarItem::Date: sample = "11/19"; break;
-        case ReaderStatusBarItem::Battery: sample = "80%"; break;
-        case ReaderStatusBarItem::TimeLeftBook: sample = "3h40"; break;
-        case ReaderStatusBarItem::TimeLeftChapter: sample = "1h20"; break;
-        case ReaderStatusBarItem::ChapterPageCount: sample = "8/32"; break;
-        case ReaderStatusBarItem::StablePageNumber: sample = "120"; break;
-        case ReaderStatusBarItem::BookProgressPercentage: sample = "75%"; break;
-        case ReaderStatusBarItem::TitleBook: sample = "Book"; break;
-        case ReaderStatusBarItem::TitleChapter: sample = "Chapter"; break;
-        default: break;
+        case ReaderStatusBarItem::Clock:
+          sample = "12:34";
+          break;
+        case ReaderStatusBarItem::Date:
+          sample = "11/19";
+          break;
+        case ReaderStatusBarItem::Battery:
+          sample = "80%";
+          break;
+        case ReaderStatusBarItem::TimeLeftBook:
+          sample = "3h40";
+          break;
+        case ReaderStatusBarItem::TimeLeftChapter:
+          sample = "1h20";
+          break;
+        case ReaderStatusBarItem::ChapterPageCount:
+          sample = "8/32";
+          break;
+        case ReaderStatusBarItem::StablePageNumber:
+          sample = "120";
+          break;
+        case ReaderStatusBarItem::BookProgressPercentage:
+          sample = "75%";
+          break;
+        case ReaderStatusBarItem::TitleBook:
+          sample = "Book";
+          break;
+        case ReaderStatusBarItem::TitleChapter:
+          sample = "Chapter";
+          break;
+        default:
+          break;
       }
       if (renderer.getTextWidth(UI_10_FONT_ID, sample) < cellWidth) {
         renderer.drawText(UI_10_FONT_ID, contentX + slot * cellWidth, previewOriginY, sample);

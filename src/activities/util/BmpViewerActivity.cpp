@@ -1,6 +1,8 @@
 #include "BmpViewerActivity.h"
 
 #include <Bitmap.h>
+#include <Epub/converters/JpegToFramebufferConverter.h>
+#include <Epub/converters/PngToFramebufferConverter.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
@@ -11,8 +13,6 @@
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
-#include <Epub/converters/PngToFramebufferConverter.h>
-#include <Epub/converters/JpegToFramebufferConverter.h>
 #include "activities/boot_sleep/ImageFolderIndex.h"
 #include "activities/home/BookActions.h"
 #include "activities/home/FileBrowserActionActivity.h"
@@ -93,7 +93,7 @@ bool BmpViewerActivity::renderCompressedImage() {
   const bool jpeg = FsHelpers::hasJpgExtension(filePath);
   ImageDimensions dims;
   if (!(jpeg ? JpegToFramebufferConverter::getDimensionsStatic(filePath, dims)
-              : PngToFramebufferConverter::getDimensionsStatic(filePath, dims))) {
+             : PngToFramebufferConverter::getDimensionsStatic(filePath, dims))) {
     drawImageError(renderer, mappedInput, "Invalid Image File");
     return false;
   }
@@ -201,7 +201,7 @@ void BmpViewerActivity::onEnter() {
                       currentImageIndex < static_cast<int>(siblingImages.size()) - 1);
 
       const auto labels = mappedInput.mapLabels(mappedInput.withBackArrow(tr(STR_BACK)),
-                                            FsHelpers::hasJpgExtension(filePath) ? "" : tr(STR_SET_SLEEP_COVER),
+                                                FsHelpers::hasJpgExtension(filePath) ? "" : tr(STR_SET_SLEEP_COVER),
                                                 (hasPrevious ? "<" : nullptr), (hasNext ? ">" : nullptr));
 
       GUI.fillPopupProgress(renderer, popupRect, 50);

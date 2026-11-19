@@ -71,7 +71,7 @@ class HalGPIO {
   bool rawInputActive();
   bool hasToggleSwitch() const;
   bool isToggleSwitchOn() const;
-  bool isXteinkDevice() const { return false; } // Crosscub admits Sticky only.
+  bool isXteinkDevice() const { return false; }  // Crosscub admits Sticky only.
   bool wasCapacitivePagePressed() const { return capacitivePagePressed; }
   bool isCapacitivePagePressed(uint8_t buttonIndex) const {
     return buttonIndex < 8 && (previousCapacitivePageButtons & (1u << buttonIndex)) != 0;

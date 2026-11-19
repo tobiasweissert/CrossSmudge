@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <HalStorage.h>
+#include <Memory.h>
 #include <SdCardFont.h>
 #include <gtest/gtest.h>
 

@@ -29,18 +29,20 @@ void LibrarySettingsActivity::onEnter() {
 }
 
 void LibrarySettingsActivity::toggle(const int row) {
-  uint8_t* fields[] = {&SETTINGS.libraryUseMetadata,&SETTINGS.libraryListExpanded,&SETTINGS.recentBooksView,
-    &SETTINGS.libraryHideFinishedBooks,&SETTINGS.libraryShowSeries,&SETTINGS.libraryShowGenre,
-    &SETTINGS.libraryShowEpub,&SETTINGS.libraryShowXtc,&SETTINGS.libraryShowTxt,&SETTINGS.libraryShowMarkdown,
-    &SETTINGS.libraryRecentOpenedOnly};
-  if(row<0 || row>=ROW_COUNT) return;
-  uint8_t& field=*fields[row];const uint8_t before=field;
-  field = row==2 ? (field==CrossPointSettings::RECENT_BOOKS_GRID ? CrossPointSettings::RECENT_BOOKS_LIST :
-                    CrossPointSettings::RECENT_BOOKS_GRID) : !field;
-  if(!SETTINGS.saveToFile()) {
-    field=before;
-    LOG_ERR("LIB","Cannot save Library settings");
-    GUI.drawPopup(renderer,"Cannot save Library settings");
+  uint8_t* fields[] = {&SETTINGS.libraryUseMetadata,       &SETTINGS.libraryListExpanded,    &SETTINGS.recentBooksView,
+                       &SETTINGS.libraryHideFinishedBooks, &SETTINGS.libraryShowSeries,      &SETTINGS.libraryShowGenre,
+                       &SETTINGS.libraryShowEpub,          &SETTINGS.libraryShowXtc,         &SETTINGS.libraryShowTxt,
+                       &SETTINGS.libraryShowMarkdown,      &SETTINGS.libraryRecentOpenedOnly};
+  if (row < 0 || row >= ROW_COUNT) return;
+  uint8_t& field = *fields[row];
+  const uint8_t before = field;
+  field = row == 2 ? (field == CrossPointSettings::RECENT_BOOKS_GRID ? CrossPointSettings::RECENT_BOOKS_LIST
+                                                                     : CrossPointSettings::RECENT_BOOKS_GRID)
+                   : !field;
+  if (!SETTINGS.saveToFile()) {
+    field = before;
+    LOG_ERR("LIB", "Cannot save Library settings");
+    GUI.drawPopup(renderer, "Cannot save Library settings");
   }
   requestUpdate();
 }
@@ -109,7 +111,8 @@ void LibrarySettingsActivity::loop() {
     topIndex = listNav.top;
     requestUpdate();
   };
-  buttonNavigator.onRelease(ButtonNavigator::getNextButtons(),[&] { move(ButtonNavigator::nextIndex(selection, ROW_COUNT)); });
+  buttonNavigator.onRelease(ButtonNavigator::getNextButtons(),
+                            [&] { move(ButtonNavigator::nextIndex(selection, ROW_COUNT)); });
   buttonNavigator.onPreviousRelease([&] { move(ButtonNavigator::previousIndex(selection, ROW_COUNT)); });
 }
 
@@ -118,11 +121,17 @@ void LibrarySettingsActivity::screen(UiApp::ScreenType& screen, void* user) {
 }
 
 void LibrarySettingsActivity::provideRow(void*, const uint16_t row, fui::ListItem& item) {
-  const char* labels[] = {
-      tr(STR_LIBRARY_USE_METADATA),   "List view", "Recently opened view",
-      "Show finished books", "Series",    "Genre",
-      "EPUB",          "XTC / XTCH",  "Text",
-      "Markdown", "Recent shelf: opened only"};
+  const char* labels[] = {tr(STR_LIBRARY_USE_METADATA),
+                          "List view",
+                          "Recently opened view",
+                          "Show finished books",
+                          "Series",
+                          "Genre",
+                          "EPUB",
+                          "XTC / XTCH",
+                          "Text",
+                          "Markdown",
+                          "Recent shelf: opened only"};
   item.label = labels[row];
   item.actionValue = static_cast<int16_t>(row);
   if (row == 1) {

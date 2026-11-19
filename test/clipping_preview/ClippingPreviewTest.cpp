@@ -317,7 +317,6 @@ TEST(SelectionGeometry, KeepsCursorClearOfHintsOnEitherAxis) {
   EXPECT_EQ(selectionGeometry::keepVisible(100, 20, 40, 700), 0);
 }
 
-
 // Preserved owner regression cases; current-runtime harness above.
 TEST(ClippingPreview, RepeatedReadsReuseReservedStorage) {
   Reader reader{std::string(4096, 'x')};

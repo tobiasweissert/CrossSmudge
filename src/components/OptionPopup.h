@@ -4,14 +4,14 @@
 
 #include <algorithm>
 #include <atomic>
-#include <memory>
-#include "activities/RenderLock.h"
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "GfxRenderer.h"
 #include "MappedInputManager.h"
+#include "activities/RenderLock.h"
 #include "components/TouchActionButtons.h"
 #include "components/UIScale.h"
 #include "components/UITheme.h"
@@ -21,8 +21,8 @@
 class OptionPopup {
  public:
   // Additive upstream subject/message APIs; owner note/footer semantics remain.
-  void show(const char* titleStr, const char* subject, const char* const* options, int count,
-            int currentIndex, std::function<void(int)> callback) {
+  void show(const char* titleStr, const char* subject, const char* const* options, int count, int currentIndex,
+            std::function<void(int)> callback) {
     show(titleStr, options, count, currentIndex, std::move(callback));
     headline = subject ? subject : "";
   }
@@ -50,11 +50,11 @@ class OptionPopup {
     } else if (previous || next) {
       if (confirmationMode && footerFocused) {
         footerFocused = false;
-        selectedIndex = firstEnabledIndex(previous ? count-1 : 0, previous ? -1 : 1);
-      } else if (confirmationMode && ((previous && selectedIndex == 0) || (!previous && selectedIndex == count-1))) {
+        selectedIndex = firstEnabledIndex(previous ? count - 1 : 0, previous ? -1 : 1);
+      } else if (confirmationMode && ((previous && selectedIndex == 0) || (!previous && selectedIndex == count - 1))) {
         footerFocused = true;
       } else {
-        selectedIndex = firstEnabledIndex((selectedIndex + (previous ? count-1 : 1)) % count, previous ? -1 : 1);
+        selectedIndex = firstEnabledIndex((selectedIndex + (previous ? count - 1 : 1)) % count, previous ? -1 : 1);
       }
       const auto published = std::atomic_load_explicit(&publishedLayout, std::memory_order_acquire);
       if (published) followSelection(static_cast<int>(published->options.size()), count);
@@ -63,11 +63,13 @@ class OptionPopup {
       active = false;
       if (confirmationMode && footerFocused) {
         if (onSaveCallback) onSaveCallback();
-      } else if (onSelectCallback) onSelectCallback(selectedIndex);
+      } else if (onSelectCallback)
+        onSelectCallback(selectedIndex);
       const bool skip = skipPostSelectionUpdate_;
       skipPostSelectionUpdate_ = false;
       if (skip) return true;
-    } else return true;
+    } else
+      return true;
     requestUpdate();
     return true;
   }
@@ -233,7 +235,7 @@ class OptionPopup {
       }
       if (touchDownTarget == TouchTarget::Option && touchDownOptionIndex >= hitLayout.firstOptionIndex &&
           touchDownOptionIndex < hitLayout.firstOptionIndex + static_cast<int>(hitLayout.options.size()) &&
-          contains(hitLayout.options[touchDownOptionIndex-hitLayout.firstOptionIndex], tx, ty)) {
+          contains(hitLayout.options[touchDownOptionIndex - hitLayout.firstOptionIndex], tx, ty)) {
         selectedIndex = touchDownOptionIndex;
         touchDownOptionIndex = -1;
         selectTouchOption(input, requestUpdate);
@@ -337,7 +339,8 @@ class OptionPopup {
     GUI.drawOptionPopup(renderer, displayTitle.c_str(), ownedStrings, selectedIndex, confirmationMode, tr(STR_CANCEL),
                         tr(STR_SAVE), footerFocused, primaryOptionIndex, popupNote.boldLabel, popupNote.body,
                         disabledOptions, renderLayout.firstOptionIndex);
-    std::atomic_store_explicit(&publishedLayout, std::make_shared<const Layout>(renderLayout), std::memory_order_release);
+    std::atomic_store_explicit(&publishedLayout, std::make_shared<const Layout>(renderLayout),
+                               std::memory_order_release);
     uiReady.store(true, std::memory_order_release);
   }
 
@@ -409,8 +412,8 @@ class OptionPopup {
     const int maxTitleLines = std::max(
         1, (maxDialogH - innerPadding * 2 - metrics.optionPopupTitleGap - noteHeight - rowHeight - footerSpace) /
                titleLineHeight);
-    const auto titleLines =
-        renderer.wrappedText(UI_12_FONT_ID, composedTitle().c_str(), titleContentWidth, maxTitleLines, EpdFontFamily::BOLD);
+    const auto titleLines = renderer.wrappedText(UI_12_FONT_ID, composedTitle().c_str(), titleContentWidth,
+                                                 maxTitleLines, EpdFontFamily::BOLD);
     const int titleHeight = static_cast<int>(titleLines.size()) * titleLineHeight;
     const int maxListHeight = std::max(rowHeight, maxDialogH - innerPadding * 2 - titleHeight -
                                                       metrics.optionPopupTitleGap - noteHeight - footerSpace);
@@ -478,8 +481,14 @@ class OptionPopup {
   std::string message;
   std::string composedTitle() const {
     std::string text = title;
-    if (!headline.empty()) { if (!text.empty()) text += "\n"; text += headline; }
-    if (!message.empty()) { if (!text.empty()) text += "\n"; text += message; }
+    if (!headline.empty()) {
+      if (!text.empty()) text += "\n";
+      text += headline;
+    }
+    if (!message.empty()) {
+      if (!text.empty()) text += "\n";
+      text += message;
+    }
     return text;
   }
   bool freshTouch = false;

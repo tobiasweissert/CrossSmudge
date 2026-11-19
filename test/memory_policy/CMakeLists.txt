@@ -8,7 +8,7 @@ add_executable(JpegDecoderPolicyTest JpegDecoderPolicyTest.cpp
   ${REPO_ROOT}/lib/Epub/Epub/converters/JpegToFramebufferConverter.cpp
   ${REPO_ROOT}/lib/Epub/Epub/converters/ImageToFramebufferDecoder.cpp)
 target_include_directories(JpegDecoderPolicyTest PRIVATE jpeg_decoder_stubs stubs
-  ${REPO_ROOT}/lib/Epub/Epub/converters ${REPO_ROOT}/lib/Epub ${REPO_ROOT}/lib/Memory
+  ${REPO_ROOT}/lib/Epub/Epub/converters ${REPO_ROOT}/lib/GfxRenderer ${REPO_ROOT}/lib/Epub ${REPO_ROOT}/lib/Memory
   ${REPO_ROOT}/lib/MemoryBudget)
 target_compile_definitions(JpegDecoderPolicyTest PRIVATE ARDUINO_ARCH_ESP32=1 CROSSINK_MEMORY_TEST=1)
 target_link_libraries(JpegDecoderPolicyTest PRIVATE crosspoint_test_common GTest::gtest_main)
@@ -24,6 +24,7 @@ target_link_libraries(InflateStreamStorageTest PRIVATE crosspoint_test_common GT
 gtest_discover_tests(InflateStreamStorageTest PROPERTIES ENVIRONMENT "UBSAN_OPTIONS=halt_on_error=1")
 
 add_executable(SdFontBitmapStorageTest SdFontBitmapStorageTest.cpp
+  ${REPO_ROOT}/freeink-sdk/libs/font/FreeInkFont/src/FontAlloc.c
   ${REPO_ROOT}/lib/EpdFont/SdCardFont.cpp ${REPO_ROOT}/lib/EpdFont/EpdFont.cpp ${REPO_ROOT}/lib/Utf8/Utf8.cpp)
 target_include_directories(SdFontBitmapStorageTest PRIVATE stubs ${REPO_ROOT}/lib/Memory ${REPO_ROOT}/lib/MemoryBudget ${REPO_ROOT}/lib/EpdFont ${REPO_ROOT}/lib/Utf8)
 target_compile_definitions(SdFontBitmapStorageTest PRIVATE ARDUINO_ARCH_ESP32=1 CROSSINK_MEMORY_TEST=1)
@@ -39,9 +40,10 @@ gtest_discover_tests(CssArenaBackingTest PROPERTIES ENVIRONMENT "UBSAN_OPTIONS=h
 function(add_layout_test name root)
   add_executable(${name} TextLayoutBackingTest.cpp
     ${root}/lib/Epub/Epub/ParsedText.cpp ${root}/lib/Epub/Epub/blocks/TextBlock.cpp
+    ${root}/lib/Epub/Epub/WordStore.cpp ${root}/lib/Epub/Epub/CjkBreaks.cpp
     ${root}/lib/MiniBidi/BidiUtils.cpp ${root}/lib/MiniBidi/minibidi.c ${root}/lib/Utf8/Utf8.cpp)
   target_include_directories(${name} PRIVATE stubs ${root}/lib/Memory ${root}/lib/MemoryBudget
-    ${root}/lib/Epub ${root}/lib/EpdFont ${root}/lib/Utf8 ${root}/lib/MiniBidi ${root}/lib/Serialization)
+    ${root}/src ${root}/test/chapter_html_slim_parser/stubs ${root}/lib/Epub ${root}/lib/EpdFont ${root}/lib/Utf8 ${root}/lib/MiniBidi ${root}/lib/Serialization)
   target_compile_definitions(${name} PRIVATE ARDUINO_ARCH_ESP32=1 CROSSINK_MEMORY_TEST=1)
   target_link_libraries(${name} PRIVATE crosspoint_test_common GTest::gtest_main)
   gtest_discover_tests(${name} TEST_PREFIX "${name}/" PROPERTIES ENVIRONMENT "UBSAN_OPTIONS=halt_on_error=1")

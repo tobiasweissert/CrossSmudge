@@ -1,6 +1,6 @@
-#include "lib/Epub/Epub/converters/DitherUtils.h"
 #include <gtest/gtest.h>
 
+#include "lib/Epub/Epub/converters/DitherUtils.h"
 #include "lib/GfxRenderer/BitmapHelpers.h"
 
 namespace {
@@ -95,7 +95,6 @@ TEST(AbsoluteGrayscale, TransparentPassesRetainBackgroundWithoutClearingBetweenP
   EXPECT_EQ(planes[0] & 0x0f, 0x0a);
   EXPECT_EQ(planes[1] & 0x0f, 0x0a);
 }
-
 
 // Preserved owner regression cases; current-runtime harness above.
 TEST(AbsoluteGrayscale, NonDitheredPngQuantizationUsesFourEvenLevels) {

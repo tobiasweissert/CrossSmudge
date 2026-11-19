@@ -1,7 +1,7 @@
 #include "WifiCredentialStore.h"
 
-#include <HalStorage.h>
 #include <CredentialIntegrity.h>
+#include <HalStorage.h>
 #include <Logging.h>
 #include <ObfuscationUtils.h>
 #include <Serialization.h>
@@ -83,10 +83,13 @@ bool WifiCredentialStore::fromJson(JsonVariantConst doc) {
       LOG_ERR("WCS", "Skipping WiFi credential with unreadable password: %s", cred.ssid.c_str());
       continue;
     }
-    if ((!obj["password_len"].isNull() && (!obj["password_len"].is<size_t>() || obj["password_len"].as<size_t>() != cred.password.size())) ||
-        (!obj["password_crc32"].isNull() && (!obj["password_crc32"].is<uint32_t>() || obj["password_crc32"].as<uint32_t>() != credential_integrity::crc32(cred.password)))) {
+    if ((!obj["password_len"].isNull() &&
+         (!obj["password_len"].is<size_t>() || obj["password_len"].as<size_t>() != cred.password.size())) ||
+        (!obj["password_crc32"].isNull() &&
+         (!obj["password_crc32"].is<uint32_t>() ||
+          obj["password_crc32"].as<uint32_t>() != credential_integrity::crc32(cred.password)))) {
       LOG_ERR("WCS", "Credential integrity check failed");
-      return false; // do not resave/discard a durable corrupt record
+      return false;  // do not resave/discard a durable corrupt record
     }
     credentials.push_back(std::move(cred));
   }
@@ -107,7 +110,9 @@ bool WifiCredentialStore::loadFromFile() {
     lastConnectedSsid.clear();
   }
 
-  const bool hasStoreFile = Storage.exists(getFilePath()) || Storage.exists((std::string(getFilePath())+".bak").c_str()) || Storage.exists((std::string(getFilePath())+".tmp").c_str());
+  const bool hasStoreFile = Storage.exists(getFilePath()) ||
+                            Storage.exists((std::string(getFilePath()) + ".bak").c_str()) ||
+                            Storage.exists((std::string(getFilePath()) + ".tmp").c_str());
   if (PersistableStore<WifiCredentialStore>::loadFromFile()) {
     LOG_INF("WCS", "load JSON complete");
     return true;

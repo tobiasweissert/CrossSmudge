@@ -4,10 +4,10 @@
 #include <HalStorage.h>
 #include <Logging.h>
 #include <MemoryBudget.h>
+#include <strings.h>
 
 #include <algorithm>
 #include <cstdlib>
-#include <strings.h>
 #if CROSSPOINT_VECTOR_FONTS
 #include <FtFont.h>
 #endif
@@ -19,8 +19,8 @@
 
 namespace {
 std::atomic<uint32_t> indexGeneration{0};
-constexpr uint32_t CatalogVersion = 2; // v1 bitmap-only entries are rebuildable, never user data
-}
+constexpr uint32_t CatalogVersion = 2;  // v1 bitmap-only entries are rebuildable, never user data
+}  // namespace
 
 // --- SdCardFontFamilyInfo helpers ---
 
@@ -49,7 +49,7 @@ const SdCardFontFileInfo* SdCardFontFamilyInfo::findClosestFile(uint8_t targetSi
 
 std::vector<uint8_t> SdCardFontFamilyInfo::availableSizes() const {
   if (!ensureDetails()) return {};
-  if (vector) return {8,9,10,11,12,13,14,15,16,17,18,19,20,21,22};
+  if (vector) return {8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22};
   std::vector<uint8_t> sizes;
   for (const auto& f : files) {
     bool found = false;
@@ -109,8 +109,11 @@ bool addFamilySummaries(const char* rootPath, bool visibleRoot, std::vector<SdCa
   if (!dir.isDirectory()) return true;
   char name[128], path[160];
   while (true) {
-    HalFile entry = dir.openNextFile(); if (!entry) break;
-    bool isDir = entry.isDirectory(); entry.getName(name, sizeof(name)); entry.close();
+    HalFile entry = dir.openNextFile();
+    if (!entry) break;
+    bool isDir = entry.isDirectory();
+    entry.getName(name, sizeof(name));
+    entry.close();
     if (name[0] == '.' || name[0] == '_') continue;
     SdCardFontFamilyInfo family;
     family.root = visibleRoot ? SdCardFontRegistry::FONTS_DIR_VISIBLE : SdCardFontRegistry::FONTS_DIR_HIDDEN;
@@ -124,7 +127,9 @@ bool addFamilySummaries(const char* rootPath, bool visibleRoot, std::vector<SdCa
 #if CROSSPOINT_VECTOR_FONTS
       size_t len = 0;
       if (!SdCardFontRegistry::parseVectorFontName(name, len)) continue;
-      family.name.assign(name, len); family.vector = true; family.loose = true;
+      family.name.assign(name, len);
+      family.vector = true;
+      family.loose = true;
       family.files.push_back({path, 0, 0});
 #else
       continue;
@@ -132,7 +137,8 @@ bool addFamilySummaries(const char* rootPath, bool visibleRoot, std::vector<SdCa
     }
     if (family.files.empty()) continue;
     bool duplicate = false;
-    for (const auto& f : families) if (f.name == family.name) duplicate = true;
+    for (const auto& f : families)
+      if (f.name == family.name) duplicate = true;
     if (duplicate) continue;
     family.indexCount = family.files.size();
     family.firstSize = UINT8_MAX;
@@ -142,10 +148,11 @@ bool addFamilySummaries(const char* rootPath, bool visibleRoot, std::vector<SdCa
     }
     // Loose fonts retain the filename until index publication; directory families re-scan one at a time.
     if (!family.loose) std::vector<SdCardFontFileInfo>().swap(family.files);
-    if (families.size() < SdCardFontRegistry::MAX_SD_FAMILIES) families.push_back(std::move(family));
+    if (families.size() < SdCardFontRegistry::MAX_SD_FAMILIES)
+      families.push_back(std::move(family));
     else {
       auto largest = std::max_element(families.begin(), families.end(),
-          [](const auto& a, const auto& b) { return a.name < b.name; });
+                                      [](const auto& a, const auto& b) { return a.name < b.name; });
       if (family.name < largest->name) *largest = std::move(family);
     }
   }
@@ -164,7 +171,8 @@ bool writeFamilyDetails(HalFile& index, const char* path, const SdCardFontFamily
     summary.hash = fontcatalog::hashBytes(summary.hash, meta, sizeof(meta));
     summary.hash = fontcatalog::hashBytes(summary.hash, f.path.data(), length);
     if (index.write(meta, sizeof(meta)) != sizeof(meta) || index.write(f.path.data(), length) != length) return false;
-    summary.bytes += sizeof(meta) + length; ++summary.count;
+    summary.bytes += sizeof(meta) + length;
+    ++summary.count;
   }
   return true;
 }
@@ -671,18 +679,20 @@ bool SdCardFontRegistry::scanDirectory(const char* dirPath, SdCardFontFamilyInfo
     HalFile entry = dir.openNextFile();
     if (!entry) break;
     const bool isDir = entry.isDirectory();
-    entry.getName(name, sizeof(name)); entry.close();
+    entry.getName(name, sizeof(name));
+    entry.close();
     if (isDir || name[0] == '.' || name[0] == '_') continue;
     const int n = snprintf(path, sizeof(path), "%s/%s", dirPath, name);
     if (n <= 0 || static_cast<size_t>(n) >= sizeof(path)) continue;
     const auto heap = MemoryBudget::snapshot();
     const size_t growBytes = 2 * (bitmap.size() + vectors.size() + 1) * sizeof(SdCardFontFileInfo);
     if (heap.freeHeap < growBytes + sizeof(path) + 8192 || heap.maxAllocHeap < growBytes + sizeof(path))
-      return false; // Incomplete scan must never be published as a smaller valid family.
+      return false;  // Incomplete scan must never be published as a smaller valid family.
     uint8_t size = 0, style = 0;
     if (parseFilename(name, size, style)) {
       bool duplicate = false;
-      for (const auto& f : bitmap) if (f.pointSize == size) duplicate = true;
+      for (const auto& f : bitmap)
+        if (f.pointSize == size) duplicate = true;
       if (!duplicate && bitmap.size() < fontcatalog::MaxFiles) bitmap.push_back({path, size, style});
     }
 #if CROSSPOINT_VECTOR_FONTS
@@ -693,7 +703,8 @@ bool SdCardFontRegistry::scanDirectory(const char* dirPath, SdCardFontFamilyInfo
     }
 #endif
   }
-  const bool ok = !FsHelpers::directoryIterationFailed(dir); dir.close();
+  const bool ok = !FsHelpers::directoryIterationFailed(dir);
+  dir.close();
   if (!ok) return false;
   family.vector = bitmap.empty() && !vectors.empty();
 #if CROSSPOINT_VECTOR_FONTS

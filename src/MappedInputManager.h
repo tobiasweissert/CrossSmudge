@@ -12,7 +12,23 @@ class GfxRenderer;
 
 class MappedInputManager {
  public:
-  enum class Button { Back, Confirm, Left, Right, Up, Down, Power, PageBack, PageForward, NavNext, NavPrevious, ScreenLeft, ScreenRight, ScreenUp, ScreenDown };
+  enum class Button {
+    Back,
+    Confirm,
+    Left,
+    Right,
+    Up,
+    Down,
+    Power,
+    PageBack,
+    PageForward,
+    NavNext,
+    NavPrevious,
+    ScreenLeft,
+    ScreenRight,
+    ScreenUp,
+    ScreenDown
+  };
   static constexpr size_t BUTTON_COUNT = static_cast<size_t>(Button::ScreenDown) + 1;
   enum class SwipeDir { None, Left, Right, Up, Down };
 
@@ -77,7 +93,10 @@ class MappedInputManager {
 
   void update(bool deferHomeButtonAction = false) const;
   // Sticky has no capacitive Home key; preserve the owner's deferred-Home path.
-  void resetHomeButtonInput() const { clearDeferredHomeGesture(); remoteInput.reset(); }
+  void resetHomeButtonInput() const {
+    clearDeferredHomeGesture();
+    remoteInput.reset();
+  }
   bool injectRemoteClick(RemoteButton button);
   bool hasRemoteClick() const { return remoteInput.button != RemoteButton::None; }
   bool wasLongPressed(Button button, unsigned long thresholdMs) const;

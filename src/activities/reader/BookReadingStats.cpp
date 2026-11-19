@@ -306,8 +306,7 @@ bool BookReadingStats::save(const std::string& cachePath) const {
   HalFile current;
   if (Storage.openFileForRead("STATS", statsPath, current)) {
     uint8_t prior[STATS_FILE_SIZE];
-    const bool same = current.fileSize() == sizeof(prior) &&
-                      current.read(prior, sizeof(prior)) == sizeof(prior) &&
+    const bool same = current.fileSize() == sizeof(prior) && current.read(prior, sizeof(prior)) == sizeof(prior) &&
                       memcmp(prior, data, sizeof(prior)) == 0;
     const bool closed = current.close();
     if (same && closed) return true;

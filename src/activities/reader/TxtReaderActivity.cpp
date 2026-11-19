@@ -1,5 +1,4 @@
 #include "TxtReaderActivity.h"
-#include "XtcReaderMenuActivity.h"
 
 #include <BidiUtils.h>
 #include <FontCacheManager.h>
@@ -20,6 +19,7 @@
 #include "ReaderUtils.h"
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
+#include "XtcReaderMenuActivity.h"
 #include "activities/boot_sleep/SleepCoverAssets.h"
 #include "activities/home/FileBrowserActionActivity.h"
 #include "components/UITheme.h"
@@ -119,7 +119,10 @@ void drawToast(const GfxRenderer& renderer, const char* msg) {
 
 void TxtReaderActivity::onEnter() {
   Activity::onEnter();
-  if (!txt && !loadBook()) { finish(); return; }
+  if (!txt && !loadBook()) {
+    finish();
+    return;
+  }
 
   if (!txt) {
     return;
@@ -196,8 +199,7 @@ void TxtReaderActivity::loop() {
   if (handlePinchFontResize()) return;
 #endif
   const auto touch = ReaderUtils::detectTouchPageTurn(renderer, mappedInput);
-  if (touch.tapped &&
-      ReaderChrome::tapped(renderer, touch.y)) {
+  if (touch.tapped && ReaderChrome::tapped(renderer, touch.y)) {
     if (SETTINGS.tapToHideStatusBar) {
       statusBarVisible = !statusBarVisible;
       requestUpdate();
@@ -642,8 +644,9 @@ void TxtReaderActivity::initializeReader() {
   } else {
     cachedOrientedMarginTop += cachedVerticalMargin;
   }
-  cachedOrientedMarginBottom += std::max(static_cast<int>(cachedVerticalMargin),
-      ReaderChrome::height(renderer, ReaderStatusBarPosition::Bottom) + ReaderUtils::STATUS_BAR_TEXT_PADDING);
+  cachedOrientedMarginBottom +=
+      std::max(static_cast<int>(cachedVerticalMargin),
+               ReaderChrome::height(renderer, ReaderStatusBarPosition::Bottom) + ReaderUtils::STATUS_BAR_TEXT_PADDING);
 
   viewportWidth = renderer.getScreenWidth() - cachedOrientedMarginLeft - cachedOrientedMarginRight;
   const int viewportHeight = renderer.getScreenHeight() - cachedOrientedMarginTop - cachedOrientedMarginBottom;
@@ -836,7 +839,6 @@ void TxtReaderActivity::renderPage() {
   // BW rendering
   renderLines();
   renderStatusBar();
-
 
   ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
 
@@ -1110,8 +1112,9 @@ bool TxtReaderActivity::drawCurrentPageToBuffer(const std::string& filePath, Gfx
   } else {
     marginTop += verticalMargin;
   }
-  marginBottom += std::max(static_cast<int>(verticalMargin),
-                           ReaderChrome::height(renderer, ReaderStatusBarPosition::Bottom) + ReaderUtils::STATUS_BAR_TEXT_PADDING);
+  marginBottom +=
+      std::max(static_cast<int>(verticalMargin),
+               ReaderChrome::height(renderer, ReaderStatusBarPosition::Bottom) + ReaderUtils::STATUS_BAR_TEXT_PADDING);
 
   const int vw = renderer.getScreenWidth() - marginLeft - marginRight;
   const int vh = renderer.getScreenHeight() - marginTop - marginBottom;
@@ -1268,8 +1271,10 @@ bool TxtReaderActivity::loadBook() {
 bool TxtReaderActivity::pageTurn(const bool forward) {
   if (!initialized || inputOverPage()) return false;
   const int old = currentPage;
-  if (forward && currentPage < totalPages - 1) ++currentPage;
-  else if (!forward && currentPage > 0) --currentPage;
+  if (forward && currentPage < totalPages - 1)
+    ++currentPage;
+  else if (!forward && currentPage > 0)
+    --currentPage;
   const bool changed = old != currentPage;
   notePageTurn(forward, changed);
   if (changed) requestUpdate();
@@ -1278,8 +1283,8 @@ bool TxtReaderActivity::pageTurn(const bool forward) {
 bool TxtReaderActivity::skipPages(const int amount) {
   if (!initialized || inputOverPage() || amount == 0) return false;
   const int old = currentPage;
-  currentPage = static_cast<int>(std::clamp<int64_t>(static_cast<int64_t>(currentPage) + amount,
-                                                   0, std::max(0, totalPages - 1)));
+  currentPage =
+      static_cast<int>(std::clamp<int64_t>(static_cast<int64_t>(currentPage) + amount, 0, std::max(0, totalPages - 1)));
   if (old != currentPage) requestUpdate();
   return old != currentPage;
 }
@@ -1303,10 +1308,15 @@ bool TxtReaderActivity::handleSideShortcut(const uint8_t action) {
     case CrossPointSettings::SIDE_ROTATE_FLIP: {
       const bool clockwise = action != CrossPointSettings::SIDE_ROTATE_COUNTERCLOCKWISE;
       uint8_t orientation = ReaderUtils::rotatedOrientation(SETTINGS.orientation, clockwise);
-      if (action == CrossPointSettings::SIDE_ROTATE_FLIP) orientation = ReaderUtils::rotatedOrientation(orientation, true);
-      SETTINGS.orientation = orientation; ReaderUtils::applyOrientation(renderer, orientation); rebuildTextLayout();
-      requestUpdate(); return true;
+      if (action == CrossPointSettings::SIDE_ROTATE_FLIP)
+        orientation = ReaderUtils::rotatedOrientation(orientation, true);
+      SETTINGS.orientation = orientation;
+      ReaderUtils::applyOrientation(renderer, orientation);
+      rebuildTextLayout();
+      requestUpdate();
+      return true;
     }
-    default: return ReaderActivity::handleSideShortcut(action);
+    default:
+      return ReaderActivity::handleSideShortcut(action);
   }
 }

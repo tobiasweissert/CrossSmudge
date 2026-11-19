@@ -1,9 +1,10 @@
 #pragma once
 
 #include <cstdint>
-#include "VectorFontSupport.h"
 #include <string>
 #include <vector>
+
+#include "VectorFontSupport.h"
 
 struct SdCardFontFileInfo {
   std::string path;   // v4 on-disk naming: "/<root>/<Family>/<Family>_<size>.cpfont"

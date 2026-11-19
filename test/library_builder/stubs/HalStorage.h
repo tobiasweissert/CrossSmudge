@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-inline constexpr int O_WRONLY = 1, O_CREAT = 2, O_TRUNC = 4, O_APPEND = 8, O_RDWR = 16, O_AT_END = 32;
+inline constexpr int O_WRONLY = 1, O_CREAT = 2, O_TRUNC = 4, O_APPEND = 8, O_RDWR = 16, O_AT_END = 32, O_EXCL = 64;
 
 namespace fake {
 
@@ -26,6 +26,7 @@ inline int failTruncate = -1;
 inline int failRename = -1;
 inline int failAlloc = -1;
 inline bool failDirectorySeek = false;
+inline std::string failDirectoryIterationPath;
 inline std::string failClosePath;
 inline std::string failWritePath;
 inline unsigned parses = 0;
@@ -57,6 +58,7 @@ inline void reset() {
   failRename = -1;
   failAlloc = -1;
   failDirectorySeek = false;
+  failDirectoryIterationPath.clear();
   failClosePath.clear();
   failWritePath.clear();
   parses = 0;
@@ -101,6 +103,8 @@ class HalFile {
   std::shared_ptr<fake::Node> node;
   std::string path;
   size_t pos = 0;
+  bool iterationError = false;
+  std::shared_ptr<std::vector<std::string>> children;
 
   explicit operator bool() const { return bool(node); }
   bool isOpen() const { return bool(node); }
@@ -114,21 +118,33 @@ class HalFile {
     return !failed;
   }
   bool isDirectory() const { return node && node->directory; }
-  void rewindDirectory() { pos = 0; }
+  void rewindDirectory() {
+    pos = 0;
+    children.reset();
+  }
   HalFile openNextFile() {
-    std::vector<std::string> children;
-    for (const auto& [name, value] : fake::files) {
-      std::string parent = name.substr(0, name.find_last_of('/'));
-      if (parent.empty()) parent = "/";
-      if (name != path && parent == path) children.push_back(name);
+    if (!children) {
+      children = std::make_shared<std::vector<std::string>>();
+      for (const auto& [name, value] : fake::files) {
+        std::string parent = name.substr(0, name.find_last_of('/'));
+        if (parent.empty()) parent = "/";
+        if (name != path && parent == path) children->push_back(name);
+      }
+      const auto extras = fake::extraDirectoryEntries.find(path);
+      if (extras != fake::extraDirectoryEntries.end()) {
+        children->insert(children->end(), extras->second.begin(), extras->second.end());
+      }
     }
-    const auto extras = fake::extraDirectoryEntries.find(path);
-    if (extras != fake::extraDirectoryEntries.end()) {
-      children.insert(children.end(), extras->second.begin(), extras->second.end());
+    if (pos >= children->size()) {
+      if (!fake::failDirectoryIterationPath.empty() && path == fake::failDirectoryIterationPath) {
+        iterationError = true;
+        fake::failDirectoryIterationPath.clear();
+        fake::failureTriggered = true;
+      }
+      return {};
     }
-    if (pos >= children.size()) return {};
     HalFile file;
-    file.path = children[pos++];
+    file.path = (*children)[pos++];
     file.node = fake::files[file.path];
     fake::directoryEntriesByPath[file.path]++;
     return file;
@@ -141,6 +157,10 @@ class HalFile {
     }
     return name.size();
   }
+  bool allocationFailed() const { return false; }
+  bool iterationFailed() const { return iterationError; }
+  uint32_t creationTime() const { return node ? node->time : 0; }
+  bool sync() { return bool(node); }
   uint32_t modificationTime() const { return node ? node->time : 0; }
   uint64_t fileSize64() const { return node ? node->bytes.size() : 0; }
   size_t fileSize() const { return static_cast<size_t>(fileSize64()); }
@@ -169,7 +189,7 @@ class HalFile {
     if (size == 0) return 0;
     if (!node || fake::fail(fake::failRead)) return -1;
     size = std::min(size, node->bytes.size() - std::min(pos, node->bytes.size()));
-    std::memcpy(out, node->bytes.data() + std::min(pos, node->bytes.size()), size);
+    if (size) std::memcpy(out, node->bytes.data() + std::min(pos, node->bytes.size()), size);
     pos += size;
     return static_cast<int>(size);
   }
@@ -201,8 +221,16 @@ class HalStorage {
     return storage;
   }
 
+  std::vector<std::string> listFiles(const char* path) {
+    std::vector<std::string> result;
+    auto dir = open(path);
+    for (auto file = dir.openNextFile(); file; file = dir.openNextFile()) {
+      if (!file.isDirectory()) result.push_back(file.path.substr(file.path.find_last_of('/') + 1));
+    }
+    return result;
+  }
   bool exists(const char* path) const { return fake::files.count(path) != 0; }
-  bool mkdir(const char* path) {
+  bool mkdir(const char* path, bool = true) {
     if (!exists(path)) fake::add(path, "");
     fake::files[path]->directory = true;
     return true;
@@ -217,6 +245,7 @@ class HalStorage {
     return file;
   }
   HalFile open(const char* path, const int flags) {
+    if ((flags & O_EXCL) && exists(path)) return {};
     if (!exists(path) && (flags & O_CREAT)) fake::add(path, "");
     auto file = open(path);
     if (file && (flags & O_TRUNC)) file.node->bytes.clear();

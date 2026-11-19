@@ -2,9 +2,9 @@
 
 #include <atomic>
 #include <cstdint>
+#include <deque>
 #include <memory>
 #include <string>
-#include <deque>
 #include <vector>
 
 #include "EpdFont.h"

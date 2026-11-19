@@ -452,12 +452,12 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
     }
 
     if (self->tempItemStore) {
-    // Write manifest rows down to SD card. The full ID makes hash collisions
-    // safe while the in-memory index keeps idref lookup fast.
-    serialization::writePod(self->tempItemStore, fnvHash(itemId));
-    serialization::writePod(self->tempItemStore, static_cast<uint16_t>(itemId.size()));
-    serialization::writeString(self->tempItemStore, itemId);
-    serialization::writeString(self->tempItemStore, href);
+      // Write manifest rows down to SD card. The full ID makes hash collisions
+      // safe while the in-memory index keeps idref lookup fast.
+      serialization::writePod(self->tempItemStore, fnvHash(itemId));
+      serialization::writePod(self->tempItemStore, static_cast<uint16_t>(itemId.size()));
+      serialization::writeString(self->tempItemStore, itemId);
+      serialization::writeString(self->tempItemStore, href);
     }
 
     if (itemId == self->coverItemId) {

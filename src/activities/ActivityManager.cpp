@@ -1,9 +1,10 @@
 #include "ActivityManager.h"
-#include <TrustedTime.h>
-#include <optional>
 
 #include <AppCapabilities.h>
 #include <BlePageTurner.h>
+#include <TrustedTime.h>
+
+#include <optional>
 
 #include "GlobalHomeDispatch.h"
 #if CROSSINK_APP_CAP_AIRDROP
@@ -29,11 +30,8 @@
 #include "boot_sleep/BootActivity.h"
 #include "boot_sleep/SleepActivity.h"
 #include "browser/OpdsBookBrowserActivity.h"
-#include "components/TouchRegistry.h"
 #include "components/HeaderBackTapTarget.h"
-#include "library/LibraryListActivity.h"
-#include "plugins/PluginCatalogActivity.h"
-#include "settings/SettingsListActivity.h"
+#include "components/TouchRegistry.h"
 #include "home/AlertActivity.h"
 #include "home/CrashActivity.h"
 #include "home/FileBrowserActivity.h"
@@ -41,10 +39,12 @@
 #include "home/RecentBookProgress.h"
 #include "home/RecentBooksActivity.h"
 #include "home/RecentBooksGridActivity.h"
+#include "library/LibraryListActivity.h"
 #include "network/CrossPointWebServerActivity.h"
 #include "network/NearbyBookTransferActivity.h"
 #include "network/NearbyStatsSyncActivity.h"
 #include "network/UsbDriveActivity.h"
+#include "plugins/PluginCatalogActivity.h"
 #include "reader/BookReadingStats.h"
 #include "reader/BookStatsActivity.h"
 #include "reader/GlobalReadingStats.h"
@@ -52,6 +52,7 @@
 #include "reader/RemoteTurnGate.h"
 #include "settings/OpdsServerListActivity.h"
 #include "settings/SettingsActivity.h"
+#include "settings/SettingsListActivity.h"
 #include "util/FrontlightPanelActivity.h"
 #include "util/FullScreenMessageActivity.h"
 #include "util/TwoFingerSwipe.h"
@@ -1001,9 +1002,9 @@ bool ActivityManager::isRemoteReaderContext() const {
   for (size_t i = 0; i < MappedInputManager::BUTTON_COUNT; ++i) {
     if (mappedInput.isPhysicalPressed(static_cast<MappedInputManager::Button>(i))) return false;
   }
-  return pendingAction == PendingAction::None && currentActivity &&
-         !currentActivity->blocksGlobalInput() && !currentActivity->requiresExclusiveStorageLoop() &&
-         currentActivity->acceptsRemoteInput() && paintedVisit.load(std::memory_order_acquire) == screenVisit;
+  return pendingAction == PendingAction::None && currentActivity && !currentActivity->blocksGlobalInput() &&
+         !currentActivity->requiresExclusiveStorageLoop() && currentActivity->acceptsRemoteInput() &&
+         paintedVisit.load(std::memory_order_acquire) == screenVisit;
 }
 
 bool ActivityManager::remoteClick(const RemoteButton button) {
@@ -1014,8 +1015,7 @@ bool ActivityManager::remoteClick(const RemoteButton button) {
 bool ActivityManager::isForegroundHomeShown() const {
   return !inputLocked && pendingAction == PendingAction::None && currentActivity &&
          !currentActivity->blocksGlobalInput() && !currentActivity->requiresExclusiveStorageLoop() &&
-         currentActivity->name == "Home" &&
-         paintedVisit.load(std::memory_order_acquire) == screenVisit;
+         currentActivity->name == "Home" && paintedVisit.load(std::memory_order_acquire) == screenVisit;
 }
 
 bool ActivityManager::remoteShortcut(const bool readerMenu) {
@@ -1192,40 +1192,46 @@ void ActivityManager::goToJoinNetwork() { goToJoinNetworkFileTransfer(); }
 bool ActivityManager::handleEdgeSlide() {
   // A configured edge is never a global permission to steal Browser, Lua/game,
   // modal, consent or header-Back input. Only full reader pages opt in here.
-  if (inputLocked || pendingAction != PendingAction::None || !currentActivity ||
-      !currentActivity->isReaderActivity() || currentActivity->blocksGlobalInput() ||
-      currentActivity->requiresExclusiveStorageLoop() ||
-      paintedVisit.load(std::memory_order_acquire) != screenVisit) return false;
+  if (inputLocked || pendingAction != PendingAction::None || !currentActivity || !currentActivity->isReaderActivity() ||
+      currentActivity->blocksGlobalInput() || currentActivity->requiresExclusiveStorageLoop() ||
+      paintedVisit.load(std::memory_order_acquire) != screenVisit)
+    return false;
   MappedInputManager::CompletedSwipe multi;
   MappedInputManager::CompletedRotation rotation;
-  if (mappedInput.wasCompletedMultiTouchSwipe(multi) || mappedInput.wasCompletedMultiTouchRotation(rotation)) return false;
+  if (mappedInput.wasCompletedMultiTouchSwipe(multi) || mappedInput.wasCompletedMultiTouchRotation(rotation))
+    return false;
   MappedInputManager::SwipeDir swipe;
-  int sx=0, sy=0, ex=0, ey=0;
+  int sx = 0, sy = 0, ex = 0, ey = 0;
   if (!mappedInput.wasSwipeWithPoints(swipe, sx, sy, ex, ey)) return false;
   // Reserve both header Back and the top/bottom navigation bands.
-  if (sy < 60 || ey < 60 || sy >= renderer.getScreenHeight()-60 || ey >= renderer.getScreenHeight()-60)
+  if (sy < 60 || ey < 60 || sy >= renderer.getScreenHeight() - 60 || ey >= renderer.getScreenHeight() - 60)
     return false;
   const auto direction = EdgeSlide::directionFor(sx, sy, ex, ey, renderer.getScreenWidth(), renderer.getScreenHeight());
   if (direction == EdgeSlide::Direction::None) return false;
-  const uint8_t configured[] = {SETTINGS.leftEdgeUp, SETTINGS.leftEdgeDown, SETTINGS.rightEdgeUp, SETTINGS.rightEdgeDown};
-  const auto action = configured[static_cast<size_t>(direction)-1];
-  if (action == CrossPointSettings::TWO_FINGER_SWIPE_NOT_SET || action >= CrossPointSettings::TWO_FINGER_SWIPE_ACTION_COUNT)
+  const uint8_t configured[] = {SETTINGS.leftEdgeUp, SETTINGS.leftEdgeDown, SETTINGS.rightEdgeUp,
+                                SETTINGS.rightEdgeDown};
+  const auto action = configured[static_cast<size_t>(direction) - 1];
+  if (action == CrossPointSettings::TWO_FINGER_SWIPE_NOT_SET ||
+      action >= CrossPointSettings::TWO_FINGER_SWIPE_ACTION_COUNT)
     return false;
   if (action == CrossPointSettings::TWO_FINGER_SWIPE_INCREASE_BRIGHTNESS ||
       action == CrossPointSettings::TWO_FINGER_SWIPE_DECREASE_BRIGHTNESS) {
     if (!Frontlight.present()) return false;
     const int delta = action == CrossPointSettings::TWO_FINGER_SWIPE_INCREASE_BRIGHTNESS ? 5 : -5;
-    const auto value = static_cast<uint8_t>(std::clamp(static_cast<int>(Frontlight.brightness())+delta, 0, 100));
-    Frontlight.setBrightness(value); Frontlight.setOn(true);
-    SETTINGS.frontlightBrightness=value; SETTINGS.frontlightOn=1;
+    const auto value = static_cast<uint8_t>(std::clamp(static_cast<int>(Frontlight.brightness()) + delta, 0, 100));
+    Frontlight.setBrightness(value);
+    Frontlight.setOn(true);
+    SETTINGS.frontlightBrightness = value;
+    SETTINGS.frontlightOn = 1;
     persistGlobalSettings();
   } else if (action == CrossPointSettings::TWO_FINGER_SWIPE_INCREASE_WARMTH ||
              action == CrossPointSettings::TWO_FINGER_SWIPE_DECREASE_WARMTH) {
     if (!Frontlight.present() || !Frontlight.hasColorTemperature()) return false;
     const int delta = action == CrossPointSettings::TWO_FINGER_SWIPE_INCREASE_WARMTH ? 5 : -5;
-    const auto value = static_cast<uint8_t>(std::clamp(static_cast<int>(Frontlight.warmth())+delta, 0, 100));
+    const auto value = static_cast<uint8_t>(std::clamp(static_cast<int>(Frontlight.warmth()) + delta, 0, 100));
     Frontlight.setWarmth(value);
-    SETTINGS.frontlightWarmth=value; SETTINGS.frontlightOn=Frontlight.isOn() ? 1 : 0;
+    SETTINGS.frontlightWarmth = value;
+    SETTINGS.frontlightOn = Frontlight.isOn() ? 1 : 0;
     persistGlobalSettings();
   } else {
     currentActivity->handleTwoFingerSwipeAction(static_cast<CrossPointSettings::TWO_FINGER_SWIPE_ACTION>(action));

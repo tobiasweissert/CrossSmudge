@@ -295,7 +295,7 @@ int pngDrawCallback(PNGDRAW* pDraw) {
           uint8_t ditheredGray;
           if (useDithering) {
             ditheredGray = ctx->config->useMonochromeDither ? applyBayerDither1Bit(gray, outX, outY)
-                                                         : applyBayerDither4Level(gray, outX, outY);
+                                                            : applyBayerDither4Level(gray, outX, outY);
           } else {
             ditheredGray = gray >> 6;
           }
@@ -478,7 +478,6 @@ bool PngToFramebufferConverter::decode(const std::string& imagePath, GfxRenderer
     if (ctx.caching) ctx.cache.abort();
     return false;
   }
-
 
   // Finalize the streamed cache (caching may have been cleared on a flush error).
   if (ctx.caching) {

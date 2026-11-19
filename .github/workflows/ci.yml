@@ -42,12 +42,19 @@ jobs:
           git diff --exit-code || (echo "Please run 'bin/clang-format-fix' to fix formatting issues" && exit 1)
 
   cppcheck:
-    runs-on: ubuntu-latest
+    # The pinned analyzer requires PCRE1, absent from ubuntu-26.04.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
           persist-credentials: false
+
+      - name: Install pinned analyzer runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libpcre3
+          python3 -c 'import ctypes; ctypes.CDLL("libpcre.so.3")'
 
       - uses: actions/setup-python@v6
         with:
@@ -67,7 +74,7 @@ jobs:
           path: |
             ~/.platformio/packages
             ~/.platformio/platforms
-          key: ${{ runner.os }}-platformio-py3.14-core6.1.19-${{ hashFiles('platformio.ini', 'platformio.local.example.ini') }}
+          key: ubuntu24-cppcheck-${{ runner.arch }}-platformio-py3.14-core6.1.19-${{ hashFiles('platformio.ini', 'platformio.local.example.ini') }}
 
       - name: Install PlatformIO Core
         run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
@@ -175,6 +182,9 @@ jobs:
 
       - name: Build ${{ matrix.environment }} firmware
         id: firmware
+        env:
+          # Collect independent compiler failures without treating any as success.
+          SCONSFLAGS: --keep-going
         run: |
           set -euo pipefail
           # Raw diagnostics (including runner paths) stay inside the sealed evidence.
@@ -197,7 +207,7 @@ jobs:
           git diff --binary HEAD > sticky-evidence/source-after-build.patch
           git -C freeink-sdk diff --binary HEAD > sticky-evidence/sdk-after-build.patch
           git -C freeink-sdk ls-tree -r HEAD > sticky-evidence/sdk-tree.txt
-          pio pkg list -e sticky --json-output > sticky-evidence/resolved-packages.json
+          pio pkg list -e sticky > sticky-evidence/resolved-packages.txt
           python3 - <<'PY'
           import configparser, hashlib, json, pathlib, shutil, subprocess, sys
           sys.path.insert(0, 'scripts')
@@ -253,7 +263,9 @@ jobs:
             sticky-sealed/sealed.envelope
             sticky-sealed/receipt.json
           if-no-files-found: error
-          retention-days: 30
+          # Provider expiry starts before created_at; request a margin above the
+          # strictly verified minimum of 30 creation-relative days.
+          retention-days: 31
           compression-level: 0
 
       # Keep portable diagnostics after real compilation and evidence retention.

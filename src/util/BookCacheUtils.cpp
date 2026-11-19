@@ -5,9 +5,9 @@
 #include <Logging.h>
 #include <Txt.h>
 #include <Xtc.h>
+#include <fcntl.h>
 
 #include <algorithm>
-#include <fcntl.h>
 #include <cstring>
 #include <iterator>
 #include <vector>
@@ -278,19 +278,21 @@ bool beginCacheClear(const std::string& cachePath, const std::vector<ResolvedPre
   constexpr char intent[] = "CPCACHECLEAR1\n";
   HalFile file = Storage.open(marker.c_str(), O_WRONLY | O_CREAT | O_EXCL);
   if (!file || file.write(reinterpret_cast<const uint8_t*>(intent), sizeof(intent) - 1) != sizeof(intent) - 1 ||
-      !file.sync() || !file.close()) return false;
+      !file.sync() || !file.close())
+    return false;
   auto verify = Storage.open(marker.c_str());
   char bytes[sizeof(intent)] = {};
   return verify && verify.size() == sizeof(intent) - 1 &&
-         verify.read(bytes, sizeof(intent) - 1) == static_cast<int>(sizeof(intent) - 1) &&
-         verify.close() && memcmp(bytes, intent, sizeof(intent) - 1) == 0;
+         verify.read(bytes, sizeof(intent) - 1) == static_cast<int>(sizeof(intent) - 1) && verify.close() &&
+         memcmp(bytes, intent, sizeof(intent) - 1) == 0;
 }
 
 bool clearCacheDirectoryPreservingFiles(const std::string& cachePath, const PreservedCacheFile* fixedPreservedFiles,
                                         const size_t fixedPreservedCount, const bool includeStatsFiles,
                                         const char* statsTmpPrefix) {
   if (cachePath.empty() || Storage.exists("/.crosspoint/book-move.pending") ||
-      Storage.exists("/.crosspoint/clippings/move.pending")) return false;
+      Storage.exists("/.crosspoint/clippings/move.pending"))
+    return false;
 
   std::vector<ResolvedPreservedCacheFile> preservedFiles;
   if (!resolvePreservedFiles(cachePath, fixedPreservedFiles, fixedPreservedCount, includeStatsFiles, statsTmpPrefix,
@@ -333,8 +335,8 @@ bool isBookCacheDirectoryName(const char* name) {
 void clearBookCache(const std::string& path) { clearBookCachePreservingUserState(path); }
 
 bool clearBookCachePreservingUserState(const std::string& path) {
-  if (Storage.exists("/.crosspoint/book-move.pending") ||
-      Storage.exists("/.crosspoint/clippings/move.pending")) return false;
+  if (Storage.exists("/.crosspoint/book-move.pending") || Storage.exists("/.crosspoint/clippings/move.pending"))
+    return false;
   size_t preservedCount = 0;
   const PreservedCacheFile* preservedFiles = preservedFilesForPath(path, preservedCount);
   if (!preservedFiles || preservedCount == 0) {
