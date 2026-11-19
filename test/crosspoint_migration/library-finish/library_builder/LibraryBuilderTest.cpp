@@ -1061,16 +1061,19 @@ TEST_F(LibraryBuilderTest, LibrariesPastOldGateAndOldCeilingKeepAllOrders) {
     EXPECT_FALSE(stats.ranksDegraded);
 
     if (count == 4096) {
+      const auto previous = fake::files[INDEX]->bytes;
       fake::parses = 0;
       fake::resetIoCounters();
       ASSERT_TRUE(buildLibraryIndex("/", stats, true));
       EXPECT_EQ(fake::parses, 0u);
       EXPECT_EQ(stats.metadataReused, 4096);
-      // The fixed-size per-directory duplicate tracker is deliberately bounded
-      // below the maximum library size, so this index remains degraded. It must
-      // rebuild rather than silently preserve an old degraded header.
-      EXPECT_TRUE(stats.indexReplaced);
+      // A deterministic cap with explicit provenance is not allocation loss.
+      // Complete fresh prior claims allow an unchanged index to stay installed;
+      // PriorDedupDegradationForcesReplacement still covers ambiguous old flags.
+      EXPECT_FALSE(stats.indexReplaced);
+      EXPECT_EQ(fake::files[INDEX]->bytes, previous);
       EXPECT_TRUE(stats.dedupDegraded);
+      EXPECT_NE(previous[offsetof(ClixHeader, flags)] & CLIX_FLAG_DEDUP_CAPPED, 0);
       EXPECT_LT(fake::delays, 10000u);
     }
 

@@ -114,6 +114,8 @@ class MappedInputManager {
   bool isPowerReleaseSuppressed() const { return releaseSuppression.isPowerReleaseSuppressed(); }
   bool wasPressed(Button button) const;
   bool wasReleased(Button button) const;
+  // A short physical Power release, subject to the same cancellation as Power.
+  bool wasPowerSingleClick() const;
   void injectRelease(Button button) const { injectedReleases[static_cast<size_t>(button)] = true; }
   void clearInjectedReleases() const { injectedReleases.fill(false); }
   bool isPressed(Button button) const;

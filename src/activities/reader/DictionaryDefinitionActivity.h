@@ -21,6 +21,16 @@ class DictionaryDefinitionActivity final : public Activity {
  public:
   using BackgroundRenderFn = void (*)(void* context);
 
+  // Legacy description viewer: the fourth argument is owned text, NOT a book
+  // cache path; the optional flag identifies HTML, NOT lookup/selection mode.
+  DictionaryDefinitionActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& title,
+                               std::string text, bool html = false)
+      : DictionaryDefinitionActivity(renderer, mappedInput, title, DictLocation{}) {
+    inlineDefinition_ = true;
+    inlineDefinitionText_ = std::move(text);
+    definitionIsHtml_ = html;
+  }
+
   // showLookupButton=true:
   //   Confirm = enter word-select mode on the definition text (Look Up Word).
   //   Back (short press) = return to caller (isCancelled=true).
@@ -138,6 +148,8 @@ class DictionaryDefinitionActivity final : public Activity {
   uint32_t definitionOffset_ = 0;
   uint32_t definitionSize_ = 0;
   bool definitionIsHtml_ = false;
+  bool inlineDefinition_ = false;
+  std::string inlineDefinitionText_;
   bool definitionHtmlNeedsPlainFallback_ = false;
   bool definitionReadFailed_ = false;
   // Kept per lookup so a failed SD-font prewarm can use the matching built-in
@@ -200,6 +212,7 @@ class DictionaryDefinitionActivity final : public Activity {
 
   bool enterWordSelectMode();
   void wrapText();
+  void prepareDefinitionSource();
   // Re-parse the definition and lay out ONLY page `page` into layoutLines,
   // discarding other pages as they are produced; also recomputes totalPages.
   void loadPage(int page);

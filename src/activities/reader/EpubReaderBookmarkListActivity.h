@@ -14,7 +14,7 @@
 class EpubReaderBookmarkListActivity final : public Activity {
  public:
   EpubReaderBookmarkListActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                 const std::vector<Bookmark>& bookmarks);
+                                 const std::vector<BookmarkRecord>& bookmarks);
 
   void onEnter() override;
   void onExit() override;
@@ -24,7 +24,7 @@ class EpubReaderBookmarkListActivity final : public Activity {
   bool allowPowerAsConfirmInReaderMode() const override { return true; }
 
  private:
-  std::vector<Bookmark> bookmarks;
+  std::vector<BookmarkRecord> bookmarks;
   int selectedIndex = 0;
   bool confirmingDelete = false;
   ButtonNavigator buttonNavigator;

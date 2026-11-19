@@ -910,6 +910,7 @@ bool MappedInputManager::wasReleased(const Button button) const {
     // shortcut dispatcher cannot consume it first and leave the reader's
     // later handler to run the configured short-Power action.
     if (releaseSuppression.consumePowerRelease()) {
+      suppressedReleaseButtons |= 1u << static_cast<uint8_t>(Button::Power);
       return false;
     }
 
@@ -919,6 +920,10 @@ bool MappedInputManager::wasReleased(const Button button) const {
   const uint8_t frontButton = mappedFrontButtonFor(button);
   return simulatedRelease || mapButton(button, &HalGPIO::wasReleased) ||
          (frontButton != kNoButton && wasFrontButtonHintTapped(frontButton));
+}
+
+bool MappedInputManager::wasPowerSingleClick() const {
+  return wasReleased(Button::Power) && gpio.getPowerButtonHeldTime() < SETTINGS.getPowerButtonLongPressDuration();
 }
 
 bool MappedInputManager::isPressed(const Button button) const {

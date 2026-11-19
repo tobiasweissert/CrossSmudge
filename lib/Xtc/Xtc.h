@@ -51,6 +51,7 @@ class Xtc {
 
   // Path accessors
   const std::string& getCachePath() const { return cachePath; }
+  const std::string& getPath() const { return filepath; }
 
   // Metadata
   std::string getTitle() const;
@@ -117,6 +118,8 @@ class Xtc {
    * @return Number of bytes read
    */
   size_t loadPage(uint32_t pageIndex, uint8_t* buffer, size_t bufferSize) const;
+  xtc::XtcError loadPageStreaming(uint32_t pageIndex, std::function<void(const uint8_t*, size_t, size_t)> callback,
+                                  size_t chunkSize = 1024) const;
 
   // Progress calculation
   uint8_t calculateProgress(uint32_t currentPage) const;

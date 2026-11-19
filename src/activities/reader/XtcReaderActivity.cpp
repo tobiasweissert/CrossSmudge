@@ -61,8 +61,8 @@ enum class XtchRenderPass { Base, Lsb, Msb };
 
 bool streamXtchRenderPass(const Xtc& xtc, const uint32_t pageIndex, const uint16_t pageWidth, const uint16_t pageHeight,
                           GfxRenderer& renderer, const XtchRenderPass pass) {
-  const size_t planeSize = (static_cast<size_t>(pageWidth) * pageHeight + 7) / 8;
   const size_t colBytes = (pageHeight + 7) / 8;
+  const size_t planeSize = static_cast<size_t>(pageWidth) * colBytes;
   const xtc::XtcError error =
       xtc.loadPageStreaming(pageIndex, [&](const uint8_t* data, const size_t size, const size_t offset) {
         for (size_t i = 0; i < size; i++) {
@@ -1368,7 +1368,7 @@ bool XtcReaderActivity::drawCurrentPageToBuffer(const std::string& filePath, Gfx
   const uint8_t bitDepth = xtc.getBitDepth();
 
   // Only use the 1-bit BW path; grayscale is not needed as a background under the overlay
-  const size_t pageBufferSize = (bitDepth == 2) ? ((static_cast<size_t>(pageWidth) * pageHeight + 7) / 8) * 2
+  const size_t pageBufferSize = (bitDepth == 2) ? static_cast<size_t>(pageWidth) * ((pageHeight + 7) / 8) * 2
                                                 : ((pageWidth + 7) / 8) * pageHeight;
 
   uint8_t* pageBuffer = static_cast<uint8_t*>(malloc(pageBufferSize));
@@ -1387,10 +1387,10 @@ bool XtcReaderActivity::drawCurrentPageToBuffer(const std::string& filePath, Gfx
 
   if (bitDepth == 2) {
     // 2-bit XTH: draw all non-white pixels as black (BW pass only)
-    const size_t planeSize = (static_cast<size_t>(pageWidth) * pageHeight + 7) / 8;
+    const size_t colBytes = (pageHeight + 7) / 8;
+    const size_t planeSize = static_cast<size_t>(pageWidth) * colBytes;
     const uint8_t* plane1 = pageBuffer;
     const uint8_t* plane2 = pageBuffer + planeSize;
-    const size_t colBytes = (pageHeight + 7) / 8;
     for (uint16_t y = 0; y < pageHeight; y++) {
       for (uint16_t x = 0; x < pageWidth; x++) {
         const size_t colIndex = pageWidth - 1 - x;

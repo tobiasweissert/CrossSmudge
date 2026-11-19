@@ -18,6 +18,10 @@ struct Bookmark {
   char snippet[BOOKMARK_SNIPPET_MAX] = {};
 };
 
+// UIIcon is an unscoped enum whose Bookmark enumerator can hide the tag.
+// Keep the persisted record unchanged and resolve the tag explicitly.
+using BookmarkRecord = struct Bookmark;
+
 struct BookmarkedBookEntry {
   std::string bookTitle;
   std::string bookAuthor;
@@ -61,7 +65,7 @@ class BookmarkStore {
   void removeBookmarkForPage(uint16_t spineIndex, float pageProgress, int pageCount);
   bool removeBookmarkAt(size_t index);
   bool hasBookmarkForPage(uint16_t spineIndex, float pageProgress, int pageCount);
-  const std::vector<Bookmark>& getBookmarks() const { return bookmarks; }
+  const std::vector<BookmarkRecord>& getBookmarks() const { return bookmarks; }
 
   // Flush to disk if dirty. Called automatically by add/remove; also call from reader onExit().
   void saveToFile();
@@ -100,7 +104,7 @@ class BookmarkStore {
  private:
   static BookmarkStore instance;
 
-  std::vector<Bookmark> bookmarks;
+  std::vector<BookmarkRecord> bookmarks;
   std::string bookFilePath;
   std::string bookTitle;
   std::string bookAuthor;
@@ -108,7 +112,7 @@ class BookmarkStore {
   bool dirty = false;
 
   bool readFromFile();
-  bool readFromFile(const std::string& path, std::vector<Bookmark>& out, bool& needsRewrite) const;
+  bool readFromFile(const std::string& path, std::vector<BookmarkRecord>& out, bool& needsRewrite) const;
   bool writeToFile() const;
 };
 

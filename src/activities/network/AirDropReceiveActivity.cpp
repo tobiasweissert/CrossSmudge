@@ -14,6 +14,7 @@
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
+#include "components/UiAppHelpers.h"
 #include "fontIds.h"
 
 namespace fui = freeink::ui;

@@ -62,15 +62,16 @@ bool readBookmarkCount(FsFile& file, const uint8_t version, uint16_t& count) {
   return false;
 }
 
-bool bookmarksMatchIdentity(const Bookmark& a, const Bookmark& b) {
+bool bookmarksMatchIdentity(const BookmarkRecord& a, const BookmarkRecord& b) {
   return a.spineIndex == b.spineIndex && a.progress == b.progress;
 }
 
-bool mergeBookmarks(std::vector<Bookmark>& dst, const std::vector<Bookmark>& src) {
+bool mergeBookmarks(std::vector<BookmarkRecord>& dst, const std::vector<BookmarkRecord>& src) {
   bool mergedAny = false;
   for (const auto& bookmark : src) {
-    const auto it = std::find_if(dst.begin(), dst.end(),
-                                 [&](const Bookmark& existing) { return bookmarksMatchIdentity(existing, bookmark); });
+    const auto it = std::find_if(dst.begin(), dst.end(), [&](const BookmarkRecord& existing) {
+      return bookmarksMatchIdentity(existing, bookmark);
+    });
     if (it != dst.end()) {
       continue;
     }
@@ -279,7 +280,7 @@ bool BookmarkStore::loadForBook(const std::string& filePath, const std::string& 
 
   if (hasLegacyFile) {
     bool legacyNeedsRewrite = false;
-    std::vector<Bookmark> legacyBookmarks;
+    std::vector<BookmarkRecord> legacyBookmarks;
     if (readFromFile(legacyStoreFilePath, legacyBookmarks, legacyNeedsRewrite)) {
       const bool mergedLegacyBookmarks = mergeBookmarks(bookmarks, legacyBookmarks);
       loadedAny = true;
@@ -331,7 +332,7 @@ BookmarkStore::AddResult BookmarkStore::addBookmark(uint16_t spineIndex, float p
     const float pageSlice = 1.0f / static_cast<float>(pageCount);
     const float pageStart = progress;
     const float pageEnd = progress + pageSlice;
-    std::erase_if(bookmarks, [&](const Bookmark& b) {
+    std::erase_if(bookmarks, [&](const BookmarkRecord& b) {
       return b.spineIndex == spineIndex && b.progress >= pageStart && b.progress < pageEnd;
     });
   }
@@ -341,7 +342,7 @@ BookmarkStore::AddResult BookmarkStore::addBookmark(uint16_t spineIndex, float p
     return AddResult::LimitReached;
   }
 
-  Bookmark bm{};
+  BookmarkRecord bm{};
   bm.spineIndex = spineIndex;
   bm.progress = progress;
   bm.timestamp = 0;  // ESP32-C3 has no battery-backed RTC; reserved for future use
@@ -361,7 +362,7 @@ void BookmarkStore::removeBookmarkForPage(uint16_t spineIndex, float pageProgres
   float pageStart = pageProgress;
   float pageEnd = pageProgress + pageSlice;
 
-  auto it = std::find_if(bookmarks.begin(), bookmarks.end(), [&](const Bookmark& b) {
+  auto it = std::find_if(bookmarks.begin(), bookmarks.end(), [&](const BookmarkRecord& b) {
     return b.spineIndex == spineIndex && b.progress >= pageStart && b.progress < pageEnd;
   });
   if (it == bookmarks.end()) return;
@@ -386,7 +387,7 @@ bool BookmarkStore::hasBookmarkForPage(uint16_t spineIndex, float pageProgress, 
   float pageStart = pageProgress;
   float pageEnd = pageProgress + pageSlice;
 
-  return std::any_of(bookmarks.begin(), bookmarks.end(), [&](const Bookmark& b) {
+  return std::any_of(bookmarks.begin(), bookmarks.end(), [&](const BookmarkRecord& b) {
     return b.spineIndex == spineIndex && b.progress >= pageStart && b.progress < pageEnd;
   });
 }
@@ -426,7 +427,7 @@ bool BookmarkStore::readFromFile() {
   return true;
 }
 
-bool BookmarkStore::readFromFile(const std::string& path, std::vector<Bookmark>& out, bool& needsRewrite) const {
+bool BookmarkStore::readFromFile(const std::string& path, std::vector<BookmarkRecord>& out, bool& needsRewrite) const {
   needsRewrite = false;
   FsFile f;
   if (!Storage.openFileForRead("BKS", path, f)) {
@@ -470,9 +471,9 @@ bool BookmarkStore::readFromFile(const std::string& path, std::vector<Bookmark>&
     return false;
   }
 
-  const size_t recordSize = sizeof(Bookmark::spineIndex) + sizeof(Bookmark::progress) + sizeof(Bookmark::timestamp) +
-                            BOOKMARK_CHAPTER_TITLE_MAX +
-                            (version >= PARAGRAPH_ANCHOR_VERSION ? sizeof(Bookmark::paragraphIndex) : 0) +
+  const size_t recordSize = sizeof(BookmarkRecord::spineIndex) + sizeof(BookmarkRecord::progress) +
+                            sizeof(BookmarkRecord::timestamp) + BOOKMARK_CHAPTER_TITLE_MAX +
+                            (version >= PARAGRAPH_ANCHOR_VERSION ? sizeof(BookmarkRecord::paragraphIndex) : 0) +
                             (version >= VERSION ? BOOKMARK_SNIPPET_MAX : 0);
   const int remaining = f.available();
   if (remaining < 0 || static_cast<size_t>(remaining) / recordSize < count) {
@@ -480,10 +481,10 @@ bool BookmarkStore::readFromFile(const std::string& path, std::vector<Bookmark>&
     return false;
   }
 
-  std::vector<Bookmark> loadedBookmarks;
+  std::vector<BookmarkRecord> loadedBookmarks;
   loadedBookmarks.reserve(count);
   for (uint16_t i = 0; i < count; i++) {
-    Bookmark bm{};
+    BookmarkRecord bm{};
     if (f.available() < static_cast<int>(sizeof(bm.spineIndex))) {
       LOG_ERR("BKS", "Bookmark file truncated at spineIndex, record %u: %s", i, path.c_str());
       f.close();
@@ -584,7 +585,7 @@ bool BookmarkStore::writeToFile() const {
     const uint16_t count = static_cast<uint16_t>(bookmarks.size());
     if (!pod(VERSION) || !pod(count) || !string(bookTitle) || !string(bookAuthor) || !string(bookFilePath))
       return false;
-    return std::all_of(bookmarks.begin(), bookmarks.end(), [&](const Bookmark& bm) {
+    return std::all_of(bookmarks.begin(), bookmarks.end(), [&](const BookmarkRecord& bm) {
       return pod(bm.spineIndex) && pod(bm.progress) && pod(bm.timestamp) &&
              bytes(bm.chapterTitle, sizeof(bm.chapterTitle)) && pod(bm.paragraphIndex) &&
              bytes(bm.snippet, sizeof(bm.snippet));
@@ -640,7 +641,7 @@ bool BookmarkStore::migrateForFilePath(const std::string& oldFilePath, const std
 
   BookmarkStore sourceReader;
   sourceReader.bookFilePath = oldFilePath;
-  std::vector<Bookmark> migratedBookmarks;
+  std::vector<BookmarkRecord> migratedBookmarks;
   bool sourceNeedsRewrite = false;
   bool loadedSourceBookmarks = false;
 
@@ -656,7 +657,7 @@ bool BookmarkStore::migrateForFilePath(const std::string& oldFilePath, const std
 
   if (hasSrcLegacy) {
     bool legacyNeedsRewrite = false;
-    std::vector<Bookmark> legacyBookmarks;
+    std::vector<BookmarkRecord> legacyBookmarks;
     if (!sourceReader.readFromFile(srcLegacyPath, legacyBookmarks, legacyNeedsRewrite)) {
       LOG_ERR("BKS", "Failed to load source legacy bookmark file during path migration: %s", srcLegacyPath.c_str());
       return false;
@@ -676,7 +677,7 @@ bool BookmarkStore::migrateForFilePath(const std::string& oldFilePath, const std
 
   if (Storage.exists(dstCurrentPath.c_str())) {
     bool dstNeedsRewrite = false;
-    std::vector<Bookmark> existingBookmarks;
+    std::vector<BookmarkRecord> existingBookmarks;
     if (!destReader.readFromFile(dstCurrentPath, existingBookmarks, dstNeedsRewrite)) {
       LOG_ERR("BKS", "Failed to load destination bookmark file during path migration: %s", dstCurrentPath.c_str());
       return false;
@@ -688,7 +689,7 @@ bool BookmarkStore::migrateForFilePath(const std::string& oldFilePath, const std
 
   if (dstLegacyPath != dstCurrentPath && Storage.exists(dstLegacyPath.c_str())) {
     bool dstLegacyNeedsRewrite = false;
-    std::vector<Bookmark> existingLegacyBookmarks;
+    std::vector<BookmarkRecord> existingLegacyBookmarks;
     if (!destReader.readFromFile(dstLegacyPath, existingLegacyBookmarks, dstLegacyNeedsRewrite)) {
       LOG_ERR("BKS", "Failed to load destination legacy bookmark file during path migration: %s",
               dstLegacyPath.c_str());
@@ -785,11 +786,12 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
     return false;
   }
 
-  const auto mergeForRename = [&](std::vector<Bookmark>& destination, const std::vector<Bookmark>& source) {
+  const auto mergeForRename = [&](std::vector<BookmarkRecord>& destination, const std::vector<BookmarkRecord>& source) {
     const size_t count =
-        destination.size() + std::count_if(source.begin(), source.end(), [&](const Bookmark& bookmark) {
-          return std::none_of(destination.begin(), destination.end(),
-                              [&](const Bookmark& existing) { return bookmarksMatchIdentity(existing, bookmark); });
+        destination.size() + std::count_if(source.begin(), source.end(), [&](const BookmarkRecord& bookmark) {
+          return std::none_of(destination.begin(), destination.end(), [&](const BookmarkRecord& existing) {
+            return bookmarksMatchIdentity(existing, bookmark);
+          });
         });
     if (preserveOnRenameFailure && count > MAX_BOOKMARKS) return false;
     mergeBookmarks(destination, source);
@@ -798,7 +800,7 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
 
   BookmarkStore sourceReader;
   sourceReader.bookFilePath = oldFilePath;
-  std::vector<Bookmark> migratedBookmarks;
+  std::vector<BookmarkRecord> migratedBookmarks;
   if (hasSrcCurrent) {
     bool needsRewrite = false;
     if (!sourceReader.readFromFile(migration.sourceCurrentPath, migratedBookmarks, needsRewrite)) {
@@ -808,7 +810,7 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
   }
   if (hasSrcLegacy) {
     bool needsRewrite = false;
-    std::vector<Bookmark> legacyBookmarks;
+    std::vector<BookmarkRecord> legacyBookmarks;
     if (!sourceReader.readFromFile(migration.sourceLegacyPath, legacyBookmarks, needsRewrite)) {
       LOG_ERR("BKS", "Failed to load source legacy bookmarks for rename: %s", migration.sourceLegacyPath.c_str());
       return false;
@@ -820,7 +822,7 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
   destinationReader.bookFilePath = newFilePath;
   if (Storage.exists(migration.destinationCurrentPath.c_str())) {
     bool needsRewrite = false;
-    std::vector<Bookmark> destinationBookmarks;
+    std::vector<BookmarkRecord> destinationBookmarks;
     if (!destinationReader.readFromFile(migration.destinationCurrentPath, destinationBookmarks, needsRewrite)) {
       LOG_ERR("BKS", "Failed to load destination bookmarks for rename: %s", migration.destinationCurrentPath.c_str());
       return false;
@@ -831,7 +833,7 @@ bool BookmarkStore::beginRenameMigration(const std::string& oldFilePath, const s
   if (migration.destinationLegacyPath != migration.destinationCurrentPath &&
       Storage.exists(migration.destinationLegacyPath.c_str())) {
     bool needsRewrite = false;
-    std::vector<Bookmark> destinationLegacyBookmarks;
+    std::vector<BookmarkRecord> destinationLegacyBookmarks;
     if (!destinationReader.readFromFile(migration.destinationLegacyPath, destinationLegacyBookmarks, needsRewrite)) {
       LOG_ERR("BKS", "Failed to load destination legacy bookmarks for rename: %s",
               migration.destinationLegacyPath.c_str());

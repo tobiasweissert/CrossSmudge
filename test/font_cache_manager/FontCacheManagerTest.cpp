@@ -32,9 +32,33 @@ void* operator new(const size_t size) {
   throw std::bad_alloc();
 }
 
+void* operator new(const size_t size, const std::nothrow_t&) noexcept {
+  try {
+    return ::operator new(size);
+  } catch (const std::bad_alloc&) {
+    return nullptr;
+  }
+}
+
 void operator delete(void* allocation) noexcept { std::free(allocation); }
 
 void operator delete(void* allocation, size_t) noexcept { std::free(allocation); }
+
+void operator delete(void* allocation, const std::nothrow_t&) noexcept { std::free(allocation); }
+
+TEST(FontCacheManagerTest, NothrowAllocationUsesTheTrackedScalarAllocationFamily) {
+  heapAllocationCount = 0;
+  countHeapAllocations = true;
+  // Exercise the allocation function explicitly: Release optimizers may elide
+  // a new/delete expression, including calls to a replacement operator new.
+  auto* value = static_cast<unsigned char*>(::operator new(sizeof(unsigned char), std::nothrow));
+  countHeapAllocations = false;
+  ASSERT_NE(nullptr, value);
+  *value = 0x42;
+  EXPECT_EQ(1u, heapAllocationCount);
+  EXPECT_EQ(0x42, *value);
+  ::operator delete(value);
+}
 
 TEST(FontCacheManagerTest, PrewarmScopeBatchesEachFontAndResolvedStyleSeparately) {
   SdCardFont readerFont;

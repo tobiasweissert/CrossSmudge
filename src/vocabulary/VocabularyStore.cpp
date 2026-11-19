@@ -249,8 +249,8 @@ bool VocabularyStore::append(const VocabularyContext& context, const std::string
       LOG_ERR("VOCAB", "Not enough memory to export formatted definition");
       return false;
     }
-    plain = htmlToPlainText(definition.substr(start, bytes), DICTIONARY_PLAIN_HEADWORD_MARKER);
-    std::replace(plain.begin(), plain.end(), DICTIONARY_PLAIN_HEADWORD_MARKER, ' ');
+    // Export plain headings directly, not the retired viewer's bold-line sentinel.
+    plain = htmlToPlainText(definition.substr(start, bytes), ' ');
     const bool visible =
         std::any_of(plain.begin(), plain.end(), [](const unsigned char c) { return !std::isspace(c); });
     if (!visible) return false;

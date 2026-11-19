@@ -18,7 +18,7 @@ constexpr fui::ActionId ACTION_ROW = 1;
 }  // namespace
 
 EpubReaderBookmarkListActivity::EpubReaderBookmarkListActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                                               const std::vector<Bookmark>& bookmarks)
+                                                               const std::vector<BookmarkRecord>& bookmarks)
     : Activity("EpubReaderBookmarkList", renderer, mappedInput),
       bookmarks(bookmarks),
       uiTarget(makeUiTarget(renderer)),
@@ -135,7 +135,8 @@ void EpubReaderBookmarkListActivity::loop() {
     topIndex = followListSelection(selectedIndex, topIndex, visibleRows, total);
     requestUpdate();
   };
-  buttonNavigator.onNextRelease([this, total, &move] { move(ButtonNavigator::nextIndex(selectedIndex, total)); });
+  buttonNavigator.onRelease(ButtonNavigator::getNextButtons(),
+                            [this, total, &move] { move(ButtonNavigator::nextIndex(selectedIndex, total)); });
   buttonNavigator.onPreviousRelease(
       [this, total, &move] { move(ButtonNavigator::previousIndex(selectedIndex, total)); });
   buttonNavigator.onNextContinuous(
@@ -164,7 +165,7 @@ void EpubReaderBookmarkListActivity::buildListScreen(UiApp::ScreenType& screen) 
   std::vector<fui::ListItem> items;
   items.reserve(bookmarks.size());
   for (size_t i = 0; i < bookmarks.size(); ++i) {
-    const Bookmark& bookmark = bookmarks[i];
+    const BookmarkRecord& bookmark = bookmarks[i];
     values[i] = std::to_string(static_cast<int>(std::lround(bookmark.progress * 100.0))) + "%";
     fui::ListItem item;
     item.label = bookmark.snippet[0] != '\0'

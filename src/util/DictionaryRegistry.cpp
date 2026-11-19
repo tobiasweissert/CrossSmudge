@@ -20,6 +20,17 @@ static constexpr const char* DICT_ROOT_CANDIDATES[] = {
 };
 
 bool DictionaryRegistry::discover() {
+  const bool found = scan(entries_, root_);
+  if (found) maybeAutoSelectDefaultDictionary();
+  return found;
+}
+
+bool DictionaryRegistry::discover(std::vector<DictionaryEntry>& out) {
+  std::string root;
+  return scan(out, root);
+}
+
+bool DictionaryRegistry::scan(std::vector<DictionaryEntry>& entries_, std::string& root_) {
   entries_.clear();
   entries_.reserve(16);
   root_.clear();
@@ -146,8 +157,6 @@ bool DictionaryRegistry::discover() {
     }
     return *s1 == '\0' && *s2 != '\0';
   });
-
-  maybeAutoSelectDefaultDictionary();
 
   return !entries_.empty();
 }

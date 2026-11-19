@@ -1,0 +1,46 @@
+int main() {
+  GfxRenderer renderer;
+  MappedInputManager input;
+  ButtonNavigator::setMappedInputManager(input);
+  BOOKMARKS.loadForBook("/ui.epub", "UI", "Author", "epub");
+  BOOKMARKS.addBookmark(3, .25f, 8, "First", 7, "First snippet");
+  BOOKMARKS.addBookmark(9, .75f, 8, "Second", 31, "Second snippet");
+  EpubReaderBookmarkListActivity list(renderer, input, BOOKMARKS.getBookmarks());
+  list.onEnter();
+  assert(list.bookmarks.size() == 2 && list.selectedIndex == 0);
+  input.release = MappedInputManager::Button::NavNext;
+  input.released = true;
+  list.loop();
+  assert(list.selectedIndex == 1);
+  list.loop();
+  assert(list.selectedIndex == 0);
+  input.released = false;
+  freeink::ui::ActionEvent event{};
+  event.value = -1;
+  EpubReaderBookmarkListActivity::onRowEvent(event, &list);
+  assert(!list.finished && list.selectedIndex == 0);
+  event.value = 1;
+  event.longPress = true;
+  EpubReaderBookmarkListActivity::onRowEvent(event, &list);
+  assert(list.selectedIndex == 1 && list.confirmingDelete && !list.finished);
+  list.confirmingDelete = false;
+  event.longPress = false;
+  EpubReaderBookmarkListActivity::onRowEvent(event, &list);
+  const auto result = std::get<BookmarkResult>(list.result.data);
+  assert(list.finished && result.spineIndex == 9 && result.progress == .75f && result.paragraphIndex == 31);
+  EpubReaderBookmarkListActivity deleting(renderer, input, BOOKMARKS.getBookmarks());
+  deleting.selectedIndex = 1;
+  deleting.deleteSelectedBookmark();
+  assert(deleting.bookmarks.size() == 1 && deleting.selectedIndex == 0);
+  assert(deleting.bookmarks[0].spineIndex == 3 && deleting.bookmarks[0].paragraphIndex == 7);
+  deleting.deleteSelectedBookmark();
+  assert(deleting.bookmarks.empty() && deleting.selectedIndex == 0);
+  deleting.selectBookmark();
+  assert(!deleting.finished);
+  input.release = MappedInputManager::Button::Back;
+  input.released = true;
+  deleting.loop();
+  assert(deleting.finished && deleting.result.isCancelled);
+  std::cout
+      << "PASS list exact selection target, long-press, stale row, real navigation wrap, deletion/clamp and Back\n";
+}

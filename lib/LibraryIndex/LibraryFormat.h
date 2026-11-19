@@ -64,6 +64,10 @@ enum ClixFlags : uint8_t {
   CLIX_FLAG_RANKS_DEGRADED = 1 << 0,
   CLIX_FLAG_DEDUP_DEGRADED = 1 << 1,
   CLIX_FLAG_ARRIVAL_DEGRADED = 1 << 2,
+  // Refines DEDUP_DEGRADED: the fixed tracker reached its deterministic cap,
+  // not an allocation failure. Older ambiguous degraded indexes must rebuild.
+  // Additive flag; layout, firstSeen reconciliation and legacy files unchanged.
+  CLIX_FLAG_DEDUP_CAPPED = 1 << 3,
 };
 
 enum ClixMetadataStatus : uint8_t {

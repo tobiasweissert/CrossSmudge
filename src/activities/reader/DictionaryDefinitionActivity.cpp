@@ -26,6 +26,7 @@
 #include "fontIds.h"
 #include "util/Dictionary.h"
 #include "util/DictionaryActivityUtils.h"
+#include "util/HtmlToPlainText.h"
 #include "util/IpaUtils.h"
 #include "util/LookupHistory.h"
 #include "util/TextPool.h"
@@ -577,8 +578,31 @@ void DictionaryDefinitionActivity::wrapText() {
   linesPerPage = (bodyBottom - bodyStartY) / getLineHeight();
   if (linesPerPage < 1) linesPerPage = 1;
 
-  // Resolve the immutable definition slice once. Page turns reuse it instead
-  // of reopening the dictionary metadata files before every layout pass.
+  prepareDefinitionSource();
+
+  prepareDefinitionFontAdvances();
+  loadPage(currentPage);
+  // Pick the modal height once per definition. Page turns re-fill the content
+  // without moving the frame, so the last (usually shorter) page feels like
+  // part of the same lookup rather than a different modal.
+  if (hasModalBackground()) sizeModalForCurrentPage();
+}
+
+void DictionaryDefinitionActivity::prepareDefinitionSource() {
+  if (inlineDefinition_) {
+    // Description callers already own the text. Convert HTML once, then reuse
+    // normal paged plain layout without opening or changing any dictionary.
+    if (definitionIsHtml_) inlineDefinitionText_ = htmlToPlainText(std::move(inlineDefinitionText_), ' ');
+    definitionIsHtml_ = false;
+    definitionReadFailed_ = false;
+    definitionOffset_ = 0;
+    definitionSize_ = static_cast<uint32_t>(inlineDefinitionText_.size());
+    definitionHtmlNeedsPlainFallback_ = false;
+    return;
+  }
+
+  // Resolve the immutable slice once. Preserve the matched spelling, selected
+  // dictionary and per-book context supplied by the modern lookup flow.
   const DictInfo info = Dictionary::readInfo(foundLocation.folderPath.c_str());
   const DictDefinitionSlice slice = Dictionary::resolveDefinitionSlice(foundLocation, info);
   definitionReadFailed_ = !slice.found;
@@ -589,13 +613,6 @@ void DictionaryDefinitionActivity::wrapText() {
   definitionSize_ = slice.size;
   definitionIsHtml_ = slice.isHtml;
   definitionHtmlNeedsPlainFallback_ = false;
-
-  prepareDefinitionFontAdvances();
-  loadPage(currentPage);
-  // Pick the modal height once per definition. Page turns re-fill the content
-  // without moving the frame, so the last (usually shorter) page feels like
-  // part of the same lookup rather than a different modal.
-  if (hasModalBackground()) sizeModalForCurrentPage();
 }
 
 void DictionaryDefinitionActivity::drawModalFrame() const {
@@ -695,7 +712,9 @@ void DictionaryDefinitionActivity::prepareDefinitionFontAdvances() {
   collectDefinitionAdvanceText(kBullet, EpdFontFamily::REGULAR);
 
   const std::string dictPath = foundLocation.folderPath + ".dict";
-  if (definitionIsHtml_) {
+  if (inlineDefinition_) {
+    collectDefinitionAdvanceText(inlineDefinitionText_.c_str(), EpdFontFamily::REGULAR);
+  } else if (definitionIsHtml_) {
     const DictHtmlRenderer::SpanSink sink{this, &DictionaryDefinitionActivity::collectSpanForAdvances};
     if (!htmlRenderer_.renderFromFileStreaming(dictPath.c_str(), definitionOffset_, definitionSize_, sink)) {
       definitionHtmlNeedsPlainFallback_ = true;
@@ -935,6 +954,23 @@ void DictionaryDefinitionActivity::wrapPlain() {
   };
 
   const StyledSpan space{.text = " "};
+
+  if (inlineDefinition_) {
+    for (const char c : inlineDefinitionText_) {
+      if (c == '\0' || c == ' ' || c == '\n') {
+        feedWord();
+        if (c == '\n')
+          wrapper.lineBreak();
+        else
+          wrapper.onSpan(space);
+      } else {
+        currentWord += c;
+      }
+    }
+    feedWord();
+    wrapper.finish();
+    return;
+  }
 
   // Stream from .dict file — the full definition is never held in RAM.
   const std::string dictPath = foundLocation.folderPath + ".dict";

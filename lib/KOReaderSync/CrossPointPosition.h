@@ -18,4 +18,5 @@ struct CrossPointPosition {
   char xpathAnchorId[64] = {};         // First <a id> captured inside the matched XPath element
   bool hasResolvedSpineIndex = false;  // Spine came from local state or a content anchor, not percentage
   bool hasMappedPage = false;          // Page came from local layout data, not percentage scaling
+  bool valid = true;                   // False when the requested coordinate mapping is unavailable
 };

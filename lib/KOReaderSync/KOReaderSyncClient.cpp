@@ -7,9 +7,9 @@
 #include <cstring>
 #include <string>
 
+#include "../../src/network/HttpDownloader.h"
+#include "../../src/network/HttpRedirectPolicy.h"
 #include "KOReaderCredentialStore.h"
-#include "network/HttpDownloader.h"
-#include "network/HttpRedirectPolicy.h"
 
 int KOReaderSyncClient::lastHttpCode = 0;
 

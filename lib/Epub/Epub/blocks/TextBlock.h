@@ -131,7 +131,10 @@ class TextBlock final : public Block {
   int wordYOffset(const GfxRenderer& renderer, int sectionFontId, uint16_t i) const;
   // Extra height the line needs beyond its block font for taller words.
   int extraAscent(const GfxRenderer& renderer, int sectionFontId) const;
-  bool isEmpty() override { return numWords == 0; }
+  bool isEmpty() override { return static_cast<const TextBlock&>(*this).isEmpty(); }
+  bool isEmpty() const { return numWords == 0; }
+  // Independent snapshot for transient previews; never borrows a PageLine arena.
+  std::unique_ptr<TextBlock> clone() const;
   bool valid() const { return isValid; }
   uint16_t wordCount() const { return numWords; }
   // NUL-terminated by construction; safe to pass to C APIs directly.

@@ -285,6 +285,9 @@ class Page {
                        [](const std::unique_ptr<PageElement>& el) { return el->getTag() == TAG_PageImage; });
   }
 
+  // Union of visible image rectangles in page coordinates (before reader margins).
+  bool getImageBoundingBox(int16_t& x, int16_t& y, int16_t& width, int16_t& height) const;
+
   void prepareImageCaches() const;
 
   bool hasImagesNeedingDecode() const {

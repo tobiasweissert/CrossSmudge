@@ -13,9 +13,14 @@
  * Progress position representation.
  */
 struct SavedProgressPosition {
-  std::string xpath;  // XPath-like progress string
-  float percentage;   // Progress percentage (0.0 to 1.0)
+  std::string xpath;     // XPath-like progress string
+  float percentage = 0;  // Progress percentage (0.0 to 1.0)
+  bool valid = true;     // False when requested coordinate conversion is unavailable
 };
+
+// Standard KOReader wire position, not the optional rich position extension.
+using KOReaderPosition = SavedProgressPosition;
+enum class PositionCoordinateSpace : uint8_t { CurrentDocument, SourceDocument };
 
 /**
  * Maps between CrossPoint and SavedProgress position formats, such as those used by KOReader.
@@ -30,6 +35,15 @@ struct SavedProgressPosition {
  */
 class ProgressMapper {
  public:
+  static KOReaderPosition toKOReader(
+      const std::shared_ptr<Epub>& epub, const CrossPointPosition& pos,
+      PositionCoordinateSpace coordinateSpace = PositionCoordinateSpace::CurrentDocument);
+
+  // Sync callers supply the renderer whose local section LUTs resolve content anchors.
+  static CrossPointPosition toCrossPoint(const std::shared_ptr<Epub>& epub, const KOReaderPosition& pos,
+                                         GfxRenderer& renderer, int currentSpineIndex, int totalPagesInCurrentSpine,
+                                         PositionCoordinateSpace coordinateSpace);
+
   /**
    * Convert CrossPoint position to SavedProgress format.
    *

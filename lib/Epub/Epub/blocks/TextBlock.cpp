@@ -23,6 +23,34 @@ size_t TextBlock::arenaSize(const uint16_t wordCount, const bool hasFocus, const
   return size + wordCount * 4U + textBytes;
 }
 
+std::unique_ptr<TextBlock> TextBlock::clone() const {
+  if (!isValid) return nullptr;
+  std::unique_ptr<TextBlock> copy(new (std::nothrow) TextBlock());
+  if (!copy) return nullptr;
+  copy->blockStyle = blockStyle;
+  copy->numWords = numWords;
+  copy->paragraphStartWord = paragraphStartWord;
+  copy->textBytes = textBytes;
+  copy->focusPresent = focusPresent;
+  copy->layoutReferenceOffset = layoutReferenceOffset;
+  if (numWords != 0) {
+    const size_t bytes = arenaSize(numWords, focusPresent, textBytes);
+    copy->arena = makeUniqueNoThrow<uint8_t[]>(bytes);
+    if (!copy->arena) return nullptr;
+    std::memcpy(copy->arena.get(), arena.get(), bytes);
+    copy->bindArenaPointers();
+  }
+  if (wordFontData) {
+    const size_t bytes = sizeof(int32_t) * MAX_WORD_FONTS + numWords;
+    copy->wordFontData = makeUniqueNoThrow<uint8_t[]>(bytes);
+    if (!copy->wordFontData) return nullptr;
+    std::memcpy(copy->wordFontData.get(), wordFontData.get(), bytes);
+  }
+  copy->rubyTexts = rubyTexts;
+  copy->linkSpans = linkSpans;
+  return copy;
+}
+
 void TextBlock::bindArenaPointers() {
   uint8_t* base = arena.get();
   const size_t wc = numWords;

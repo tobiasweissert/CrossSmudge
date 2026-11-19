@@ -445,8 +445,47 @@ TEST_F(LibraryBuilderTest, MetadataModeChangesInvalidateCachedMetadata) {
   EXPECT_EQ(index.header().metadataEnabled, 0);
   index.close();
 
+  // This case isolates invalidation of the installed index's metadata mode.
+  // The independent resumable source cache is qualified separately below.
+  ASSERT_TRUE(Storage.remove("/.crosspoint/crosscub-library-v7.meta"));
+  ASSERT_TRUE(Storage.remove("/.crosspoint/crosscub-library-v7.metd"));
   ASSERT_TRUE(buildLibraryIndex("/", stats, true));
   EXPECT_EQ(fake::parses, 2u);
+  EXPECT_EQ(stats.metadataCached, 0);
+}
+
+TEST_F(LibraryBuilderTest, MetadataModeRoundTripReusesOnlyFreshSourceCache) {
+  bookMetadata["/a.epub"].title = "Cached title";
+  initial();
+  fake::parses = 0;
+  ASSERT_TRUE(buildLibraryIndex("/", stats, false));
+  ASSERT_TRUE(buildLibraryIndex("/", stats, true));
+  EXPECT_EQ(fake::parses, 0u);
+  EXPECT_EQ(stats.metadataCached, 2);
+  EXPECT_EQ(stats.metadataReused, 0);
+
+  ASSERT_TRUE(buildLibraryIndex("/", stats, false));
+  bookMetadata["/a.epub"].title = "Changed source title";
+  fake::files["/a.epub"]->time++;
+  ASSERT_TRUE(buildLibraryIndex("/", stats, true));
+  EXPECT_EQ(fake::parses, 1u);
+  EXPECT_EQ(stats.metadataCached, 1);
+  LibraryIndexFile index;
+  ASSERT_TRUE(index.open(INDEX));
+  EXPECT_EQ(index.header().metadataEnabled, 1);
+  bool found = false;
+  for (uint16_t i = 0; i < index.bookCount(); ++i) {
+    ClixRecord record{};
+    std::string path;
+    std::string title;
+    ASSERT_TRUE(index.readRecord(i, record));
+    ASSERT_TRUE(index.readPath(record, path));
+    if (path != "/a.epub") continue;
+    ASSERT_TRUE(index.readTitle(record, title));
+    EXPECT_EQ(title, "Changed source title");
+    found = true;
+  }
+  EXPECT_TRUE(found);
 }
 
 TEST_F(LibraryBuilderTest, RebuildVotesFromSourceAuthorInsteadOfPriorCanonicalAuthor) {
@@ -592,8 +631,11 @@ TEST_F(LibraryBuilderTest, ReadWriteCloseAndAllocationFailuresRetainPreviousInde
   EXPECT_FALSE(buildLibraryIndex("/", stats, true));
   EXPECT_EQ(fake::files[INDEX]->bytes, old);
 
-  fake::failAlloc = 3;
+  // Fail the mandatory name buffer, not an optional/fallback scratch owner.
+  fake::failAlloc = 0;
+  fake::failureTriggered = false;
   EXPECT_FALSE(buildLibraryIndex("/", stats, true));
+  EXPECT_TRUE(fake::failureTriggered);
   EXPECT_EQ(fake::files[INDEX]->bytes, old);
   fake::failAlloc = -1;
 
@@ -669,13 +711,124 @@ TEST_F(LibraryBuilderTest, LibrariesPastOldGateAndAtFormatCeilingKeepAllOrders) 
   }
 }
 
+TEST_F(LibraryBuilderTest, PrivateExplicitRootsArePrunedAtEveryDepthAndAlias) {
+  for (const auto* root : {"/apps", "/Books/ApPs", "/Books/.receive", "/Books/.recovery", "/Books/XTCache",
+                           "/Books/System Volume Information", "/Books/$RECYCLE.BIN"}) {
+    for (const auto* alias : {"", "/./", "/"}) {
+      fake::reset();
+      const std::string path = std::string(root) + "/nested/book.txt";
+      fake::add(path);
+      const std::string scanRoot = std::string(alias) + root;
+      EXPECT_FALSE(isLibraryBookFile(scanRoot + "/nested/book.txt"));
+      ASSERT_TRUE(buildLibraryIndex(scanRoot.c_str(), stats, false));
+      EXPECT_EQ(stats.books, 0);
+      EXPECT_EQ(fake::directoryEntriesByPath[std::string(root) + "/nested"], 0u);
+      EXPECT_EQ(fake::directoryEntriesByPath[path], 0u);
+    }
+  }
+}
+
+TEST_F(LibraryBuilderTest, CappedReconciliationDoesNotHideChangesOrDuplicateMultiplicity) {
+  fake::reset();
+  const unsigned count = LIBRARY_MAX_DEDUP_KEYS + 3;
+  for (unsigned i = 0; i < count; i++)
+    fake::add("/book" + numbered("", i) + ".txt", i == 0 ? "unique-size-book" : "book");
+  ASSERT_TRUE(buildLibraryIndex("/", stats, false));
+  const std::string last = "/book" + numbered("", count - 1) + ".txt";
+  // An untracked duplicate has its own prior claim; count equality alone must
+  // never hide an addition, a removal, or a same-count identity substitution.
+  fake::duplicateDirectoryEntry(last);
+  ASSERT_TRUE(buildLibraryIndex("/", stats, false));
+  EXPECT_TRUE(stats.indexReplaced);
+  EXPECT_EQ(stats.books, count + 1);
+  fake::extraDirectoryEntries.clear();
+  ASSERT_TRUE(buildLibraryIndex("/", stats, false));
+  EXPECT_TRUE(stats.indexReplaced);
+  EXPECT_EQ(stats.removed, 1);
+  fake::files[last]->time++;
+  ASSERT_TRUE(buildLibraryIndex("/", stats, false));
+  EXPECT_TRUE(stats.indexReplaced);
+  fake::files.erase("/book0000.txt");
+  fake::duplicateDirectoryEntry(last);
+  ASSERT_TRUE(buildLibraryIndex("/", stats, false));
+  EXPECT_TRUE(stats.indexReplaced);
+  EXPECT_EQ(stats.books, count);
+  EXPECT_EQ(stats.removed, 1);
+}
+
+TEST_F(LibraryBuilderTest, DuplicateAllocationLossMustNotUseUnchangedShortcutOrPersistAsCap) {
+  initial();
+  fake::failAlloc = 2;  // mandatory name, staging record, then dedup keys
+  ASSERT_TRUE(buildLibraryIndex("/", stats, true));
+  ASSERT_TRUE(fake::failureTriggered);
+  EXPECT_TRUE(stats.dedupAllocFailed);
+  EXPECT_TRUE(stats.indexReplaced);
+  // Even a successful following allocation cannot bless the old OOM build.
+  ASSERT_TRUE(buildLibraryIndex("/", stats, true));
+  EXPECT_TRUE(stats.indexReplaced);
+  EXPECT_FALSE(stats.dedupDegraded);
+}
+
+TEST_F(LibraryBuilderTest, AmbiguousPriorDegradationMustRebuildAndKeepFirstSeen) {
+  initial();
+  auto& bytes = fake::files[INDEX]->bytes;
+  bytes[offsetof(ClixHeader, flags)] |= CLIX_FLAG_DEDUP_DEGRADED;
+  LibraryIndexFile before;
+  ASSERT_TRUE(before.open(INDEX));
+  ClixRecord prior{};
+  ASSERT_TRUE(before.readRecord(0, prior));
+  before.close();
+  ASSERT_TRUE(buildLibraryIndex("/", stats, true));
+  EXPECT_TRUE(stats.indexReplaced);
+  LibraryIndexFile after;
+  ASSERT_TRUE(after.open(INDEX));
+  ClixRecord current{};
+  ASSERT_TRUE(after.readRecord(0, current));
+  EXPECT_EQ(current.firstSeen, prior.firstSeen);
+  EXPECT_EQ(after.header().flags & CLIX_FLAG_DEDUP_DEGRADED, 0);
+}
+
+TEST_F(LibraryBuilderTest, CappedProvenanceIsExplicitAndOldAmbiguousCapsRebuildOnce) {
+  fake::reset();
+  for (unsigned i = 0; i < LIBRARY_MAX_DEDUP_KEYS + 2; i++) fake::add("/book" + numbered("", i) + ".txt");
+  ASSERT_TRUE(buildLibraryIndex("/", stats, false));
+  auto& bytes = fake::files[INDEX]->bytes;
+  ASSERT_NE(bytes[offsetof(ClixHeader, flags)] & CLIX_FLAG_DEDUP_CAPPED, 0);
+  bytes[offsetof(ClixHeader, flags)] &= ~CLIX_FLAG_DEDUP_CAPPED;
+  LibraryIndexFile before;
+  ASSERT_TRUE(before.open(INDEX));
+  ClixRecord prior{};
+  ASSERT_TRUE(before.readRecord(0, prior));
+  before.close();
+  ASSERT_TRUE(buildLibraryIndex("/", stats, false));
+  EXPECT_TRUE(stats.indexReplaced);
+  LibraryIndexFile after;
+  ASSERT_TRUE(after.open(INDEX));
+  ClixRecord current{};
+  ASSERT_TRUE(after.readRecord(0, current));
+  EXPECT_EQ(current.firstSeen, prior.firstSeen);
+  EXPECT_NE(after.header().flags & CLIX_FLAG_DEDUP_CAPPED, 0);
+  after.close();
+  ASSERT_TRUE(buildLibraryIndex("/", stats, false));
+  EXPECT_FALSE(stats.indexReplaced);
+  fake::failAlloc = 2;
+  ASSERT_TRUE(buildLibraryIndex("/", stats, false));
+  ASSERT_TRUE(stats.dedupAllocFailed);
+  EXPECT_TRUE(stats.indexReplaced);
+  EXPECT_EQ(fake::files[INDEX]->bytes[offsetof(ClixHeader, flags)] & CLIX_FLAG_DEDUP_CAPPED, 0);
+  ASSERT_TRUE(buildLibraryIndex("/", stats, false));
+  EXPECT_TRUE(stats.indexReplaced);
+}
+
 TEST_F(LibraryBuilderTest, SortAllocationFailureProducesValidDegradedIndex) {
   fake::reset();
   for (unsigned i = 0; i < 513; i++) fake::add("/book" + numbered("", i) + ".txt");
-  fake::failAlloc = 6;
+  fake::failAllocationType = "SpellingSlot";
 
   ASSERT_TRUE(buildLibraryIndex("/", stats, false));
   EXPECT_TRUE(fake::failureTriggered);
+  EXPECT_EQ(fake::triggeredAllocationType, "SpellingSlot");
+  EXPECT_TRUE(fake::failAllocationType.empty());
   EXPECT_TRUE(stats.ranksDegraded);
   EXPECT_TRUE(stats.indexReplaced);
 

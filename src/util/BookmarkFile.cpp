@@ -5,14 +5,31 @@
 #include <Logging.h>
 #include <PersistableStore.h>
 
-#include "BookmarkUtil.h"
+#include <algorithm>
+
+namespace {
+constexpr char BOOKMARKS_DIR[] = "/.crosspoint/bookmarks/";
+
+// Retain the upstream JSON filename derivation exactly. The owner binary
+// BookmarkStore uses a separate hash/versioned format in the same directory.
+std::string bookmarkPath(const std::string& bookPath) {
+  std::string bookName = std::string(bookPath).erase(0, 1);
+  std::replace(bookName.begin(), bookName.end(), '/', '_');
+  std::replace(bookName.begin(), bookName.end(), '\\', '_');
+  const size_t lastDot = bookName.find_last_of('.');
+  if (lastDot != std::string::npos) {
+    bookName.erase(lastDot);
+  }
+  return std::string(BOOKMARKS_DIR) + bookName + ".json";
+}
+}  // namespace
 
 bool BookmarkFile::load(const std::string& bookPath, std::vector<BookmarkEntry>& bookmarks) {
   bookmarks.clear();
 
   // Read/write go through PersistableStoreBase so the JSON parser and
   // serializer stay instantiated once, in PersistableStore.cpp.
-  const std::string path = BookmarkUtil::getBookmarkPath(bookPath);
+  const std::string path = bookmarkPath(bookPath);
   JsonDocument doc;
   if (!PersistableStoreBase::readDocFromFile(path.c_str(), doc)) {
     return false;
@@ -71,7 +88,7 @@ bool BookmarkFile::save(const std::string& bookPath, const std::vector<BookmarkE
   }
 
   // writeDocToFile ensures /.crosspoint; the bookmarks subdirectory is ours.
-  Storage.mkdir(BookmarkUtil::getBookmarksDir().c_str());
-  const std::string path = BookmarkUtil::getBookmarkPath(bookPath);
+  Storage.mkdir(BOOKMARKS_DIR);
+  const std::string path = bookmarkPath(bookPath);
   return PersistableStoreBase::writeDocToFile(path.c_str(), doc);
 }

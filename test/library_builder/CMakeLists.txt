@@ -19,3 +19,8 @@ target_include_directories(LibraryBuilderTest PRIVATE
 )
 target_link_libraries(LibraryBuilderTest PRIVATE crosspoint_test_common GTest::gtest_main EXPAT::EXPAT)
 gtest_discover_tests(LibraryBuilderTest)
+
+add_executable(HalStorageShortWriteTest HalStorageShortWriteTest.cpp)
+target_include_directories(HalStorageShortWriteTest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/stubs)
+target_compile_options(HalStorageShortWriteTest PRIVATE -UNDEBUG)
+add_test(NAME HalStorageShortWriteTest COMMAND HalStorageShortWriteTest)

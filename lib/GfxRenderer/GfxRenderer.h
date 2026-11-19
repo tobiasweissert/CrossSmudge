@@ -331,6 +331,7 @@ class GfxRenderer {
   // grayscale planes band-by-band without a full second buffer.
   void beginStripTarget(uint8_t* scratch, int stripY0, int stripRows) const;
   void endStripTarget() const;
+  bool isStripTargetActive() const { return _stripActive; }
 
   // Band culling for tiled grayscale. Takes a glyph bounding box in logical
   // screen coords and returns false only when a strip is active AND the box's

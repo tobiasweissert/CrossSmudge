@@ -127,6 +127,8 @@ class HalFile : public Print {
   size_t fileSize();
   uint64_t fileSize64();
   uint32_t modificationTime();
+  // Packed FAT date/time, or zero when birth time is unavailable.
+  uint32_t creationTime();
   bool truncate(uint64_t length);
   bool seek(size_t pos);
   bool seek64(uint64_t pos);

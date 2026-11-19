@@ -3,6 +3,7 @@
 #include <I18n.h>
 
 #include "CrossPointSettings.h"
+#include "util/HomeButtonInput.h"
 
 namespace home_button {
 inline constexpr StrId ACTION_LABELS[] = {StrId::STR_HOME_SHORTCUT,

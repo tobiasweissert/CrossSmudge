@@ -40,10 +40,12 @@ class TouchReaderPreviewModel {
       }
       if (blockTextSize > text.size() - textSize) break;
 
+      auto snapshot = block->clone();
+      if (!snapshot) break;
       Line& line = lines[lineCount++];
       line.x = pageLine.xPos;
       line.y = pageLine.yPos;
-      line.sourceBlock = block;
+      line.sourceBlock = std::move(snapshot);
       line.firstWord = wordCount;
       line.wordCount = block->wordCount();
       line.style = block->getBlockStyle();
@@ -126,8 +128,8 @@ class TouchReaderPreviewModel {
     }
   }
 
-  // Keep the source blocks alive so unchanged settings use the reader's exact
-  // rendering, including justification, ruby, bidi, and focus run positions.
+  // Own independent source snapshots so unchanged settings use exact rendering
+  // even after the reader replaces its uniquely owned page.
   // TextBlock::render writes pixels through the renderer, so this must remain
   // a mutable reference despite cppcheck not seeing that dependency.
   // cppcheck-suppress constParameterReference
@@ -151,7 +153,7 @@ class TouchReaderPreviewModel {
   };
 
   struct Line {
-    std::shared_ptr<TextBlock> sourceBlock;
+    std::unique_ptr<TextBlock> sourceBlock;
     int16_t x = 0;
     int16_t y = 0;
     uint16_t firstWord = 0;

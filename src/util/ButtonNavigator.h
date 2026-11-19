@@ -32,6 +32,10 @@ class ButtonNavigator final {
   static void onPreviousPress(const Callback& callback);
   static void onPress(const Buttons& buttons, const Callback& callback);
 
+  // Poll once per input frame, before onNextContinuous. Short taps fire only
+  // on release; a hold that already repeated cancels that deferred tap.
+  // Callbacks are invoked synchronously, never retained (callers borrow locals).
+  void onNextRelease(const Callback& callback);
   void onPreviousRelease(const Callback& callback);
   void onRelease(const Buttons& buttons, const Callback& callback);
 

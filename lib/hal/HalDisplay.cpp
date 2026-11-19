@@ -158,6 +158,7 @@ uint16_t HalDisplay::getDisplayWidthBytes() const { return einkDisplay.getDispla
 uint32_t HalDisplay::getBufferSize() const { return einkDisplay.getBufferSize(); }
 
 HalDisplay::Controller HalDisplay::getController() const { return BoardConfig::ACTIVE.displayController; }
+const char* HalDisplay::controllerName() const { return einkDisplay.getControllerName(); }
 void HalDisplay::controllerIdle() {
   HalSpiBus::Lock spiLock;
   einkDisplay.controllerIdle();

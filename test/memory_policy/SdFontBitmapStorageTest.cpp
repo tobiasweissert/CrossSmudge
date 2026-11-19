@@ -93,7 +93,11 @@ TEST_F(SdFontBitmapStorageTest, FailureInvalidatesViewsAndCanRecover) {
   EXPECT_TRUE(fakeheap::live.empty());
   fakeheap::internal.largest = 1024 * 1024;
   ASSERT_EQ(font.prewarm("ABC", 1), 0);
+  EXPECT_FALSE(font.lastPrewarmFailed());
   EXPECT_NE(font.getEpdFont()->data->bitmap, nullptr);
+  // A codepoint absent from the font is a coverage miss, not an OOM latch.
+  EXPECT_GT(font.prewarm("Z", 1), 0);
+  EXPECT_FALSE(font.lastPrewarmFailed());
 }
 TEST_F(SdFontBitmapStorageTest, C3AndAdmittedInternalFallbackAndMetadataOnly) {
   for (bool psram : {false, true}) {
@@ -149,11 +153,33 @@ TEST_F(SdFontBitmapStorageTest, ExternalBitmapsStillHonorUnderuseAndInternalPres
   ASSERT_TRUE(font.load("large.cpfont"));
   ASSERT_EQ(font.prewarm(range(0, 500).c_str(), 1), 0);
   ASSERT_NE(font.getEpdFont()->data->bitmap, nullptr);
+  const auto denseBytes = fakeheap::live.at(font.getEpdFont()->data->bitmap).bytes;
   for (int i = 0; i < 3; ++i) {
-    ASSERT_EQ(font.prewarm(range(500 + i * 25, 25).c_str(), 1), 0);
+    const auto text = range(500 + i * 25, 25);
+    ASSERT_EQ(font.prewarm(text.c_str(), 1), 0);
+    const auto* prefetched = font.getEpdFont()->data->bitmap;
     font.clearCache();
-    EXPECT_EQ(fakeheap::live.empty(), i == 2);
+    // Closing idle prefetch must preserve the actual page for its later draw.
+    EXPECT_EQ(font.getEpdFont()->data->bitmap, prefetched);
+    EXPECT_EQ(fakeheap::live.at(prefetched).bytes, denseBytes);
+    for (int hit = 0; hit < 4; ++hit) {
+      font.resetStats();
+      const auto reads = Storage.data("large.cpfont").readCalls;
+      ASSERT_EQ(font.prewarm(text.c_str(), 1), 0);
+      EXPECT_EQ(Storage.data("large.cpfont").readCalls, reads);
+      EXPECT_EQ(font.getStats().seekCount, 0u);
+      font.clearCache();
+      EXPECT_EQ(font.getEpdFont()->data->bitmap, prefetched);
+    }
   }
+  // The next miss accounts for the third sparse rebuild, then replaces the
+  // high-water bitmap with a bounded small one rather than evicting prefetch.
+  ASSERT_EQ(font.prewarm(range(575, 25).c_str(), 1), 0);
+  const auto* trimmed = font.getEpdFont()->data->bitmap;
+  ASSERT_NE(trimmed, nullptr);
+  EXPECT_LT(fakeheap::live.at(trimmed).bytes, denseBytes);
+  EXPECT_EQ(fakeheap::live.at(trimmed).bytes, 26u * 8u);
+  for (size_t i = 0; i < 26u * 8u; ++i) EXPECT_EQ(trimmed[i], 0xA5);
   ASSERT_EQ(font.prewarm(range(0, 20).c_str(), 1), 0);
   fakeheap::internal.free = 39 * 1024;
   font.clearCache();

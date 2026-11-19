@@ -13,7 +13,11 @@
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Memory.h>
+// PNGdec's bundled zlib exports `local`; keep it out of subsequent SDK UI headers.
+#pragma push_macro("local")
+#undef local
 #include <PNGdec.h>
+#pragma pop_macro("local")
 #include <Xtc.h>
 
 #include <algorithm>

@@ -3574,9 +3574,9 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       LOG_ERR("ERS", "Could not change book statistics tracking");
       drawToast(renderer, (std::string(tr(STR_TRACK_READING_STATS)) + " " + tr(STR_FAILED_LOWER)).c_str());
     } else {
-      drawToast(renderer,
-                (std::string(tr(STR_TRACK_READING_STATS)) + ": " + tr(bookStatsEnabled ? STR_ENABLED : STR_DISABLED))
-                    .c_str());
+      drawToast(renderer, (std::string(tr(STR_TRACK_READING_STATS)) + ": " +
+                           (bookStatsEnabled ? tr(STR_ENABLED) : tr(STR_DISABLED)))
+                              .c_str());
     }
     delay(1000);
     resumeReadingPaceTimer("stats_toggle_return");

@@ -6,6 +6,7 @@
 #include <map>
 #include <memory>
 #include <new>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -38,16 +39,28 @@ inline void libraryFree(void* p) { fake::libraryFree(p); }
 #undef malloc
 #undef makeUniqueNoThrow
 
+namespace fake {
+template <typename T>
+bool failTypedAllocation() {
+  const std::string_view signature = __PRETTY_FUNCTION__;
+  if (failAllocationType.empty() || signature.find(failAllocationType) == std::string_view::npos) return false;
+  triggeredAllocationType = failAllocationType;
+  failAllocationType.clear();
+  failureTriggered = true;
+  return true;
+}
+}  // namespace fake
+
 template <typename T, typename... Args>
   requires(!std::is_array_v<T>)
 std::unique_ptr<T> makeUniqueNoThrow(Args&&... args) {
-  if (fake::fail(fake::failAlloc)) return nullptr;
+  if (fake::failTypedAllocation<T>() || fake::fail(fake::failAlloc)) return nullptr;
   return std::make_unique<T>(std::forward<Args>(args)...);
 }
 
 template <typename T>
   requires std::is_unbounded_array_v<T>
 std::unique_ptr<T> makeUniqueNoThrow(size_t count) {
-  if (fake::fail(fake::failAlloc)) return nullptr;
+  if (fake::failTypedAllocation<T>() || fake::fail(fake::failAlloc)) return nullptr;
   return std::make_unique<T>(count);
 }

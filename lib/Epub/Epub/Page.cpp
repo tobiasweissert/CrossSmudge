@@ -804,6 +804,27 @@ std::unique_ptr<Page> Page::deserialize(HalFile& file) {
   return page;
 }
 
+bool Page::getImageBoundingBox(int16_t& x, int16_t& y, int16_t& width, int16_t& height) const {
+  int left = INT16_MAX, top = INT16_MAX, right = INT16_MIN, bottom = INT16_MIN;
+  bool found = false;
+  for (const auto& element : elements) {
+    if (!element || element->getTag() != TAG_PageImage) continue;
+    const auto& image = static_cast<const PageImage&>(*element).getImageBlock();
+    if (image.getWidth() <= 0 || image.getHeight() <= 0) continue;
+    left = std::min(left, static_cast<int>(element->xPos));
+    top = std::min(top, static_cast<int>(element->yPos));
+    right = std::max(right, static_cast<int>(element->xPos) + image.getWidth());
+    bottom = std::max(bottom, static_cast<int>(element->yPos) + image.getHeight());
+    found = true;
+  }
+  if (!found) return false;
+  x = static_cast<int16_t>(left);
+  y = static_cast<int16_t>(top);
+  width = static_cast<int16_t>(std::min(right - left, static_cast<int>(INT16_MAX)));
+  height = static_cast<int16_t>(std::min(bottom - top, static_cast<int>(INT16_MAX)));
+  return true;
+}
+
 void Page::prepareImageCaches() const {
   for (const auto& element : elements) {
     if (element->getTag() == TAG_PageImage) {

@@ -350,15 +350,52 @@ bool isBookName(const std::string& name) { return fileTypeFor(name) != 0; }
 // card written on a Mac shows every book twice.
 bool isHiddenOrSidecar(const char* name) { return name[0] == '.'; }
 
-// Never walk application payloads/saves, font assets or sleep images. Hidden
-// receive/recovery directories are rejected above, at every depth. Fold ASCII
-// because FAT names are case-insensitive even on the host test adapter.
-bool excludedDirectory(std::string_view name) {
+// Owner/upstream compatibility: resource asset names are special only at the
+// card root. /Books/fonts and /books/sleep are ordinary content. Application
+// saves, system/cache and hidden receive/recovery paths stay private everywhere.
+// Count absolute components, not recursion depth (an explicit root may be deep).
+bool excludedDirectory(std::string_view name, const size_t component) {
+  if (name.front() == '.') return true;
   std::string folded(name);
   for (auto& c : folded) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  return folded == "apps" || folded == "fonts" || folded == "sleep" || folded == "system volume information" ||
-         folded == "$recycle.bin" || folded == "xtcache" || folded == "dictionaries" || folded == "plugins" ||
-         folded == "sleep-overlay";
+  return folded == "apps" || folded == "system volume information" || folded == "$recycle.bin" || folded == "xtcache" ||
+         (component == 0 && (folded == "fonts" || folded == "sleep" || folded == "dictionaries" ||
+                             folded == "plugins" || folded == "sleep-overlay"));
+}
+
+// The walk, explicit-root admission and mutation predicate share this policy.
+// Empty components and '.' are aliases, never depth. Reject '..' conservatively
+// rather than let a private path escape its admission check via parent traversal.
+bool excludedLibraryPath(const std::string_view path) {
+  size_t start = 0;
+  size_t component = 0;
+  while (start < path.size()) {
+    const size_t end = path.find('/', start);
+    const auto part = path.substr(start, end == std::string_view::npos ? path.size() - start : end - start);
+    if (!part.empty() && part != ".") {
+      if (excludedDirectory(part, component)) return true;
+      component++;
+    }
+    if (end == std::string_view::npos) break;
+    start = end + 1;
+  }
+  return false;
+}
+
+std::string normalizedLibraryRoot(const std::string_view path) {
+  std::string result;
+  size_t start = 0;
+  while (start < path.size()) {
+    const size_t end = path.find('/', start);
+    const auto part = path.substr(start, end == std::string_view::npos ? path.size() - start : end - start);
+    if (!part.empty() && part != ".") {
+      result += '/';
+      result.append(part);
+    }
+    if (end == std::string_view::npos) break;
+    start = end + 1;
+  }
+  return result.empty() ? "/" : result;
 }
 
 std::string stemOf(const std::string& name) {
@@ -789,7 +826,7 @@ struct DedupFrame {
 };
 
 void walk(WalkState& st, const std::string& path, const int depth) {
-  if (st.failed || depth > LIBRARY_MAX_DEPTH) return;
+  if (st.failed || depth > LIBRARY_MAX_DEPTH || excludedLibraryPath(path)) return;
 
   const uint16_t dedupBase = st.activeDedupCount;
   const DedupFrame dedupFrame{st, dedupBase};
@@ -841,7 +878,7 @@ void walk(WalkState& st, const std::string& path, const int depth) {
     const std::string name(st.nameBuf);
 
     if (isDir) {
-      if (excludedDirectory(name)) continue;
+      if (excludedLibraryPath(joinLibraryPath(path, name))) continue;
       const size_t resumePosition = dir.position();
       dir.close();
       walk(st, joinLibraryPath(path, name), depth + 1);
@@ -1503,8 +1540,9 @@ bool emitIndex(const char* folderStagePath, WalkState& st, BuildStats& stats) {
   // Arrival order no longer has a fallback to degrade into; the flag stays
   // defined so older indexes still validate.
   stats.arrivalDegraded = false;
-  header.flags =
-      (stats.ranksDegraded ? CLIX_FLAG_RANKS_DEGRADED : 0) | (stats.dedupDegraded ? CLIX_FLAG_DEDUP_DEGRADED : 0);
+  header.flags = (stats.ranksDegraded ? CLIX_FLAG_RANKS_DEGRADED : 0) |
+                 (stats.dedupDegraded ? CLIX_FLAG_DEDUP_DEGRADED : 0) |
+                 (stats.dedupDegraded && !stats.dedupAllocFailed ? CLIX_FLAG_DEDUP_CAPPED : 0);
 
   if (!out.seekSet(0)) {
     ioFailed = true;
@@ -1677,11 +1715,12 @@ const char* libraryIndexPath() { return INDEX_PATH; }
 const char* libraryRetainedIndexPath() { return Storage.exists(INDEX_PATH) ? INDEX_PATH : LEGACY_INDEX_PATH; }
 
 bool isLibraryBookFile(const std::string_view path) {
+  if (excludedLibraryPath(path)) return false;
   size_t start = 0;
   while (start < path.size()) {
     const size_t end = path.find('/', start);
     const auto part = path.substr(start, end == std::string_view::npos ? path.size() - start : end - start);
-    if (!part.empty() && part != "." && (part.front() == '.' || excludedDirectory(part))) return false;
+
     if (end == std::string_view::npos) {
       std::string folded(part);
       for (auto& c : folded) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -1778,7 +1817,7 @@ static bool rebuildLibraryIndex(const char* rootPath, BuildStats& stats, const b
   {
     serialization::BufferedFileWriter stageOut(st.stage, LIBRARY_IO_BUFFER_SIZE);
     st.stageOut = &stageOut;
-    walk(st, rootPath, 0);
+    walk(st, normalizedLibraryRoot(rootPath), 0);
     st.stageOut = nullptr;
     stageFlushed = stageOut.flush();
   }
@@ -1809,9 +1848,14 @@ static bool rebuildLibraryIndex(const char* rootPath, BuildStats& stats, const b
       previous.header().foldVersion == CLIX_FOLD_VERSION &&
       previous.header().metadataEnabled == static_cast<uint8_t>(readMetadata) && st.books == priorCount &&
       st.reused == priorCount && stats.metadataReused == priorCount && st.creationTimesUnchanged &&
-      st.unreadableSkipped == 0 && !st.dedupDegraded &&
-      (previous.header().flags & (CLIX_FLAG_RANKS_DEGRADED | CLIX_FLAG_DEDUP_DEGRADED | CLIX_FLAG_ARRIVAL_DEGRADED)) ==
-          0) {
+      priorByPath.claimedCount() == priorCount && st.unreadableSkipped == 0 && !stats.dedupAllocFailed &&
+      (previous.header().flags & (CLIX_FLAG_RANKS_DEGRADED | CLIX_FLAG_ARRIVAL_DEGRADED)) == 0 &&
+      // Every previous identity must be claimed exactly once, with fresh
+      // metadata, sizes and times. A deterministic bounded cap is reproducible;
+      // an allocation-lost or old ambiguous degradation is not. Older derived
+      // indexes lack CAPPED and therefore rebuild without losing firstSeen.
+      (previous.header().flags & (CLIX_FLAG_DEDUP_DEGRADED | CLIX_FLAG_DEDUP_CAPPED)) ==
+          (st.dedupDegraded ? (CLIX_FLAG_DEDUP_DEGRADED | CLIX_FLAG_DEDUP_CAPPED) : 0)) {
     previous.close();
     stats.walkMs = millis() - startMs;
     LOG_INF("LIBIDX", "unchanged: %u reused, %u parsed, no replacement, %ums",

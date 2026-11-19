@@ -25,6 +25,9 @@ inline int shortWrite = -1;
 inline int failTruncate = -1;
 inline int failRename = -1;
 inline int failAlloc = -1;
+// Match the actual allocation type, not its unstable position in the build.
+inline std::string failAllocationType;
+inline std::string triggeredAllocationType;
 inline bool failDirectorySeek = false;
 inline std::string failDirectoryIterationPath;
 inline std::string failClosePath;
@@ -57,6 +60,8 @@ inline void reset() {
   failTruncate = -1;
   failRename = -1;
   failAlloc = -1;
+  failAllocationType.clear();
+  triggeredAllocationType.clear();
   failDirectorySeek = false;
   failDirectoryIterationPath.clear();
   failClosePath.clear();
@@ -206,6 +211,7 @@ class HalFile {
       size = std::min(size, static_cast<size_t>(fake::shortWrite));
       fake::shortWrite = -1;
     }
+    if (size == 0) return 0;
     node->bytes.resize(std::max(node->bytes.size(), pos + size));
     std::memcpy(node->bytes.data() + pos, data, size);
     pos += size;

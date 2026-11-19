@@ -1151,6 +1151,7 @@ int SdCardFont::prewarm(TextGetter getter, const void* ctx, uint32_t textCount, 
         fit /= 2;
       }
       if (missedForStyle == PREWARM_ARENA_TOO_LARGE) {
+        lastPrewarmFailed_ = true;
         missedForStyle = static_cast<int>(cpCount);  // nothing resident
       } else {
         missedForStyle += static_cast<int>(cpCount - fit);  // the dropped suffix is absent too

@@ -19,6 +19,9 @@ class DictionaryRegistry {
  public:
   // Scan the SD card, populate entries_ (sorted by folder name). Returns true if any found.
   bool discover();
+  // Fresh read-only enumeration for web callers, including const registries.
+  // Does not change cached entries or persist an automatic selection.
+  static bool discover(std::vector<DictionaryEntry>& out);
   void clear();
 
   const std::vector<DictionaryEntry>& getEntries() const { return entries_; }
@@ -37,6 +40,7 @@ class DictionaryRegistry {
   }
 
  private:
+  static bool scan(std::vector<DictionaryEntry>& entries, std::string& root);
   void maybeAutoSelectDefaultDictionary() const;
 
   std::vector<DictionaryEntry> entries_;  // sorted alphabetically by name

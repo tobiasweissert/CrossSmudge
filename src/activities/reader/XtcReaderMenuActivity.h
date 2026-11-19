@@ -12,6 +12,8 @@
 #include "components/UiAppHost.h"
 #include "util/ButtonNavigator.h"
 
+struct Rect;
+
 // Shared reader chrome lives here while the migration's production-file boundary
 // is frozen. Paint, viewport reservation and taps use the same oriented band.
 namespace ReaderChrome {

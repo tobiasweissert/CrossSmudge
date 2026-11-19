@@ -547,4 +547,12 @@ uint32_t HalFile::modificationTime() {
   return (static_cast<uint32_t>(date) << 16) | time;
 }
 
+uint32_t HalFile::creationTime() {
+  HalStorage::StorageLock lock;
+  uint16_t date = 0;
+  uint16_t time = 0;
+  if (!impl || !impl->file.getCreateDateTime(&date, &time) || date == 0) return 0;
+  return (static_cast<uint32_t>(date) << 16) | time;
+}
+
 bool HalFile::truncate(const uint64_t length) { HAL_FILE_WRAPPED_CALL(truncate, length); }

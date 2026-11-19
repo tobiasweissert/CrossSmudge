@@ -274,6 +274,27 @@ SettingsActivity::SettingsActivity(GfxRenderer& renderer, MappedInputManager& ma
       uiTarget(makeUiTarget(renderer)),
       app(uiTarget, uiTarget.deviceContext()) {}
 
+SettingsActivity::SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
+                                   const SettingsSection section)
+    : SettingsActivity(renderer, mappedInput, false, true, View::Root) {
+  entrySection = section;
+}
+
+void SettingsActivity::focusEntrySection() {
+  // Library and Network remain the owner's existing System actions, not new
+  // screens or automatically dispatched side effects. Focus their real row.
+  const auto action = entrySection == SettingsSection::Library   ? SettingAction::Library
+                      : entrySection == SettingsSection::Network ? SettingAction::Network
+                                                                 : SettingAction::None;
+  if (action == SettingAction::None || currentSettings == nullptr) return;
+  for (size_t i = 0; i < currentSettings->size(); ++i) {
+    if ((*currentSettings)[i].action == action) {
+      selectedSettingIndex = static_cast<int>(i) + 1;
+      return;
+    }
+  }
+}
+
 void SettingsActivity::rebuildSettingsLists() {
   displaySettings.clear();
   displaySleepSettings.clear();
@@ -730,7 +751,7 @@ void SettingsActivity::onEnter() {
     dictionaryRegistry.discover();
   }
 
-  selectedCategoryIndex = isFileBrowserView() ? 3 : 0;
+  selectedCategoryIndex = isFileBrowserView() ? 3 : categoryForSection(entrySection);
   selectedSettingIndex = 0;
   activeSubmenu = SettingAction::None;
   parentSubmenu = SettingAction::None;
@@ -742,6 +763,7 @@ void SettingsActivity::onEnter() {
   }
 
   rebuildSettingsLists();
+  focusEntrySection();
 
   uiReady = false;
   visibleRows = 1;

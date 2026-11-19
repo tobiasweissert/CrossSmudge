@@ -35,6 +35,8 @@ add_executable(CssArenaBackingTest CssArenaBackingTest.cpp ${REPO_ROOT}/lib/Epub
 target_include_directories(CssArenaBackingTest PRIVATE stubs ${REPO_ROOT}/lib/Memory ${REPO_ROOT}/lib/MemoryBudget ${REPO_ROOT}/lib/Epub/Epub/css)
 target_compile_definitions(CssArenaBackingTest PRIVATE ARDUINO_ARCH_ESP32=1 CROSSINK_MEMORY_TEST=1)
 target_link_libraries(CssArenaBackingTest PRIVATE crosspoint_test_common GTest::gtest_main)
+# Track actual bounded-array lifetimes without replacing sanitizer-visible new/delete.
+target_link_options(CssArenaBackingTest PRIVATE "-Wl,--wrap=_ZdaPv" "-Wl,--wrap=_ZdaPvm")
 gtest_discover_tests(CssArenaBackingTest PROPERTIES ENVIRONMENT "UBSAN_OPTIONS=halt_on_error=1")
 
 function(add_layout_test name root)

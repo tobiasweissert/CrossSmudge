@@ -1,5 +1,5 @@
 """
-Apply the pinned AnimatedGIF width guard and bounded-copy/palette fixes.
+Apply the pinned AnimatedGIF width, bounds, palette and alignment fixes.
 """
 
 import argparse
@@ -66,7 +66,7 @@ COPY_OLD = """            while (buf < pEnd) {
             }
 """
 
-COPY_NEW = """#ifdef ALLOWS_UNALIGNED
+COPY_PREVIOUS = """#ifdef ALLOWS_UNALIGNED
             while (pEnd - buf >= (int)sizeof(BIGUINT)) {
                 BIGUINT tmp = *(BIGUINT *) s;
                 s += sizeof(BIGUINT);
@@ -78,6 +78,71 @@ COPY_NEW = """#ifdef ALLOWS_UNALIGNED
                 *buf++ = *s++;
             }
 """
+
+
+COPY_NEW = COPY_PREVIOUS.replace(
+    "BIGUINT tmp = *(BIGUINT *) s;", "BIGUINT tmp; memcpy(&tmp, s, sizeof(tmp));"
+).replace("*(BIGUINT *)buf = tmp;", "memcpy(buf, &tmp, sizeof(tmp));")
+
+ALIGNMENT_OLD = """#if (INTPTR_MAX == INT64_MAX)
+#define ALLOWS_UNALIGNED
+#define INTELSHORT(p) (*(uint16_t *)p)
+#define INTELLONG(p) (*(uint64_t *)p)
+#define REGISTER_WIDTH 64
+#define BIGINT int64_t
+#define BIGUINT uint64_t
+#else
+#define REGISTER_WIDTH 32
+#ifdef ALLOWS_UNALIGNED
+#define INTELSHORT(p) (*(uint16_t *)p)
+#define INTELLONG(p) (*(uint32_t *)p)
+#else
+// Due to unaligned memory causing an exception, we have to do these macros the slow way
+#define INTELSHORT(p) ((*p) + (*(p+1)<<8))
+#define INTELLONG(p) ((*p) + (*(p+1)<<8) + (*(p+2)<<16) + (*(p+3)<<24))
+#endif // ALLOWS_UNALIGNED
+#define BIGINT int32_t
+#define BIGUINT uint32_t
+#endif // 64 vs 32-bit native register size
+"""
+ALIGNMENT_HELPERS = """// Native-endian loads preserve the existing native fast-path semantics.
+// memcpy permits arbitrary byte alignment and avoids typed pointer aliasing.
+static inline uint16_t animatedgif_load16(const void *p) {
+    uint16_t value; memcpy(&value, p, sizeof(value)); return value;
+}
+static inline uint32_t animatedgif_load32(const void *p) {
+    uint32_t value; memcpy(&value, p, sizeof(value)); return value;
+}
+static inline uint64_t animatedgif_load64(const void *p) {
+    uint64_t value; memcpy(&value, p, sizeof(value)); return value;
+}
+"""
+ALIGNMENT_NEW = ALIGNMENT_HELPERS + ALIGNMENT_OLD.replace(
+    "(*(uint16_t *)p)", "animatedgif_load16(p)"
+).replace("(*(uint32_t *)p)", "animatedgif_load32(p)").replace(
+    "(*(uint64_t *)p)", "animatedgif_load64(p)"
+)
+TURBO_COPY_OLD = """        BIGUINT tmp = *(BIGUINT *) s;
+        s += sizeof(BIGUINT);
+        *(BIGUINT *)d = tmp;
+        d += sizeof(BIGUINT);
+"""
+TURBO_COPY_NEW = TURBO_COPY_OLD.replace(
+    "BIGUINT tmp = *(BIGUINT *) s;", "BIGUINT tmp; memcpy(&tmp, s, sizeof(tmp));"
+).replace("*(BIGUINT *)d = tmp;", "memcpy(d, &tmp, sizeof(tmp));")
+
+
+def _patch_alignment_header(header_path):
+    with open(header_path, "r", encoding="utf-8") as file:
+        text = file.read()
+    if ALIGNMENT_NEW in text:
+        return True
+    if text.count(ALIGNMENT_OLD) != 1:
+        raise RuntimeError("AnimatedGIF native-load patch does not match %s" % header_path)
+    with open(header_path, "w", encoding="utf-8") as file:
+        file.write(text.replace(ALIGNMENT_OLD, ALIGNMENT_NEW, 1))
+    print("Patched AnimatedGIF alignment-safe native loads")
+    return True
 
 
 def _patch_header(header_path):
@@ -120,8 +185,12 @@ def _patch_decoder(source_path):
     for name, before, after in (
         ("global palette", PALETTE_OLD, PALETTE_NEW),
         ("bounded scanline copy", COPY_OLD, COPY_NEW),
+        ("turbo word copy", TURBO_COPY_OLD, TURBO_COPY_NEW),
     ):
         if after in text:
+            continue
+        if name == "bounded scanline copy" and text.count(COPY_PREVIOUS) == 1:
+            text = text.replace(COPY_PREVIOUS, after, 1)
             continue
         if text.count(before) != 1:
             raise RuntimeError("AnimatedGIF %s patch does not match %s" % (name, source_path))
@@ -129,12 +198,13 @@ def _patch_decoder(source_path):
     if text != original:
         with open(source_path, "w", encoding="utf-8") as file:
             file.write(text)
-        print("Patched AnimatedGIF palette and scanline bounds")
+        print("Patched AnimatedGIF palette, scanline bounds and alignment-safe word copies")
     return True
 
 
 def patch_library(library_path):
-    return _patch_header(os.path.join(library_path, "src", "AnimatedGIF.h")) and _patch_decoder(
+    header = os.path.join(library_path, "src", "AnimatedGIF.h")
+    return _patch_header(header) and _patch_alignment_header(header) and _patch_decoder(
         os.path.join(library_path, "src", "gif.inl")
     )
 

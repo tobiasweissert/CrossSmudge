@@ -8,6 +8,7 @@
 #include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
 #include "components/UIThemeTokens.h"
+#include "components/UiAppHelpers.h"
 #include "components/icons/listIcons.h"
 #if CROSSINK_APP_CAP_AIRDROP
 #include "components/icons/airdropIcons.h"

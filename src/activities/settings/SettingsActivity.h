@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "CrossPointSettings.h"
+#include "SettingsSection.h"
 #include "activities/Activity.h"
 #include "components/OptionPopup.h"
 #include "util/ButtonNavigator.h"
@@ -272,6 +273,25 @@ class SettingsActivity final : public Activity {
   // instance must pop back to the panel instead of replacing the reader with Home.
   bool returnToParentOnClose = false;
   View view = View::Root;
+  SettingsSection entrySection = SettingsSection::End;
+  // Modern section entrypoints adapt to the owner's existing four-tab UI.
+  static constexpr int categoryForSection(const SettingsSection section) {
+    switch (section) {
+      case SettingsSection::Display:
+        return 0;
+      case SettingsSection::Reader:
+        return 1;
+      case SettingsSection::Controls:
+        return 2;
+      case SettingsSection::General:
+      case SettingsSection::Library:
+      case SettingsSection::Network:
+        return 3;
+      default:
+        return 0;
+    }
+  }
+  void focusEntrySection();
   // Settings can be created over a landscape reader. Its teardown resets the
   // renderer before this activity enters, so retain the requested layout.
   GfxRenderer::Orientation entryOrientation;
@@ -324,6 +344,7 @@ class SettingsActivity final : public Activity {
   bool isFileBrowserView() const { return view == View::FileBrowser; }
 
  public:
+  explicit SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, SettingsSection section);
   explicit SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, bool dismissOnUpSwipe = false,
                             bool returnToParentOnClose = false, View view = View::Root);
   bool allowGlobalHomeSwipeGesture() const override { return false; }
