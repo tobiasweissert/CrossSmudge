@@ -1,5 +1,6 @@
 _language_name: "Magyar"
 _language_code: "HU"
+_bcp47: "hu"
 _order: "19"
 STR_PIN_AS_FAVORITE: "Alvóképernyő beállítása"
 STR_UNPIN_AS_FAVORITE: "Alvóképernyő törlése"
@@ -533,7 +534,6 @@ STR_TAP_HIDE_STATUS_BAR: "Állapotsáv elrejtése koppintással"
 STR_PREV_PAGE: "Előző oldal"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Folytatás"
 STR_INDEX_FAILED: "Indexelés sikertelen – érvénytelen könyv"

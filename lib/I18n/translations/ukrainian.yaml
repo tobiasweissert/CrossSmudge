@@ -1,5 +1,6 @@
 _language_name: "Українська"
 _language_code: "UK"
+_bcp47: "uk"
 _order: "10"
 STR_PIN_AS_FAVORITE: "Установити екран сну"
 STR_UNPIN_AS_FAVORITE: "Скасувати екран сну"
@@ -586,7 +587,6 @@ STR_CUSTOM_BOOTSCREEN: "Власний екран запуску"
 STR_TAP_HIDE_STATUS_BAR: "Дотик ховає рядок стану"
 
 
-# CrossPoint modern feature labels.
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Відновити"
 STR_INDEX_FAILED: "Помилка індексації - некоректна книга"

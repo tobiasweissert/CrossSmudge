@@ -1,5 +1,6 @@
 _language_name: "Slovenčina"
 _language_code: "SK"
+_bcp47: "sk"
 _order: "25"
 STR_PIN_AS_FAVORITE: "Nastaviť obrazovku spánku"
 STR_UNPIN_AS_FAVORITE: "Zrušiť obrazovku spánku"
@@ -629,7 +630,6 @@ STR_CUSTOM_BOOTSCREEN: "Vlastná úvodná obrazovka"
 STR_TAP_HIDE_STATUS_BAR: "Ťuknutím skryť stavový riadok"
 
 
-# CrossPoint modern feature labels.
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Pokračovať"
 STR_INDEX_FAILED: "Indexovanie zlyhalo - chybná kniha"

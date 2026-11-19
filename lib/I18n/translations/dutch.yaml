@@ -1,5 +1,6 @@
 _language_name: "Nederlands"
 _language_code: "NL"
+_bcp47: "nl"
 _order: "16"
 STR_PIN_AS_FAVORITE: "Slaapscherm instellen"
 STR_UNPIN_AS_FAVORITE: "Slaapscherm wissen"
@@ -532,7 +533,6 @@ STR_TAP_HIDE_STATUS_BAR: "Tik om statusbalk te verbergen"
 STR_PREV_PAGE: "Vorige pagina"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_LONG_PRESS_BEHAVIOR: "Long-press button behavior"
 STR_TEXT_SETTINGS: "Tekstinstellingen"

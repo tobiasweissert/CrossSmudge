@@ -1,5 +1,6 @@
 _language_name: "Tiếng Việt"
 _language_code: "VI"
+_bcp47: "vi"
 _order: "24"
 STR_PIN_AS_FAVORITE: "Đặt màn hình ngủ"
 STR_UNPIN_AS_FAVORITE: "Bỏ màn hình ngủ"
@@ -590,7 +591,6 @@ STR_CUSTOM_BOOTSCREEN: "Màn hình khởi động riêng"
 STR_TAP_HIDE_STATUS_BAR: "Chạm để ẩn thanh trạng thái"
 
 
-# CrossPoint modern feature labels.
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Tiếp tục"
 STR_TOOL_CONTENTS: "Mục lục"

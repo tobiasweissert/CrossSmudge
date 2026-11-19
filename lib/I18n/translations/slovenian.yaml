@@ -1,5 +1,6 @@
 _language_name: "Slovenščina"
 _language_code: "SI"
+_bcp47: "sl"
 _order: "21"
 STR_PIN_AS_FAVORITE: "Nastavi zaslon spanja"
 STR_UNPIN_AS_FAVORITE: "Odstrani zaslon spanja"
@@ -533,7 +534,6 @@ STR_TAP_HIDE_STATUS_BAR: "Dotik skrije vrstico stanja"
 STR_PREV_PAGE: "Prejšnja stran"
 
 
-# CrossPoint modern feature labels.
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Nadaljuj"
 STR_INDEX_FAILED: "Indeksiranje ni uspelo - neveljavna knjiga"

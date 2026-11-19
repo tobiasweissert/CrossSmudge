@@ -1,5 +1,6 @@
 _language_name: "Беларуская"
 _language_code: "BE"
+_bcp47: "be"
 _order: "11"
 STR_PIN_AS_FAVORITE: "Усталяваць экран сну"
 STR_UNPIN_AS_FAVORITE: "Скінуць экран сну"
@@ -534,7 +535,6 @@ STR_TAP_HIDE_STATUS_BAR: "Націск хавае радок стану"
 STR_PREV_PAGE: "Папярэдняя старонка"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Працягнуць"
 STR_INDEX_FAILED: "Памылка індэксацыі — няправільная кніга"

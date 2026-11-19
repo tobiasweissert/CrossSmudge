@@ -1,5 +1,6 @@
 _language_name: "Română"
 _language_code: "RO"
+_bcp47: "ro"
 _order: "8"
 STR_PIN_AS_FAVORITE: "Setează ecran repaus"
 STR_UNPIN_AS_FAVORITE: "Elimină ecran repaus"
@@ -532,7 +533,6 @@ STR_TAP_HIDE_STATUS_BAR: "Atinge pentru a ascunde starea"
 STR_PREV_PAGE: "Pagina anterioară"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_LONG_PRESS_BEHAVIOR: "Comportament buton apăsat lung"
 STR_TEXT_SETTINGS: "Setări text"

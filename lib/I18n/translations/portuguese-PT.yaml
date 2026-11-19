@@ -1,5 +1,6 @@
 _language_name: "Português (Portugal)"
 _language_code: "PT2"
+_bcp47: "pt-PT"
 _order: "26"
 
 STR_TAP_AND_SWIPE: "Toque e deslizar"
@@ -803,7 +804,6 @@ STR_CUSTOM_BOOTSCREEN: "Ecrã inicial personalizado"
 STR_TAP_HIDE_STATUS_BAR: "Toque para ocultar barra de estado"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Retomar"
 STR_TOOL_CONTENTS: "Índice"

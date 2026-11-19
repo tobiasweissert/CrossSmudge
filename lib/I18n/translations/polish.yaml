@@ -1,5 +1,6 @@
 _language_name: "Polski"
 _language_code: "PL"
+_bcp47: "pl"
 _order: "13"
 STR_PIN_AS_FAVORITE: "Ustaw ekran uśpienia"
 STR_UNPIN_AS_FAVORITE: "Usuń ekran uśpienia"
@@ -553,7 +554,6 @@ STR_TAP_HIDE_STATUS_BAR: "Dotknij, by ukryć pasek stanu"
 STR_PREV_PAGE: "Poprzednia strona"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Wznów"
 STR_TOOL_CONTENTS: "Spis treści"

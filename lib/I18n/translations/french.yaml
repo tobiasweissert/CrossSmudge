@@ -1,5 +1,6 @@
 _language_name: "Français"
 _language_code: "FR"
+_bcp47: "fr"
 _order: "2"
 STR_PIN_AS_FAVORITE: "Définir écran de veille"
 STR_UNPIN_AS_FAVORITE: "Retirer écran de veille"
@@ -533,7 +534,6 @@ STR_TAP_HIDE_STATUS_BAR: "Toucher pour masquer l’état"
 STR_PREV_PAGE: "Page précédente"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Reprendre"
 STR_TOOL_CONTENTS: "Sommaire"

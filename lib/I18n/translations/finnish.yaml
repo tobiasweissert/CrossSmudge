@@ -1,5 +1,6 @@
 _language_name: "Suomi"
 _language_code: "FI"
+_bcp47: "fi"
 _order: "14"
 STR_PIN_AS_FAVORITE: "Aseta lepotilan näyttö"
 STR_UNPIN_AS_FAVORITE: "Poista lepotilan näyttö"
@@ -522,7 +523,6 @@ STR_TAP_HIDE_STATUS_BAR: "Piilota tilapalkki napauttamalla"
 STR_PREV_PAGE: "Edellinen sivu"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_LONG_PRESS_BEHAVIOR: "Long-press button behavior"
 STR_TEXT_SETTINGS: "Tekstiasetukset"

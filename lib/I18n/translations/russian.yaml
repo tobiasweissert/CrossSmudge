@@ -1,5 +1,6 @@
 _language_name: "Русский"
 _language_code: "RU"
+_bcp47: "ru"
 _order: "6"
 STR_PIN_AS_FAVORITE: "Установить экран сна"
 STR_UNPIN_AS_FAVORITE: "Убрать экран сна"
@@ -600,7 +601,6 @@ STR_CUSTOM_BOOTSCREEN: "Свой экран запуска"
 STR_TAP_HIDE_STATUS_BAR: "Касание скрывает строку состояния"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Читать"
 STR_TOOL_CONTENTS: "Главы"

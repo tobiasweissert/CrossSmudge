@@ -1,5 +1,6 @@
 _language_name: "Español"
 _language_code: "ES"
+_bcp47: "es"
 _order: "1"
 STR_DICTIONARY: "Diccionario"
 STR_NOT_FOUND: "No encontrado"
@@ -709,7 +710,6 @@ STR_CUSTOM_BOOTSCREEN: "Pantalla de inicio propia"
 STR_TAP_HIDE_STATUS_BAR: "Tocar para ocultar el estado"
 
 
-# CrossPoint modern feature labels.
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Seguir"
 STR_TOOL_CONTENTS: "Índice"

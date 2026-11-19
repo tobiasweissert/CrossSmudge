@@ -1,5 +1,6 @@
 _language_name: "עברית"
 _language_code: "HE"
+_bcp47: "he"
 _order: "23"
 STR_PIN_AS_FAVORITE: "הגדרת מסך שינה"
 STR_UNPIN_AS_FAVORITE: "ביטול מסך שינה"
@@ -529,7 +530,6 @@ STR_CUSTOM_BOOTSCREEN: "מסך פתיחה מותאם"
 STR_TAP_HIDE_STATUS_BAR: "הקשה להסתרת שורת מצב"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "המשך"
 STR_TOOL_CONTENTS: "תוכן עניינים"

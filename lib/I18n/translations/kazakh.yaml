@@ -1,5 +1,6 @@
 _language_name: "Қазақша"
 _language_code: "KK"
+_bcp47: "kk"
 _order: "18"
 STR_PIN_AS_FAVORITE: "Ұйқы экранын орнату"
 STR_UNPIN_AS_FAVORITE: "Ұйқы экранын өшіру"
@@ -533,7 +534,6 @@ STR_TAP_HIDE_STATUS_BAR: "Түртіп күй жолағын жасыру"
 STR_PREV_PAGE: "Алдыңғы бет"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_TEXT_SETTINGS: "Мәтін параметрлері"
 STR_FONT: "Қаріп"

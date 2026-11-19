@@ -1,5 +1,6 @@
 _language_name: "العربية"
 _language_code: "AR"
+_bcp47: "ar"
 _order: "28"
 STR_DICTIONARY: "قاموس"
 STR_NOT_FOUND: "غير موجود"
@@ -712,7 +713,6 @@ STR_CUSTOM_BOOTSCREEN: "شاشة بدء مخصصة"
 STR_TAP_HIDE_STATUS_BAR: "نقر لإخفاء شريط الحالة"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "استئناف"
 STR_INVALID_BMP_FILE: "ملف BMP غير صالح"

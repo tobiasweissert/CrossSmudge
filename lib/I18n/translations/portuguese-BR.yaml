@@ -1,5 +1,6 @@
 _language_name: "Português (Brasil)"
 _language_code: "PT"
+_bcp47: "pt-BR"
 _order: "5"
 STR_DICTIONARY: "Dicionário"
 STR_NOT_FOUND: "Não encontrado"
@@ -708,7 +709,6 @@ STR_CUSTOM_BOOTSCREEN: "Tela inicial personalizada"
 STR_TAP_HIDE_STATUS_BAR: "Toque para ocultar barra de status"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Retomar"
 STR_TOOL_CONTENTS: "Sumário"

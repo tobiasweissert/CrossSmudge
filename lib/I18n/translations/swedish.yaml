@@ -1,5 +1,6 @@
 _language_name: "Svenska"
 _language_code: "SV"
+_bcp47: "sv"
 _order: "7"
 STR_PIN_AS_FAVORITE: "Ställ in viloskärm"
 STR_UNPIN_AS_FAVORITE: "Ta bort viloskärm"
@@ -588,7 +589,6 @@ STR_CUSTOM_BOOTSCREEN: "Egen startskärm"
 STR_TAP_HIDE_STATUS_BAR: "Tryck döljer statusfältet"
 
 
-# CrossPoint modern feature labels.
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Återuppta"
 STR_TOOL_CONTENTS: "Innehåll"

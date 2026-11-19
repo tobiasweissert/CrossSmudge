@@ -1,5 +1,6 @@
 _language_name: "Lietuvių"
 _language_code: "LT"
+_bcp47: "lt"
 _order: "20"
 STR_PIN_AS_FAVORITE: "Nustatyti miego ekraną"
 STR_UNPIN_AS_FAVORITE: "Pašalinti miego ekraną"
@@ -533,7 +534,6 @@ STR_TAP_HIDE_STATUS_BAR: "Bakstelėjus slėpti būsenos juostą"
 STR_PREV_PAGE: "Ankstesnis puslapis"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Tęsti"
 STR_INDEX_FAILED: "Klaida - netinkama knyga"

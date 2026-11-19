@@ -1,5 +1,6 @@
 _language_name: "Türkçe"
 _language_code: "TR"
+_bcp47: "tr"
 _order: "17"
 STR_PIN_AS_FAVORITE: "Uyku ekranını ayarla"
 STR_UNPIN_AS_FAVORITE: "Uyku ekranını kaldır"
@@ -532,7 +533,6 @@ STR_TAP_HIDE_STATUS_BAR: "Dokunarak durum çubuğunu gizle"
 STR_PREV_PAGE: "Önceki sayfa"
 
 
-# CrossPoint modern feature labels.
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Devam Et"
 STR_INVALID_BMP_FILE: "Geçersiz BMP dosyası"

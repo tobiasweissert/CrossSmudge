@@ -1,5 +1,6 @@
 _language_name: "Dansk"
 _language_code: "DA"
+_bcp47: "da"
 _order: "15"
 STR_PIN_AS_FAVORITE: "Indstil dvaleskærm"
 STR_UNPIN_AS_FAVORITE: "Nulstil dvaleskærm"
@@ -533,7 +534,6 @@ STR_TAP_HIDE_STATUS_BAR: "Tryk skjuler statuslinje"
 STR_PREV_PAGE: "Forrige side"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_LONG_PRESS_BEHAVIOR: "Comportamiento al mantener pulsado el botón"
 STR_TEXT_SETTINGS: "Tekstindstillinger"

@@ -1,5 +1,6 @@
 _language_name: "Català"
 _language_code: "CA"
+_bcp47: "ca"
 _order: "9"
 STR_PIN_AS_FAVORITE: "Establir pantalla de repòs"
 STR_UNPIN_AS_FAVORITE: "Llevar pantalla de repòs"
@@ -593,7 +594,6 @@ STR_CUSTOM_BOOTSCREEN: "Pantalla d’inici pròpia"
 STR_TAP_HIDE_STATUS_BAR: "Toca per amagar l’estat"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Continua"
 STR_TOOL_CONTENTS: "Índex"

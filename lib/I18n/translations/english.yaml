@@ -1,5 +1,6 @@
 _language_name: "English"
 _language_code: "EN"
+_bcp47: "en"
 _order: "0"
 
 STR_CROSSSMUDGE: "Crosscub"
@@ -905,7 +906,6 @@ STR_FILES_ACTIONS: "Actions (hold Open)"
 STR_FILES_MEMORY_FAILED: "Not enough memory to open file actions."
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_CROSSPOINT: "CrossPoint"
 STR_RESUME: "Resume"
 STR_TOOL_CONTENTS: "Contents"

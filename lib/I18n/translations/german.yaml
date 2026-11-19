@@ -1,5 +1,6 @@
 _language_name: "Deutsch"
 _language_code: "DE"
+_bcp47: "de"
 _order: "3"
 STR_DICTIONARY: "Wörterbuch"
 STR_NOT_FOUND: "Nicht gefunden"
@@ -709,7 +710,6 @@ STR_CUSTOM_BOOTSCREEN: "Eigenes Startbild"
 STR_TAP_HIDE_STATUS_BAR: "Tippen blendet Statusleiste aus"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_ABOUT: "Über"
 STR_ACCOUNT_CREATED: "Konto erstellt"
 STR_ALIGNMENT: "Ausrichtung"

@@ -1,5 +1,6 @@
 _language_name: "Italiano"
 _language_code: "IT"
+_bcp47: "it"
 _order: "12"
 STR_PIN_AS_FAVORITE: "Imposta schermata sospensione"
 STR_UNPIN_AS_FAVORITE: "Rimuovi schermata sospensione"
@@ -603,7 +604,6 @@ STR_CUSTOM_BOOTSCREEN: "Schermata avvio personale"
 STR_TAP_HIDE_STATUS_BAR: "Tocca per nascondere lo stato"
 
 
-# CrossPoint modern feature labels (owner translations above retained).
 STR_ABOUT: "Informazioni"
 STR_ACCOUNT_CREATED: "Account creato"
 STR_ALIGNMENT: "Allineamento"
