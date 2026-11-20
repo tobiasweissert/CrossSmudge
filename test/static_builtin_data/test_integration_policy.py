@@ -78,6 +78,12 @@ class IntegrationPolicy(unittest.TestCase):
         module.Proposal('test_experiment_actual_lto_hooks_keep_sdk_and_object_policy').test_experiment_actual_lto_hooks_keep_sdk_and_object_policy()
 
     def test_full_bridge_wiring_synthetic_generator_recording(self):
+        self._exercise_bridge(None)
+
+    def test_bridge_import_uses_project_dir_not_dunder_file(self):
+        self._exercise_bridge('/unrelated/scons-wrapper.py')
+
+    def _exercise_bridge(self, dunder_file):
         # Real bridge side effects with an explicitly synthetic generator double;
         # canonical generation/owner C++ is exercised separately by run.py.
         import sys
@@ -91,6 +97,7 @@ class IntegrationPolicy(unittest.TestCase):
             root = Path(tmp); (root/'lib/I18n').mkdir(parents=True)
             calls = []
             def generate(project, private, profile):
+                self.assertEqual(sys.path[0], str(root.resolve()/'scripts'))
                 calls.append((project, private, profile))
                 private.mkdir(parents=True)
                 for filename in ['I18nKeys.h', 'I18nStrings.h', 'I18nStrings.cpp']:
@@ -104,7 +111,10 @@ class IntegrationPolicy(unittest.TestCase):
             original_path = sys.path[:]
             try:
                 with patch.dict(sys.modules, {'gen_static_builtin_data': types.SimpleNamespace(generate=generate)}):
-                    exec(code, dict(env=env, Import=lambda *_: None, Path=Path, sys=sys, __file__=str(ROOT/'scripts/gen_i18n.py')))
+                    scope = dict(env=env, Import=lambda *_: None, Path=Path, sys=sys)
+                    if dunder_file is not None:
+                        scope['__file__'] = dunder_file
+                    exec(code, scope)
             finally:
                 sys.path[:] = original_path
             private = root/'build/static-builtins'

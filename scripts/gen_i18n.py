@@ -1165,9 +1165,9 @@ else:
             raise RuntimeError("static-builtins experiment is scoped to env:sticky-static-builtins-experimental; ordinary environments remain raw")
         if env.GetProjectOption("custom_i18n_builtin_langs", "all") not in ("", "all"):
             raise RuntimeError("static-builtins experiment requires every existing language")
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        root = Path(env.subst("$PROJECT_DIR")).resolve()
+        sys.path.insert(0, str(root / "scripts"))
         from gen_static_builtin_data import generate
-        root = Path(env.subst("$PROJECT_DIR"))
         private = Path(env.subst("$BUILD_DIR")) / "static-builtins"
         generate(root, private, "esp32-le-v1")
         for filename in ("I18nKeys.h", "I18nStrings.h", "I18nStrings.cpp"):
