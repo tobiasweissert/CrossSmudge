@@ -25,6 +25,9 @@ inline int shortWrite = -1;
 inline int failTruncate = -1;
 inline int failRename = -1;
 inline int failAlloc = -1;
+// Actual unaligned nothrow new families used by checked clipping storage.
+inline size_t checkedAllocationAttempts = 0;
+inline size_t liveCheckedAllocations = 0;
 // Match the actual allocation type, not its unstable position in the build.
 inline std::string failAllocationType;
 inline std::string triggeredAllocationType;
@@ -32,6 +35,8 @@ inline bool failDirectorySeek = false;
 inline std::string failDirectoryIterationPath;
 inline std::string failClosePath;
 inline std::string failWritePath;
+inline std::string failRemovePath;
+inline bool removeDespiteFailure = false;
 inline unsigned parses = 0;
 inline unsigned reads = 0;
 inline unsigned seeks = 0;
@@ -66,6 +71,8 @@ inline void reset() {
   failDirectoryIterationPath.clear();
   failClosePath.clear();
   failWritePath.clear();
+  failRemovePath.clear();
+  removeDespiteFailure = false;
   parses = 0;
   reads = 0;
   seeks = 0;
@@ -273,7 +280,15 @@ class HalStorage {
   bool openFileForWrite(const char* module, const std::string& path, HalFile& file) {
     return openFileForWrite(module, path.c_str(), file);
   }
-  bool remove(const char* path) { return fake::files.erase(path) != 0; }
+  bool remove(const char* path) {
+    if (!fake::failRemovePath.empty() && fake::failRemovePath == path) {
+      fake::failRemovePath.clear();
+      fake::failureTriggered = true;
+      if (fake::removeDespiteFailure) fake::files.erase(path);
+      return false;
+    }
+    return fake::files.erase(path) != 0;
+  }
   bool rename(const char* from, const char* to) {
     if (fake::fail(fake::failRename) || !exists(from) || exists(to)) return false;
     std::vector<std::pair<std::string, std::shared_ptr<fake::Node>>> moved;

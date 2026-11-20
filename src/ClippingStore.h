@@ -5,12 +5,18 @@
 #include <string>
 #include <vector>
 
+#include "clippings/CheckedClippingStorage.h"
+
 inline constexpr size_t CLIPPING_CHAPTER_TITLE_MAX = 48;
 // Clipping text lives on the SD card rather than in every in-memory clipping
 // record. Match the reader's bounded selection-text budget so previews retain
 // a complete multi-paragraph selection without growing the saved-item index.
 inline constexpr size_t CLIPPING_TEXT_MAX = 4U * 1024U;
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+inline constexpr uint16_t CLIPPING_MAX_PER_BOOK = 1024;
+#else
 inline constexpr uint16_t CLIPPING_MAX_PER_BOOK = 256;
+#endif
 inline constexpr uint16_t CLIPPING_MAX_PAGE_MATCHES = 16;
 inline constexpr uint32_t CLIPPING_WORD_LAYOUT_VERSION = 2;
 inline constexpr uint8_t CLIPPING_LAYOUT_START_RESOLVED = 1U << 0;
@@ -103,10 +109,13 @@ class ClippingStore {
   bool saveToFile();
   void clearAll();
 
-  bool hasClippings() const { return !clippings.empty(); }
-  size_t clippingCount() const { return clippings.size(); }
+  bool hasClippings() const { return !quarantined && !clippings.empty(); }
+  size_t clippingCount() const { return quarantined ? 0 : clippings.size(); }
   const Clipping* clippingAt(size_t index) const;
-  const std::vector<Clipping>& getClippings() const { return clippings; }
+  const CheckedClippingStorage<Clipping>& getClippings() const {
+    static const CheckedClippingStorage<Clipping> empty;
+    return quarantined ? empty : clippings;
+  }
   bool cacheResolvedLayoutRange(size_t index, uint16_t page, uint16_t startWord, uint16_t endWord,
                                 uint32_t layoutSignature);
   bool readClippingText(size_t index, std::string& out) const;
@@ -116,6 +125,10 @@ class ClippingStore {
   static bool hasAnyClippings();
   static bool getAllClippedBooks(std::vector<ClippedBookEntry>& out);
   static bool deleteForFilePath(const std::string& filePath, const std::string& bookType);
+  // Read-only admission for physical book deletion; never removes recovery roots.
+  static bool canDeleteForFilePath(const std::string& filePath, const std::string& bookType);
+  static bool canRenameForFilePath(const std::string& oldFilePath, const std::string& newFilePath,
+                                   const std::string& bookType);
   static bool migrateForFilePath(const std::string& oldFilePath, const std::string& newFilePath,
                                  const std::string& title, const std::string& author, const std::string& bookType);
   // Conservative Manual Move refuses retained destination records (no merge),
@@ -123,33 +136,61 @@ class ClippingStore {
   static bool beginRenameMigration(const std::string& oldFilePath, const std::string& newFilePath,
                                    const std::string& title, const std::string& author, const std::string& bookType,
                                    RenameMigration& migration, bool preserveOnRenameFailure = false);
+  struct PreparedRename;
+  // Read-only checked admission, retained by the encompassing BookMove caller.
+  static bool prepareRenameMigration(const std::string& oldFilePath, const std::string& newFilePath,
+                                     const std::string& title, const std::string& author, const std::string& bookType,
+                                     RenameMigration& migration, PreparedRename& prepared);
+  static bool publishPreparedRename(RenameMigration& migration, PreparedRename& prepared);
   static bool commitRenameMigration(RenameMigration& migration);
   static bool rollbackRenameMigration(RenameMigration& migration);
 
  private:
   static ClippingStore instance;
 
-  std::vector<Clipping> clippings;
+  CheckedClippingStorage<Clipping> clippings;
   std::string bookFilePath;
   std::string bookTitle;
   std::string bookAuthor;
   std::string storeFilePath;
   bool dirty = false;
   bool loaded = false;
+  // A potentially published snapshot must never be read using rolled-back
+  // offsets. Retained candidates require explicit recovery, not a retry.
+  bool quarantined = false;
   // Tombstones share the checked version-5 snapshot: no two-file delete commit.
-  std::vector<std::string> deletedIds;
+  CheckedClippingStorage<CheckedClippingId> deletedIds;
+
+  struct WriteAdmission {
+    CheckedClippingStorage<uint32_t> offsets;
+    CheckedClippingStorage<uint16_t> lengths;
+    CheckedClippingStorage<Clipping> rows;
+    CheckedClippingStorage<CheckedClippingId> deletions;
+    bool reserve(size_t count, size_t deletionCount) {
+      return offsets.reserve(count) && lengths.reserve(count) && rows.reserve(count) &&
+             deletions.reserve(deletionCount);
+    }
+  };
 
   bool loadForBookImpl(const std::string&, const std::string&, const std::string&, const std::string&, bool moveOwner);
-  static bool beginRenameMigrationImpl(const std::string&, const std::string&, const std::string&, const std::string&,
-                                       const std::string&, RenameMigration&, bool, bool moveOwner);
   static bool commitRenameMigrationImpl(RenameMigration&, bool moveOwner);
   bool readFromFile();
-  bool readFromFile(const std::string& path, std::vector<Clipping>& out,
-                    std::vector<std::string>* deletions = nullptr) const;
-  bool readVersionedFile(const std::string& path, std::vector<Clipping>& out, std::vector<std::string>* deletions,
-                         bool modernV4) const;
+  bool readFromFile(const std::string& path, CheckedClippingStorage<Clipping>& out,
+                    CheckedClippingStorage<CheckedClippingId>* deletions = nullptr) const;
+  bool readVersionedFile(const std::string& path, CheckedClippingStorage<Clipping>& out,
+                         CheckedClippingStorage<CheckedClippingId>* deletions, bool modernV4,
+                         bool* allocationFailed = nullptr, bool allowAllocation = true) const;
   bool writeToFile(const std::string* replacementText = nullptr, size_t replacementIndex = SIZE_MAX,
-                   const std::string* sourcePathOverride = nullptr, bool preserveOnRenameFailure = false);
+                   const std::string* sourcePathOverride = nullptr, bool preserveOnRenameFailure = false,
+                   WriteAdmission* admission = nullptr);
+};
+
+struct ClippingStore::PreparedRename {
+ private:
+  friend class ClippingStore;
+  ClippingStore writer;
+  WriteAdmission admission;
+  bool ready = false;
 };
 
 inline bool clippingStoredRangeMatchesLayout(const Clipping& clipping, const uint16_t currentPageCount,

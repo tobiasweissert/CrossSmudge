@@ -259,11 +259,13 @@ RenameMigrationResult migrateRenamedBookState(const std::string& oldPath, const 
     return RenameMigrationResult::RolledBack;
   };
 
+  ClippingStore::PreparedRename preparedClippings;
   if (strcmp(bookType, "epub") == 0) {
-    // Validate even when there is no primary: a lone retained .tmp/.bak is
-    // unresolved data, not an empty store. Public preparation alone can no-op.
-    ClippingStore validation;
-    if (!validation.loadForBook(oldPath, title, author, bookType)) return RenameMigrationResult::RolledBack;
+    // Retain the source index and all checked writer/readback capacity before
+    // the encompassing intent and before any other store mutates metadata.
+    if (!ClippingStore::prepareRenameMigration(oldPath, newPath, title, author, bookType, clippingMigration,
+                                               preparedClippings))
+      return RenameMigrationResult::RolledBack;
   }
   if (preserveOnRenameFailure && !writeMoveIntent(oldPath, newPath)) return RenameMigrationResult::Uncertain;
 
@@ -278,8 +280,7 @@ RenameMigrationResult migrateRenamedBookState(const std::string& oldPath, const 
   }
 
   if (strcmp(bookType, "epub") == 0) {
-    if (!ClippingStore::beginRenameMigration(oldPath, newPath, title, author, bookType, clippingMigration,
-                                             preserveOnRenameFailure)) {
+    if (!ClippingStore::publishPreparedRename(clippingMigration, preparedClippings)) {
       LOG_ERR("BookMove", "Failed to migrate clippings for renamed book %s -> %s", oldPath.c_str(), newPath.c_str());
       if (preserveOnRenameFailure || clippingMigration.uncertain) return RenameMigrationResult::Uncertain;
       return recover();

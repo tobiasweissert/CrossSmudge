@@ -20,6 +20,7 @@
 #include <limits>
 
 #include "BookActions.h"
+#include "ClippingStore.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "FileActionPaths.h"
@@ -489,6 +490,13 @@ void FileBrowserActivity::promptDeleteFile(const std::string& fullPath, const st
       return;
     }
 
+    if (Storage.exists("/.crosspoint/book-move.pending") || Storage.exists("/.crosspoint/clippings/move.pending") ||
+        ((FsHelpers::hasEpubExtension(fullPath) || FsHelpers::hasTxtExtension(fullPath) ||
+          FsHelpers::hasMarkdownExtension(fullPath)) &&
+         !ClippingStore::canDeleteForFilePath(fullPath, "epub"))) {
+      fileOperationError(tr(STR_FILES_CACHE_CLEANUP_FAILED));
+      return;
+    }
     if (!Storage.remove(fullPath.c_str())) {
       LOG_ERR("FileBrowser", "Failed to delete file: %s", fullPath.c_str());
       fileOperationError(tr(STR_FILES_DELETE_FAILED));
@@ -1095,7 +1103,11 @@ void FileBrowserActivity::renameFile(const std::string& oldPath, const std::stri
       author = recent->author;
     }
     const auto migration =
-        BookMoveUtils::migrateRenamedBookState(oldPath, newPath, oldCachePath, title, author, bookType);
+        BookMoveUtils::migrateRenamedBookState(oldPath, newPath, oldCachePath, title, author, bookType, true);
+    if (migration == BookMoveUtils::RenameMigrationResult::Uncertain) {
+      fileOperationError(tr(STR_FILES_MOVE_UNCERTAIN));
+      return;
+    }
     if (migration == BookMoveUtils::RenameMigrationResult::RolledBack) {
       LOG_ERR("FileBrowser", "Could not rename book while preserving reader state: %s -> %s", oldPath.c_str(),
               newPath.c_str());

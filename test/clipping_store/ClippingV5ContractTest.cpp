@@ -142,7 +142,7 @@ TEST(ClippingV5Contract, ShortSnapshotWriteRollsBackRecordAndDurableTombstone) {
   EXPECT_EQ(offset, 1u);
 }
 
-TEST(ClippingV5Contract, LegacyJournalImportIsReadOnlyAndRejectsInterruptedTail) {
+TEST(ClippingV5Contract, LegacyJournalImportIsReadOnlyAndPreservesInterruptedTail) {
   for (const bool interrupted : {false, true}) {
     fake::reset();
     ClippingStore store;
@@ -156,27 +156,20 @@ TEST(ClippingV5Contract, LegacyJournalImportIsReadOnlyAndRejectsInterruptedTail)
     journal.replace(0, 7, "deleted");
     if (interrupted) journal += 'x';
     fake::add(path + ".deleted", journal);
-    EXPECT_EQ(store.loadForBook("/book.epub", "Book", "Author", "epub"), !interrupted);
+    EXPECT_TRUE(store.loadForBook("/book.epub", "Book", "Author", "epub"));
     EXPECT_EQ(fake::files.at(path + ".deleted")->bytes, std::vector<uint8_t>(journal.begin(), journal.end()));
     EXPECT_EQ(fake::files.at(path)->bytes, before);
     uint32_t offset = 0;
     char id[65];
-    if (interrupted) {
-      EXPECT_FALSE(store.prepareSync());
-      EXPECT_FALSE(store.nextDeletion(offset, id));
-      EXPECT_FALSE(store.saveToFile());
-      store.unload();
-      EXPECT_EQ(fake::files.at(path)->bytes, before);
-    } else {
-      ASSERT_TRUE(store.prepareSync());
-      EXPECT_EQ(fake::files.at(path)->bytes[0], 5);
-      store.unload();
-      ASSERT_TRUE(store.loadForBook("/book.epub", "Book", "Author", "epub"));
-      ASSERT_TRUE(store.nextDeletion(offset, id));
-      EXPECT_STREQ(id, "deleted");
-      ASSERT_TRUE(store.finishDeletions());
-      EXPECT_FALSE(Storage.exists((path + ".deleted").c_str()));
-    }
+    ASSERT_TRUE(store.prepareSync());
+    EXPECT_EQ(fake::files.at(path)->bytes[0], 5);
+    EXPECT_EQ(fake::files.at(path + ".deleted")->bytes, std::vector<uint8_t>(journal.begin(), journal.end()));
+    store.unload();
+    ASSERT_TRUE(store.loadForBook("/book.epub", "Book", "Author", "epub"));
+    ASSERT_TRUE(store.nextDeletion(offset, id));
+    EXPECT_STREQ(id, "deleted");
+    ASSERT_TRUE(store.finishDeletions());
+    EXPECT_FALSE(Storage.exists((path + ".deleted").c_str()));
   }
 }
 

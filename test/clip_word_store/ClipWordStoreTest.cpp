@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdlib>
+#include <cstring>
+#include <new>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -13,6 +16,31 @@
 #include "clippings/ClippingHighlightGeometry.h"
 #include "clippings/ClippingMatchTracker.h"
 #include "clippings/ClippingTextMatcher.h"
+
+namespace allocationProbe {
+thread_local bool enabled = false;
+thread_local size_t calls = 0;
+}  // namespace allocationProbe
+// Test executable observation only; production allocation is not replaced.
+void* operator new(std::size_t size) {
+  if (allocationProbe::enabled) ++allocationProbe::calls;
+  if (void* p = std::malloc(size ? size : 1)) return p;
+  std::abort();
+}
+void* operator new[](std::size_t size) { return ::operator new(size); }
+void* operator new(std::size_t size, const std::nothrow_t&) noexcept {
+  if (allocationProbe::enabled) ++allocationProbe::calls;
+  return std::malloc(size ? size : 1);
+}
+void* operator new[](std::size_t size, const std::nothrow_t& tag) noexcept { return ::operator new(size, tag); }
+// Keep the replacement allocation/deallocation boundary out-of-line so the
+// compiler does not diagnose an inlined free as a mismatched standard new.
+[[gnu::noinline]] void operator delete(void* p) noexcept { std::free(p); }
+[[gnu::noinline]] void operator delete[](void* p) noexcept { std::free(p); }
+[[gnu::noinline]] void operator delete(void* p, std::size_t) noexcept { std::free(p); }
+[[gnu::noinline]] void operator delete[](void* p, std::size_t) noexcept { std::free(p); }
+void operator delete(void* p, const std::nothrow_t&) noexcept { std::free(p); }
+void operator delete[](void* p, const std::nothrow_t&) noexcept { std::free(p); }
 
 TEST(ClipWordStore, StoresNullTerminatedUtf8TextWithStableOffsets) {
   ClipWordStore store;
@@ -392,21 +420,49 @@ TEST(ClippingLayout, CachesLegacyBoundaryRangesWithoutAHeapAllocation) {
   clipping.pageCount = 10;
   clipping.layoutSignature = 123;
 
-  EXPECT_EQ(sizeof(Clipping), 84U);
+  // Explicit RAM ceiling, not a serialized ABI: all wire fields are written
+  // individually. Keep modern 64-character IDs and owner selection fields.
+  EXPECT_LE(sizeof(Clipping), 192U);
+  clipping.tableSelection = 7;
+  clipping.startOffset = 100;
+  clipping.endOffset = 200;
+  clipping.syncRevision = 0x123456789abcdef0ULL;
+  std::memset(clipping.id, 'x', 64);
+  clipping.id[64] = 0;
   EXPECT_FALSE(clippingCachedRangeReadyOnPage(clipping, 2));
   EXPECT_TRUE(clippingCachedRangeReadyOnPage(clipping, 3));
   EXPECT_FALSE(clippingCachedRangeReadyOnPage(clipping, 4));
 
-  EXPECT_TRUE(cacheClippingResolvedLayoutRange(clipping, 2, 7, 12, 456));
+  allocationProbe::calls = 0;
+  allocationProbe::enabled = true;
+  void* control = ::operator new(1);
+  allocationProbe::enabled = false;
+  ::operator delete(control);
+  ASSERT_EQ(allocationProbe::calls, 1u);
+  allocationProbe::calls = 0;
+  allocationProbe::enabled = true;
+  const bool startChanged = cacheClippingResolvedLayoutRange(clipping, 2, 7, 12, 456);
+  allocationProbe::enabled = false;
+  EXPECT_EQ(allocationProbe::calls, 0u);
+  EXPECT_TRUE(startChanged);
   EXPECT_EQ(clipping.startWordIndex, 7);
   EXPECT_EQ(clipping.layoutSignature, 123U);
   EXPECT_TRUE(clippingCachedRangeReadyOnPage(clipping, 2));
   EXPECT_FALSE(clippingCachedRangeReadyOnPage(clipping, 4));
 
-  EXPECT_TRUE(cacheClippingResolvedLayoutRange(clipping, 4, 1, 9, 456));
+  allocationProbe::enabled = true;
+  const bool endChanged = cacheClippingResolvedLayoutRange(clipping, 4, 1, 9, 456);
+  allocationProbe::enabled = false;
+  EXPECT_EQ(allocationProbe::calls, 0u);
+  EXPECT_TRUE(endChanged);
   EXPECT_EQ(clipping.endWordIndex, 9);
   EXPECT_EQ(clipping.layoutSignature, 456U);
   EXPECT_TRUE(clippingCachedRangeReadyOnPage(clipping, 4));
+  EXPECT_EQ(clipping.tableSelection, 7);
+  EXPECT_EQ(clipping.startOffset, 100u);
+  EXPECT_EQ(clipping.endOffset, 200u);
+  EXPECT_EQ(clipping.syncRevision, 0x123456789abcdef0ULL);
+  EXPECT_EQ(std::string(clipping.id), std::string(64, 'x'));
 }
 
 TEST(ClippingLayout, CompletesSinglePageMigrationInOneMatch) {
