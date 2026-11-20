@@ -12,6 +12,7 @@
 #include "UITheme.h"
 #include "icons/blocks.h"
 #include "icons/book.h"
+#include "icons/folder.h"
 #include "icons/library.h"
 #include "icons/settings2.h"
 #include "icons/transfer.h"

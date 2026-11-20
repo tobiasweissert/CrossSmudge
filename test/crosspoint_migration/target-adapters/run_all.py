@@ -22,6 +22,7 @@ def main():
     flags = ['--sanitize'] if args.sanitize else []
     phases = [
         ('contract', [*base, 'contract', str(HERE/'contract.cpp'), '--syntax', '--evidence', str(args.evidence)]),
+        ('cover-grid-source', [*base, 'cover-grid-source', str(HERE.parent/'target-ui-settings/cover_grid.cpp'), '--syntax', '--evidence', str(args.evidence)]),
         ('navigation-display', [*base, 'navigation-display', *map(str, sources), '--evidence', str(args.evidence), *flags]),
         ('creation-time', [sys.executable, str(HERE/'creation_time.py'), '--evidence', str(args.evidence/'creation-time'), *flags]),
     ]

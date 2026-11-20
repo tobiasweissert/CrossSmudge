@@ -44,7 +44,7 @@ def main():
    if not a.syntax:a.sources += [str(tmp/'support.cpp'),str(R/'src/components/TouchRegistry.cpp')]
    gtest=pathlib.Path('/root/.hermes/cache/scratch/library-finish-deps/googletest-1.17.0/googletest')
    inc += [gtest/'include',gtest]
-   cmd=['g++','-std=c++20','-DFREEINK_DEVICE_STICKY','-DCROSSPOINT_EMULATED=0','-DARDUINOJSON_ENABLE_ARDUINO_STRING=0','-DARDUINOJSON_ENABLE_ARDUINO_STREAM=0','-DARDUINOJSON_ENABLE_PROGMEM=0','-DENABLE_ARDUINO_FEATURES=0','-DCROSSSMUDGE_APP_CAP_TOUCH=1','-DCROSSINK_APP_CAP_USB_DRIVE=0','-DSPI_DRIVER_SELECT=3','-DENABLE_ARDUINO_SERIAL=0','-DUSE_FCNTL_H=0','-ffunction-sections','-fdata-sections','-g']
+   cmd=['g++','-std=c++20','-include','Arduino.h','-DFREEINK_DEVICE_STICKY','-DCROSSPOINT_EMULATED=0','-DARDUINOJSON_ENABLE_ARDUINO_STRING=0','-DARDUINOJSON_ENABLE_ARDUINO_STREAM=0','-DARDUINOJSON_ENABLE_PROGMEM=0','-DENABLE_ARDUINO_FEATURES=0','-DCROSSSMUDGE_APP_CAP_TOUCH=1','-DCROSSINK_APP_CAP_USB_DRIVE=0','-DSPI_DRIVER_SELECT=3','-DENABLE_ARDUINO_SERIAL=0','-DUSE_FCNTL_H=0','-ffunction-sections','-fdata-sections','-g']
    cmd += ['-I'+str(x) for x in inc]
    if a.sanitize:cmd+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-fno-pie','-no-pie']
    cmd+=a.sources
