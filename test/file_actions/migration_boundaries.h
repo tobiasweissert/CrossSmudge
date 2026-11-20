@@ -50,8 +50,8 @@ struct ClippingStore {
     return deleteAdmissionOk && deleteOk;
   }
   static bool prepareRenameMigration(const std::string& from, const std::string& to, const std::string&,
-                                      const std::string&, const std::string& type,
-                                      RenameMigration& m, PreparedRename& p) {
+                                     const std::string&, const std::string& type, RenameMigration& m,
+                                     PreparedRename& p) {
     assert(type == "epub" && !from.empty() && from != to && !m.prepared && !p.ready);
     assert(!Storage.exists("/.crosspoint/book-move.pending"));
     events.push_back("clipping-prepare");

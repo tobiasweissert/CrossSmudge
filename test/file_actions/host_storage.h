@@ -7,9 +7,19 @@ struct FileHandle {
   size_t position = 0;
   explicit operator bool() const { return valid; }
   bool isDirectory() const { return dir; }
-  bool close() { const bool ok = valid; valid = false; return ok; }
-  bool sync() { assert(valid && bytes); return true; }
-  size_t size() const { assert(valid && bytes); return bytes->size(); }
+  bool close() {
+    const bool ok = valid;
+    valid = false;
+    return ok;
+  }
+  bool sync() {
+    assert(valid && bytes);
+    return true;
+  }
+  size_t size() const {
+    assert(valid && bytes);
+    return bytes->size();
+  }
   size_t write(const uint8_t* p, size_t n) {
     assert(valid && bytes && !dir);
     bytes->append(reinterpret_cast<const char*>(p), n);
@@ -27,7 +37,7 @@ using HalFile = FileHandle;
 namespace library {
 inline unsigned dirtyCalls = 0;
 inline void markLibraryIndexDirty() { ++dirtyCalls; }
-}
+}  // namespace library
 struct StorageAdapter {
   bool removeOk = true;
   int renameFailure = 0, renames = 0, renameFailureEffect = 0;

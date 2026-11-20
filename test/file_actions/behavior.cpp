@@ -374,9 +374,9 @@ int main() {
     BookmarkStore::beginOk = ClippingStore::beginOk = true;
     // Current coordinator admits clippings before intent, but bookmarks publish after it.
     const auto expected = failure == 1 ? BookMoveUtils::RenameMigrationResult::Uncertain
-                                      : BookMoveUtils::RenameMigrationResult::RolledBack;
-    assert(result == expected && Storage.moves.empty() &&
-           Storage.paths.count("/Books/Prepared.epub") && Storage.paths.count("/cache/Books/Prepared.epub"));
+                                       : BookMoveUtils::RenameMigrationResult::RolledBack;
+    assert(result == expected && Storage.moves.empty() && Storage.paths.count("/Books/Prepared.epub") &&
+           Storage.paths.count("/cache/Books/Prepared.epub"));
     assert(Storage.exists("/.crosspoint/book-move.pending") == (failure == 1));
     std::cout << "CASE preparation failure " << failure << "\n";
   }
@@ -428,7 +428,8 @@ int main() {
     const auto pos = [](const char* name) { return std::find(events.begin(), events.end(), name) - events.begin(); };
     assert(pos("clipping-prepare") < pos("intent-create") && pos("intent-create") < pos("bookmark-prepare") &&
            pos("bookmark-prepare") < pos("clipping-publish"));
-    assert(result == (publish ? BookMoveUtils::RenameMigrationResult::Success : BookMoveUtils::RenameMigrationResult::Uncertain));
+    assert(result ==
+           (publish ? BookMoveUtils::RenameMigrationResult::Success : BookMoveUtils::RenameMigrationResult::Uncertain));
     assert(Storage.exists("/.crosspoint/book-move.pending") == !publish);
     if (!publish) {
       assert(Storage.moves.empty() && Storage.paths.count("/Books/Protocol.epub") &&
@@ -451,8 +452,10 @@ int main() {
     deletion.callback(ActivityResult{});
     assert(ClippingStore::deleteAdmissions == admissions + 1 && APP_STATE.hasPendingAlert);
     assert(Storage.paths.count("/Books/Admission.epub") == (stage == 0));
-    if (stage == 0) assert(events.empty() && Storage.paths.count("/cache/Books/Admission.epub"));
-    else assert(events.front() == "remove" && std::find(events.begin(), events.end(), "delete-clippings") != events.end());
+    if (stage == 0)
+      assert(events.empty() && Storage.paths.count("/cache/Books/Admission.epub"));
+    else
+      assert(events.front() == "remove" && std::find(events.begin(), events.end(), "delete-clippings") != events.end());
     ClippingStore::deleteAdmissionOk = ClippingStore::deleteOk = true;
     std::cout << "CASE clipping delete failure stage " << stage << "\n";
   }
