@@ -19,7 +19,9 @@
 #include "AppCapabilities.h"
 #include "AppVersion.h"
 #include "BackupStatsActivity.h"
+#if defined(FREEINK_CAP_BLE_HID_HOST) && FREEINK_CAP_BLE_HID_HOST
 #include "BleSettingsActivity.h"
+#endif
 #include "ButtonRemapActivity.h"
 #include "ClearCacheActivity.h"
 #include "ClockOffsetActivity.h"
@@ -402,7 +404,9 @@ void SettingsActivity::rebuildSettingsLists() {
   addSettingByKey(systemSettings, allSettings, "pluginsEnabled");
   systemSettings.push_back(SettingInfo::Action(StrId::STR_LIBRARY, SettingAction::Library));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_PLUGINS, SettingAction::Plugins));
+#if defined(FREEINK_CAP_BLE_HID_HOST) && FREEINK_CAP_BLE_HID_HOST
   systemDeviceSettings.push_back(SettingInfo::Action(StrId::STR_BT_PAGE_TURNER, SettingAction::Bluetooth));
+#endif
   systemDeviceSettings.push_back(SettingInfo::Action(StrId::STR_ABOUT, SettingAction::About));
   if (halClock.isAvailable()) {
     systemDeviceSettings.push_back(SettingInfo::Action(StrId::STR_CLOCK, SettingAction::ClockSettings));
@@ -1109,11 +1113,13 @@ void SettingsActivity::toggleCurrentSetting() {
         activityManager.goToPlugins();
         break;
       case SettingAction::Bluetooth: {
+#if defined(FREEINK_CAP_BLE_HID_HOST) && FREEINK_CAP_BLE_HID_HOST
         auto child = makeUniqueNoThrow<BleSettingsActivity>(renderer, mappedInput);
         if (child)
           startActivityForResult(std::move(child), resultHandler);
         else
           requestUpdate();
+#endif
         break;
       }
       case SettingAction::ClockSettings: {

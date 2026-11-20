@@ -1,0 +1,18 @@
+cmake_minimum_required(VERSION 3.16)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  project(sticky_no_bluetooth_tests NONE)
+  enable_testing()
+endif()
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+get_filename_component(STICKY_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+set(STICKY_NO_BLUETOOTH_SDK "${STICKY_REPO_ROOT}/freeink-sdk" CACHE PATH "Read-only pinned SDK headers")
+foreach(mode normal sanitized)
+  set(mode_args)
+  if(mode STREQUAL "sanitized")
+    list(APPEND mode_args --sanitize)
+  endif()
+  add_test(NAME sticky_no_bluetooth_${mode}
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/run.py
+            --sdk ${STICKY_NO_BLUETOOTH_SDK} ${mode_args})
+  set_tests_properties(sticky_no_bluetooth_${mode} PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE)
+endforeach()

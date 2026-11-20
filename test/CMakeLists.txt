@@ -128,6 +128,7 @@ add_subdirectory(ble_link_note_title)
 add_subdirectory(ble_chapter_build_gate)
 add_subdirectory(ble_remote_turn_gate)
 
+add_subdirectory(sticky_no_bluetooth)
 add_subdirectory(${REPO_ROOT}/lib/BlePageTurner/test BlePageTurnerTests)
 
 add_test(NAME selection_buttons COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_selection_buttons.py)
