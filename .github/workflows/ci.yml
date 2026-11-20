@@ -204,6 +204,10 @@ jobs:
             fi
           done
           trap 'test -f sticky-evidence/image-validation.json || printf "{\"valid\":false,\"error\":\"provenance collection failed\",\"publication_authorized\":false}\\n" > sticky-evidence/image-validation.json' EXIT
+          startup_capture_status=0
+          python3 scripts/capture_sticky_startup_config.py \
+            --project . --env sticky --memory-type qio_opi \
+            --out sticky-evidence || startup_capture_status=$?
           git diff --binary HEAD > sticky-evidence/source-after-build.patch
           git -C freeink-sdk diff --binary HEAD > sticky-evidence/sdk-after-build.patch
           git -C freeink-sdk ls-tree -r HEAD > sticky-evidence/sdk-tree.txt
@@ -246,6 +250,7 @@ jobs:
           (out/'artifact-sha256.json').write_text(json.dumps(hashes, indent=2)+'\n')
           if not valid: raise SystemExit('BIN/ELF/toolchain qualification failed; preserve diagnostic artifact')
           PY
+          test "$startup_capture_status" -eq 0
 
       - name: Seal exact Sticky evidence including failed-build diagnostics
         if: always() && steps.recipient.outcome == 'success' && steps.firmware.outcome != 'skipped'
