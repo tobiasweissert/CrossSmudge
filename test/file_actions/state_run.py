@@ -25,7 +25,8 @@ def run():
    tmp=Path(tmp)
    (tmp/'HalStorage.h').write_text((HERE/'state_boundaries.h').read_text())
    (tmp/'Logging.h').write_text('#pragma once\n#define LOG_ERR(...) ((void)0)\n#define LOG_INF(...) ((void)0)\n#define LOG_DBG(...) ((void)0)\n')
-   (tmp/'ObfuscationUtils.h').write_text('#pragma once\n')
+   # Credentials are outside this reference-persistence fixture. Fail loudly if reached.
+   (tmp/'ObfuscationUtils.h').write_text('#pragma once\n#include <cstdlib>\n#include <string>\nnamespace obfuscation { inline std::string deobfuscateFromBase64(const char*, size_t, bool*, bool*) { std::abort(); } }\n')
    flags=['-fsanitize=address,undefined','-fno-omit-frame-pointer',*(['-fno-pie','-no-pie'] if sys.platform != 'darwin' else [])] if '--sanitize' in sys.argv else []
    subject=HERE/'state_persistence.cpp'
    if '--ui' in sys.argv:

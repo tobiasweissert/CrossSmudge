@@ -32,6 +32,11 @@ class HalFile {
     return it == io.reportedSizes.end() ? io.files.at(path).size() : it->second;
   }
   uint64_t fileSize() const { return size(); }
+  int available() const {
+    if (!valid) return 0;
+    const auto& bytes = io.files.at(path);
+    return pos < bytes.size() ? static_cast<int>(bytes.size() - pos) : 0;
+  }
   int read(void* buf, size_t n) {
     ++io.bodyReads[path];
     if (io.failRead == path && io.writeOpens.count(path)) return -1;

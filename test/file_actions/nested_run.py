@@ -1,18 +1,56 @@
 #!/usr/bin/env python3
-"""Bounded read-only-source review probe; no SD/native-FAT qualification.
-Execute exact production BookmarkStore begin/rollback/commit/write bodies.
-Derived from the retained reviewer probe; real codecs now execute.
-Path identities and storage are adapters; failing I/O is a plain false/no-mutation
-backup rename or a short write, NOT a speculative FAT alias model.
+"""Real complete BookmarkStore/ClippingStore TUs; bounded memory-HAL composition.
+The qualified clipping HAL is read-only and adapted only in scratch. No FAT or
+power-loss qualification; cache/reference/library services are explicit doubles.
 """
 from pathlib import Path
-import fcntl, subprocess, tempfile, json, hashlib
+import fcntl, subprocess, tempfile, os, sys, json, hashlib, shlex
 ROOT=Path(__file__).resolve().parents[2]
-import os, sys
-OUT=Path(os.environ.get('NESTED_LOG', str(Path(tempfile.gettempdir())/'crosscub-nested.log')))
+OUT=Path(os.environ.get('NESTED_LOG',str(Path(tempfile.gettempdir())/'crosscub-nested.log')))
 def method(path, signature):
-    text=(ROOT/path).read_text(); start=text.index(signature)
+    text=(ROOT/path).read_text()
+    assert text.count(signature)==1, signature
+    start=text.index(signature)
     return text[start:text.index('\n}',start)+2]
+def replace_once(text,old,new):
+    assert text.count(old)==1,old
+    return text.replace(old,new)
+
+def hal_source():
+    text=(ROOT/'test/library_builder/stubs/HalStorage.h').read_text()
+    text=replace_once(text,'#pragma once','#pragma once\n#include "nested_io.h"')
+    text=replace_once(text,'bool sync() { return bool(node); }','bool sync() { return bool(node) && !(failSync && path==readbackFaultPath); }')
+    text=replace_once(text,'    fake::reads++;',r'''    fake::reads++;
+    if (path==inputFaultPath) {
+      if(inputFaultHits) ++inputReadsAfterFault;
+      if(inputFault && pos==inputFaultPosition) {
+        inputFault=false;++inputFaultHits;
+        if(inputFaultReturn<0)return -1;
+        const size_t n=std::min(size?size-1:0,node?node->bytes.size()-std::min(pos,node->bytes.size()):0);
+        if(n)std::memcpy(out,node->bytes.data()+pos,n);
+        pos+=n;return static_cast<int>(n);
+      }
+    }
+    if(failRead && path==readbackFaultPath)return -1;
+''')
+    text=replace_once(text,'    pos += size;\n    return static_cast<int>(size);','    if(corruptRead && path==readbackFaultPath && size)static_cast<char*>(out)[0]^=1;\n    pos += size;\n    return static_cast<int>(size);')
+    text=replace_once(text,'    fake::writesByPath[path]++;',r'''    fake::writesByPath[path]++;
+    ++writeCalls;
+    if(shortWrite){++shortWrites;return 0;}
+    if(writeCalls==failWriteAt){++shortWrites;--size;if(!size)return 0;}
+    ++mutations;''')
+    text=replace_once(text,'  bool remove(const char* path) {','  bool remove(const char* path) {\n    ++mutations;')
+    text=replace_once(text,'  bool rename(const char* from, const char* to) {',r'''  bool rename(const char* from, const char* to) {
+    ++mutations;
+    if(std::string(to)==failRenameTo) {
+      if(mutateRenameFailure && exists(from))fake::files[to]=fake::files[from];
+      return false;
+    }
+    if(failBackup && std::string(to).find(".rename.bak")!=std::string::npos)return false;''')
+    # Real firmware BookmarkStore still names FsFile; all operations use the
+    # complete checked HAL contract, not an FsFile-only alias shim.
+    return text+'\nusing FsFile=HalFile;\n'
+
 preamble=r'''
 #include <algorithm>
 #include <cassert>
@@ -22,90 +60,79 @@ preamble=r'''
 #include <limits>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
+#include <HalStorage.h>
+#include "nested_disk.h"
+#include <uzlib.h>
+#include <Serialization.h>
 #define private public
-#include "src/BookmarkStore.h"
+#include "BookmarkStore.h"
+#include "ClippingStore.h"
 #undef private
 #define LOG_ERR(...) ((void)0)
 #define LOG_INF(...) ((void)0)
-constexpr uint8_t LEGACY_VERSION=2, COUNT_U16_VERSION=3, PARAGRAPH_ANCHOR_VERSION=4, VERSION=5;
 constexpr size_t MAX_BOOKMARKS=1024;
 constexpr char BOOKMARKS_DIR[]="/.crosspoint/bookmarks";
-std::map<std::string,std::string> disk;
-bool failBackup=false, shortWrite=false;
-std::string failRenameTo; bool mutateRenameFailure=false, corruptRead=false;
-int failWriteAt=0, writeCalls=0; bool failSync=false, failRead=false;
-int shortWrites=0;
-std::string inputFaultPath; size_t inputFaultPosition=0; int inputFaultReturn=-1, inputFaultHits=0;
-bool inputFault=false; int inputReadsAfterFault=0, mutations=0;
-struct FsFile {
- std::string path; size_t pos=0;
- bool sync(){return !failSync;}
- int available(){return disk[path].size()-pos;}
- int read(void* data,size_t n){if(path==inputFaultPath){if(inputFaultHits)++inputReadsAfterFault;if(inputFault && pos==inputFaultPosition){inputFault=false;++inputFaultHits;if(inputFaultReturn<0)return -1;size_t partial=n?n-1:0;memcpy(data,disk[path].data()+pos,partial);pos+=partial;return partial;}}if(failRead && path=="/current/Target/A.epub")return 0; n=std::min(n,disk[path].size()-pos); memcpy(data,disk[path].data()+pos,n);if(corruptRead && path=="/current/Target/A.epub" && n) static_cast<char*>(data)[0]^=1;pos+=n;return n;}
- size_t write(const uint8_t* data,size_t n) {
-   if(shortWrite){++shortWrites;return 0;}
-   if(++writeCalls==failWriteAt){++shortWrites;size_t partial=n?n-1:0;disk[path].append(reinterpret_cast<const char*>(data),partial);return partial;}
-   ++mutations;disk[path].append(reinterpret_cast<const char*>(data),n);return n;
- }
- explicit operator bool()const{return !path.empty();}
- size_t position(){return pos;}
- bool seek(size_t n){if(n>disk[path].size())return false;pos=n;return true;}
- bool seekCur(size_t n){return seek(pos+n);}
- void close(){}
-};
-constexpr int O_WRONLY=1,O_CREAT=2,O_TRUNC=4;
-struct StorageAdapter {
- FsFile open(const char*p,int){disk[p]="";FsFile f;f.path=p;return f;}
- bool exists(const char*p){return disk.count(p);}
- bool mkdir(const char*){return true;}
- bool remove(const char*p){++mutations;return disk.erase(p)>0;}
- bool rename(const char*a,const char*b){++mutations;
-   if(std::string(b)==failRenameTo){if(mutateRenameFailure && disk.count(a))disk[b]=disk[a];return false;}
-   if(failBackup && std::string(b).find(".rename.bak")!=std::string::npos)return false;
-   if(!disk.count(a)||disk.count(b))return false;
-   disk[b]=disk[a];disk.erase(a);return true;
- }
- bool openFileForRead(const char*,const std::string&p,FsFile&f){if(!disk.count(p))return false;f.path=p;f.pos=0;return true;}
- bool openFileForWrite(const char*,const std::string&p,FsFile&f){++mutations;disk[p]="";f.path=p;return true;}
-} Storage;
-// Deliberately simple, distinct path identity adapter; no hash collisions.
-std::string currentStoreFilePathForBook(const std::string&p,const std::string&){return "/current"+p;}
-std::string legacyStoreFilePathForBook(const std::string&p,const std::string&){return "/legacy"+p;}
-'''
-source=preamble+'\n'+(ROOT/'lib/Serialization/Serialization.h').read_text().replace('#pragma once','').replace('#include <HalStorage.h>','')
-for sig in ['bool readBookmarkString(', 'bool readBookmarkCount(', 'bool BookmarkStore::readFromFile(const std::string&', 'bool bookmarksMatchIdentity(', 'bool mergeBookmarks(', 'bool deleteBookmarkStorePath(', 'bool BookmarkStore::writeToFile(', 'bool BookmarkStore::beginRenameMigration(', 'bool BookmarkStore::commitRenameMigration(', 'bool BookmarkStore::rollbackRenameMigration(']:
-    source+='\n'+method('src/BookmarkStore.cpp',sig)+'\n'
-source+=r'''
+constexpr char CLIPPINGS_DIR[]="/.crosspoint/clippings";
 struct Epub { static std::string cachePathForFilePath(const std::string&p,const char*){return "/cache"+p;} };
 struct Xtc {std::string path; Xtc(const std::string&p,const char*):path(p){} std::string getCachePath(){return "/cache"+path;} };
 using Txt=Xtc;
+namespace library {inline unsigned dirties=0;inline void markLibraryIndexDirty(){++dirties;}}
 struct {std::string openEpubPath;bool saveToFile(){return true;}} APP_STATE;
 struct {bool updatePath(const std::string&,const std::string&,const std::string&,const std::string&){return true;}} RECENT_BOOKS;
 '''
-source+='\n#define private public\n#include "src/ClippingStore.h"\n#undef private\n'
-source+='\nconstexpr uint8_t CLIP_LEGACY_VERSION=1, CLIP_TEXT_OFFSET_VERSION=2, CLIP_LAYOUT_SIGNATURE_VERSION=3, CLIP_VERSION=4;\nconstexpr char CLIPPINGS_DIR[]="/.crosspoint/clippings";\nconstexpr size_t TEXT_COPY_BUFFER_SIZE=128;\nstd::string storeFilePathForBook(const std::string&p,const std::string&){return "/clips"+p;}\n'
-import re
-for sig in ['bool copyBytes(', 'bool ClippingStore::readFromFile(const std::string&', 'bool ClippingStore::writeToFile(', 'bool ClippingStore::beginRenameMigration(', 'bool ClippingStore::commitRenameMigration(', 'bool ClippingStore::rollbackRenameMigration(']:
-    body=method('src/ClippingStore.cpp',sig)
-    body=re.sub(r'\b(LEGACY_VERSION|TEXT_OFFSET_VERSION|LAYOUT_SIGNATURE_VERSION|VERSION)\b',r'CLIP_\1',body)
-    source+='\n'+body+'\n'
-source+=(ROOT/'src/util/BookMoveUtils.h').read_text().replace('#pragma once','')
-source+='\nnamespace {\n'+method('src/util/BookMoveUtils.cpp','bool getCachePath(')+'\n}\nnamespace BookMoveUtils {\n'+method('src/util/BookMoveUtils.cpp','RenameMigrationResult migrateRenamedBookState(')+'\n}\n'
+source=preamble
+for sig in ['std::string currentStoreFilePathForBook(', 'std::string legacyStoreFilePathForBook(']:
+    source+='\n'+method('src/BookmarkStore.cpp',sig)
+for sig in ['std::string storeFilePathForBook(', 'std::string modernStorePathForBook(']:
+    source+='\n'+method('src/ClippingStore.cpp',sig)
+source+='\n'+(ROOT/'src/activities/home/FileActionPaths.h').read_text().replace('#pragma once','')
+source+='\n'+(ROOT/'src/util/BookMoveUtils.h').read_text().replace('#pragma once','')
+bookmove=(ROOT/'src/util/BookMoveUtils.cpp').read_text()
+assert bookmove.count('namespace {')==1 and bookmove.count('}  // namespace\n')==1
+helpers=bookmove.split('namespace {',1)[1].split('}  // namespace',1)[0]
+source+='\nnamespace {\n'+helpers+'\n}\nnamespace BookMoveUtils {\n'+method('src/util/BookMoveUtils.cpp','RenameMigrationResult migrateRenamedBookState(')+'\n}\n'
 source+=(ROOT/'test/file_actions/nested_cases.cpp').read_text()
 with open(Path(tempfile.gettempdir())/'crosscub-review-probes.lock','a') as lock:
     try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
     except BlockingIOError:raise SystemExit('BLOCKED: shared compiler lock busy')
     with tempfile.TemporaryDirectory(prefix='files-independent-nested-') as tmp:
-        cpp=Path(tmp)/'probe.cpp';exe=Path(tmp)/'probe';cpp.write_text(source)
-        cmd=['g++','-std=c++17','-Wall','-Wextra','-Wno-unused-function','-Wno-unused-parameter','-O1','-I'+str(ROOT),str(cpp),'-o',str(exe)]
-        if '--sanitize' in sys.argv:cmd[1:1]=['-fsanitize=address,undefined','-fno-omit-frame-pointer',*(['-fno-pie','-no-pie'] if sys.platform != 'darwin' else [])]
-        compile_result=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=60)
-        log='COMMAND: '+repr(cmd)+'\n'+compile_result.stdout+'\nCOMPILE_EXIT='+str(compile_result.returncode)+'\n'
-        if compile_result.returncode==0:
-            result=subprocess.run([str(exe)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=10)
+        tmp=Path(tmp);cpp=tmp/'probe.cpp';exe=tmp/'probe';cpp.write_text(source)
+        (tmp/'HalStorage.h').write_text(hal_source())
+        # Local quoted includes in the existing unrelated Arduino/FsHelpers
+        # stubs must resolve the same scratch HAL, not introduce a second HAL.
+        for name in ['Arduino.h','FsHelpers.h']:
+            text=(ROOT/'test/library_builder/stubs'/name).read_text()
+            text=replace_once(text,'#include "HalStorage.h"','#include <HalStorage.h>')
+            if name=='FsHelpers.h':
+                text+='\nnamespace FsHelpers {\ninline '+method('lib/FsHelpers/FsHelpers.cpp','bool isSafePathComponent(std::string_view name) {')+'\n}\n'
+            (tmp/name).write_text(text)
+        cmd=['g++','-std=c++20','-Wall','-Wextra','-Wno-unused-function','-Wno-unused-parameter','-O1',
+             '-I'+str(tmp),'-I'+str(ROOT/'test/file_actions'),'-I'+str(ROOT/'test/clipping_store/stubs'),
+             '-I'+str(ROOT/'test/library_builder/stubs'),'-I'+str(ROOT/'src'),
+             '-I'+str(ROOT/'lib/Serialization'),'-I'+str(ROOT/'lib/Utf8'),'-I'+str(ROOT/'lib/uzlib/src'),
+             str(cpp),str(ROOT/'src/BookmarkStore.cpp'),str(ROOT/'src/ClippingStore.cpp'),
+             str(ROOT/'lib/Utf8/Utf8.cpp'),str(ROOT/'lib/uzlib/src/uzlib_checksums.c'),'-o',str(exe)]
+        if '--sanitize' in sys.argv:cmd[1:1]=['-fsanitize=address,undefined','-fno-omit-frame-pointer',*(['-fno-pie','-no-pie'] if sys.platform!='darwin' else [])]
+        if os.environ.get('NESTED_INPUTS'):
+            dependencies=subprocess.run(cmd[:-2]+['-MM'],capture_output=True,text=True,timeout=30)
+            if dependencies.returncode:
+                OUT.write_text(dependencies.stdout+dependencies.stderr)
+                raise SystemExit(dependencies.returncode)
+            paths={Path(token) for token in shlex.split(dependencies.stdout.replace('\\\n',' ')) if not token.endswith(':')}
+            paths.update(ROOT/'test/file_actions'/name for name in ['nested_run.py','nested_cases.cpp','nested_io.h','nested_disk.h'])
+            paths.update(ROOT/'test/library_builder/stubs'/name for name in ['HalStorage.h','Arduino.h','FsHelpers.h'])
+            paths.update([ROOT/'src/util/BookMoveUtils.cpp',ROOT/'lib/FsHelpers/FsHelpers.cpp'])
+            inputs={str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else 'generated/'+p.name:
+                    hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths) if p.is_file()}
+            Path(os.environ['NESTED_INPUTS']).write_text(json.dumps(inputs,indent=2))
+        compiled=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=180)
+        log='COMMAND: '+repr(cmd)+'\n'+compiled.stdout+'\nCOMPILE_EXIT='+str(compiled.returncode)+'\n'
+        if compiled.returncode==0:
+            result=subprocess.run([str(exe)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=60)
             log+=result.stdout+'\nRUN_EXIT='+str(result.returncode)+'\n'
-        else:result=compile_result
-        OUT.write_text(log);print(log)
+        else:result=compiled
+        OUT.write_text(log);print(log,flush=True)
         raise SystemExit(result.returncode)

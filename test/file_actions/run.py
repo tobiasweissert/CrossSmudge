@@ -28,13 +28,22 @@ def run():
     source = 'enum class StrId {' + ','.join(ids) + '};\n'
     source += '\n'.join('constexpr auto '+i+'=StrId::'+i+';' for i in ids) + '\n' + enums + '\n'
     gate = '\n'.join(line for line in (ROOT/'src/activities/home/FileMutationInputGate.h').read_text().splitlines() if not line.startswith('#'))
-    source += (HERE / 'boundaries.h').read_text().replace('// INPUT_GATE',gate)
+    boundaries = (HERE / 'boundaries.h').read_text().replace('// INPUT_GATE', gate)
+    # Replace only the Host storage boundary; StateUi imports the common header unchanged.
+    assert boundaries.count('struct FileHandle {') == 1 and boundaries.count('} Storage;') == 1
+    first = boundaries.index('struct FileHandle {')
+    last = boundaries.index('} Storage;', first) + len('} Storage;')
+    source += boundaries[:first] + (HERE / 'host_storage.h').read_text() + boundaries[last:]
     source += (HERE / 'migration_boundaries.h').read_text()
     source += '\n' + '\n'.join(line for line in (ROOT/'src/util/BookMoveUtils.h').read_text().splitlines() if not line.startswith('#'))
-    source += '\nnamespace {\n' + method('src/util/BookMoveUtils.cpp', 'bool getCachePath(') + '\n}\nnamespace BookMoveUtils {\n'
+    source += '\n' + '\n'.join(line for line in (ROOT/'src/activities/home/FileActionPaths.h').read_text().splitlines() if not line.startswith('#'))
+    move = (ROOT / 'src/util/BookMoveUtils.cpp').read_text()
+    assert move.count('namespace {') == 1 and move.count('}  // namespace\n') == 1
+    helpers = move.split('namespace {', 1)[1].split('}  // namespace', 1)[0]
+    source += '\nnamespace {\n' + helpers + '\n}\nnamespace BookMoveUtils {\n'
     source += method('src/util/BookMoveUtils.cpp', 'RenameMigrationResult migrateRenamedBookState(') + '\n}\n'
     source += '\nnamespace BookActions {\n' + method('src/activities/home/BookActions.cpp','bool clearFileMetadata(') + '\n}\n'
-    source += '\n' + '\n'.join(line for line in (ROOT/'src/activities/home/FileActionPaths.h').read_text().splitlines() if not line.startswith('#'))
+    source += '\n' + method('src/activities/home/FileBrowserActivity.cpp', 'bool getMutationBookCache(')
     source += '\n' + method('src/activities/home/FileBrowserActivity.cpp', 'void FileBrowserActivity::promptDeleteFile(')
     source += '\n' + method('src/activities/home/FileBrowserActivity.cpp', 'void FileBrowserActivity::showFileActionMenu(')
     source += '\n' + method('src/activities/home/FileBrowserActivity.cpp', 'void FileBrowserActivity::startMoveFile(')
@@ -67,9 +76,23 @@ def run():
             subject=('#include "activities/home/FileMutationConfirmationActivity.h"\n' if header.exists() else
                      '#include "activities/util/ConfirmationActivity.h"\nusing FileMutationConfirmationActivity=ConfirmationActivity;\n')
             (Path(tmp)/'Subject.h').write_text(subject)
-            includes=['-I'+str(HERE/'stubs'),'-I'+str(ROOT/'test/option_popup/stubs'),'-I'+str(ROOT/'src'),'-I'+tmp]
-            cmd=['g++','-std=c++20','-Wall','-Wextra','-Werror','-O1','-g',*flags,*includes,
-                 '-DCROSSINK_APP_CAP_TOUCH=1',str(HERE/'confirmation.cpp'),
+            # Current navigator boundary names are distinct logical inputs, not aliases.
+            input_boundary = (HERE/'stubs/MappedInputManager.h').read_text()
+            old_buttons = 'enum class Button { Back, Confirm, Left, Right, Up, Down, Power };'
+            assert input_boundary.count(old_buttons) == 1
+            (Path(tmp)/'MappedInputManager.h').write_text(input_boundary.replace(
+                old_buttons, 'enum class Button { Back, Confirm, Left, Right, Up, Down, Power, NavNext, NavPrevious };'))
+            confirmation = (HERE/'confirmation.cpp').read_text()
+            end_loop = '  }\n  std::cout << "PASS mutation confirmation'
+            assert confirmation.count(end_loop) == 1
+            confirmation = confirmation.replace(end_loop,
+                '    std::cout << "CASE mutation confirmation orientation " << landscape << "\\n";\n' + end_loop)
+            (Path(tmp)/'confirmation.cpp').write_text(confirmation)
+            includes=['-I'+tmp,'-I'+str(HERE/'stubs'),'-I'+str(ROOT/'test/option_popup/stubs'),'-I'+str(ROOT/'src')]
+            # Firmware-compatible C++17 avoids C++20 shared_ptr atomic deprecation;
+            # no warnings, sanitizers, or assertions are suppressed.
+            cmd=['g++','-std=c++17','-Wall','-Wextra','-Werror','-O1','-g',*flags,*includes,
+                 '-DCROSSINK_APP_CAP_TOUCH=1',tmp+'/confirmation.cpp',
                  str(ROOT/'src/activities/util/ConfirmationActivity.cpp'),'-o',tmp+'/confirmation']
             print('COMMAND:', ' '.join(cmd),flush=True)
             subprocess.run(cmd,check=True,timeout=90)

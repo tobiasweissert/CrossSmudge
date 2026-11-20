@@ -1,4 +1,5 @@
 int main() {
+  std::cout << std::unitbuf;
   {
     FileBrowserActivity oom;
     failActivityAllocation = true;
@@ -19,6 +20,7 @@ int main() {
   cancelled.isCancelled = true;
   browser.callback(cancelled);
   assert(events.empty());
+  std::cout << "CASE cancelled Delete has no effects\n";
   Storage.removeOk = false;
   browser.callback(ActivityResult{});
   assert(events == std::vector<std::string>{"remove"} && "failed delete must preserve metadata and progress");
@@ -45,6 +47,7 @@ int main() {
     events.clear();
     BookActions::clearFileMetadata(path);
     assert(!Storage.paths.count("/cache" + path) && "successful delete must clear all path-keyed format caches");
+    std::cout << "CASE delete cache " << ext << "\n";
   }
   std::cout << "PASS deleted file format caches are removed\n";
   {
@@ -57,6 +60,7 @@ int main() {
     Epub::cacheOk = true;
     assert(!Storage.paths.count("/Books/Partial.epub") && Storage.paths.count("/cache/Books/Partial.epub") &&
            APP_STATE.hasPendingAlert && "post-delete cleanup failure must be visible separately");
+    std::cout << "CASE failed cache cleanup follows acknowledged Delete\n";
   }
   browser.showFileActionMenu("Original.epub");
   auto* menu = dynamic_cast<FileBrowserActionActivity*>(browser.child.get());
@@ -98,6 +102,7 @@ int main() {
       assert(APP_STATE.hasPendingAlert &&
              std::string(APP_STATE.pendingAlertBody).find("already exists") != std::string::npos &&
              "collision must be explicit");
+    std::cout << "CASE move admission [" << target << "]\n";
   }
   std::cout << "PASS Move admission no-op collision invalid directory\n";
   for (const auto& ext : std::vector<std::string>{".epub", ".xtc", ".txt", ".md"}) {
@@ -109,6 +114,7 @@ int main() {
     assert(Storage.paths.count(next) && Storage.paths.count("/cache" + next) && !Storage.paths.count("/cache" + old));
     assert(APP_STATE.openEpubPath == next);
     assert(std::find(events.begin(), events.end(), "recent-move") != events.end());
+    std::cout << "CASE move continuity " << ext << "\n";
   }
   std::cout << "PASS book Move preserves path-keyed state for all formats\n";
   {
@@ -134,6 +140,7 @@ int main() {
     assert(std::any_of(screen.buttons.begin(), screen.buttons.end(),
                        [](const auto& b) { return b.props.label && std::string(b.props.label) == "Select folder"; }) &&
            "empty destination folder must have a visible touch acceptance button");
+    std::cout << "CASE empty picker button orientation " << landscape << "\n";
   }
   std::cout << "PASS empty picker Select folder is visible both orientations\n";
   {
@@ -175,6 +182,7 @@ int main() {
     assert(folder.finished && !folder.result.isCancelled &&
            std::get<FilePathResult>(folder.result.data).path == "/Empty" &&
            "fresh touch Select folder must return current empty directory");
+    std::cout << "CASE fresh destination touch orientation " << landscape << "\n";
   }
   std::cout << "PASS fresh touch destination acceptance both orientations\n";
   for (bool landscape : {false, true}) {
@@ -201,6 +209,7 @@ int main() {
     list.mappedInput.tap = true;
     list.loop();
     assert(dynamic_cast<FileBrowserActionActivity*>(list.child.get()) && list.selectorIndex == 1);
+    std::cout << "CASE selected Actions orientation " << landscape << "\n";
   }
   std::cout << "PASS visible Actions routes selected file in both orientations\n";
   for (bool landscape : {false, true}) {
@@ -221,6 +230,7 @@ int main() {
       folder.loop();
       assert(folder.finished && !folder.result.isCancelled &&
              std::get<FilePathResult>(folder.result.data).path == path);
+      std::cout << "CASE picker hardware orientation " << landscape << " path " << path << "\n";
     }
     FileBrowserActivity descent;
     descent.mode = FileBrowserActivity::Mode::PickDirectory;
@@ -244,6 +254,7 @@ int main() {
     descent.mappedInput.released.insert(MappedInputManager::Button::Right);
     descent.loop();
     assert(!descent.finished && "directory navigation invalidates destination consent until the new path is painted");
+    std::cout << "CASE descent invalidates consent orientation " << landscape << "\n";
   }
   std::cout << "PASS picker hardware root nested empty and descent consent\n";
   for (bool landscape : {false, true}) {
@@ -276,6 +287,7 @@ int main() {
     cancel.mappedInput.released.insert(MappedInputManager::Button::Back);
     cancel.loop();
     assert(cancel.finished && cancel.result.isCancelled);
+    std::cout << "CASE touch hold photo Back orientation " << landscape << "\n";
   }
   std::cout << "PASS touch long-press hardware hold ordinary photo and picker Back\n";
   {
@@ -287,6 +299,7 @@ int main() {
     assert(std::none_of(menu->items.begin(), menu->items.end(),
                         [](const auto& i) { return i.action == FileBrowserAction::Delete; }) &&
            "file-only mutation scope must not recursively delete hidden Inbox journals");
+    std::cout << "CASE directory menu excludes Delete\n";
   }
   {
     Storage.paths = {{"/Books/Recent.epub", false}, {"/cache/Books/Recent.epub", true}};
@@ -346,6 +359,8 @@ int main() {
       assert(Storage.paths.count("/Books/Alias.epub") || Storage.paths.count("/Target/Alias.epub"));
       assert(Storage.paths.count("/cache/Books/Alias.epub") || Storage.paths.count("/cache/Target/Alias.epub"));
       assert(std::find(events.begin(), events.end(), "bookmark-rollback") == events.end());
+      assert(Storage.exists("/.crosspoint/book-move.pending"));
+      std::cout << "CASE negative rename failure " << failure << " effect " << effect << "\n";
     }
   Storage.renameFailureEffect = 0;
   Storage.renameFailure = 0;
@@ -357,8 +372,13 @@ int main() {
     const auto result = BookMoveUtils::migrateRenamedBookState(
         "/Books/Prepared.epub", "/Target/Prepared.epub", "/cache/Books/Prepared.epub", "Title", "Author", "epub", true);
     BookmarkStore::beginOk = ClippingStore::beginOk = true;
-    assert(result == BookMoveUtils::RenameMigrationResult::RolledBack && Storage.moves.empty() &&
+    // Current coordinator admits clippings before intent, but bookmarks publish after it.
+    const auto expected = failure == 1 ? BookMoveUtils::RenameMigrationResult::Uncertain
+                                      : BookMoveUtils::RenameMigrationResult::RolledBack;
+    assert(result == expected && Storage.moves.empty() &&
            Storage.paths.count("/Books/Prepared.epub") && Storage.paths.count("/cache/Books/Prepared.epub"));
+    assert(Storage.exists("/.crosspoint/book-move.pending") == (failure == 1));
+    std::cout << "CASE preparation failure " << failure << "\n";
   }
   std::cout << "PASS fault matrix cache/file negative acknowledgement none alias moved and preparation failure\n";
   FileActionPaths::mutationBlocked = false;
@@ -369,6 +389,7 @@ int main() {
     denied.promptDeleteFile(path, path.substr(path.rfind('/') + 1));
     if (denied.callback) denied.callback(ActivityResult{});
     assert(events.empty() && Storage.paths.count(path) && "Delete must not mutate hidden state or directories");
+    std::cout << "CASE delete excluded " << path << "\n";
   }
   std::cout << "PASS Delete excludes hidden state and directory mutation\n";
   Storage.paths = {
@@ -391,5 +412,48 @@ int main() {
     FileBrowserActivity blocked;
     blocked.showFileActionMenu("Fault.epub");
     assert(!blocked.child && "uncertain state must block destructive context actions, not only Move retries");
+    std::cout << "CASE uncertainty blocks destructive context actions\n";
+  }
+  // Independent injected-boundary scenarios: reset only this scenario's fake media.
+  for (bool publish : {false, true}) {
+    Storage.paths = {{"/Books/Protocol.epub", false}, {"/cache/Books/Protocol.epub", true}};
+    Storage.moves.clear();
+    Storage.renames = 0;
+    Storage.renameFailure = 0;
+    ClippingStore::publishOk = publish;
+    events.clear();
+    const auto result = BookMoveUtils::migrateRenamedBookState(
+        "/Books/Protocol.epub", "/Target/Protocol.epub", "/cache/Books/Protocol.epub", "Title", "Author", "epub", true);
+    ClippingStore::publishOk = true;
+    const auto pos = [](const char* name) { return std::find(events.begin(), events.end(), name) - events.begin(); };
+    assert(pos("clipping-prepare") < pos("intent-create") && pos("intent-create") < pos("bookmark-prepare") &&
+           pos("bookmark-prepare") < pos("clipping-publish"));
+    assert(result == (publish ? BookMoveUtils::RenameMigrationResult::Success : BookMoveUtils::RenameMigrationResult::Uncertain));
+    assert(Storage.exists("/.crosspoint/book-move.pending") == !publish);
+    if (!publish) {
+      assert(Storage.moves.empty() && Storage.paths.count("/Books/Protocol.epub") &&
+             Storage.paths.count("/cache/Books/Protocol.epub"));
+      assert(pos("bookmark-rollback") == static_cast<ptrdiff_t>(events.size()) &&
+             pos("clipping-rollback") == static_cast<ptrdiff_t>(events.size()));
+    }
+    std::cout << "CASE checked preparation publication " << publish << "\n";
+  }
+  for (int stage : {0, 1}) {
+    FileActionPaths::mutationBlocked = false;
+    Storage.paths = {{"/Books/Admission.epub", false}, {"/cache/Books/Admission.epub", true}};
+    ClippingStore::deleteAdmissionOk = stage != 0;
+    ClippingStore::deleteOk = stage != 1;
+    APP_STATE.hasPendingAlert = false;
+    FileBrowserActivity deletion;
+    deletion.promptDeleteFile("/Books/Admission.epub", "Admission.epub");
+    events.clear();
+    const auto admissions = ClippingStore::deleteAdmissions;
+    deletion.callback(ActivityResult{});
+    assert(ClippingStore::deleteAdmissions == admissions + 1 && APP_STATE.hasPendingAlert);
+    assert(Storage.paths.count("/Books/Admission.epub") == (stage == 0));
+    if (stage == 0) assert(events.empty() && Storage.paths.count("/cache/Books/Admission.epub"));
+    else assert(events.front() == "remove" && std::find(events.begin(), events.end(), "delete-clippings") != events.end());
+    ClippingStore::deleteAdmissionOk = ClippingStore::deleteOk = true;
+    std::cout << "CASE clipping delete failure stage " << stage << "\n";
   }
 }

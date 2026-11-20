@@ -22,6 +22,9 @@ def source(browser_path=None):
  source+='\n'.join('[[maybe_unused]] constexpr auto '+i+'=StrId::'+i+';' for i in ids)+'\n'+enums+'\n'
  source+=boundaries.replace('// INPUT_GATE',gate)+'\n'
  source+='namespace BookActions {bool clearFileMetadata(const std::string&){return true;}}\n'
+ # Explicit store admission boundary: these cases qualify reference persistence only.
+ source+='struct ClippingStore { static bool canDeleteForFilePath(const std::string&, const char*) { return true; } };\n'
+ source+=method(browser,'bool getMutationBookCache(')+'\n'
  source+='namespace BookMoveUtils {enum class RenameMigrationResult{Success,RolledBack,Uncertain};template<class...T>RenameMigrationResult migrateRenamedBookState(T&&...){return RenameMigrationResult::Success;}}\n'
  source+='\n'.join(l for l in (ROOT/'src/activities/home/FileActionPaths.h').read_text().splitlines() if not l.startswith('#'))+'\n'
  for name in ['promptDeleteFile','moveFile','fileOperationError']:
