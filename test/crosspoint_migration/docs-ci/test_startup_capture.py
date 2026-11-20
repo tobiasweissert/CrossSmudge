@@ -441,7 +441,8 @@ class WorkflowTests(unittest.TestCase):
             primary.write_bytes(b'original-primary')
             result = subprocess.run(['bash', '-c', 'set -euo pipefail\n' + block +
                                      '\nprintf hash-stage > sticky-evidence/artifact-sha256.json\n' +
-                                     'test "$startup_capture_status" -eq 0'], cwd=root, capture_output=True, text=True)
+                                     'test "$startup_capture_status" -eq 0'], cwd=root, capture_output=True, text=True,
+                                    env={**os.environ, 'PIO_ENV': 'sticky'})
             self.assertEqual(result.returncode, 1)
             self.assertEqual(primary.read_bytes(), b'original-primary')
             self.assertEqual((root / 'sticky-evidence/artifact-sha256.json').read_text(), 'hash-stage')

@@ -867,6 +867,89 @@ def parse_builtin_langs(value: Optional[str], languages: List[str]) -> Optional[
 
 
 # ---------------------------------------------------------------------------
+# Optional private fixed-storage output (ordinary generation remains raw)
+# ---------------------------------------------------------------------------
+
+def generate_static_variant(output_dir):
+    """Wrap already generated sources; preserve the exact C++ literal bytes.
+
+    All languages are required. This is called only by the private experiment
+    generator, never by the ordinary SCons/raw generation path.
+    """
+    import hashlib
+    import json
+    import zlib
+    out = Path(output_dir)
+    cpp = (out / "I18nStrings.cpp").read_text()
+    pattern = re.compile(r'const char (STRINGS_(\w+)_DATA)\[\] =\n(.*?)^;', re.S | re.M)
+    matches = list(pattern.finditer(cpp))
+    if len(matches) != 35 or matches[0][2] != "EN":
+        raise ValueError("fixed language profile requires all 35 languages, English first")
+
+    def literal_bytes(text):
+        # Only the existing generator's explicit ASCII/byte escape grammar.
+        token = r'"(?:[^"\\\n]|\\(?:[ntr"\\0]|x[0-9A-Fa-f]{2}))*"'
+        if not re.fullmatch(r'\s*(?:' + token + r'\s*)+', text):
+            raise ValueError("unsupported generated string literal syntax")
+        raw = bytearray()
+        escapes = {'n': 10, 't': 9, 'r': 13, '"': 34, '\\': 92, '0': 0}
+        for part in re.findall(token, text):
+            i = 1
+            while i < len(part)-1:
+                ch = part[i]
+                if ch != '\\':
+                    if ord(ch) > 127:
+                        raise ValueError("expected explicit UTF-8 bytes")
+                    raw.append(ord(ch))
+                    i += 1
+                elif part[i+1] == 'x':
+                    raw.append(int(part[i+2:i+4], 16))
+                    i += 4
+                else:
+                    raw.append(escapes[part[i+1]])
+                    i += 2
+        return bytes(raw) + b'\0'  # implicit C++ terminal byte
+
+    guard = 'defined(CROSSPOINT_STATIC_BUILTINS) || defined(STATIC_BUILTIN_HOST_TEST)'
+    inventory, blocks, checks = [], [], []
+    en_size = len(literal_bytes(matches[0][3]))
+    for match in reversed(matches):
+        name, code, literals = match.groups()
+        raw = literal_bytes(literals)
+        inventory.append(dict(name=name, raw=len(raw), sha256=hashlib.sha256(raw).hexdigest(),
+                              compressed=len(zlib.compress(raw, 9)) if code != 'EN' else 0))
+        checks.append(f'{{i18n_strings::{name}, {len(raw)}, i18n_strings::OFFSETS_{code}, static_cast<size_t>(StrId::_COUNT), i18n_strings::STRINGS_EN_DATA, {en_size}, i18n_strings::OFFSETS_EN, {str(code == "EN").lower()}}}')
+        if code == 'EN':
+            continue
+        packed = zlib.compress(raw, 9)
+        (out / (name+'.zlib')).write_bytes(packed)
+        alternative = [f'#if {guard}',
+                       f'STATIC_BUILTIN_BSS static_builtin::Backing<char, {len(raw)}> sb_{name};',
+                       f'using sb_type_{name} = static_builtin::Backing<char, {len(raw)}>;',
+                       f'static_assert(offsetof(sb_type_{name}, values) == 0 && offsetof(sb_type_{name}, terminal) == {len(raw)} && sizeof(sb_type_{name}) == {(len(raw)+4)//4*4} && alignof(sb_type_{name}) == 4, "typed language wrapper layout");',
+                       f'const char* const {name} = sb_{name}.values;',
+                       f'static const unsigned char packed_{name}[] = {{' + ','.join(map(str,packed)) + '};',
+                       '#else', match[0], '#endif']
+        cpp = cpp[:match.start()] + '\n'.join(alternative) + cpp[match.end():]
+        blocks.append(f'{{i18n_strings::packed_{name}, sizeof(i18n_strings::packed_{name}), reinterpret_cast<unsigned char*>(&i18n_strings::sb_{name}), {len(raw)}, sizeof(i18n_strings::sb_{name}), {zlib.crc32(raw)}u}}')
+    cpp = f'#if {guard}\n#include "StaticBuiltinData.h"\n#endif\n' + cpp
+    cpp += f'\n#if {guard}\nnamespace static_builtin {{\n'
+    cpp += 'static const Block languageBlocks[] = {\n' + ',\n'.join(blocks) + '\n};\n'
+    cpp += 'static const LanguageCheck languageChecks[] = {\n' + ',\n'.join(checks) + '\n};\n'
+    cpp += 'Tables languageTables() { return {languageBlocks, sizeof(languageBlocks)/sizeof(languageBlocks[0]), nullptr, 0, languageChecks, sizeof(languageChecks)/sizeof(languageChecks[0])}; }\n}\n#endif\n'
+    (out / 'I18nStrings.cpp').write_text(cpp)
+    for filename in ['I18nKeys.h', 'I18nStrings.h']:
+        path = out / filename
+        text = path.read_text()
+        text = re.sub(r'extern const char (STRINGS_(?!EN_DATA)(\w+)_DATA)\[\];',
+                      lambda m: f'#if {guard}\nextern const char* const {m[1]};\n#else\n{m[0]}\n#endif', text)
+        path.write_text(text)
+    inventory.sort(key=lambda x: x['name'])
+    (out / 'language-inventory.json').write_text(json.dumps(inventory, indent=2)+'\n')
+    return inventory
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1075,3 +1158,19 @@ else:
             strip_unused=True,
             builtin_langs=env.GetProjectOption("custom_i18n_builtin_langs", "all"),
         )
+
+    # Separate owner-authorized non-distributing experiment; ordinary builds stay raw.
+    if "Import" in globals() and env.GetProjectOption("custom_static_builtin_data", "no") == "yes":
+        if env["PIOENV"] != "sticky-static-builtins-experimental":
+            raise RuntimeError("static-builtins experiment is scoped to env:sticky-static-builtins-experimental; ordinary environments remain raw")
+        if env.GetProjectOption("custom_i18n_builtin_langs", "all") not in ("", "all"):
+            raise RuntimeError("static-builtins experiment requires every existing language")
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from gen_static_builtin_data import generate
+        root = Path(env.subst("$PROJECT_DIR"))
+        private = Path(env.subst("$BUILD_DIR")) / "static-builtins"
+        generate(root, private, "esp32-le-v1")
+        for filename in ("I18nKeys.h", "I18nStrings.h", "I18nStrings.cpp"):
+            (root / "lib/I18n" / filename).write_bytes((private / filename).read_bytes())
+        env.Prepend(CPPPATH=[str(private)])
+        env.Append(CPPDEFINES=[("CROSSPOINT_STATIC_BUILTINS", 1)])

@@ -49,7 +49,7 @@ class Policy(unittest.TestCase):
         build = text.split('      - name: Build ${{ matrix.environment }} firmware', 1)[1]
         build = build.split('      - name: Stage exact Sticky BIN ELF and provenance', 1)[0]
         commands = re.findall(r'(?m)^          pio run .+$', build)
-        self.assertEqual(commands, ['          pio run --verbose -j1 -e sticky > pio-sticky.log 2>&1'])
+        self.assertEqual(commands, ['          pio run --verbose -j1 -e "$PIO_ENV" > "pio-$PIO_ENV.log" 2>&1'])
         self.assertIn('pio check --verbose --fail-on-defect low --fail-on-defect medium --fail-on-defect high', text)
 
     def test_release_is_owner_sticky_and_guarded(self):
@@ -66,8 +66,8 @@ class Policy(unittest.TestCase):
     def test_pkg_list_matches_pinned_core_cli(self):
         text = (ROOT / '.github/workflows/ci.yml').read_text()
         stage = text[text.index('name: Stage exact Sticky BIN ELF and provenance'):]
-        self.assertRegex(stage, r'(?m)^\s+pio pkg list -e sticky > sticky-evidence/resolved-packages\.txt$')
-        self.assertNotIn('pio pkg list -e sticky --json-output', stage)
+        self.assertRegex(stage, r'(?m)^\s+pio pkg list -e "\$PIO_ENV" > sticky-evidence/resolved-packages\.txt$')
+        self.assertNotIn('pio pkg list -e "$PIO_ENV" --json-output', stage)
 
     def test_cppcheck_declares_compatible_os_and_pcre_runtime(self):
         text = (ROOT / '.github/workflows/ci.yml').read_text()

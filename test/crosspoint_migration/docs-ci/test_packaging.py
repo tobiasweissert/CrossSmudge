@@ -29,7 +29,7 @@ def staging_python():
 
 
 class Packaging(unittest.TestCase):
-    def run_stage(self, corrupt=False):
+    def run_stage(self, corrupt=False, environment='sticky'):
         spec = importlib.util.spec_from_file_location('synthetic_ota_fixture', ROOT / 'test/ota_release/test_release.py')
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
@@ -39,7 +39,7 @@ class Packaging(unittest.TestCase):
             expected_temp = Path(os.environ.get('RUNNER_TEMP') or os.environ['TMPDIR'])
             self.assertEqual(root.parent.resolve(), expected_temp.resolve())
             (root / 'scripts').symlink_to(ROOT / 'scripts', target_is_directory=True)
-            build = root / '.pio/build/sticky'
+            build = root / '.pio/build' / environment
             build.mkdir(parents=True)
             binary = module.synthetic_image(version='1.6.5.5')
             if corrupt:
@@ -57,7 +57,7 @@ class Packaging(unittest.TestCase):
             old = Path.cwd()
             try:
                 os.chdir(root)
-                with patch('pathlib.Path.home', return_value=home), patch('subprocess.check_output', return_value='SYNTHETIC Core 6.1.19 / compiler fixture'):
+                with patch.dict(os.environ, {'PIO_ENV': environment}), patch('pathlib.Path.home', return_value=home), patch('subprocess.check_output', return_value='SYNTHETIC Core 6.1.19 / compiler fixture'):
                     if corrupt:
                         with self.assertRaises(SystemExit):
                             exec(staging_python(), {'__name__': '__workflow_staging_fixture__'})
@@ -72,6 +72,10 @@ class Packaging(unittest.TestCase):
                 hashes = json.loads((out / 'artifact-sha256.json').read_text())
                 self.assertEqual(hashes['firmware.bin'], hashlib.sha256(binary).hexdigest())
                 self.assertIn('toolchain-manifest.json', hashes)
+                self.assertIn('merged-initializer-receipt.json', hashes)
+                self.assertIn('merged-initializer.txt', hashes)
+                provenance = json.loads((out / 'build-environment.json').read_text())
+                self.assertEqual(provenance, {'environment': environment, 'hardware_board': 'Sticky', 'publication_authorized': False})
             finally:
                 os.chdir(old)
 

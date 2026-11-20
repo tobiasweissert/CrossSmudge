@@ -22,7 +22,14 @@
 #include <SPI.h>
 #include <TrustedTime.h>
 #include <WiFi.h>
+#if defined(CROSSPOINT_STATIC_BUILTINS)
+#include <StaticBuiltinData.h>
+#include <StaticBuiltinFonts.h>
+
+#include <cstdlib>
+#else
 #include <builtinFonts/all.h>
+#endif
 #include <uzlib.h>
 
 #include "AppCapabilities.h"
@@ -1308,6 +1315,11 @@ void setupDisplayAndFonts(const bool seamless, const bool loadReaderResources, c
 }
 
 void setup() {
+#if defined(CROSSPOINT_STATIC_BUILTINS)
+  // Fence every reset/deep-wake/silent-resume/error path before application consumers.
+  // Do not invoke a UI or translated-text error route on partial backing.
+  if (!static_builtin::hydrateBuiltins()) std::abort();
+#endif
 #ifdef SIMULATOR
   SimulatorLifecycle::restoreSilentRebootToken(silentRebootMagic, silentRebootTarget, silentRebootPayload);
 #endif

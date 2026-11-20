@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: Non-distributing build environment
+        type: choice
+        options: [sticky, sticky-static-builtins-experimental]
+        default: sticky
+        required: true
   workflow_call:
 
 # A newer commit supersedes older PR validation; keep main pushes independent.
@@ -99,14 +106,25 @@ jobs:
         run: pio check --verbose --fail-on-defect low --fail-on-defect medium --fail-on-defect high
 
   build:
-    # Standard Sticky only; PR/manual/reusable validation never publishes.
+    # Ordinary validation stays raw Sticky; only manual dispatch can opt in.
+    # Neither environment publishes or authorizes hardware execution.
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        environment: [sticky]
+        environment: ["${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'sticky' }}"]
+    env:
+      PIO_ENV: ${{ matrix.environment }}
     steps:
+      - name: Validate selected build environment
+        run: |
+          set -euo pipefail
+          case "$PIO_ENV" in
+            sticky|sticky-static-builtins-experimental) ;;
+            *) printf '%s\n' 'Invalid build environment' >&2; exit 1 ;;
+          esac
+
       - uses: actions/checkout@v6
         with:
           submodules: recursive
@@ -138,7 +156,7 @@ jobs:
       - name: Pin nested core and verify source toolchain pins
         run: |
           set -euo pipefail
-          pio pkg install -e sticky
+          pio pkg install -e "$PIO_ENV"
           uv pip install --python ~/.platformio/penv/bin/python "pioarduino==6.1.19"
           python3 - <<'PY'
           import configparser, pathlib, subprocess
@@ -188,7 +206,7 @@ jobs:
         run: |
           set -euo pipefail
           # Raw diagnostics (including runner paths) stay inside the sealed evidence.
-          pio run --verbose -j1 -e sticky > pio-sticky.log 2>&1
+          pio run --verbose -j1 -e "$PIO_ENV" > "pio-$PIO_ENV.log" 2>&1
 
       - name: Stage exact Sticky BIN ELF and provenance
         if: always() && steps.firmware.outcome != 'skipped'
@@ -196,24 +214,24 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p sticky-evidence
-          cp pio-sticky.log sticky-evidence/build.log
+          cp "pio-$PIO_ENV.log" sticky-evidence/build.log
           # Preserve primary bytes before any metadata command can fail.
           for name in firmware.bin firmware.elf firmware.map bootloader.bin partitions.bin; do
-            if test -f ".pio/build/sticky/$name"; then
-              cp ".pio/build/sticky/$name" sticky-evidence/
+            if test -f ".pio/build/$PIO_ENV/$name"; then
+              cp ".pio/build/$PIO_ENV/$name" sticky-evidence/
             fi
           done
           trap 'test -f sticky-evidence/image-validation.json || printf "{\"valid\":false,\"error\":\"provenance collection failed\",\"publication_authorized\":false}\\n" > sticky-evidence/image-validation.json' EXIT
           startup_capture_status=0
           python3 scripts/capture_sticky_startup_config.py \
-            --project . --env sticky --memory-type qio_opi \
+            --project . --env "$PIO_ENV" --memory-type qio_opi \
             --out sticky-evidence || startup_capture_status=$?
           git diff --binary HEAD > sticky-evidence/source-after-build.patch
           git -C freeink-sdk diff --binary HEAD > sticky-evidence/sdk-after-build.patch
           git -C freeink-sdk ls-tree -r HEAD > sticky-evidence/sdk-tree.txt
-          pio pkg list -e sticky > sticky-evidence/resolved-packages.txt
+          pio pkg list -e "$PIO_ENV" > sticky-evidence/resolved-packages.txt
           python3 - <<'PY'
-          import configparser, hashlib, json, pathlib, shutil, subprocess, sys
+          import configparser, hashlib, json, os, pathlib, shutil, subprocess, sys
           sys.path.insert(0, 'scripts')
           from validate_ota_release import validate_release, validate_version
           out = pathlib.Path('sticky-evidence')
@@ -221,7 +239,10 @@ jobs:
           config.read('platformio.ini')
           version = validate_version(config['crosssmudge']['version'])
           assert config['crossink']['version'] == version
-          build = pathlib.Path('.pio/build/sticky')
+          selected_env = os.environ['PIO_ENV']
+          assert selected_env in ('sticky', 'sticky-static-builtins-experimental')
+          build = pathlib.Path('.pio/build')/selected_env
+          (out/'build-environment.json').write_text(json.dumps({'environment': selected_env, 'hardware_board': 'Sticky', 'publication_authorized': False}, indent=2)+'\n')
           for name in ['firmware.bin', 'firmware.elf', 'firmware.map', 'bootloader.bin', 'partitions.bin']:
               if (build/name).is_file(): shutil.copy2(build/name, out/name)
           # Copy, never rebuild or patch descriptor bytes for validation.
@@ -238,6 +259,97 @@ jobs:
           for path in sorted((pathlib.Path.home()/'.platformio/packages').glob('toolchain*/bin/*-g++')):
               compilers[str(path)] = {'sha256': hashlib.sha256(path.read_bytes()).hexdigest(), 'version': subprocess.check_output([str(path), '--version'], text=True)}
           (out/'toolchain-manifest.json').write_text(json.dumps({'cores': cores, 'packages': manifests, 'compilers': compilers}, indent=2)+'\n')
+          def capture_merged_initializer(compilers, out, elf):
+              # This run only: bounded private diagnostic, not constructor closure.
+              import selectors, shlex, time
+              symbol = '_sub_I_65535_0$0'
+              cap = 128 * 1024
+              output = out/'merged-initializer.txt'
+              output.write_bytes(b'')
+              def collect(command, timeout, status):
+                  # One bounded private stream; EOF does not imply process exit.
+                  data = bytearray()
+                  proc = None
+                  deadline = time.monotonic()+timeout
+                  status.update(exit_code=None, overflow=False, timed_out=False)
+                  try:
+                      proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                      with selectors.DefaultSelector() as selector:
+                          selector.register(proc.stdout, selectors.EVENT_READ)
+                          while len(data) <= cap:
+                              remaining = deadline-time.monotonic()
+                              if remaining <= 0 or not selector.select(remaining):
+                                  status['timed_out'] = True
+                                  break
+                              chunk = os.read(proc.stdout.fileno(), min(8192, cap+1-len(data)))
+                              if not chunk:
+                                  break
+                              data.extend(chunk)
+                      status['overflow'] = len(data) > cap
+                      if not status['timed_out'] and not status['overflow']:
+                          try:
+                              status['exit_code'] = proc.wait(timeout=max(0, deadline-time.monotonic()))
+                          except subprocess.TimeoutExpired:
+                              status['timed_out'] = True
+                  except Exception as exc:
+                      status['error'] = str(exc)
+                  finally:
+                      if proc is not None:
+                          try:
+                              if proc.poll() is None:
+                                  proc.kill()
+                              status['exit_code'] = proc.wait(timeout=5)
+                          except (OSError, subprocess.SubprocessError) as exc:
+                              status['error'] = str(exc)
+                          finally:
+                              if proc.stdout is not None:
+                                  proc.stdout.close()
+                  return bytes(data[:cap])
+              receipt = {'complete': False, 'symbol': symbol, 'cap_bytes': cap, 'command': [], 'exit_code': None}
+              try:
+                  receipt['elf_sha256'] = hashlib.sha256(elf.read_bytes()).hexdigest()
+                  environment = os.environ.get('PIO_ENV')
+                  if environment not in ('sticky', 'sticky-static-builtins-experimental'):
+                      raise ValueError('validated build environment missing')
+                  linked_output = '.pio/build/'+environment+'/firmware.elf'
+                  selected = []
+                  for line in (out/'build.log').read_text(errors='replace').splitlines():
+                      if linked_output not in line:
+                          continue
+                      args = shlex.split(line)
+                      if not args or args[0] not in compilers or pathlib.Path(args[0]).name not in ('xtensa-esp-elf-g++', 'xtensa-esp32-elf-g++', 'xtensa-esp32s3-elf-g++'):
+                          continue
+                      if '-c' in args or args.count('-o') != 1:
+                          continue
+                      position = args.index('-o')
+                      if position+1 < len(args) and args[position+1] == linked_output:
+                          selected.append(args[0])
+                  if len(selected) != 1:
+                      raise ValueError('actual final ELF link driver not uniquely captured')
+                  compiler = selected[0]
+                  receipt.update(compiler_selection='captured final ELF link driver', linked_output=linked_output, environment=environment)
+                  tool = pathlib.Path(compiler).with_name(pathlib.Path(compiler).name[:-3]+'objdump')
+                  receipt.update(compiler=compiler, compiler_identity=compilers[compiler], objdump=str(tool))
+                  receipt['objdump_sha256'] = hashlib.sha256(tool.read_bytes()).hexdigest()
+                  version_status = {}
+                  receipt['version_status'] = version_status
+                  version = collect([str(tool), '--version'], 10, version_status)
+                  receipt['objdump_version'] = version.decode(errors='replace')
+                  receipt['objdump_version_sha256'] = hashlib.sha256(version).hexdigest()
+                  if version_status.get('error') or version_status['timed_out'] or version_status['overflow'] or version_status['exit_code'] != 0:
+                      raise ValueError('objdump version failed/overflow/timeout; consumer gate remains open')
+                  command = [str(tool), '-d', '-r', '-l', '--disassemble='+symbol, str(elf)]
+                  receipt['command'] = command
+                  data = collect(command, 20, receipt)
+                  output.write_bytes(data)
+                  receipt['complete'] = not receipt.get('error') and not receipt['timed_out'] and not receipt['overflow'] and receipt['exit_code'] == 0 and ('<'+symbol+'>:').encode() in data
+                  if not receipt['complete']:
+                      receipt['error'] = 'failed/missing symbol/overflow/timeout; consumer gate remains open'
+              except (OSError, ValueError, subprocess.SubprocessError) as exc:
+                  receipt['error'] = str(exc)
+              receipt['output_sha256'] = hashlib.sha256(output.read_bytes()).hexdigest()
+              (out/'merged-initializer-receipt.json').write_text(json.dumps(receipt, indent=2)+'\n')
+          capture_merged_initializer(compilers, out, out/'firmware.elf')
           valid = False
           try:
               report = validate_release(canonical, version)
@@ -282,8 +394,8 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "## ${{ matrix.environment }} firmware build stats"
-            grep -E "RAM:\s|Flash:\s" pio-${{ matrix.environment }}.log | while read -r line; do echo "- ${line}"; done
+            echo "## $PIO_ENV firmware build stats"
+            grep -E "RAM:\s|Flash:\s" "pio-$PIO_ENV.log" | while read -r line; do echo "- ${line}"; done
           } >> "$GITHUB_STEP_SUMMARY"
 
   # This job is used as the PR required actions check, allows for changes to other steps in the future without breaking
