@@ -44,6 +44,14 @@ class Policy(unittest.TestCase):
         self.assertNotIn('gh release', text)
         self.assertNotIn('secrets.RELEASE_PAT', text)
 
+    def test_sticky_build_is_verbose_without_weakening_cppcheck(self):
+        text = (ROOT / '.github/workflows/ci.yml').read_text()
+        build = text.split('      - name: Build ${{ matrix.environment }} firmware', 1)[1]
+        build = build.split('      - name: Stage exact Sticky BIN ELF and provenance', 1)[0]
+        commands = re.findall(r'(?m)^          pio run .+$', build)
+        self.assertEqual(commands, ['          pio run --verbose -j1 -e sticky > pio-sticky.log 2>&1'])
+        self.assertIn('pio check --verbose --fail-on-defect low --fail-on-defect medium --fail-on-defect high', text)
+
     def test_release_is_owner_sticky_and_guarded(self):
         text = (ROOT / '.github/workflows/release.yml').read_text()
         self.assertNotRegex(text, r'(?m)^[<=>]{7}')

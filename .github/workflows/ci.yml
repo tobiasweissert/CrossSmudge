@@ -188,7 +188,7 @@ jobs:
         run: |
           set -euo pipefail
           # Raw diagnostics (including runner paths) stay inside the sealed evidence.
-          pio run -j1 -e sticky > pio-sticky.log 2>&1
+          pio run --verbose -j1 -e sticky > pio-sticky.log 2>&1
 
       - name: Stage exact Sticky BIN ELF and provenance
         if: always() && steps.firmware.outcome != 'skipped'

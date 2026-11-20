@@ -1,10 +1,11 @@
-"""Optimize project C/C++ objects, never the HybridCompile SDK.
+"""Use GCC -Oz with LTO for project C/C++, never the HybridCompile SDK.
 
 Registered before frameworks run because PlatformIO 6.1.19 constructs project
 objects before POST scripts. Object-local flags do not enter the SDK's project
 options or mutate framework compilation environments. Assembly stays untouched.
 """
 from pathlib import Path
+import re
 
 
 def enabled(env):
@@ -12,10 +13,11 @@ def enabled(env):
             and env.GetProjectOption("custom_firmware_device_type", "") == "sticky")
 
 
-def without_lto(flags):
+def without_profile_flags(flags):
     return [flag for flag in flags
             if not (isinstance(flag, str)
-                    and (flag == "-fno-lto" or flag == "-flto" or flag.startswith("-flto=")))]
+                    and (flag == "-fno-lto" or flag == "-flto" or flag.startswith("-flto=")
+                         or re.fullmatch(r"-O(?:[0-9]+|s|z|g|fast)?", flag)))]
 
 
 def register(env):
@@ -35,9 +37,9 @@ def register(env):
             return node
         if not any(source.is_relative_to(root) for root in roots):
             return node
-        flags = {name: without_lto(object_env.get(name, []))
+        flags = {name: without_profile_flags(object_env.get(name, []))
                  for name in ("CCFLAGS", "CFLAGS", "CXXFLAGS")}
-        flags["CCFLAGS"].append("-flto=1")
+        flags["CCFLAGS"].extend(["-flto=1", "-Oz"])
         return object_env.Object(node, **flags)
 
     env.AddBuildMiddleware(project_object)
