@@ -1,4 +1,7 @@
 #include "SettingsActivity.h"
+#if defined(CROSSCUB_FINDMY_EXPERIMENTAL) && CROSSCUB_FINDMY_EXPERIMENTAL
+#include "FindMySettingsActivity.h"
+#endif
 
 #include <BoardConfig.h>
 #include <GfxRenderer.h>
@@ -802,6 +805,17 @@ void SettingsActivity::applyUiSettingChange(uint8_t CrossPointSettings::* valueP
 }
 
 void SettingsActivity::loop() {
+#if defined(CROSSCUB_FINDMY_EXPERIMENTAL) && CROSSCUB_FINDMY_EXPERIMENTAL
+  if (!isFileBrowserView() && selectedCategoryIndex == 3) {
+    int x = 0, y = 0;
+    if (mappedInput.wasScreenTapped(x, y) && y >= renderer.getScreenHeight() - 120 &&
+        y < renderer.getScreenHeight() - 76) {
+      startActivityForResult(std::make_unique<FindMySettingsActivity>(renderer, mappedInput),
+                             [this](const ActivityResult&) { requestUpdate(); });
+      return;
+    }
+  }
+#endif
   if (optionPopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
 
   const auto& metrics = UITheme::getInstance().getMetrics();
@@ -1539,5 +1553,10 @@ void SettingsActivity::render(RenderLock&&) {
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   // Always use standard refresh for settings screen
+#if defined(CROSSCUB_FINDMY_EXPERIMENTAL) && CROSSCUB_FINDMY_EXPERIMENTAL
+  if (!isFileBrowserView() && selectedCategoryIndex == 3) {
+    renderer.drawCenteredText(UI_10_FONT_ID, renderer.getScreenHeight() - 104, "Find My (experimental) - tap");
+  }
+#endif
   renderer.displayBuffer();
 }

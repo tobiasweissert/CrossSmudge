@@ -22,6 +22,7 @@
 #include <uzlib.h>
 
 #include "AppCapabilities.h"
+#include "findmy/Firmware.h"
 
 #ifdef SIMULATOR
 using esp_reset_reason_t = int;
@@ -1058,6 +1059,22 @@ void mirrorWakeShortPressToNvs() {
 
 // Enter deep sleep mode
 void enterDeepSleep(bool fromTimeout) {
+#if defined(CROSSCUB_FINDMY_EXPERIMENTAL) && CROSSCUB_FINDMY_EXPERIMENTAL
+  crosscub::findmy::firmware::poll();
+  if (crosscub::findmy::firmware::standby()) {
+    // First slice: foreground retention, NOT deep sleep or qualified rail-off.
+    // Keep the existing physical long-Power unlock and the current activity.
+    if (!buttonShortcutController.isQuickLocked()) {
+      buttonShortcutController.toggleQuickLock(millis(), QuickLockTrigger::LongPower, true);
+      notifyQuickLockChanged();
+    }
+    return;
+  }
+  if (!crosscub::findmy::firmware::beforeSleep()) {
+    GUI.drawPopup(renderer, "Find My radio uncertain. Reboot required; sleep blocked.");
+    return;
+  }
+#endif
   HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
   APP_STATE.lastSleepFromReader = activityManager.isReaderActivity();
 
@@ -1537,6 +1554,18 @@ void setup() {
 }
 
 void loop() {
+#if defined(CROSSCUB_FINDMY_EXPERIMENTAL) && CROSSCUB_FINDMY_EXPERIMENTAL
+  // Must precede every Quick Lock/exclusive-activity early return.
+  crosscub::findmy::firmware::poll();
+  static bool trackingLockObserved = false;
+  if (trackingLockObserved && !crosscub::findmy::firmware::standby() &&
+      buttonShortcutController.isQuickLocked()) {
+    buttonShortcutController.toggleQuickLock(millis(), buttonShortcutController.quickLockTrigger());
+    notifyQuickLockChanged();
+    GUI.drawPopup(renderer, crosscub::findmy::firmware::statusText());
+  }
+  trackingLockObserved = buttonShortcutController.isQuickLocked() && crosscub::findmy::firmware::standby();
+#endif
   static unsigned long maxLoopDuration = 0;
   const unsigned long loopStartTime = millis();
   static unsigned long lastMemPrint = 0;
@@ -1679,7 +1708,8 @@ void loop() {
       return;
     }
     const unsigned long sleepTimeoutMs = SETTINGS.getSleepTimeoutMs();
-    if (sleepTimeoutMs > 0 && buttonShortcutController.shouldQuickLockSleep(millis(), sleepTimeoutMs)) {
+    if (sleepTimeoutMs > 0 && !crosscub::findmy::firmware::standby() &&
+        buttonShortcutController.shouldQuickLockSleep(millis(), sleepTimeoutMs)) {
       LOG_DBG("SLP", "Quick Lock timeout triggered after %lu ms", sleepTimeoutMs);
       APP_STATE.quickLockResumePending = true;
       enterDeepSleep(true);
@@ -1691,6 +1721,10 @@ void loop() {
       lastActivityTime = millis();
     }
     mappedInputManager.clearInjectedReleases();
+    // Avoid tight spinning while retaining the normal physical unlock path.
+#if defined(CROSSCUB_FINDMY_EXPERIMENTAL) && CROSSCUB_FINDMY_EXPERIMENTAL
+    if (crosscub::findmy::firmware::standby()) delay(50);
+#endif
     return;
   }
 

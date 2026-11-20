@@ -1,0 +1,28 @@
+{
+  "synthetic_only": true,
+  "master_hex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c",
+  "initial_seed_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "reference": "FindMy.py 7969003ca785658369b650f75d9e7ca519566bf6 findmy/util/crypto.py derive_ps_key; cryptography 50.0.1 X963KDF + SECP224R1",
+  "vectors": [
+    {
+      "index": 0,
+      "seed": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "public_x": "a65cc0bfc9b5fc26208249eb966d85635a3c94b7f1b60c7431d41a8a"
+    },
+    {
+      "index": 1,
+      "seed": "09a9c1f072ab2aa85eeb2f10b038c2e1d2a36f890a51b3394268808e633ba700",
+      "public_x": "58d0dd8ea4869cc3681641950337c5b8b796f7ecfc61cd5e87c4717c"
+    },
+    {
+      "index": 2,
+      "seed": "c168863ff66bb923146220018a6a6f619011896d9dc7c2871fd152ae17a98d63",
+      "public_x": "3f078ccbc728f68a84744cb3fca172b2c25d3d0090b43e54fa46d5e2"
+    },
+    {
+      "index": 96,
+      "seed": "22251446bf58ee1e8c5ecb9746e0657e3ff2da3ffa89e44ae53e9f0539eb9fc3",
+      "public_x": "2ad4285aadfe2a7a4ec0338f0d0b34dcb21b55ddb013fe7ecdd2c330"
+    }
+  ]
+}

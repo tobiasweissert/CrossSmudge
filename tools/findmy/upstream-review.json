@@ -1,0 +1,21 @@
+{
+  "candidate_repository": "VibeCoderLab/esp32-findmy-integration",
+  "candidate_commit": "1c0ede3989ee11bd97e9bed169a7fbc6a99db460",
+  "findmy_contract_commit": "7969003ca785658369b650f75d9e7ca519566bf6",
+  "license": "MIT; Copyright (c) 2026 ESP32 Find My contributors",
+  "reuse": "contract inspection only; no vendored runtime code",
+  "sha256": {
+    "LICENSE": "dcba72b6ab4f5978a8a3597fda2135b314bfc43ef5fb10f939358996addeee67",
+    "findmy_accessory.py": "34ad11ed81881f837172750168e5a87348cbb4ff63ad813dc7cdf7b03b6cbcff",
+    "findmy_cloudkit_beacons.py": "c86f9cdcbfb233f1c9e84acc247327f0018e69a0d81e47bd460cdc3fd91de2ab",
+    "firmware_src_main.cpp": "d7ff718a52d2646206d93f3b1007611c2347505c7584ca6da987520c0260b0a7",
+    "host_cloud.py": "89c3872127cf6a8e878534f150079790de97585e1f36636498a08d8f3dc529df",
+    "host_common.py": "c149e262ae340884d16b741958f361bb44f4a654aeb584944281f823295646c8",
+    "host_install_findmy.py": "7ccc959bf9a5a1c423999dc258d9358f07ba59280765a79d7988fee7c418d3f2",
+    "host_key_header.py": "14ab7a1564ce570a54b5bd63979e32b8d7d397574bfd15f534d855d73acbf3d4",
+    "host_records.py": "86f08f850160afd671fc3c09031606d19d1f969bbe93ec694e3875421717cafd",
+    "host_register.py": "b1fa949fe2cee47036ef42a8a3ce68ec5da41b934bdd598918c8bade1238392a",
+    "requirements.lock": "04e8aadc8090274d20275504cd4fe3b4b13b6bdda71ae1f1a0f1949becb90890",
+    "sources.lock.json": "20aa8122fbfe515b3f7dffec6b3e03b0d325f027d6b5541571f69cccd94c043b"
+  }
+}

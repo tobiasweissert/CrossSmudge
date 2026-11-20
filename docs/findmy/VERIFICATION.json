@@ -1,0 +1,136 @@
+{
+  "status": "verified-source-prototype-not-end-to-end",
+  "base_commit": "818b0befac4d9249c7abded67fa980187c4b41af",
+  "reviewed_candidate_file_count": 71,
+  "review_verdict": "PASS",
+  "review_blockers": [],
+  "checks": [
+    {
+      "name": "core",
+      "exit": 0
+    },
+    {
+      "name": "transport",
+      "exit": 0
+    },
+    {
+      "name": "transport-ubsan",
+      "exit": 0
+    },
+    {
+      "name": "sound",
+      "exit": 0
+    },
+    {
+      "name": "runtime",
+      "exit": 0
+    },
+    {
+      "name": "profile",
+      "exit": 0
+    },
+    {
+      "name": "host",
+      "exit": 0
+    },
+    {
+      "name": "registration",
+      "exit": 0
+    },
+    {
+      "name": "core-sdk-syntax",
+      "exit": 0
+    },
+    {
+      "name": "transport-sdk-syntax",
+      "exit": 0
+    },
+    {
+      "name": "runtime-sdk-syntax",
+      "exit": 0
+    }
+  ],
+  "source_stability": true,
+  "scope_limits": [
+    "No full firmware SDK regeneration/build/link",
+    "No Apple authentication/keychain recovery/account writes",
+    "No native iOS Items or relayed-report acceptance",
+    "No physical RF, flashing, power-cut or battery measurement",
+    "Native Play Sound not implemented",
+    "Tracking standby is foreground Quick Lock, not qualified low-power sleep"
+  ],
+  "reviewed_candidate_sha256": {
+    "docs/research/findmy-native-pairing-and-standby.md": "86d9b37a352c2a4704873e570413e60f960263fde361170c5c37ba53301cbd85",
+    "docs/research/findmy-tracking.md": "de7ae3cf3928b6c994865d063bce7e2b1b6d422e6eb01177e9d29228ba1c4ba3",
+    "docs/research/findmy_packet_probe.py": "1c3fd86197781fd2df5c565d0cafba454d5b6176ae0f50d70f46417a362bcd0c",
+    "lib/FindMy/FindMyCore.cpp": "ecf18be8118325880cf57652b247f823ec90d714064756307ed12f771d3395c6",
+    "lib/FindMy/FindMyCore.h": "9607c1435906032343c8dca4c855e61efa89f27af8b7de75ae1250100e97b75e",
+    "lib/FindMy/FindMyCrypto.cpp": "c0f305e057f39e62609312033e38e08a90ead3fbeed21c74b150ca28e980925b",
+    "lib/FindMy/NOTICE": "dc6ba0c05e01c67006a729af236b49132b5035a55800dc4f8901b69fe72a56ff",
+    "lib/FindMy/README.md": "d30632eb9f8253cc51b187374601991f6d987ca2b6358e29a6b94ea436ecd941",
+    "lib/FindMyRuntime/PrivateState.h": "f6427368f542cf798ad956d0c372532dbf123194bf0229e3c162217075d51321",
+    "lib/FindMyRuntime/README.md": "030e431808fdf3c2c2aaeaec9f7515007489b848b6e3323398c0b2898a6918b9",
+    "lib/FindMyRuntime/Runtime.h": "f5276bde92667a3172f4b4dd9c418a840a2737f22b6faa75f45d2da509606aa1",
+    "lib/FindMyRuntime/TrackingPolicy.h": "0a5cecba489d961fa509470c362359f3b92d190a71cee02d3ec5e9511930092c",
+    "lib/FindMySound/FindMySound.h": "b6661ac40f76f882f9ed14d9236ddfb54bde284671089fd3ae364454e4ea7d92",
+    "lib/FindMySound/README.md": "b317f8133732c3c28809a672ae85e21fcd4bf5c581383d8a49571670681510e6",
+    "lib/HalFindMyBle/EarlyBtRetention.cpp": "aed7b43d5886d512c65b00845f1015f11344df79edc1f270acd653316f4c0454",
+    "lib/HalFindMyBle/HalFindMyBle.cpp": "d7ca155047d7060e9701aa1c3037bf14e8c44f9713e38b35a67b8379c4e0f7b4",
+    "lib/HalFindMyBle/HalFindMyBle.h": "3b342635058e393b80a224359fe4efa2d38b2e2500775b5a935a446f66f84ae4",
+    "lib/HalFindMyBle/README.md": "1493d74f19252233828fef1e5b6ea427010e66c83f26497577ea198010d41122",
+    "src/activities/settings/FindMySettingsActivity.cpp": "291f98a6ca6a001f692a07fd31cdf96a494ab65065049bbffe1b3250814a6837",
+    "src/activities/settings/FindMySettingsActivity.h": "52c1f1b951746e4654581dec77b43cf05c7e3c58522a822df61eab684fea76bd",
+    "src/findmy/Firmware.cpp": "a68765d80c188e1b2551da7337e2f66e4b67c5bcda8d009a730ba77bcc160762",
+    "src/findmy/Firmware.h": "fa2def653d81ae75fad59622dd4a687a0ecbe4b43410f5d0a0a9ea662de04ede",
+    "test/findmy/core/core_test.cpp": "53d8cb01bbad2d226c400be5e1ab30121f8d620c4e88a9388e30cb093a5ce7d2",
+    "test/findmy/core/no_crypto_test.cpp": "a5c774970fad5a54f4194558d91060c8efc28f284756275fa7575b78d1f7afca",
+    "test/findmy/core/run.py": "8f34c87644cd389701adab485cf620d8e4dcd55884805409ad4846e95103a068",
+    "test/findmy/core/sdk_syntax.py": "c92df46582c8de087f2974409251751fcf7ab1cfe641ed3719ca0df90bd65883",
+    "test/findmy/core/vectors.json": "8b46b6af232f8919f6f73ca439af26c41009c24d1623cb0ab2132d85c4ff6bf0",
+    "test/findmy/host/test_cli.py": "db53e94f33c28f2b69f903dc13ca207749f424c30365b7bcfb4a97ae54d992a8",
+    "test/findmy/registration/fixtures/LICENSE.FindMy.txt": "51396fd82204e1d844bbff2019054d8c3712e53c3ed8485c9f19dd73990eb46e",
+    "test/findmy/registration/fixtures/cloudkit_client.py": "cf32c14e7b380e6a18392cc0c8742d99ea1fe8e4ca316e5843745c5253d5452e",
+    "test/findmy/registration/test_registration.py": "61a50823d903f9bfc8ed3c20da3b034d9ca07b8ea11be27193ac6bd28318db8f",
+    "test/findmy/run_all.py": "a0fb2a0e8b23159c9b2ac1f3a13fcc6119402949421613d2845992a8adf26db7",
+    "test/findmy/runtime/check.py": "29c4ea4efe1feefb3331e206a051d48429b6b28ed28e9e25a5b367409f0ddf6a",
+    "test/findmy/runtime/default_off.cpp": "4b36fd53f2de79fb2e0ee02a1e43b6716807c14d6a691379c37bc76ef7f30418",
+    "test/findmy/runtime/firmware.cpp": "8f3876d02fd9b905aa1adc0d6f46ab155cd1e79257134389a54a022203676955",
+    "test/findmy/runtime/hooks.py": "5a7e45b611f4d193f3a7d919da29c75f1dd351b093af39b87b04351f701e7b8c",
+    "test/findmy/runtime/integration.cpp": "cce386767796688332d25ed37483ad11c347cb8cc2cc81503e8886503007dcf9",
+    "test/findmy/runtime/private_state.cpp": "beaba52c4251b9d0bd59e0af2db63c373ed22ffda2c6327c9ea411feb54f122b",
+    "test/findmy/runtime/profile_run.py": "f8f085d18982e5c7eac3adfd1a24b0f2c08cb20689d423890e426722dbd7d7f4",
+    "test/findmy/runtime/run.py": "a3a01ca579f1359fc986de465995eb38ba796c1768ac2e5c87c3474897bee7f4",
+    "test/findmy/runtime/sdk_syntax.py": "a875d9bffce3a5e4a8c7d446eabf4a720911fd20cc8bb434f99477ee8a225283",
+    "test/findmy/runtime/ui.cpp": "bb3ae231b38c471e3104f9399d8e2189e9f54366bfdf06ccb92fb5356ef1449c",
+    "test/findmy/sound/run.py": "756395f0fcca7da0f959e394d42ddc4ebcab912ecfc50e3be56a268682ba519e",
+    "test/findmy/sound/sound_test.cpp": "461752eab9462118e8aa0f20b39f326a3461d529f5c054812e9d0047af21414a",
+    "test/findmy/transport/archive_link.py": "f7fedc2b782576b570744a2ecfdf0bf5eab3819ac7e880fb604099b79f8e632b",
+    "test/findmy/transport/run.py": "b70795cb5b7ae8acc1d5cb0f5c721d55b3ff394c4fd8e492fc8576c262bc4c36",
+    "test/findmy/transport/sdk_syntax.py": "782109a4339f7a8092df57e180e2a2c1d36b03318a6818224b790079931c3f2d",
+    "test/findmy/transport/stubs/esp_timer.h": "d2b9643437f8cf0cfea213dabab50d8720176a62f7e1e6c904d9f67cf098646b",
+    "test/findmy/transport/stubs/host/ble_gap.h": "6b0e6338abfb56d2f962804b92fade5417d585a894c97d71081de638fd292908",
+    "test/findmy/transport/stubs/host/ble_hs.h": "c277d505c1c46268b85c813afd6cdee208074080d43f4feed8a42c8fca1baa8b",
+    "test/findmy/transport/stubs/host/ble_hs_id.h": "65a66a10edaef63ccea5e2c2729f5fa4c3529b671699ef0bcb004c85afbdcb4f",
+    "test/findmy/transport/stubs/nimble/nimble_port.h": "9dbc8d384d844b8152689f1174367bc1d14d00046a4ee20187b3cbd2cf215f73",
+    "test/findmy/transport/stubs/nimble/nimble_port_freertos.h": "d7f1c6402c4f3200ca5b841641713b4decb24e0d312ca0a069cc77456a347780",
+    "test/findmy/transport/stubs/sdkconfig.h": "e54f8da49f9955b24855353737c6ab431cdab9efeb1da50a91530ef56d96b0d9",
+    "test/findmy/transport/transport_test.cpp": "fcbeff0d9ebb1ec890b3bd08d7c43429e664e283fbd54d9f8db11b43847b514b",
+    "tools/findmy/README.md": "dbd4b99af773dd2b5c8ee1a2c3eecaf2bfd178d048a5468ff74fc03be90a7408",
+    "tools/findmy/SECURITY-REVIEW.md": "6145bfaa08c7a3fdacef5f9965567dfeaac3a730e05f1eb0ff70d4f8ee42d0c6",
+    "tools/findmy/crosscub_findmy.py": "81c2bd8a9ec6e4a6335fcecca192d7510d5d4faa2e903889c29e18d8a19fc51e",
+    "tools/findmy/upstream-review.json": "a9580a9df7b0accb2482af29e722e57662129b6fec3c763122c9ba729f8e4177",
+    "tools/findmy_registration/LICENSE.upstream.txt": "dcba72b6ab4f5978a8a3597fda2135b314bfc43ef5fb10f939358996addeee67",
+    "tools/findmy_registration/README.md": "2ed8d8b7946b148afa9f26e563c0b579d406b452918639ba67469c2addcebde5",
+    "tools/findmy_registration/SECURITY-REVIEW.md": "7cdfeed23facb32e67685fafae5969656effd5c1576e47d4e2ac534055ee0fae",
+    "tools/findmy_registration/THIRD-PARTY-NOTICES.md": "b5838eaa01d4e796fd3f495d27d4a96363f6b02ee91ab7a8c63fe61a6a7a32eb",
+    "tools/findmy_registration/registration.py": "c1e2be354a3f50e808ffcfbaf276721bdb282ed057924af264b08224860730e5",
+    "tools/findmy_registration/source.lock.json": "a672063e66019151619a965ef6af9a85ba79931f9a1352c447274b0a12df9d76",
+    "lib/hal/HalAirDropRadio.cpp": "de4b8acfba4ac5d1c92c5765e29e48d389fab8d54cf03b638c744d5bc333cc5f",
+    "lib/hal/HalPowerManager.cpp": "ea47b1460e339888c0db65d3a17670e664819187b178c7ae6fb4450d56012565",
+    "platformio.ini": "f45aae676f8c71752c4d0a418187797abedeba2d4329e511d0a3e643f0a2cea9",
+    "src/activities/settings/SettingsActivity.cpp": "a6068d5322ac3101e2ec516e5cf9e18a8e330d3bd826f011753027b98cabdbc3",
+    "src/main.cpp": "65c6338fb1ba4d881dbf2878f1f9e09a495cda17543a85731e582b70f230ed7d",
+    "test/crosscub/run_all.py": "b506aa54ffaa510759af410a719b3a13fa992be126d9d23aeb6a80b7d5dde346"
+  },
+  "documentation_note": "Mac handoff and this evidence summary were added after the frozen code review; code hashes above identify the reviewed candidate. Server-only raw evidence remains outside Git."
+}

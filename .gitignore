@@ -1,3 +1,8 @@
+# Find My local development state: never commit production tracker/account material.
+/.venv-findmy/
+/crosscub-findmy.json
+/findmy-private/
+
 .pio
 .idea
 .DS_Store

@@ -5,7 +5,10 @@ Supply existing read-only dependency/fixture paths via environment; no downloads
 from pathlib import Path
 import argparse,json,os,subprocess,sys,time,hashlib
 R=Path(__file__).resolve().parents[2]
-p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--reader-only',action='store_true');p.add_argument('--airdrop-only',action='store_true');p.add_argument('--ota-only',action='store_true');p.add_argument('--heatmap-only',action='store_true');a=p.parse_args();O=a.output.resolve();O.mkdir(parents=True,exist_ok=True)
+p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--reader-only',action='store_true');p.add_argument('--airdrop-only',action='store_true');p.add_argument('--ota-only',action='store_true');p.add_argument('--heatmap-only',action='store_true');p.add_argument('--findmy-only',action='store_true');a=p.parse_args();O=a.output.resolve();O.mkdir(parents=True,exist_ok=True)
+findmy_commands=[[sys.executable,str(R/'test/findmy/run_all.py'),'--output',str(O/'findmy')]]
+if a.findmy_only:
+ raise SystemExit(subprocess.run(findmy_commands[0],cwd=R,env={**os.environ,'PYTHONDONTWRITEBYTECODE':'1'}).returncode)
 heatmap_commands=[[sys.executable,str(R/'test/reading_heatmap/run.py')]+(['--sanitize'] if sanitized else []) for sanitized in [False,True]]
 ota_commands=[
  [sys.executable,str(R/'test/ota_transition/run.py'),'--output',str(O/('ota-ubsan' if sanitized else 'ota-normal'))]+(['--sanitize'] if sanitized else [])
@@ -75,7 +78,7 @@ for key in ['ARDUINOJSON_INCLUDE_DIR','CP_FIXTURES','ESP_IDF_SOURCE_ROOT']:
  if not os.environ.get(key)or not Path(os.environ[key]).is_dir():raise SystemExit('Set '+key+' to the existing read-only dependency/fixture directory')
 env={**os.environ,'ASSISTED_TEST_OUT':str(O/'browser'),'AIRDROP_SESSION_TEST_OUTPUT':str(O/'receiver'),'PYTHONDONTWRITEBYTECODE':'1'}
 env.setdefault('BROWSER_CODEC_ROOT',str(Path(env['ARDUINOJSON_INCLUDE_DIR']).resolve().parents[1]))
-commands=heatmap_commands+ota_commands+airdrop_commands+reader_commands+[[sys.executable,str(R/'test/file_actions/run_all.py'),'--output',str(O/'file-actions')]]+[[sys.executable,str(R/'test/crosscub'/('test_'+name+'.py'))]for name in ['product','web','release','ota_activity','logo','stopwatch']]
+commands=findmy_commands+heatmap_commands+ota_commands+airdrop_commands+reader_commands+[[sys.executable,str(R/'test/file_actions/run_all.py'),'--output',str(O/'file-actions')]]+[[sys.executable,str(R/'test/crosscub'/('test_'+name+'.py'))]for name in ['product','web','release','ota_activity','logo','stopwatch']]
 commands+=[
  [sys.executable,str(R/'test/integration_catalog/check_catalog.py')],
  [sys.executable,str(R/'test/crosscub/run_preservation.py'),'--group','apps','--output',str(O/'apps')],

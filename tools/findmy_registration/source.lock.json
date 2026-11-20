@@ -1,0 +1,440 @@
+{
+  "schema": 1,
+  "repositories": {
+    "candidate": {
+      "repository": "VibeCoderLab/esp32-findmy-integration",
+      "commit": "1c0ede3989ee11bd97e9bed169a7fbc6a99db460"
+    },
+    "os": {
+      "repository": "sacca97/os-findmy-e",
+      "commit": "374d83854f657a7fdca45f813387d99d491db0e2"
+    },
+    "findmy": {
+      "repository": "parawanderer/FindMy.py",
+      "commit": "7969003ca785658369b650f75d9e7ca519566bf6"
+    }
+  },
+  "files": [
+    {
+      "repository": "candidate",
+      "path": "LICENSE",
+      "sha256": "dcba72b6ab4f5978a8a3597fda2135b314bfc43ef5fb10f939358996addeee67"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/auth_entry.py",
+      "sha256": "4c031a8f890d0e5fd0ae7b04e4019cd5f8d9b77136d08062d17b1e0b7135531e"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/cloud.py",
+      "sha256": "89c3872127cf6a8e878534f150079790de97585e1f36636498a08d8f3dc529df"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/common.py",
+      "sha256": "c149e262ae340884d16b741958f361bb44f4a654aeb584944281f823295646c8"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/diagnose.py",
+      "sha256": "7cfb6fd3142b6981d052dd2d3b2a8729d352c331a97ff7ef708cb17ed1953526"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/fetch.py",
+      "sha256": "d52db2051ebd8ab0df5a683d879f4f3480a01724f29a559f10314eb1dc59df14"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/fetch_coreadi.py",
+      "sha256": "866d424cfbb411e4068f5f0b719ad69952359e01fa464eafa18a1393c820b7b1"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/fresh_protection.py",
+      "sha256": "08628328e8ee7108e125f2bfd766409ef7b3b2a6ee6c78867ca3ef94f227770f"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/install.py",
+      "sha256": "ac466da36b58c5e13b85611830f92d53a0f3ef4929b42cd5d5686188731d6dd4"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/install_findmy.py",
+      "sha256": "7ccc959bf9a5a1c423999dc258d9358f07ba59280765a79d7988fee7c418d3f2"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/key_header.py",
+      "sha256": "14ab7a1564ce570a54b5bd63979e32b8d7d397574bfd15f534d855d73acbf3d4"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/login.py",
+      "sha256": "c74da90f15fdd38b9a2d9787c12960a1be5f6c041cccb5f36fc6cbedb82f9bf2"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/logout.py",
+      "sha256": "f859fbdeede0e58263bf4cf7ba7207f77f5803310b5e8b5b49c98f6726a6f795"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/records.py",
+      "sha256": "86f08f850160afd671fc3c09031606d19d1f969bbe93ec694e3875421717cafd"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/recovery_status.py",
+      "sha256": "60fc1ce60065855383331e4cbc58919ed9870f5b3d4812b8f6443b467bd46b45"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/register.py",
+      "sha256": "b1fa949fe2cee47036ef42a8a3ce68ec5da41b934bdd598918c8bade1238392a"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/service_limits.py",
+      "sha256": "aa1853416097c4fbee1fedb9c522f6e9fa0c52d6628cb312ab02ae4abe870a94"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/snapshot.py",
+      "sha256": "86aa3ff58ca7545c0a3fc68fe174bd2c95c192a8ab862b1dd135d02a289ee274"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/verify.py",
+      "sha256": "b2abe61ac76864ebce97450d8258e931f646d87f659a33daea903d452f50507d"
+    },
+    {
+      "repository": "candidate",
+      "path": "host/zone_signing.py",
+      "sha256": "bad44435bf7142bf550cd26730b47264ca441a42000bd62f277ddb7b39e11c5f"
+    },
+    {
+      "repository": "candidate",
+      "path": "patches/LICENSE.FindMy.txt",
+      "sha256": "51396fd82204e1d844bbff2019054d8c3712e53c3ed8485c9f19dd73990eb46e"
+    },
+    {
+      "repository": "candidate",
+      "path": "patches/LICENSE.os-findmy-e",
+      "sha256": "d13de33ca644eb1350ca7ab815075d2499621f24dad01ee9be532360934483d6"
+    },
+    {
+      "repository": "candidate",
+      "path": "patches/auth-output.patch",
+      "sha256": "ac6467d7ee3765df875630280d9bb5daacd993e20cc5453f0d6e57e8ee612233"
+    },
+    {
+      "repository": "candidate",
+      "path": "patches/cloudkit-status.patch",
+      "sha256": "8770d09c82c0553237d2d72dbbe2393b3f9d3b2523fcf9d45e9637207902ac77"
+    },
+    {
+      "repository": "candidate",
+      "path": "patches/cooldown.patch",
+      "sha256": "bcadc4c3da06e76332844cb1fc63169479a2b35468ef289716c3c6a795a55987"
+    },
+    {
+      "repository": "candidate",
+      "path": "patches/findmy-packaging.patch",
+      "sha256": "02e4268036c109949b183ce7556ea9b9098ff5c89a707f0ae78587fd8bc82ea3"
+    },
+    {
+      "repository": "candidate",
+      "path": "patches/machine-state.patch",
+      "sha256": "a5d2529db8fe79250d09996436dd10a6585d4a1d83b43062947baf67a33fc7bf"
+    },
+    {
+      "repository": "candidate",
+      "path": "requirements-build.lock",
+      "sha256": "8dada98e74a25b719a6d414c6e345543b53a11888fb16afe66545ae23c0f482f"
+    },
+    {
+      "repository": "candidate",
+      "path": "requirements.lock",
+      "sha256": "04e8aadc8090274d20275504cd4fe3b4b13b6bdda71ae1f1a0f1949becb90890"
+    },
+    {
+      "repository": "candidate",
+      "path": "requirements.txt",
+      "sha256": "02c449bae59b6d7827a3e3f0b70fc38157e8efa9feeade466a1113da099870d2"
+    },
+    {
+      "repository": "candidate",
+      "path": "scripts/setup.sh",
+      "sha256": "b8c1a21add97eee39664a703b4dde5ed33a513572286772eab324b01617c1826"
+    },
+    {
+      "repository": "candidate",
+      "path": "sources.lock.json",
+      "sha256": "20aa8122fbfe515b3f7dffec6b3e03b0d325f027d6b5541571f69cccd94c043b"
+    },
+    {
+      "repository": "os",
+      "path": "LICENSE",
+      "sha256": "d13de33ca644eb1350ca7ab815075d2499621f24dad01ee9be532360934483d6"
+    },
+    {
+      "repository": "os",
+      "path": "auth_probe.py",
+      "sha256": "6370cd0ecc568cce34e6dffcc767def37537a1f8e7665914f8ba9847362bfaee"
+    },
+    {
+      "repository": "os",
+      "path": "tools/machoadi/adi_run.py",
+      "sha256": "eb5b7ec35cd488508d1b6927d23da55d551fb385c1b17fb74c5bea0a001760ae"
+    },
+    {
+      "repository": "os",
+      "path": "tools/machoadi/age_check.py",
+      "sha256": "ec5e1e4c522b2b27277f5a39f137877b55e115d3d395ba0aab63bcf0fd3c5ea2"
+    },
+    {
+      "repository": "os",
+      "path": "tools/machoadi/cooldown.py",
+      "sha256": "7d49756111a8f51bffb6217edb030413aedac3cd043ac971e6f962f4ee0361d6"
+    },
+    {
+      "repository": "os",
+      "path": "tools/machoadi/dev_check.py",
+      "sha256": "ead2556fd891988f5d8e3e783868b7a6fdd6726eb4986c4878a7882e79b45123"
+    },
+    {
+      "repository": "os",
+      "path": "tools/machoadi/fetch_reports.py",
+      "sha256": "0a77a75cb72ac7993db2a562dd98ff82a09ec5a7cb925293b5e5a9da2119269a"
+    },
+    {
+      "repository": "os",
+      "path": "tools/machoadi/gsa.py",
+      "sha256": "f31fffe7e976a956d1cdc653c4f886b36d9accf960c2b5a3158312c92726b3bf"
+    },
+    {
+      "repository": "os",
+      "path": "tools/machoadi/gsa_init.py",
+      "sha256": "4ae42ec61c006b86f7088578b13f6aa8ad9fd544e0bd7ece048ff83facc7785d"
+    },
+    {
+      "repository": "os",
+      "path": "tools/machoadi/harness.py",
+      "sha256": "2df372afa7f67a19135bf2c744a6ce9f3d5bb7a53a9a32d870bd8566c7c8e139"
+    },
+    {
+      "repository": "os",
+      "path": "tools/machoadi/login_store.py",
+      "sha256": "518101ca519651ce8940257e4a1376b78b7175cd7a0f1d04951f4045fae9f750"
+    },
+    {
+      "repository": "os",
+      "path": "tools/machoadi/mac_anisette.py",
+      "sha256": "d3af1814aaa8dfb63c1033d8e327aecf32a7cb5ab220b8538c9f9001fe0ca94e"
+    },
+    {
+      "repository": "os",
+      "path": "tools/machoadi/macho.py",
+      "sha256": "6775e284e904debbae59234cb8d0732df5c199f7aaa9c285767d1f3bea09b6d4"
+    },
+    {
+      "repository": "os",
+      "path": "tools/machoadi/provider.py",
+      "sha256": "d792e0e8486abdab5fb4521350bdf17a4375781a01980bd4e665b8201d4fccb2"
+    },
+    {
+      "repository": "os",
+      "path": "tools/machoadi/replay.py",
+      "sha256": "05a66367c74899af0d7940f1e97d863aec5dba1ee7f25d75d0ee0825b7a7abc6"
+    },
+    {
+      "repository": "os",
+      "path": "tools/machoadi/resync.py",
+      "sha256": "967ab148158e956baac53fb24007566ddb840f1f60aec48852dfed34d253f636"
+    },
+    {
+      "repository": "os",
+      "path": "tools/machoadi/stubs.py",
+      "sha256": "be2ef85170b2dfa2fc23514d487dedada0d9d1f60aeefdebec8fe318a892f24c"
+    },
+    {
+      "repository": "os",
+      "path": "tools/machoadi/tag_keys.py",
+      "sha256": "f6fb5972b817fc71fc3601710f8249140365a190c49dfd35f405450abd488ca1"
+    },
+    {
+      "repository": "findmy",
+      "path": "LICENSE.md",
+      "sha256": "51396fd82204e1d844bbff2019054d8c3712e53c3ed8485c9f19dd73990eb46e"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/cloudkit/__init__.py",
+      "sha256": "5166732689d83f38d83dc4aeeb111325facf1c58d46daa21c5ae04ec82bf4fbe"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/cloudkit/beacons.py",
+      "sha256": "c86f9cdcbfb233f1c9e84acc247327f0018e69a0d81e47bd460cdc3fd91de2ab"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/cloudkit/client.py",
+      "sha256": "cf32c14e7b380e6a18392cc0c8742d99ea1fe8e4ca316e5843745c5253d5452e"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/cloudkit/constants.py",
+      "sha256": "f5e0a4e4fefcf3cd479af74d2007e9ec88efaa25775110ed7aa2c05f6b4e5060"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/cloudkit/der.py",
+      "sha256": "ae046fdf00279ff396837d274728769c14df8f8252ad31afd28af56531f31cd8"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/cloudkit/pcs.py",
+      "sha256": "0a9c6244cf69327988bc2bd99b196af8b219b74b0e98a3e4ab1823771bbc67bc"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/cloudkit/proto/__init__.py",
+      "sha256": "6ecbf31833f54a094d75a85a34d45516bdaad168a80831b0dcc3427dd23e4f34"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/cloudkit/proto/cloudkit.proto",
+      "sha256": "22b95f8198d7f03a7a87074024aa7e81cb1fcec9de7288dd205f1dce2b36771c"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/cloudkit/proto/cloudkit_pb2.py",
+      "sha256": "5d39d8b8d5bb138082728b6feb209c074f4ba762db120b7d87c0c8fd02ead1f4"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/cloudkit/proto/cloudkit_pb2.pyi",
+      "sha256": "a5c8bda67df957fce2bb5905325d828d739d93eb4f425e5713660d5b49e5a0fc"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/cloudkit/proto/cuttlefish.proto",
+      "sha256": "565042be746e42123fb5f860002afa58714015b89dc0ef029361f4bd70ecadb3"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/cloudkit/proto/cuttlefish_pb2.py",
+      "sha256": "482566741fad9d2eb997578a1ebd6c922308e98ee1c85b154784d0722facdd96"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/cloudkit/proto/cuttlefish_pb2.pyi",
+      "sha256": "c7432911b9c6c24be06ee9ef33bb2eedc21bba8ca26b4073fb7272f9aa996178"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/cloudkit/records.py",
+      "sha256": "6eae8a1f5daba5930556a79ff18043c8d4940467da17a29d859d4a1ff0f37ebe"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/keychain/__init__.py",
+      "sha256": "578b9f22c5ab56fadc39143d8d6998b1b5e6018e1c40d573b754541356e51e42"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/keychain/bottle.py",
+      "sha256": "fac0077634c345f8d89aeaddce89b020fdde4ccce6a2720ec0af56699a7fdeba"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/keychain/cuttlefish.py",
+      "sha256": "22c40465caedd282e937b44677411900d310030b93b9e89886f03bec3d80c2fb"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/keychain/enrolment.py",
+      "sha256": "10d85cd293739d5d01131ca359b623b7f46e22fb28fbc5e0604a159eb57d7162"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/keychain/escrow.py",
+      "sha256": "d9c54872cb337841cc0ab9a92f932252e825f463a40acb7b16e46c2efb300838"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/keychain/items.py",
+      "sha256": "f239238e965ad16c8228665eedaf3041b808fd9b36cc25c04c63334d72d4984c"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/keychain/join.py",
+      "sha256": "6da83d577f1e262de49c8d2574f853f0dff486cc34789f874e757257e5774b30"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/keychain/peers.py",
+      "sha256": "25bccec3a42b49534e65f97c099352041470bdee3050556e803264c96081be95"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/keychain/recovery.py",
+      "sha256": "a5d9f85624d4ab4c0ecf30f01089e6066e0b6e112fe14c7bb87e9db83057171b"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/keychain/roots/101.crt",
+      "sha256": "5644c142208dd4bf7ad770902f70d6730b8571164fd874d9ae5168807b32f766"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/keychain/roots/102.crt",
+      "sha256": "d4eaa88170b8aee18fceff68698310d4c2ab4ceb48179d99206a53ac73e8a4eb"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/keychain/roots/103.crt",
+      "sha256": "fdba6f3365d617b9eb799d2f48851b1a85c62cf366c36797e539b3c4c2c3bdc6"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/keychain/roots/500.crt",
+      "sha256": "654bfb656d80a715559034c7fe08e637b335e770c84ec05cd90475e8bbc59eb0"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/keychain/servicekey.py",
+      "sha256": "70634c08adda364b4b2a87bc8bd4a76a67f43afcc4ad0e7c6d70677a99960a6a"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/keychain/session.py",
+      "sha256": "f0e8e3397cdfe9156a0b951a38a222481466fd20121b254f76ee095d5649f30b"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/keychain/shares.py",
+      "sha256": "c4ba7a6906e9ea40a9712589f69412c4711bd1be17c273ddbf813f3889b0efa5"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/reports/account.py",
+      "sha256": "f892e9f2d30a7459ac8266fec83588f5e084cd096d79c5b964c86de08059a78c"
+    },
+    {
+      "repository": "findmy",
+      "path": "findmy/reports/anisette.py",
+      "sha256": "fa79d9cca396bd9ed9cfbb4c0150f882b64fd806914f047dcd272cb98d657aa9"
+    },
+    {
+      "repository": "findmy",
+      "path": "pyproject.toml",
+      "sha256": "7e4d7fbef1a3a0d8d1492e106b24ffa94627e8488524e74c69dc75175b5caac2"
+    }
+  ],
+  "scope": "review handoff only; not complete executable dependency closure"
+}

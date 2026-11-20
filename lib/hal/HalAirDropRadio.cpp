@@ -1,4 +1,5 @@
 #include "HalAirDropRadio.h"
+#include "findmy/Firmware.h"
 
 #include <AppCapabilities.h>
 #if CROSSINK_APP_CAP_AIRDROP
@@ -8,6 +9,9 @@
 #include <esp_wifi.h>
 namespace HalAirDropRadio {
 bool releaseArduino() {
+  // Explicit BLE stop + controller idle confirmation, never inferred from WiFi.
+  // Handoff is latched; only a reboot and new owner consent can re-enable.
+  if (!crosscub::findmy::firmware::beforeAirDrop()) return false;
   if (ink::http::Session::busy()) {
     LOG_ERR("AIRDROP", "HTTPS owner is still active");
     return false;

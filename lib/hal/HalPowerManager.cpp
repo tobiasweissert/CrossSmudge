@@ -1,4 +1,5 @@
 #include "HalPowerManager.h"
+#include "findmy/Firmware.h"
 
 #include <BoardConfig.h>
 #include <Logging.h>
@@ -90,6 +91,10 @@ void HalPowerManager::setPowerSaving(bool enabled) {
 }
 
 void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
+  if (!crosscub::findmy::firmware::beforeSleep()) {
+    LOG_ERR("PWR", "Find My radio ownership uncertain; refusing deep sleep");
+    return;
+  }
   disableWiFiBeforeDeepSleep();
 
 #ifdef ENABLE_SERIAL_LOG
