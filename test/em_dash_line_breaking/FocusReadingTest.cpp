@@ -8,10 +8,11 @@
 
 TEST(FocusReading, PreservesLetterOrderAndRunPlacement) {
   for (const bool rtlParagraph : {false, true}) {
-    for (const int8_t tracking : {0, 2}) {
+    for (const int8_t tracking : {-1, 0, 2}) {
       for (const bool focus : {false, true}) {
-        for (const auto style : {EpdFontFamily::REGULAR, EpdFontFamily::ITALIC, EpdFontFamily::BOLD}) {
-          for (const char* word : {"שלום", "בראשית", "התלמידים", "reading", "١٢٣٤"}) {
+        for (const auto style :
+             {EpdFontFamily::REGULAR, EpdFontFamily::ITALIC, EpdFontFamily::BOLD, EpdFontFamily::BOLD_ITALIC}) {
+          for (const char* word : {"שלום", "בראשית", "התלמידים", "reading", "١٢٣٤", "1234"}) {
             SCOPED_TRACE(word);
             GfxRenderer renderer;
             renderer.boldGlyphAdvance = 11;
@@ -30,7 +31,8 @@ TEST(FocusReading, PreservesLetterOrderAndRunPlacement) {
             int nextX = renderer.textDraws.front().x;
             for (const auto& draw : renderer.textDraws) {
               EXPECT_EQ(draw.x, nextX);
-              nextX += renderer.getTextAdvanceX(0, draw.text.c_str(), draw.style, tracking) + tracking;
+              // The fourth owner API argument is a following Unicode codepoint, not tracking.
+              nextX += renderer.getTextAdvanceXTracked(0, draw.text.c_str(), draw.style, tracking) + tracking;
               std::string visual;
               ASSERT_TRUE(BidiUtils::applyBidiVisual(draw.text.c_str(), visual, static_cast<int>(draw.direction)));
               actual += visual;
@@ -38,7 +40,11 @@ TEST(FocusReading, PreservesLetterOrderAndRunPlacement) {
             std::string expected;
             ASSERT_TRUE(BidiUtils::applyBidiVisual(word, expected));
             EXPECT_EQ(actual, expected);
-            if (focus && style != EpdFontFamily::BOLD) {
+            if (std::string(word) == "1234") {
+              // ParsedText::processSegment preserves ASCII numbers as one unmodified run.
+              ASSERT_EQ(renderer.textDraws.size(), 1u);
+              EXPECT_EQ(renderer.textDraws.front().style, style);
+            } else if (focus && !(style & EpdFontFamily::BOLD)) {
               ASSERT_EQ(renderer.textDraws.size(), 2u);
               const bool rtlWord = BidiUtils::startsWithRtl(word);
               EXPECT_TRUE(renderer.textDraws[rtlWord ? 1 : 0].style & EpdFontFamily::BOLD);

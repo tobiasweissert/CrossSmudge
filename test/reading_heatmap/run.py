@@ -103,16 +103,23 @@ int main(){
 #include <cstdint>
 #include <initializer_list>
 #include <string>
-struct GfxRenderer { enum class Orientation {Portrait,LandscapeClockwise}; Orientation getOrientation(){return Orientation::Portrait;}void setOrientation(Orientation){} };
+struct GfxRenderer { enum class Orientation {Portrait,LandscapeClockwise}; Orientation getOrientation(){return Orientation::Portrait;}void setOrientation(Orientation){} void clearScreen(){} int getScreenWidth(){return 480;} int getScreenHeight(){return 800;} void displayBuffer(){} };
+struct Rect {int x,y,w,h;}; constexpr int UI_10_FONT_ID=0;
+namespace UITheme {void drawCenteredWrappedText(GfxRenderer&,Rect,int,const char*,int){}}
+void delay(int){}
+// Explicit persistence doubles: independent acknowledgements, no disk/persistence proof.
+struct StatsDouble {int value=0; bool ack=true; int calls=0; bool save(const std::string& = ""){++calls;return ack;}};
+struct ReadingStatsResult {bool changed;};
 struct Activity {void onEnter(){}};
 struct MappedInputManager {
  enum class Button {Back,Confirm,Power,Up,Left,Down,Right}; enum class SwipeDir {None,Left,Right};
  Button pressed=Button::Power,released=Button::Power; SwipeDir swipe=SwipeDir::None; int target=-1; bool header=false;
- bool isPressed(Button){return false;}bool wasPressed(Button b){return b==pressed;}bool wasReleased(Button b){return b==released;}
+ bool heldBack=false,heldPower=false,heldConfirm=false; int suppressedBack=0,suppressedConfirm=0;
+ bool isPressed(Button b){return (b==Button::Back&&heldBack)||(b==Button::Power&&heldPower)||(b==Button::Confirm&&heldConfirm);}bool wasPressed(Button b){return b==pressed;}bool wasReleased(Button b){return b==released;}
  bool wasItemTapped(int& t){t=target;return target>=0;}bool wasItemTouchedDown(int&){return false;}
- SwipeDir wasSwipe(){return swipe;}void suppressNextBackRelease(){}void suppressNextConfirmRelease(){}
+ SwipeDir wasSwipe(){return swipe;}void suppressNextBackRelease(){++suppressedBack;}void suppressNextConfirmRelease(){++suppressedConfirm;}
 };
-struct InputReleaseGuard {static bool consumeInitialRelease(MappedInputManager&,MappedInputManager::Button,bool&){return false;}};
+/*REAL_RELEASE_GUARD*/
 struct TouchHeaderBackButton {static int compactHeaderRect(GfxRenderer&){return 0;}static bool wasTapped(MappedInputManager& i,int){return i.header;}};
 namespace BookStatsTouchTarget {constexpr int PageIndicatorBase=100,DateFieldBase=10,DateFieldCount=6,DateAdjustUp=20,DateAdjustDown=21,DateSave=22,DateCancel=23,StartedDaysStat=1;}
 struct Harness : Activity {
@@ -123,13 +130,18 @@ struct Harness : Activity {
  bool ignoreInitialBackRelease=false,ignoreInitialPowerRelease=false,ignoreInitialConfirmRelease=false;
  bool usesNoRtcSingleScreenLayout(){return noRtc;}bool hasEditableBook(){return editable;}
  void requestUpdate(){++updates;}void finish(){++exits;}void onGoHome(){++exits;}
- void beginDateEditing(){page=Page::EditDates;++edits;}void finishDateEditing(bool){page=Page::PerBook;}void adjustSelectedDateField(int){}void cycleEditField(){}
+ StatsDouble stats,globalStats,dateEditStatsSnapshot,dateEditGlobalStatsSnapshot;
+ bool didChangeStats=false,didChangeStatsBeforeDateEdit=false,dateEditSnapshotValid=false; int refreshes=0;
+ void refreshAllDevicesStats(){++refreshes;} void setResult(ReadingStatsResult){}
+ void adjustSelectedDateField(int){}void cycleEditField(){}
 '''
+ guard=(R/'src/util/InputReleaseGuard.h').read_text()
+ harness=harness.replace('/*REAL_RELEASE_GUARD*/',guard[guard.index('namespace InputReleaseGuard'):])
  import re
  initial_page=re.search(r'Page page = (Page::\w+);',header)
  assert initial_page
  harness=harness.replace('INITIAL_PAGE',initial_page.group(1))
- for name in ['onEnter','exitStatsActivity','showNextStatsPage','showPreviousStatsPage','selectEditFieldFromTouchTarget','loop']:harness+=method(name)
+ for name in ['onEnter','saveStats','beginDateEditing','finishDateEditing','exitStatsActivity','showNextStatsPage','showPreviousStatsPage','selectEditFieldFromTouchTarget','loop']:harness+=method(name)
  harness+=r'''
 };
 int main(){
@@ -163,6 +175,58 @@ int main(){
  Harness confirm;confirm.page=Harness::Page::PerBook;confirm.mappedInput.released=MappedInputManager::Button::Confirm;confirm.loop();assert(confirm.page==Harness::Page::EditDates);
  Harness back;back.mappedInput.swipe=MappedInputManager::SwipeDir::Right;back.loop();assert(back.exits==1);
  puts("PASS actual Activity loop: hardware, swipes, header/back/confirm, editor route, no-RTC preservation");
+ // Actual production save/edit/exit methods, independently faulted persistence boundary.
+ for(bool bookAck:{false,true})for(bool globalAck:{false,true})for(int route=0;route<3;++route){
+  Harness s;s.didChangeStats=true;s.stats.value=17;s.globalStats.value=23;
+  s.stats.ack=bookAck;s.globalStats.ack=globalAck;
+  if(route==0)s.mappedInput.released=MappedInputManager::Button::Back;
+  if(route==1)s.mappedInput.released=MappedInputManager::Button::Confirm;
+  if(route==2)s.mappedInput.header=true;
+  s.loop();assert(s.stats.calls==1 && s.globalStats.calls==1);
+  assert(s.didChangeStats==!(bookAck&&globalAck));assert(s.exits==(bookAck&&globalAck?1:0));
+  assert(s.stats.value==17 && s.globalStats.value==23);
+  if(!bookAck||!globalAck){
+   assert(s.dateEditStatsSnapshot.value==17 && s.dateEditGlobalStatsSnapshot.value==23 && s.didChangeStatsBeforeDateEdit);
+   s.stats.ack=true;s.globalStats.ack=true;s.loop();
+   assert(s.exits==1 && !s.didChangeStats && s.stats.calls==2 && s.globalStats.calls==2);
+  }
+ }
+ puts("PASS save boundary: independent book/global failure, Back/Confirm/header stay dirty, retry exits");
+ for(bool dirty:{false,true}){
+  Harness s;s.didChangeStats=dirty;s.stats.value=1;s.globalStats.value=2;s.beginDateEditing();
+  s.stats.value=3;s.globalStats.value=4;s.didChangeStats=true;
+  s.mappedInput.target=BookStatsTouchTarget::DateCancel;s.loop();
+  assert(s.page==Harness::Page::PerBook && s.didChangeStats==dirty);
+  assert(s.stats.value==1 && s.globalStats.value==2 && s.stats.calls==0 && s.globalStats.calls==0);
+ }
+ Harness failedEdit;failedEdit.beginDateEditing();failedEdit.stats.value=9;failedEdit.globalStats.value=10;
+ failedEdit.didChangeStats=true;failedEdit.globalStats.ack=false;
+ failedEdit.mappedInput.target=BookStatsTouchTarget::DateSave;failedEdit.loop();
+ assert(failedEdit.page==Harness::Page::EditDates && failedEdit.didChangeStats && failedEdit.exits==0);
+ failedEdit.mappedInput.target=BookStatsTouchTarget::DateCancel;failedEdit.loop();
+ assert(failedEdit.page==Harness::Page::PerBook && failedEdit.didChangeStats);
+ assert(failedEdit.stats.value==9 && failedEdit.globalStats.value==10); // partial ack candidate must not roll back
+ failedEdit.globalStats.ack=true;failedEdit.mappedInput.target=-1;
+ failedEdit.mappedInput.released=MappedInputManager::Button::Back;failedEdit.loop();
+ assert(!failedEdit.didChangeStats && failedEdit.exits==1);
+ Harness noCache;noCache.didChangeStats=true;noCache.bookCachePath.clear();noCache.exitStatsActivity();
+ assert(noCache.exits==1 && noCache.stats.calls==0 && noCache.globalStats.calls==0);
+ Harness clean;clean.exitStatsActivity();assert(clean.exits==1 && clean.stats.calls==0 && clean.globalStats.calls==0);
+ Harness noRtcDirty;noRtcDirty.noRtc=true;noRtcDirty.didChangeStats=true;noRtcDirty.stats.ack=false;
+ noRtcDirty.exitStatsActivity();assert(noRtcDirty.exits==0 && noRtcDirty.didChangeStats && noRtcDirty.stats.calls==1);
+ puts("PASS editor save failure/cancel retains acknowledged candidate; clean/cancel/no-book/no-RTC save gates");
+ for(auto button:{MappedInputManager::Button::Back,MappedInputManager::Button::Confirm,MappedInputManager::Button::Power}){
+  Harness g;g.mappedInput.heldBack=button==MappedInputManager::Button::Back;
+  g.mappedInput.heldConfirm=button==MappedInputManager::Button::Confirm;
+  g.mappedInput.heldPower=button==MappedInputManager::Button::Power;
+  g.onEnter();g.loop();assert(g.exits==0);
+  g.mappedInput.heldBack=g.mappedInput.heldConfirm=g.mappedInput.heldPower=false;
+  g.mappedInput.released=button;g.loop();assert(g.exits==0);
+  g.mappedInput.released=MappedInputManager::Button::Back;g.loop();assert(g.exits==1 && g.mappedInput.suppressedBack==1);
+ }
+ Harness confirmGate;confirmGate.mappedInput.released=MappedInputManager::Button::Confirm;confirmGate.loop();
+ assert(confirmGate.exits==1 && confirmGate.mappedInput.suppressedConfirm==1);
+ puts("PASS actual release guard: held Back/Confirm/Power consumed, fresh Back/Confirm suppressed on exit");
 }
 '''
  (d/'activity.cpp').write_text(harness)
