@@ -183,7 +183,7 @@ def get_hardware_version(project_dir, pioenv):
         if (os.environ.get('CROSSSMUDGE_RELEASE_VERSION') or os.environ.get('CROSSINK_RELEASE_VERSION'))
         else get_crosssmudge_version(project_dir)
     )
-    if pioenv not in {'sticky', 'default'}:
+    if pioenv not in {'sticky', 'default', 'sticky-static-builtins-experimental'}:
         raise ValueError('Crosscub hardware version requires Sticky')
     device_suffix = '-sticky'
     return f'{base_version}{device_suffix}'
@@ -200,7 +200,7 @@ def inject_version(env):
         ('CROSSINK_GIT_DIRTY', f'\\"{get_git_dirty(project_dir)}\\"'),
     ])
 
-    if pioenv in {'default', 'sticky', 'sticky-owner-test'}:
+    if pioenv in {'default', 'sticky', 'sticky-owner-test', 'sticky-static-builtins-experimental'}:
         version_string = get_hardware_version(project_dir, pioenv)
         if os.environ.get('CROSSSMUDGE_RC_HASH') or os.environ.get('CROSSINK_RC_HASH'):
             print(f'Crosscub RC build version: {version_string}')
