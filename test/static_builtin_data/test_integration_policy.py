@@ -22,23 +22,37 @@ def option(c, section, key, default=''):
 
 
 class IntegrationPolicy(unittest.TestCase):
-    def test_experimental_sdk_delta_and_raw_aliases(self):
+    def test_production_packing_sdk_delta_and_raw_controls(self):
         c = configparser.ConfigParser(interpolation=None)
         c.read(ROOT/'platformio.ini')
         self.assertEqual(c['platformio']['default_envs'], 'sticky')
-        for name in ['sticky', 'default', 'sticky-owner-test', 'sticky-debug', 'debug', 'sticky-simulator', 'simulator']:
+        self.assertEqual(c['crossink']['version'], '2.0.0')
+        packed = ['sticky', 'default', 'sticky-owner-test', EXPERIMENT]
+        for name in packed:
+            self.assertEqual(option(c, 'env:'+name, 'custom_static_builtin_data', 'no'), 'yes')
+            self.assertEqual(option(c, 'env:'+name, 'custom_i18n_builtin_langs'), 'all')
+        for name in ['sticky-debug', 'debug', 'sticky-simulator', 'simulator']:
             self.assertEqual(option(c, 'env:'+name, 'custom_static_builtin_data', 'no'), 'no')
-        self.assertEqual(option(c, 'env:'+EXPERIMENT, 'custom_static_builtin_data'), 'yes')
+        self.assertEqual(option(c, 'base', 'custom_static_builtin_data', 'no'), 'no')
+        self.assertEqual(option(c, 'firmware_tuned', 'custom_static_builtin_data', 'no'), 'no')
         expected = {'CONFIG_SPIRAM_BOOT_HW_INIT=y', 'CONFIG_SPIRAM_BOOT_INIT=y',
                     'CONFIG_SPIRAM_PRE_CONFIGURE_MEMORY_PROTECTION=y', 'CONFIG_SPIRAM_MEMTEST=y',
                     'CONFIG_SPIRAM_IGNORE_NOTFOUND=n', 'CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y'}
-        baseline = set(option(c, 'env:sticky', 'custom_sdkconfig').splitlines())
-        candidate = set(option(c, 'env:'+EXPERIMENT, 'custom_sdkconfig').splitlines())
-        self.assertEqual(candidate-baseline, expected)
-        self.assertFalse(baseline-candidate)
-        for key in ['build_flags', 'extra_scripts', 'custom_sticky_project_lto', 'board',
+        def settings(section):
+            return {line.strip() for line in option(c, section, 'custom_sdkconfig').splitlines()
+                    if line.strip() and not line.lstrip().startswith(';')}
+        baseline = settings('env:sticky-debug')
+        self.assertIn('CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024', baseline)
+        self.assertIn('CONFIG_BT_ENABLED=n', baseline)
+        for name in packed:
+            candidate = settings('env:'+name)
+            self.assertEqual(candidate-baseline, expected)
+            self.assertFalse(baseline-candidate)
+        for key in ['custom_sdkconfig', 'build_flags', 'extra_scripts', 'custom_sticky_project_lto', 'board',
                     'board_build.partitions', 'board_upload.maximum_size', 'platform', 'custom_firmware_device_type']:
             self.assertEqual(option(c, 'env:'+EXPERIMENT, key), option(c, 'env:sticky', key))
+        self.assertEqual(option(c, 'env:sticky', 'board_upload.maximum_size'), '6553600')
+        self.assertEqual(option(c, 'env:sticky', 'board_build.partitions'), 'partitions.csv')
 
     def test_earliest_setup_fence_and_one_owner(self):
         main = (ROOT/'src/main.cpp').read_text().split('void setup() {', 1)[1]
@@ -78,12 +92,63 @@ class IntegrationPolicy(unittest.TestCase):
         module.Proposal('test_experiment_actual_lto_hooks_keep_sdk_and_object_policy').test_experiment_actual_lto_hooks_keep_sdk_and_object_policy()
 
     def test_full_bridge_wiring_synthetic_generator_recording(self):
-        self._exercise_bridge(None)
+        for name in ['sticky', 'default', 'sticky-owner-test', EXPERIMENT]:
+            with self.subTest(name=name):
+                self._exercise_bridge(None, name)
 
     def test_bridge_import_uses_project_dir_not_dunder_file(self):
-        self._exercise_bridge('/unrelated/scons-wrapper.py')
+        for name in ['sticky', 'default', 'sticky-owner-test', EXPERIMENT]:
+            with self.subTest(name=name):
+                self._exercise_bridge('/unrelated/scons-wrapper.py', name)
 
-    def _exercise_bridge(self, dunder_file):
+    def test_production_bridge_real_generation_without_file(self):
+        # Execute the actual bridge and real generator. Redirect only the three
+        # source-install writes to a private sink; never replace generation.
+        import json
+        import sys
+        from unittest.mock import patch
+        tree = ast.parse((ROOT/'scripts/gen_i18n.py').read_text())
+        bridge = next(n for n in ast.walk(tree) if isinstance(n, ast.If) and isinstance(n.test, ast.BoolOp)
+                      and 'custom_static_builtin_data' in ast.unparse(n.test))
+        code = compile(ast.Module(body=[bridge], type_ignores=[]), '<actual-bridge-real-generation>', 'exec')
+        c = configparser.ConfigParser(interpolation=None)
+        c.read(ROOT/'platformio.ini')
+        with tempfile.TemporaryDirectory(dir=os.environ['TMPDIR']) as tmp:
+            build = Path(tmp)
+            installed = {}
+            targets = {ROOT/'lib/I18n'/name for name in ['I18nKeys.h', 'I18nStrings.h', 'I18nStrings.cpp']}
+            original_write = Path.write_bytes
+            def install(path, data):
+                if path in targets:
+                    installed[path.name] = data
+                    return len(data)
+                return original_write(path, data)
+            class Env(dict):
+                def GetProjectOption(self, key, default): return option(c, 'env:sticky', key, default)
+                def subst(self, key): return str(ROOT if key == '$PROJECT_DIR' else build)
+                def Prepend(self, **kwargs): self['prepend'] = kwargs
+                def Append(self, **kwargs): self['append'] = kwargs
+            env = Env(PIOENV='sticky')
+            original_path = sys.path[:]
+            try:
+                with patch.object(Path, 'write_bytes', install):
+                    exec(code, dict(env=env, Import=lambda *_: None, Path=Path, sys=sys))
+            finally:
+                sys.path[:] = original_path
+            private = build/'static-builtins'
+            fonts = json.loads((private/'font-inventory.json').read_text())
+            languages = json.loads((private/'language-inventory.json').read_text())
+            self.assertEqual(len(fonts), 76)
+            self.assertEqual(len({font['source'] for font in fonts}), 38)
+            self.assertEqual(len(languages), 35)
+            self.assertEqual(len(list(private.glob('*.zlib'))), 110)  # English remains raw.
+            self.assertEqual(set(installed), {path.name for path in targets})
+            for name, data in installed.items():
+                self.assertEqual(data, (private/name).read_bytes())
+            self.assertEqual(env['prepend'], {'CPPPATH': [str(private)]})
+            self.assertEqual(env['append'], {'CPPDEFINES': [('CROSSPOINT_STATIC_BUILTINS', 1)]})
+
+    def _exercise_bridge(self, dunder_file, name):
         # Real bridge side effects with an explicitly synthetic generator double;
         # canonical generation/owner C++ is exercised separately by run.py.
         import sys
@@ -107,7 +172,7 @@ class IntegrationPolicy(unittest.TestCase):
                 def subst(self, key): return str(root if key == '$PROJECT_DIR' else root/'build')
                 def Prepend(self, **kwargs): self['prepend'] = kwargs
                 def Append(self, **kwargs): self['append'] = kwargs
-            env = Env(PIOENV=EXPERIMENT, custom_static_builtin_data='yes')
+            env = Env(PIOENV=name, custom_static_builtin_data='yes')
             original_path = sys.path[:]
             try:
                 with patch.dict(sys.modules, {'gen_static_builtin_data': types.SimpleNamespace(generate=generate)}):
@@ -138,11 +203,13 @@ class IntegrationPolicy(unittest.TestCase):
         code = compile(ast.fix_missing_locations(ast.Module(body=bridge, type_ignores=[])), '<actual-bridge-recording>', 'exec')
         class Env(dict):
             def GetProjectOption(self, key, default): return self.get(key, default)
-        for name in [EXPERIMENT, 'sticky', 'default', 'sticky-debug', 'simulator']:
+        approved = [EXPERIMENT, 'sticky', 'default', 'sticky-owner-test']
+        for name in [*approved, 'sticky-debug', 'debug', 'sticky-simulator', 'simulator',
+                     'other-device', 'sticky-other', EXPERIMENT+'-other']:
             for optin in ['no', 'yes']:
                 for langs in ['all', '', 'en']:
                     scope = dict(env=Env(PIOENV=name, custom_static_builtin_data=optin, custom_i18n_builtin_langs=langs), Import=lambda *_: None, accepted=False)
-                    if optin == 'yes' and (name != EXPERIMENT or langs == 'en'):
+                    if optin == 'yes' and (name not in approved or langs == 'en'):
                         with self.assertRaises(RuntimeError): exec(code, scope)
                     else:
                         exec(code, scope)

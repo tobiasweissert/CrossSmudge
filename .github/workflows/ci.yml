@@ -106,7 +106,7 @@ jobs:
         run: pio check --verbose --fail-on-defect low --fail-on-defect medium --fail-on-defect high
 
   build:
-    # Ordinary validation stays raw Sticky; only manual dispatch can opt in.
+    # Standard Sticky uses approved packing; the manual compatibility alias is equivalent.
     # Neither environment publishes or authorizes hardware execution.
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
     runs-on: ubuntu-latest

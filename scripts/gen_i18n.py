@@ -873,8 +873,8 @@ def parse_builtin_langs(value: Optional[str], languages: List[str]) -> Optional[
 def generate_static_variant(output_dir):
     """Wrap already generated sources; preserve the exact C++ literal bytes.
 
-    All languages are required. This is called only by the private experiment
-    generator, never by the ordinary SCons/raw generation path.
+    All languages are required. The private fixed-storage generator calls this
+    for approved Sticky packing; standalone/raw generation remains unchanged.
     """
     import hashlib
     import json
@@ -1159,12 +1159,12 @@ else:
             builtin_langs=env.GetProjectOption("custom_i18n_builtin_langs", "all"),
         )
 
-    # Separate owner-authorized non-distributing experiment; ordinary builds stay raw.
+    # Owner-approved Sticky production and direct aliases only; other profiles stay raw.
     if "Import" in globals() and env.GetProjectOption("custom_static_builtin_data", "no") == "yes":
-        if env["PIOENV"] != "sticky-static-builtins-experimental":
-            raise RuntimeError("static-builtins experiment is scoped to env:sticky-static-builtins-experimental; ordinary environments remain raw")
+        if env["PIOENV"] not in {"sticky", "default", "sticky-owner-test", "sticky-static-builtins-experimental"}:
+            raise RuntimeError("static-builtins packing is scoped to Sticky production and its approved direct aliases")
         if env.GetProjectOption("custom_i18n_builtin_langs", "all") not in ("", "all"):
-            raise RuntimeError("static-builtins experiment requires every existing language")
+            raise RuntimeError("static-builtins packing requires every existing language")
         root = Path(env.subst("$PROJECT_DIR")).resolve()
         sys.path.insert(0, str(root / "scripts"))
         from gen_static_builtin_data import generate
