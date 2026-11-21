@@ -126,7 +126,7 @@ ReaderSettingsChangeMask classifyReaderSettingsChange(const ReaderLayoutSettings
   ReaderSettingsChangeMask changeMask = ReaderSettingsChangeMask::None;
 
   if (before.textAntiAliasing != after.textAntiAliasing) {
-    changeMask = changeMask | ReaderSettingsChangeMask::NonLayout;
+    changeMask = ReaderSettingsChangeMask::NonLayout;
   }
   if (before.orientation != after.orientation) {
     changeMask = changeMask | ReaderSettingsChangeMask::Orientation;
