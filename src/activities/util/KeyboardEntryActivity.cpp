@@ -118,8 +118,10 @@ const fui::KeyboardLayout URL_SNIPPET_LAYOUT{URL_SNIP_ROWS, 4};
 
 void KeyboardEntryActivity::paintSnapshot(size_t cursor, bool shift, bool symbolLayer, int focus, int language) {
   cursorPos = std::min(cursor, text.size());
-  while (cursorPos > 0 && cursorPos < text.size() && (static_cast<uint8_t>(text[cursorPos]) & 0xc0) == 0x80) --cursorPos;
-  layoutId = language >= 0 && language < keyboard_layouts::COUNT ? keyboard_layouts::ALL[language].id : keyboard_layouts::startingLayout();
+  while (cursorPos > 0 && cursorPos < text.size() && (static_cast<uint8_t>(text[cursorPos]) & 0xc0) == 0x80)
+    --cursorPos;
+  layoutId = language >= 0 && language < keyboard_layouts::COUNT ? keyboard_layouts::ALL[language].id
+                                                                 : keyboard_layouts::startingLayout();
   const auto enabled = keyboard_layouts::enabled();
   showLangKey = (enabled & (enabled - 1)) != 0;
   shifted = shift;
@@ -134,22 +136,27 @@ void KeyboardEntryActivity::paintSnapshot(size_t cursor, bool shift, bool symbol
 }
 
 int KeyboardEntryActivity::snapshotTouch(size_t cursor, bool symbolLayer, int x, int y, int language) {
-  cursorPos = std::min(cursor,text.size());
-  layoutId = language >= 0 && language < keyboard_layouts::COUNT ? keyboard_layouts::ALL[language].id : keyboard_layouts::startingLayout();
+  cursorPos = std::min(cursor, text.size());
+  layoutId = language >= 0 && language < keyboard_layouts::COUNT ? keyboard_layouts::ALL[language].id
+                                                                 : keyboard_layouts::startingLayout();
   const auto enabled = keyboard_layouts::enabled();
   showLangKey = (enabled & (enabled - 1)) != 0;
   symbols = symbolLayer;
-  const auto& m=UITheme::getInstance().getMetrics();
-  const auto back=TouchHeaderBackButton::layout(Rect{0,m.topPadding,renderer.getScreenWidth(),TouchHeaderBackButton::height(m,mappedInput)}).touchRect;
-  if(x>=back.x && x<back.x+back.width && y>=back.y && y<back.y+back.height) return -2;
-  size_t position=0;
-  if(inputFieldTouchTargetFromPoint(x,y,position)==InputFieldTouchTarget::Cursor) return static_cast<int>(position);
+  const auto& m = UITheme::getInstance().getMetrics();
+  const auto back = TouchHeaderBackButton::layout(
+                        Rect{0, m.topPadding, renderer.getScreenWidth(), TouchHeaderBackButton::height(m, mappedInput)})
+                        .touchRect;
+  if (x >= back.x && x < back.x + back.width && y >= back.y && y < back.y + back.height) return -2;
+  size_t position = 0;
+  if (inputFieldTouchTargetFromPoint(x, y, position) == InputFieldTouchTarget::Cursor)
+    return static_cast<int>(position);
   return -1;
 }
 
 int KeyboardEntryActivity::snapshotLayoutIndex(bool next) const {
   const auto id = next ? keyboard_layouts::next(layoutId) : layoutId;
-  for(int i=0;i<keyboard_layouts::COUNT;++i)if(keyboard_layouts::ALL[i].id==id)return i;
+  for (int i = 0; i < keyboard_layouts::COUNT; ++i)
+    if (keyboard_layouts::ALL[i].id == id) return i;
   return 0;
 }
 

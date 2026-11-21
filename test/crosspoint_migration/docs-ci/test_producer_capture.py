@@ -302,6 +302,140 @@ class BoundedProducerTests(unittest.TestCase):
                 self.assertFalse(status.exists(), 'descendant not reaped by host init')
 
 class EffectiveArgvTests(unittest.TestCase):
+    def test_hosted_quoted_board_with_default_spawn_and_object_lto(self):
+        import sys
+        import shlex
+        sys.path.insert(0, str(Path.home()/'.platformio/packages/tool-scons/scons-local-4.8.1'))
+        import SCons
+        from SCons.Script import Environment, Action
+        from SCons.Platform.posix import subprocess_spawn
+        # Authenticated hosted inner-main argv, both 44861002849 and 44861453556:
+        # exact board/version values; raw SCons quoting built by its own defines.
+        board = 'Espressif ESP32-S3-DevKitC-1-N16R8V (16 MB Flash Quad, 8 MB PSRAM Octal)'
+        env = Environment(tools=['g++'], ENV={'PATH': os.defpath,
+                          'ONLY_CONSTRUCTION': 'synthetic-env-not-hosted'})
+        env.Replace(CXX='/not-executed/cxx', CCFLAGS=['-Os'], CPPDEFINES=[
+            ('CROSSCUB_APP_VERSION', r'\"2.0.0\"'),
+            ('ARDUINO_BOARD', '\\"'+board+'\\"')])
+        obj = env.Object(target='hosted-main.o', source='hosted-main.cpp',
+                         CCFLAGS=['-flto=1', '-Oz'])[0]
+        effective = obj.get_executor().get_build_env()
+        self.assertEqual(SCons.__version__, '4.8.1')
+        self.assertIs(effective['SPAWN'], subprocess_spawn)
+        self.assertEqual(Path(effective['SHELL']).name, 'sh')
+        seen = []
+        def no_op(shell, escape, cmd, args, execution_env):
+            seen.append((shlex.split(' '.join(args)), dict(execution_env)))
+            return 0
+        self.assertEqual(Action('$CXXCOM').execute([obj], obj.sources,
+                         effective.Override({'SPAWN': no_op})), 0)
+        expected, expected_env = seen[0]
+        self.assertIn('-DARDUINO_BOARD="'+board+'"', expected)
+        self.assertIn('-DCROSSCUB_APP_VERSION="2.0.0"', expected)
+        self.assertIn('-Oz', expected)
+        self.assertNotIn('-Os', expected)
+        argv, execution_env = load().effective_compile(effective, [obj], obj.sources)
+        self.assertEqual(argv, expected)
+        self.assertEqual(execution_env, expected_env)
+        self.assertIs(effective['SPAWN'], subprocess_spawn)
+        self.assertEqual(env['CCFLAGS'], ['-Os'])
+
+    def test_quote_removal_literals_and_escapes_without_shell_execution(self):
+        import sys
+        from unittest.mock import patch
+        sys.path.insert(0, str(Path.home()/'.platformio/packages/tool-scons/scons-local-4.8.1'))
+        from SCons.Script import Environment
+        env = Environment(tools=['g++'], ENV={'PATH': os.defpath})
+        # Independent literal expectations, including POSIX double-quote
+        # backslash rules which shlex.split does not implement for escaped $/`.
+        cases = [
+            (r'''-DVALUE='()[]*?~#;&|<>`' ''', '-DVALUE=()[]*?~#;&|<>`'),
+            (r'''-DVALUE="()[]*?~#;&|<>" ''', '-DVALUE=()[]*?~#;&|<>'),
+            (r'''-DVALUE='owner'"'"'s "board" \path' ''', '-DVALUE=owner\'s "board" \\path'),
+            (r'''-DVALUE="a\qb\$c\`d\"e\\f" ''', '-DVALUE=a\\qb$c`d"e\\f'),
+            (r'''-DVALUE=escaped\ space\(x\)\[y\] ''', '-DVALUE=escaped space(x)[y]'),
+            (r'''"" ''', ''),
+        ]
+        m = load()
+        self.assertEqual(m.literal_posix_argv("cxx '()[]*?~#;&|<>$`'"),
+                         ['cxx', '()[]*?~#;&|<>$`'])
+        with patch('subprocess.Popen', side_effect=AssertionError('must not spawn')):
+            for raw, expected in cases:
+                with self.subTest(raw=raw):
+                    env.Replace(CXXCOM='/not-executed/cxx '+raw.replace('$', '$$'))
+                    argv, execution_env = m.effective_compile(env, [], [])
+                    self.assertEqual(argv, ['/not-executed/cxx', expected])
+                    self.assertEqual(execution_env, dict(env['ENV']))
+
+    def test_unsafe_posix_forms_denied_without_execution(self):
+        import sys
+        from unittest.mock import patch
+        sys.path.insert(0, str(Path.home()/'.platformio/packages/tool-scons/scons-local-4.8.1'))
+        from SCons.Script import Environment
+        env = Environment(tools=['g++'])
+        m = load()
+        unsafe = [';', '&&', '|', '>', '<', '(', ')', '*', '?', '[x]', '~root', '#comment',
+                  '$NAME', '${NAME}', '$(id)', '`id`', '"$NAME"', '"$(id)"', '"`id`"',
+                  "'literal'$(id)", '"literal";bad', "'unterminated", '"unterminated',
+                  'trailing\\', 'a\nb', 'a\rb', "'a\nb'", '"a\nb"', 'a\x00b', 'a\x01b',
+                  'a\\\nb', 'a\x7fb']
+        with patch('subprocess.Popen', side_effect=AssertionError('must not spawn')):
+            for raw in unsafe:
+                with self.subTest(raw=raw):
+                    env.Replace(CXXCOM='/not-executed/cxx '+raw.replace('$', '$$'))
+                    with self.assertRaises(ValueError):
+                        m.effective_compile(env, [], [])
+
+    def test_pre_admission_guards_have_independent_constant_stages(self):
+        import sys
+        from unittest.mock import patch
+        sys.path.insert(0, str(Path.home()/'.platformio/packages/tool-scons/scons-local-4.8.1'))
+        import SCons
+        from SCons.Script import Environment
+        env = Environment(tools=['g++'])
+        env.Replace(CXXCOM='/not-executed/cxx')
+        m = load()
+        # Each isolated guard fails before even constructing the action.
+        with patch('SCons.Action.Action', side_effect=AssertionError('action reached')):
+            with patch.object(SCons, '__version__', 'unsupported'):
+                with self.assertRaises(ValueError) as failure:
+                    m.effective_compile(env, [], [])
+                self.assertEqual(failure.exception.stage, 'execution-version')
+            for changes, stage in [({'SPAWN': lambda *a: self.fail('unknown spawn executed')}, 'execution-spawn'),
+                                   ({'SHELL': '/bin/bash'}, 'execution-shell')]:
+                with self.subTest(stage=stage), self.assertRaises(ValueError) as failure:
+                    m.effective_compile(env.Override(changes), [], [])
+                self.assertEqual(failure.exception.stage, stage)
+
+    def test_callback_retains_only_allowlisted_admission_stage(self):
+        import sys
+        from unittest.mock import patch
+        sys.path.insert(0, str(Path.home()/'.platformio/packages/tool-scons/scons-local-4.8.1'))
+        from SCons.Script import Environment
+        m = load()
+        for stage in ('execution-version', 'execution-spawn', 'execution-shell',
+                      'execution-platform', 'shell-lexical', 'compile-action', None):
+            with self.subTest(stage=stage), tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as temp:
+                root = Path(temp)
+                env = Environment(tools=['g++'])
+                env.Replace(PROJECT_DIR=str(root), BUILD_DIR=str(root/'build'), PIOENV='sticky')
+                obj = env.Object(target=str(root/'build/src/main.cpp.o'), source=str(root/'src/main.cpp'))[0]
+                env.AddMethod(lambda e, node, fn: setattr(e, 'action', fn), 'AddPostAction')
+                failure = m.CompileAdmissionError(stage) if stage else ValueError('SECRET-ERROR-DO-NOT-RETAIN')
+                with patch.dict(os.environ, CROSSCUB_PRIVATE_EVIDENCE=str(root/'evidence')), \
+                     patch.object(m, 'effective_compile', side_effect=failure):
+                    m.install_main(env)
+                    self.assertEqual(env.action(obj.sources, [obj], env), 0)
+                text = (root/'evidence/producer-main-receipt.json').read_text()
+                receipt = json.loads(text)
+                self.assertEqual(receipt['probe_error'], 'ValueError')
+                self.assertEqual(receipt.get('admission_stage'), stage)
+                self.assertNotIn('SECRET', text)
+                self.assertNotIn('compile_argv', receipt)
+                self.assertNotIn('compile_env_sha256', receipt)
+        with self.assertRaises(ValueError):
+            m.CompileAdmissionError('SECRET-ERROR-DO-NOT-RETAIN')
+
     def test_real_scons_spawn_semantics_no_compiler(self):
         import sys
         import shlex

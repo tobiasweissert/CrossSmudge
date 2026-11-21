@@ -199,32 +199,101 @@ def probe_command(args, dependency, macros, target):
     return result + ['-E', '-dM', '-MD', '-MF', str(dependency), '-MT', str(target), '-o', str(macros)]
 
 
+class CompileAdmissionError(ValueError):
+    STAGES = frozenset(('execution-version', 'execution-platform', 'execution-spawn',
+                        'execution-shell', 'shell-lexical', 'compile-action'))
+
+    def __init__(self, stage):
+        if stage not in self.STAGES:
+            raise ValueError('unknown-admission-stage')
+        self.stage = stage
+        super().__init__('unsupported-compile-admission')
+
+
+def literal_posix_argv(text):
+    """Decode only literal POSIX words. No expansion, evaluation or shell calls.
+
+    Backslash in double quotes removes itself only before $, `, ", or backslash;
+    unlike shlex, preserve it before other characters. Deny controls even inside
+    quotes, and deny unquoted shell operators/expansion/globbing fail closed.
+    """
+    if any(ord(c) < 32 or ord(c) == 127 for c in text):
+        raise CompileAdmissionError('shell-lexical')
+    words, word = [], []
+    quote = None
+    started = False
+    i = 0
+    while i < len(text):
+        c = text[i]
+        if c == '\\' and quote != "'":
+            i += 1
+            if i == len(text):
+                raise CompileAdmissionError('shell-lexical')
+            c = text[i]
+            if quote == '"' and c not in '$`"\\':
+                word.append('\\')
+            word.append(c)
+            started = True
+        elif quote:
+            if c == quote:
+                quote = None
+            elif quote == '"' and c in '$`':
+                raise CompileAdmissionError('shell-lexical')
+            else:
+                word.append(c)
+        elif c in "'\"":
+            quote = c
+            started = True
+        elif c == ' ':
+            if started:
+                words.append(''.join(word))
+                word, started = [], False
+        elif c in '$`;&|<>()*?[]~#':
+            raise CompileAdmissionError('shell-lexical')
+        else:
+            word.append(c)
+            started = True
+        i += 1
+    if quote:
+        raise CompileAdmissionError('shell-lexical')
+    if started:
+        words.append(''.join(word))
+    if not words or not words[0]:
+        raise CompileAdmissionError('shell-lexical')
+    return words
+
+
 def effective_compile(env, target, source):
     """Observe pinned SCons execution without spawning or mutating the build env.
 
     POSIX quote removal only: reject expansion/control syntax, never evaluate a
     shell command. Unknown/multiple actions fail closed for diagnostics only.
     """
-    import shlex
     import SCons
     from SCons.Action import Action
     from SCons.Platform.posix import subprocess_spawn
-    if (SCons.__version__ != '4.8.1' or os.name != 'posix'
-            or env.get('SPAWN') is not subprocess_spawn
-            or Path(env.get('SHELL', '')).name != 'sh'):
-        raise ValueError('unsupported-scons-execution')
+    if SCons.__version__ != '4.8.1':
+        raise CompileAdmissionError('execution-version')
+    if os.name != 'posix':
+        raise CompileAdmissionError('execution-platform')
+    if env.get('SPAWN') is not subprocess_spawn:
+        raise CompileAdmissionError('execution-spawn')
+    if Path(env.get('SHELL', '')).name != 'sh':
+        raise CompileAdmissionError('execution-shell')
+    # SCons normalizes CR/tab whitespace and splits newline commands before
+    # SPAWN. Reject controls before that information can be lost as well.
+    if any(ord(c) < 32 or ord(c) == 127
+           for c in env.subst('$CXXCOM', target=target, source=source)):
+        raise CompileAdmissionError('shell-lexical')
     observed = []
     def observe(shell, escape, cmd, args, execution_env):
-        text = ' '.join(args)
-        if any(c in text for c in '$`;&|<>\n\r()*?[]~#'):
-            raise ValueError('unsupported-shell-syntax')
-        observed.append((shlex.split(text, posix=True), dict(execution_env)))
+        observed.append((literal_posix_argv(' '.join(args)), dict(execution_env)))
         return 0
     # Object-local LTO uses OverrideEnvironment; Clone() on that proxy fails
     # under pinned SCons/Python 3.14. Overlay only SPAWN, keeping its real flags.
     observed_env = env.Override({'SPAWN': observe})
     if Action('$CXXCOM').execute(target, source, observed_env) != 0 or len(observed) != 1:
-        raise ValueError('unsupported-compile-action')
+        raise CompileAdmissionError('compile-action')
     return observed[0]
 
 
@@ -262,7 +331,9 @@ def install_main(env):
             args, execution_env = effective_compile(env, target, source)
         except Exception as exc:
             # Diagnostic admission must not alter the original compilation.
-            receipt['probe_error'] = type(exc).__name__
+            receipt['probe_error'] = 'ValueError' if isinstance(exc, CompileAdmissionError) else type(exc).__name__
+            if isinstance(exc, CompileAdmissionError) and exc.stage in CompileAdmissionError.STAGES:
+                receipt['admission_stage'] = exc.stage
             save_receipt(out, 'producer-main-receipt.json', receipt)
             return 0
         receipt['compile_argv'] = args

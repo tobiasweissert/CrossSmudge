@@ -5,10 +5,10 @@
 #include <cstring>
 
 #include "LuaRuntime.h"
-#include "fontIds.h"
 #include "MappedInputManager.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "activities/util/KeyboardLayoutSet.h"
+#include "fontIds.h"
 
 // Paint only: Lua retains its existing keymap, hit targets, handlers and editor
 // ownership. No native text-input or asynchronous modal API is implied.
@@ -54,68 +54,94 @@ inline int paint(lua_State* L) {
 // snapshot owner's C++ destructor. No owning C++ locals belong in this emitter.
 inline int snapshotResult(lua_State* L) {
   auto& owner = **static_cast<KeyboardEntryActivity**>(lua_touserdata(L, 1));
-  const auto& interactions=owner.paintedInteractions();
+  const auto& interactions = owner.paintedInteractions();
   lua_newtable(L);
-  for(size_t i=0;i<interactions.publishedCount();++i) {
-    const auto& item=interactions.publishedData()[i];
-    const auto* key=owner.paintedKey(item.value);
-    if(!key) continue;
+  for (size_t i = 0; i < interactions.publishedCount(); ++i) {
+    const auto& item = interactions.publishedData()[i];
+    const auto* key = owner.paintedKey(item.value);
+    if (!key) continue;
     lua_newtable(L);
-    auto integer=[&](const char* name,int value){lua_pushinteger(L,value);lua_setfield(L,-2,name);};
-    auto string=[&](const char* name,const char* value){lua_pushstring(L,value?value:"");lua_setfield(L,-2,name);};
-    integer("x",item.rect.x);integer("y",item.rect.y);integer("w",item.rect.width);integer("h",item.rect.height);
-    string("label",key->label);string("output",key->output);
-    const char* action="insert";
-    namespace fui=freeink::ui;
-    if(item.value==fui::QWERTY_KEY_SHIFT) action="shift";
-    else if(item.value==fui::QWERTY_KEY_MODE) action="mode";
-    else if(item.value==fui::QWERTY_KEY_LANG) action="language";
-    else if(item.value==fui::QWERTY_KEY_BACKSPACE) action="delete";
-    else if(item.value==fui::QWERTY_KEY_ENTER) action="done";
-    string("action",action);
-    lua_rawseti(L,-2,i+1);
+    auto integer = [&](const char* name, int value) {
+      lua_pushinteger(L, value);
+      lua_setfield(L, -2, name);
+    };
+    auto string = [&](const char* name, const char* value) {
+      lua_pushstring(L, value ? value : "");
+      lua_setfield(L, -2, name);
+    };
+    integer("x", item.rect.x);
+    integer("y", item.rect.y);
+    integer("w", item.rect.width);
+    integer("h", item.rect.height);
+    string("label", key->label);
+    string("output", key->output);
+    const char* action = "insert";
+    namespace fui = freeink::ui;
+    if (item.value == fui::QWERTY_KEY_SHIFT)
+      action = "shift";
+    else if (item.value == fui::QWERTY_KEY_MODE)
+      action = "mode";
+    else if (item.value == fui::QWERTY_KEY_LANG)
+      action = "language";
+    else if (item.value == fui::QWERTY_KEY_BACKSPACE)
+      action = "delete";
+    else if (item.value == fui::QWERTY_KEY_ENTER)
+      action = "done";
+    string("action", action);
+    lua_rawseti(L, -2, i + 1);
   }
-  lua_pushinteger(L,owner.snapshotLayoutIndex(false));lua_setfield(L,-2,"layout_index");
-  lua_pushinteger(L,owner.snapshotLayoutIndex(true));lua_setfield(L,-2,"next_layout_index");
+  lua_pushinteger(L, owner.snapshotLayoutIndex(false));
+  lua_setfield(L, -2, "layout_index");
+  lua_pushinteger(L, owner.snapshotLayoutIndex(true));
+  lua_setfield(L, -2, "next_layout_index");
   return 1;
 }
 inline int snapshot(lua_State* L) {
   auto* renderer = static_cast<GfxRenderer*>(lua_touserdata(L, lua_upvalueindex(1)));
-  size_t titleSize=0, textSize=0;
-  const char* title=luaL_checklstring(L,1,&titleSize);
-  const char* text=luaL_checklstring(L,2,&textSize);
-  const lua_Integer cursor=luaL_checkinteger(L,3), focus=luaL_optinteger(L,6,1), language=luaL_optinteger(L,9,-1);
-  if(language < -1 || language>=keyboard_layouts::COUNT || titleSize>256 || textSize>8192 || cursor<1 || cursor>static_cast<lua_Integer>(textSize)+1 || focus<1 || focus>56 ||
-     memchr(title,0,titleSize) || memchr(text,0,textSize)) return luaL_error(L,"invalid keyboard snapshot");
-  const bool touch=!lua_isnoneornil(L,7), shifted=lua_toboolean(L,4), symbols=lua_toboolean(L,5);
-  const lua_Integer x=touch?luaL_checkinteger(L,7):0, y=touch?luaL_checkinteger(L,8):0;
-  if(touch && (x<0 || y<0 || x>=renderer->getScreenWidth() || y>=renderer->getScreenHeight())) {lua_pushinteger(L,0);return 1;}
-  if(touch) {
-    lua_Integer position=0;
+  size_t titleSize = 0, textSize = 0;
+  const char* title = luaL_checklstring(L, 1, &titleSize);
+  const char* text = luaL_checklstring(L, 2, &textSize);
+  const lua_Integer cursor = luaL_checkinteger(L, 3), focus = luaL_optinteger(L, 6, 1),
+                    language = luaL_optinteger(L, 9, -1);
+  if (language < -1 || language >= keyboard_layouts::COUNT || titleSize > 256 || textSize > 8192 || cursor < 1 ||
+      cursor > static_cast<lua_Integer>(textSize) + 1 || focus < 1 || focus > 56 || memchr(title, 0, titleSize) ||
+      memchr(text, 0, textSize))
+    return luaL_error(L, "invalid keyboard snapshot");
+  const bool touch = !lua_isnoneornil(L, 7), shifted = lua_toboolean(L, 4), symbols = lua_toboolean(L, 5);
+  const lua_Integer x = touch ? luaL_checkinteger(L, 7) : 0, y = touch ? luaL_checkinteger(L, 8) : 0;
+  if (touch && (x < 0 || y < 0 || x >= renderer->getScreenWidth() || y >= renderer->getScreenHeight())) {
+    lua_pushinteger(L, 0);
+    return 1;
+  }
+  if (touch) {
+    lua_Integer position = 0;
     {
-      MappedInputManager input(gpio,*renderer);
-      KeyboardEntryActivity owner(*renderer,input,std::string(title,titleSize),std::string(text,textSize));
-      position=owner.snapshotTouch(static_cast<size_t>(cursor-1),symbols,static_cast<int>(x),static_cast<int>(y),static_cast<int>(language))+1;
+      MappedInputManager input(gpio, *renderer);
+      KeyboardEntryActivity owner(*renderer, input, std::string(title, titleSize), std::string(text, textSize));
+      position = owner.snapshotTouch(static_cast<size_t>(cursor - 1), symbols, static_cast<int>(x), static_cast<int>(y),
+                                     static_cast<int>(language)) +
+                 1;
     }
-    lua_pushinteger(L,position);
+    lua_pushinteger(L, position);
     return 1;
   }
   // Prepare stack capacity, function and POD argument BEFORE any native owner.
   // Even closure/stack allocation failure here has no native lifetime to skip.
-  luaL_checkstack(L,2,"keyboard snapshot result");
-  KeyboardEntryActivity* active=nullptr;
-  lua_pushcfunction(L,snapshotResult);
-  lua_pushlightuserdata(L,&active);
+  luaL_checkstack(L, 2, "keyboard snapshot result");
+  KeyboardEntryActivity* active = nullptr;
+  lua_pushcfunction(L, snapshotResult);
+  lua_pushlightuserdata(L, &active);
   int status;
   {
-    MappedInputManager input(gpio,*renderer);
-    KeyboardEntryActivity owner(*renderer,input,std::string(title,titleSize),std::string(text,textSize));
-    active=&owner;
-    owner.paintSnapshot(static_cast<size_t>(cursor-1),shifted,symbols,static_cast<int>(focus-1),static_cast<int>(language));
-    status=lua_pcall(L,1,1,0);
+    MappedInputManager input(gpio, *renderer);
+    KeyboardEntryActivity owner(*renderer, input, std::string(title, titleSize), std::string(text, textSize));
+    active = &owner;
+    owner.paintSnapshot(static_cast<size_t>(cursor - 1), shifted, symbols, static_cast<int>(focus - 1),
+                        static_cast<int>(language));
+    status = lua_pcall(L, 1, 1, 0);
   }
   // Propagate only after all native owning objects have been destroyed.
-  if(status!=LUA_OK) return lua_error(L);
+  if (status != LUA_OK) return lua_error(L);
   return 1;
 }
 inline int metrics(lua_State* L) {
