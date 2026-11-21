@@ -103,7 +103,7 @@ class ActivityManager {
 
  public:
   explicit ActivityManager(GfxRenderer& renderer, MappedInputManager& mappedInput);
-  ~ActivityManager();
+  virtual ~ActivityManager();
 
   void begin(uint32_t renderTaskStackBytes = 16384);
   void loop();
