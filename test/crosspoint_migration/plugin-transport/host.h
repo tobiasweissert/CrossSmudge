@@ -1,3 +1,5 @@
+#define CROSSINK_GIT_SHA "0123456789abcdef0123456789abcdef01234567"
+#define CROSSINK_GIT_DIRTY "1"
 #include <arpa/inet.h>
 #include <netdb.h>
 
@@ -15,12 +17,23 @@
 #include <string>
 #include <utility>
 #include <vector>
+inline std::vector<std::string> diagnostics;
+template <typename... Args>
+inline void captureLog(const char* tag, const char* format, Args... args) {
+  char message[96];
+  const int n = snprintf(message, sizeof(message), format, args...);
+  assert(std::string(tag) == "PHTP" && n >= 0 && n < static_cast<int>(sizeof(message)));
+  diagnostics.emplace_back(message);
+}
+#define LOG_ERR(...) captureLog(__VA_ARGS__)
 namespace freeink {
 class SecureHttpClient {};
 }  // namespace freeink
 class String {
  public:
   std::string s;
+  String() = default;
+  String(const char* p) : s(p) {}
   void remove(size_t) { s.clear(); }
   size_t length() const { return s.size(); }
   bool concat(const char* p, size_t n) {
@@ -32,8 +45,16 @@ struct WifiPowerSaveGuard {
   ~WifiPowerSaveGuard() {}
 };
 struct Clock {
-  bool valid = true;
+  bool valid = true, syncOk = false;
+  unsigned syncCalls = 0;
+  std::function<void()> duringSync;
   bool hasSynchronizedSystemTime() { return valid; }
+  bool syncSystemTimeFromNTP() {
+    ++syncCalls;
+    if (duringSync) duringSync();
+    valid = syncOk;
+    return syncOk;
+  }
 };
 inline Clock halClock;
 struct File {
@@ -54,6 +75,14 @@ struct HalFile {
   }
 };
 struct Store {
+  std::string manifestFixture;
+  bool exists(const char*) { return false; }
+  bool ensureDirectoryExists(const char*) { return true; }
+  bool writeFile(const char*, const String&) { return true; }
+  bool readFileToString(const char*, const std::string&, size_t cap, std::string& out) {
+    out = manifestFixture;
+    return out.size() <= cap;
+  }
   bool removed = false;
   bool openFileForWrite(const char*, const char*, HalFile&) {
     fs.opened = true;
@@ -148,7 +177,11 @@ inline int esp_tls_conn_new_async(const char* ip, size_t, uint16_t, const esp_tl
   return handshake;
 }
 inline void* esp_tls_get_ssl_context(esp_tls_t*) { return &ssl; }
+inline size_t writeLimit = SIZE_MAX, writeFailAfter = SIZE_MAX;
 inline int esp_tls_conn_write(esp_tls_t* t, const void* p, size_t n) {
+  if (writeFailAfter == 0) return -1;
+  if (writeFailAfter != SIZE_MAX) --writeFailAfter;
+  n = std::min(n, writeLimit);
   writes[t->index].append(static_cast<const char*>(p), n);
   return static_cast<int>(n);
 }

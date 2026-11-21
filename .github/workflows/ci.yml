@@ -9,7 +9,7 @@ on:
       environment:
         description: Non-distributing build environment
         type: choice
-        options: [sticky, sticky-static-builtins-experimental]
+        options: [sticky, sticky-owner-test, sticky-static-builtins-experimental]
         default: sticky
         required: true
   workflow_call:
@@ -121,7 +121,7 @@ jobs:
         run: |
           set -euo pipefail
           case "$PIO_ENV" in
-            sticky|sticky-static-builtins-experimental) ;;
+            sticky|sticky-owner-test|sticky-static-builtins-experimental) ;;
             *) printf '%s\n' 'Invalid build environment' >&2; exit 1 ;;
           esac
 
@@ -240,7 +240,7 @@ jobs:
           version = validate_version(config['crosssmudge']['version'])
           assert config['crossink']['version'] == version
           selected_env = os.environ['PIO_ENV']
-          assert selected_env in ('sticky', 'sticky-static-builtins-experimental')
+          assert selected_env in ('sticky', 'sticky-owner-test', 'sticky-static-builtins-experimental')
           build = pathlib.Path('.pio/build')/selected_env
           (out/'build-environment.json').write_text(json.dumps({'environment': selected_env, 'hardware_board': 'Sticky', 'publication_authorized': False}, indent=2)+'\n')
           for name in ['firmware.bin', 'firmware.elf', 'firmware.map', 'bootloader.bin', 'partitions.bin']:
@@ -309,7 +309,7 @@ jobs:
               try:
                   receipt['elf_sha256'] = hashlib.sha256(elf.read_bytes()).hexdigest()
                   environment = os.environ.get('PIO_ENV')
-                  if environment not in ('sticky', 'sticky-static-builtins-experimental'):
+                  if environment not in ('sticky', 'sticky-owner-test', 'sticky-static-builtins-experimental'):
                       raise ValueError('validated build environment missing')
                   linked_output = '.pio/build/'+environment+'/firmware.elf'
                   selected = []

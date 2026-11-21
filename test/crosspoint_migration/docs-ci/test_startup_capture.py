@@ -165,6 +165,111 @@ class CaptureTests(unittest.TestCase):
                 self.assertEqual((self.out / 'startup-main.cpp.d').read_bytes(), self.dep.read_bytes())
                 self.assertEqual((self.out / 'startup-application-sdkconfig.h').read_bytes(), self.header.read_bytes())
 
+    def invisible_fixture(self, **changes):
+        self.complete_fixture()
+        values = load().parse_config((self.libs / 'sdkconfig').read_text())
+        values.update(CONFIG_SPIRAM_BOOT_HW_INIT='y',
+                      CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY='y')
+        values.update(changes)
+        values.pop('CONFIG_SPIRAM_IGNORE_NOTFOUND')
+        for path in (self.project / 'sdkconfig.sticky', self.libs / 'sdkconfig'):
+            path.write_text(''.join(k + '=' + v + '\n' for k, v in values.items()))
+        self.header.write_text(''.join('#define ' + k + ' ' + ('1' if v == 'y' else v) + '\n'
+                                       for k, v in values.items() if v != 'n'))
+        self.kconfig = self.home / '.platformio/packages/framework-espidf/components/esp_psram/Kconfig.spiram.common'
+        self.write(self.kconfig, 'config SPIRAM_IGNORE_NOTFOUND\n'
+                   '    bool "Ignore PSRAM when not found"\n    default "n"\n'
+                   '    depends on SPIRAM_BOOT_HW_INIT && !SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY && !SPIRAM_ALLOW_NOINIT_SEG_EXTERNAL_MEMORY\n'
+                   '    help\n        Normally, if psram initialization is enabled during compile time but not found at runtime, it\n'
+                   '        is seen as an error making the CPU panic.\n')
+
+    def test_source_proven_invisible_ignore_preserves_raw_absence(self):
+        for index, changes in enumerate(({}, {'CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY': 'n',
+                                              'CONFIG_SPIRAM_ALLOW_NOINIT_SEG_EXTERNAL_MEMORY': 'y'},
+                                             {'CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY': 'n',
+                                              'CONFIG_SPIRAM_BOOT_HW_INIT': 'n'})):
+            with self.subTest(index=index):
+                self.invisible_fixture(**changes)
+                self.out = self.base / ('invisible-' + str(index))
+                self.assertEqual(self.run_capture().returncode, 0)
+                receipt = self.receipt()
+                key = 'CONFIG_SPIRAM_IGNORE_NOTFOUND'
+                self.assertEqual(receipt['selected_resolved_values'][key], 'ABSENT_UNRESOLVED')
+                proof = receipt['qualified_dependency_invisible'][key]
+                self.assertEqual(proof['raw_header_state'], 'UNDEFINED')
+                self.assertEqual(proof['raw_config_state'], 'ABSENT_UNRESOLVED')
+                self.assertEqual(proof['source_sha256'], hashlib.sha256(self.kconfig.read_bytes()).hexdigest())
+                self.assertEqual(proof['certainty'], 'source-proven-dependency-inactive')
+                self.assertTrue(proof['false_dependency_terms'])
+                self.assertFalse(receipt['publication_authorized'])
+
+    def test_invisible_ignore_requires_exact_source_and_consistent_absence(self):
+        for case in ('visible', 'missing-source', 'changed-dependency', 'extra-property',
+                     'duplicate-definition', 'header-present', 'unproven-condition',
+                     'contradictory-condition', 'unrelated-absence', 'enabled-ignore'):
+            with self.subTest(case=case):
+                self.invisible_fixture()
+                self.out = self.base / case
+                if case == 'missing-source':
+                    self.kconfig.unlink()
+                elif case == 'changed-dependency':
+                    self.kconfig.write_text(self.kconfig.read_text().replace(' && !SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY', ''))
+                elif case == 'extra-property':
+                    self.kconfig.write_text(self.kconfig.read_text() + '    default y\n')
+                elif case == 'duplicate-definition':
+                    self.kconfig.write_text(self.kconfig.read_text() * 2)
+                elif case == 'header-present':
+                    self.header.write_text(self.header.read_text() + '#define CONFIG_SPIRAM_IGNORE_NOTFOUND 0\n')
+                elif case == 'contradictory-condition':
+                    self.header.write_text(self.header.read_text().replace('#define CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY 1\n', ''))
+                elif case == 'enabled-ignore':
+                    for path in (self.project / 'sdkconfig.sticky', self.libs / 'sdkconfig'):
+                        path.write_text(path.read_text() + 'CONFIG_SPIRAM_IGNORE_NOTFOUND=y\n')
+                    self.header.write_text(self.header.read_text() + '#define CONFIG_SPIRAM_IGNORE_NOTFOUND 1\n')
+                else:
+                    for path in (self.project / 'sdkconfig.sticky', self.libs / 'sdkconfig'):
+                        text = path.read_text()
+                        if case == 'visible':
+                            text = text.replace('CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y', 'CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=n')
+                        elif case == 'unproven-condition':
+                            text = text.replace('CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y\n', '')
+                        else:
+                            text = text.replace('CONFIG_SPIRAM_BOOT_INIT=n\n', '')
+                        path.write_text(text)
+                    if case in ('visible', 'unproven-condition'):
+                        self.header.write_text(self.header.read_text().replace('#define CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY 1\n', ''))
+                self.assert_incomplete()
+
+    def test_observed_identifier_alias_and_chain_match_literals(self):
+        for length in (1, 4):
+            with self.subTest(length=length):
+                self.complete_fixture()
+                self.out = self.base / ('alias-' + str(length))
+                first = 'CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY'
+                chain = ['CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM'] + ['CONFIG_ALIAS_' + str(i) for i in range(length - 1)]
+                for path in (self.project / 'sdkconfig.sticky', self.libs / 'sdkconfig'):
+                    path.write_text(path.read_text() + first + '=y\n' + ''.join(k + '=y\n' for k in chain))
+                self.header.write_text(self.header.read_text() + ''.join('#define ' + a + ' ' + b + '\n'
+                    for a, b in zip([first] + chain, chain + ['1'])))
+                self.assertEqual(self.run_capture().returncode, 0)
+
+    def test_identifier_alias_undefined_cycles_conflicts_and_depth_fail_closed(self):
+        for case in ('undefined', 'cycle', 'conflict', 'target-raw-conflict', 'expression', 'depth'):
+            with self.subTest(case=case):
+                self.complete_fixture()
+                self.out = self.base / ('bad-alias-' + case)
+                first = 'CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY'
+                for path in (self.project / 'sdkconfig.sticky', self.libs / 'sdkconfig'):
+                    path.write_text(path.read_text() + first + '=y\n' +
+                                    ('CONFIG_ALIAS=n\n' if case == 'target-raw-conflict' else ''))
+                tail = {'undefined': '', 'cycle': '#define CONFIG_ALIAS ' + first + '\n',
+                        'target-raw-conflict': '#define CONFIG_ALIAS 1\n',
+                        'conflict': '#define CONFIG_ALIAS 0\n', 'expression': '#define CONFIG_ALIAS (1)\n',
+                        'depth': ''.join('#define CONFIG_ALIAS' + str(i) + ' CONFIG_ALIAS' + str(i + 1) + '\n' for i in range(70)) + '#define CONFIG_ALIAS70 1\n'}[case]
+                target = 'CONFIG_ALIAS0' if case == 'depth' else 'CONFIG_ALIAS'
+                self.header.write_text(self.header.read_text() + '#define ' + first + ' ' + target + '\n' + tail)
+                self.assert_incomplete()
+
     def test_header_only_flag_is_conflict(self):
         self.complete_fixture()
         with self.header.open('a') as stream:
@@ -410,6 +515,17 @@ def load():
 
 
 class StartupParserTests(unittest.TestCase):
+    def test_identifier_alias_exact_depth_boundary(self):
+        module = load()
+        for edges in (32, 33):
+            definitions = {'CONFIG_ALIAS' + str(i): 'CONFIG_ALIAS' + str(i + 1) for i in range(edges)}
+            definitions['CONFIG_ALIAS' + str(edges)] = '1'
+            if edges == 32:
+                self.assertEqual(module.resolve_header_value(definitions, 'CONFIG_ALIAS0'), '1')
+            else:
+                with self.assertRaises(ValueError):
+                    module.resolve_header_value(definitions, 'CONFIG_ALIAS0')
+
     def test_config_disabled_numeric_and_unknown(self):
         module = load()
         self.assertIsNotNone(module, 'capture helper missing')

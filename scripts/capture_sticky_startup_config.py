@@ -80,6 +80,60 @@ def parse_generated_header(text):
     return definitions
 
 
+def resolve_header_value(definitions, key):
+    """At most 32 CONFIG identifier edges to a literal; no C evaluation."""
+    seen = set()
+    if key not in definitions:
+        return None
+    for _ in range(33):
+        if key in seen or key not in definitions:
+            raise ValueError('header-alias-cycle-or-undefined')
+        seen.add(key)
+        value = definitions[key]
+        if re.fullmatch(r'CONFIG_[A-Za-z0-9_]+', value):
+            key = value
+        elif re.fullmatch(r'-?[0-9]+|0[xX][0-9A-Fa-f]+|"[^"\n]*"', value):
+            return value
+        else:
+            raise ValueError('header-nonliteral')
+    raise ValueError('header-alias-depth-limit')
+
+
+def qualify_invisible_ignore(text, values, definitions, source):
+    """One known Kconfig dependency, not a Kconfig evaluator or default guess."""
+    key = 'CONFIG_SPIRAM_IGNORE_NOTFOUND'
+    if key in values or key in definitions or text is None:
+        return {}
+    dependency = ('SPIRAM_BOOT_HW_INIT && !SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY '
+                  '&& !SPIRAM_ALLOW_NOINIT_SEG_EXTERNAL_MEMORY')
+    # Require the actual top-level definition and its entire property grammar.
+    # Help prose is non-semantic; additional properties/definitions fail closed.
+    if len(re.findall(r'^\s*(?:menuconfig|config) SPIRAM_IGNORE_NOTFOUND\s*$', text, re.M)) != 1:
+        return {}
+    match = re.search(r'^config SPIRAM_IGNORE_NOTFOUND\n(.*?)(?=^\S|\Z)', text, re.M | re.S)
+    if not match:
+        return {}
+    body = match[1].splitlines()
+    expected = ['    bool "Ignore PSRAM when not found"', '    default "n"',
+                '    depends on ' + dependency, '    help']
+    if body[:4] != expected or any(line.strip() and not line.startswith('        ') for line in body[4:]):
+        return {}
+    terms = {'CONFIG_SPIRAM_BOOT_HW_INIT': 'n',
+             'CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY': 'y',
+             'CONFIG_SPIRAM_ALLOW_NOINIT_SEG_EXTERNAL_MEMORY': 'y'}
+    # A false conjunct must itself be explicit and header-consistent. All other
+    # selected values still undergo the ordinary strict validation below.
+    false_terms = {k: v for k, v in terms.items() if values.get(k) == v and
+                   definitions.get(k) == (None if v == 'n' else '1')}
+    if not false_terms:
+        return {}
+    return {key: {'raw_config_state': 'ABSENT_UNRESOLVED', 'raw_header_state': 'UNDEFINED',
+                  'certainty': 'source-proven-dependency-inactive',
+                  'source': source['source'], 'source_sha256': source['sha256'],
+                  'definition': 'config SPIRAM_IGNORE_NOTFOUND\n' + '\n'.join(expected),
+                  'dependency': dependency, 'false_dependency_terms': false_terms}}
+
+
 def parse_dependencies(text, target):
     """Read GCC Make prerequisites, not shell syntax; never expand Make variables."""
     text = text.replace('\\\r\n', ' ').replace('\\\n', ' ')
@@ -220,6 +274,7 @@ def capture(project, environment, memory_type, out):
             'build-memory.ld': build / 'memory.ld', 'build-sections.ld': build / 'sections.ld',
         }.items():
             take(name, path)
+        kconfig_common = None
         for source in (
             'components/esp_psram/Kconfig.spiram.common', 'components/esp_psram/esp32s3/Kconfig.spiram',
             'components/esp_system/port/cpu_start.c', 'components/esp_psram/system_layer/esp_psram.c',
@@ -227,7 +282,9 @@ def capture(project, environment, memory_type, out):
             'components/bt/linker_common.lf', 'components/bt/controller/linker_rw_bt_controller.lf',
             'components/bt/controller/linker_esp_ble_controller.lf',
         ):
-            take('idf-' + source.replace('/', '__'), idf / source)
+            captured = take('idf-' + source.replace('/', '__'), idf / source)
+            if source == 'components/esp_psram/Kconfig.spiram.common':
+                kconfig_common = captured
         for source in ('espidf.py', 'arduino.py', 'component_manager.py'):
             take('builder-' + source, platform / 'builder/frameworks' / source)
         try:
@@ -327,13 +384,26 @@ def capture(project, environment, memory_type, out):
             report['project_package_byte_equal'] = project_config == package_config
             if project_config != package_config:
                 raise ValueError('project-package-conflict')
-            definitions = parse_generated_header(header_text)
+            raw_definitions = parse_generated_header(header_text)
+            definitions = {key: resolve_header_value(raw_definitions, key) for key in raw_definitions}
+            report['header_identifier_aliases'] = {k: v for k, v in raw_definitions.items()
+                                                   if re.fullmatch(r'CONFIG_[A-Za-z0-9_]+', v)}
+            qualified = qualify_invisible_ignore(
+                kconfig_common, values, definitions,
+                report['files']['idf-components__esp_psram__Kconfig.spiram.common'])
+            report['qualified_dependency_invisible'] = qualified
+            if values.get('CONFIG_SPIRAM_IGNORE_NOTFOUND') == 'y':
+                raise ValueError('ignore-notfound-enabled')
             mismatches = []
-            relevant = {k for k in values.keys() | definitions.keys()
-                        if k.startswith('CONFIG_SPIRAM') or k in KEYS}
+            relevant = ({k for k in values.keys() | definitions.keys()
+                         if k.startswith('CONFIG_SPIRAM') or k in KEYS} |
+                        set(report['header_identifier_aliases']) |
+                        set(report['header_identifier_aliases'].values()))
             numeric = {'CONFIG_SPIRAM_SPEED', 'CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL',
                        'CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL'}
             for key in KEYS:
+                if key in qualified:
+                    continue
                 value = values.get(key, '')
                 if (key in numeric and not re.fullmatch(r'[0-9]+', value)) or (key not in numeric and value not in ('y', 'n')):
                     raise ValueError('selected-value-invalid')
@@ -345,7 +415,7 @@ def capture(project, environment, memory_type, out):
             report['header_mismatches'] = mismatches
             if mismatches:
                 raise ValueError('header-config-conflict')
-            if any(key not in values for key in KEYS):
+            if any(key not in values and key not in qualified for key in KEYS):
                 raise ValueError('selected-values-unresolved')
             if relative is not None and relative.parts[0] != memory_type:
                 raise ValueError('actual-header-candidate-disagreement')

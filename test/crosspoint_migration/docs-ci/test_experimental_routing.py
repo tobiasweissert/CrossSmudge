@@ -41,9 +41,28 @@ class ExperimentalRouting(unittest.TestCase):
         import test_packaging
         test_packaging.Packaging().run_stage(environment=EXPERIMENT)
 
+    def test_owner_diagnostic_provenance_and_profile_boundary(self):
+        import configparser
+        import test_packaging
+        test_packaging.Packaging().run_stage(environment='sticky-owner-test')
+        config = configparser.ConfigParser(interpolation=None)
+        config.read(ROOT/'platformio.ini')
+        self.assertEqual(config['env:sticky-owner-test']['extends'], 'env:sticky')
+        self.assertIn('${env:sticky.build_flags}', config['env:sticky-owner-test']['build_flags'])
+        self.assertIn('-DCROSSCUB_PLUGIN_TRANSPORT_DIAGNOSTICS=1', config['env:sticky-owner-test']['build_flags'])
+        for section in config.sections():
+            for value in config[section].values():
+                self.assertNotIn('CROSSCUB_VERIFIED_PLUGIN_TRANSPORT', value)
+                if section != 'env:sticky-owner-test':
+                    self.assertNotIn('CROSSCUB_PLUGIN_TRANSPORT_DIAGNOSTICS', value)
+        text = workflow()
+        self.assertIn('Require recipient-encrypted artifact retention', text)
+        self.assertIn('sticky-sealed/sealed.envelope', text)
+        self.assertIn('retention-days: 31', text)
+
     def test_manual_choice_single_build_and_no_shell_expression_injection(self):
         text = workflow()
-        self.assertIn('options: [sticky, sticky-static-builtins-experimental]', text)
+        self.assertIn('options: [sticky, sticky-owner-test, sticky-static-builtins-experimental]', text)
         self.assertIn('default: sticky', text)
         self.assertIn("github.event_name == 'workflow_dispatch' && inputs.environment || 'sticky'", text)
         self.assertIn('PIO_ENV: ${{ matrix.environment }}', text)
@@ -54,7 +73,7 @@ class ExperimentalRouting(unittest.TestCase):
         self.assertNotIn('action-gh-release', text)
         self.assertNotIn('contents: write', text)
 
-    def test_actual_cli_two_environments_and_invalid_rejected(self):
+    def test_actual_cli_three_environments_and_invalid_rejected(self):
         with tempfile.TemporaryDirectory(dir=os.environ['TMPDIR']) as tmp:
             root = Path(tmp)
             tools = root/'tools'; tools.mkdir()
@@ -63,7 +82,7 @@ class ExperimentalRouting(unittest.TestCase):
                 path = tools/name; path.write_text(producer); path.chmod(0o700)
             (root/'scripts').mkdir()
             (root/'scripts/capture_sticky_startup_config.py').write_text(producer)
-            for name in ['sticky', EXPERIMENT]:
+            for name in ['sticky', 'sticky-owner-test', EXPERIMENT]:
                 record = root/'record'; record.write_text('')
                 env = {**os.environ, 'PATH': str(tools)+':'+os.environ['PATH'], 'PIO_ENV': name, 'RECORD': str(record)}
                 subprocess.run(['bash', '-c', 'set -euo pipefail\n'+block('Validate selected build environment')], cwd=root, env=env, check=True)

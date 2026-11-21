@@ -1,4 +1,7 @@
 #include "UsbSerialFileTransfer.h"
+#if defined(CROSSCUB_PLUGIN_TRANSPORT_DIAGNOSTICS) && CROSSCUB_PLUGIN_TRANSPORT_DIAGNOSTICS == 1
+#include "util/PluginHttp.h"
+#endif
 
 #include <Arduino.h>
 #include <FsHelpers.h>
@@ -736,6 +739,12 @@ ProcessResult handleLine() {
   if (strcmp(lineBuffer, "CMD:SCREENSHOT") == 0) {
     return ProcessResult::ScreenshotRequested;
   }
+#if defined(CROSSCUB_PLUGIN_TRANSPORT_DIAGNOSTICS) && CROSSCUB_PLUGIN_TRANSPORT_DIAGNOSTICS == 1
+  if (strcmp(lineBuffer, "CMD:PLUGIN_DIAGNOSTICS") == 0) {
+    if (ensureFileTransferAllowed())
+      pluginhttp::runTransportDiagnostics([](const char* record) { logSerial.printf("%s\n", record); });
+  }
+#endif
   return ProcessResult::None;
 }
 

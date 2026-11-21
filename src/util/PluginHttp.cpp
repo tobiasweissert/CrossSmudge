@@ -1,4 +1,7 @@
 #include "PluginHttp.h"
+#if defined(CROSSCUB_PLUGIN_TRANSPORT_DIAGNOSTICS) && CROSSCUB_PLUGIN_TRANSPORT_DIAGNOSTICS == 1
+#include "AppVersion.h"
+#endif
 
 #include <Arduino.h>
 #include <HalClock.h>
@@ -28,12 +31,68 @@
 namespace {
 constexpr size_t MAX_TOKEN_FILE_SIZE = 2 * 1024;
 
+// Fixed, nonsecret failure-stage codes only; never include request/peer data.
+// 1 qualification, 2 clock, 3 DNS, 4 address, 5 TLS handshake,
+// 6 TLS verify, 7 TLS date/chain bounds, 8 framing, 9 input,
+// 10 permission/cancellation/elapsed, 11 write.
+enum class Failure : unsigned {
+  Qualification = 1,
+  Clock,
+  Dns,
+  Address,
+  TlsHandshake,
+  TlsVerify,
+  TlsDate,
+  Framing,
+  Input,
+  Stopped,
+  Write
+};
+int fail(Failure stage) {
+  LOG_ERR("PHTP", "stage=%u", static_cast<unsigned>(stage));
+  return -1;
+}
+bool reject(Failure stage) {
+  fail(stage);
+  return false;
+}
+
 // No permission prompts: public plugin networking is admitted by default.
 // This optional global opt-out is independent of the parent's qualification flag.
 std::atomic<bool> networkAllowed{true};
 constexpr uint32_t ELAPSED_MS = 30000;
 constexpr size_t MAX_URL = 4096, MAX_HEADERS = 8192, MAX_LINE = 4096;
 constexpr size_t MAX_UPLOAD = 64 * 1024, MAX_BODY = 30 * 1024 * 1024;
+
+// Private admission, never available to a generic manifest/event/relay caller.
+enum class Admission { Generic, Diagnostic };
+enum class ProbeStage : unsigned { Input, Clock, Dns, Address, Tls, Verify, Date, Http };
+struct Probe {
+  ProbeStage stage = ProbeStage::Input;
+  size_t httpWrites = 0, httpBytes = 0;
+  unsigned verifyFlags = 0;
+  bool clockReady = false;
+};
+#if defined(CROSSCUB_PLUGIN_TRANSPORT_DIAGNOSTICS) && CROSSCUB_PLUGIN_TRANSPORT_DIAGNOSTICS == 1
+const char* diagnosticTarget(unsigned i) {
+  static const char* const targets[] = {
+      "https://raw.githubusercontent.com/crosspoint-reader/crosspoint-plugin-hub/main/catalog-lists.json",
+      "https://raw.githubusercontent.com/crosspoint-reader/crosspoint-plugin-hub/main/catalog.json",
+      "https://raw.githubusercontent.com/crosspoint-reader/crosspoint-plugin-hub/main/community-catalog.json",
+      "https://expired.badssl.com/",
+      "https://wrong.host.badssl.com/",
+      "https://self-signed.badssl.com/",
+      "https://untrusted-root.badssl.com/"};
+  return i < sizeof(targets) / sizeof(targets[0]) ? targets[i] : nullptr;
+}
+bool diagnosticInput(const std::string& url, const std::string& method, const std::string& body,
+                     const pluginhttp::Headers& headers, size_t cap) {
+  if (method != "GET" || !body.empty() || !headers.empty() || cap > 32768) return false;
+  for (unsigned i = 0; diagnosticTarget(i); ++i)
+    if (url == diagnosticTarget(i)) return true;
+  return false;
+}
+#endif
 
 std::string lower(std::string s) {
   for (char& c : s) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
@@ -75,7 +134,7 @@ bool parseUrl(const std::string& raw, Url& out) {
     out.port = static_cast<uint16_t>(port);
     authority.erase(colon);
   }
-  if (authority.size() > 253 || authority.back() == '.') return false;
+  if (authority.empty() || authority.size() > 253 || authority.back() == '.') return false;
   size_t label = 0;
   for (unsigned char c : authority) {
     if (c == '.') {
@@ -147,7 +206,8 @@ struct Connection {
   esp_tls_t* tls = nullptr;
   uint32_t start;
   const std::function<bool()>& cancel;
-  Connection(uint32_t s, const std::function<bool()>& c) : start(s), cancel(c) {}
+  Probe* probe;
+  Connection(uint32_t s, const std::function<bool()>& c, Probe* p = nullptr) : start(s), cancel(c), probe(p) {}
   ~Connection() {
     if (tls) esp_tls_conn_destroy(tls);
   }
@@ -155,9 +215,11 @@ struct Connection {
     return !networkAllowed.load() || uint32_t(millis() - start) >= ELAPSED_MS || (cancel && cancel());
   }
   bool open(const Url& u) {
-    if (stopped() || !halClock.hasSynchronizedSystemTime()) return false;
+    if (stopped()) return reject(Failure::Stopped);
+    if (!halClock.hasSynchronizedSystemTime()) return reject(Failure::Clock);
     const time_t epoch = trustedTlsNow();
-    if (epoch < 1735689600 || epoch > 4102444800LL) return false;
+    if (epoch < 1735689600 || epoch > 4102444800LL) return reject(Failure::Clock);
+    if (probe) probe->stage = ProbeStage::Dns;
     addrinfo hints{};
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
@@ -165,8 +227,9 @@ struct Connection {
     const int rc = getaddrinfo(u.host.c_str(), nullptr, &hints, &answers);
     if (rc || !answers) {
       if (answers) freeaddrinfo(answers);
-      return false;
+      return reject(Failure::Dns);
     }
+    if (probe) probe->stage = ProbeStage::Address;
     uint32_t chosen = 0;
     bool valid = true;
     for (auto* a = answers; a; a = a->ai_next) {
@@ -182,13 +245,15 @@ struct Connection {
       if (!chosen) chosen = ip;
     }
     freeaddrinfo(answers);
-    if (!valid || !chosen || stopped()) return false;
+    if (!valid || !chosen) return reject(Failure::Address);
+    if (stopped()) return reject(Failure::Stopped);
     char numeric[16];
     in_addr address{};
     address.s_addr = chosen;
-    if (!inet_ntop(AF_INET, &address, numeric, sizeof(numeric))) return false;
+    if (!inet_ntop(AF_INET, &address, numeric, sizeof(numeric))) return reject(Failure::Address);
+    if (probe) probe->stage = ProbeStage::Tls;
     tls = esp_tls_init();
-    if (!tls) return false;
+    if (!tls) return reject(Failure::TlsHandshake);
     esp_tls_cfg_t cfg{};
     cfg.crt_bundle_attach = esp_crt_bundle_attach;
     cfg.common_name = u.host.c_str();
@@ -198,23 +263,27 @@ struct Connection {
     cfg.non_block = true;
     int result;
     do {
-      if (stopped()) return false;
+      if (stopped()) return reject(Failure::Stopped);
       result = esp_tls_conn_new_async(numeric, strlen(numeric), u.port, &cfg, tls);
       if (!result) delay(10);
     } while (!result);
-    if (result != 1 || stopped()) return false;
+    if (stopped()) return reject(Failure::Stopped);
     auto* ssl = static_cast<mbedtls_ssl_context*>(esp_tls_get_ssl_context(tls));
-    if (!ssl || mbedtls_ssl_get_verify_result(ssl) != 0) return false;
+    if (probe && ssl) probe->verifyFlags = mbedtls_ssl_get_verify_result(ssl);
+    if (result != 1) return reject(Failure::TlsHandshake);
+    if (probe) probe->stage = ProbeStage::Verify;
+    if (!ssl || mbedtls_ssl_get_verify_result(ssl) != 0) return reject(Failure::TlsVerify);
+    if (probe) probe->stage = ProbeStage::Date;
     auto* cert = mbedtls_ssl_get_peer_cert(ssl);
     time_t now = trustedTlsNow();
     tm utc{};
-    if (!now || !cert || !gmtime_r(&now, &utc)) return false;
+    if (!now || !cert || !gmtime_r(&now, &utc)) return reject(Failure::TlsDate);
     size_t count = 0, total = 0;
     for (; cert; cert = cert->next) {
       total += cert->raw.len;
       if (++count > 8 || total > 32768 || compareDate(cert->valid_from, utc) > 0 ||
           compareDate(cert->valid_to, utc) < 0)
-        return false;
+        return reject(Failure::TlsDate);
     }
     return !stopped();
   }
@@ -222,6 +291,12 @@ struct Connection {
     for (;;) {
       if (stopped()) return -1;
       const int rc = writing ? esp_tls_conn_write(tls, data, n) : esp_tls_conn_read(tls, data, n);
+      // Count every successful SSL application write, including a partial write
+      // followed by an error. Counting after write() would hide leaked bytes.
+      if (probe && writing && rc > 0) {
+        ++probe->httpWrites;
+        probe->httpBytes += static_cast<size_t>(rc);
+      }
       if (rc != ESP_TLS_ERR_SSL_WANT_READ && rc != ESP_TLS_ERR_SSL_WANT_WRITE) return rc;
       delay(1);
     }
@@ -256,7 +331,7 @@ struct Connection {
 #else
 // Simulator has no ESP TLS backend. Never silently substitute plaintext.
 struct Connection {
-  Connection(uint32_t, const std::function<bool()>&) {}
+  Connection(uint32_t, const std::function<bool()>&, Probe* = nullptr) {}
   bool stopped() const { return true; }
   bool open(const Url&) { return false; }
   bool write(const std::string&) { return false; }
@@ -281,36 +356,57 @@ bool number(const std::string& s, unsigned base, size_t& value) {
 // followed only for GET/HEAD, with fresh DNS vetting and no foreign headers.
 int exchange(const std::string& initial, const std::string& method, const std::string& body,
              const pluginhttp::Headers& headers, const pluginhttp::StreamStart& onStart,
-             const pluginhttp::StreamData& onData, bool& complete, size_t cap, const std::function<bool()>& cancel) {
+             const pluginhttp::StreamData& onData, bool& complete, size_t cap, const std::function<bool()>& cancel,
+             Admission admission = Admission::Generic, Probe* probe = nullptr) {
   complete = false;
-#if !defined(CROSSCUB_VERIFIED_PLUGIN_TRANSPORT) || CROSSCUB_VERIFIED_PLUGIN_TRANSPORT != 1
-  // Source integration is not certificate qualification. Parent enables this
-  // only after the actual ESP adapter's target crypto/compatibility gates.
-  return -1;
+  if (admission == Admission::Diagnostic) {
+#if defined(CROSSCUB_PLUGIN_TRANSPORT_DIAGNOSTICS) && CROSSCUB_PLUGIN_TRANSPORT_DIAGNOSTICS == 1
+    if (!probe || !diagnosticInput(initial, method, body, headers, cap)) return fail(Failure::Input);
+#else
+    return fail(Failure::Qualification);
 #endif
+  } else {
+#if !defined(CROSSCUB_VERIFIED_PLUGIN_TRANSPORT) || CROSSCUB_VERIFIED_PLUGIN_TRANSPORT != 1
+    return fail(Failure::Qualification);
+#endif
+  }
   Url origin;
   if (!onStart || !onData || !parseUrl(initial, origin) || !token(method) || body.size() > MAX_UPLOAD ||
       !requestHeaders(headers) || cap > MAX_BODY)
-    return -1;
+    return fail(Failure::Input);
   const uint32_t start = millis();
+  Connection preparation(start, cancel, probe);
+  if (preparation.stopped()) return fail(Failure::Stopped);
+  if (probe) probe->stage = ProbeStage::Clock;
+#ifndef SIMULATOR
+  // Per-boot HAL state, not saved preferences. Its mutex/DNS can block beyond
+  // the five-second SNTP wait; this is not a hard total execution deadline.
+  const bool timeReady = halClock.hasSynchronizedSystemTime() || halClock.syncSystemTimeFromNTP();
+  // Anchor UTC before invoking cancellation callbacks or observing later edits.
+  const time_t prepared = timeReady ? trustedTlsNow() : 0;
+  if (probe) probe->clockReady = prepared != 0;
+  if (preparation.stopped()) return fail(Failure::Stopped);
+  if (!prepared) return fail(Failure::Clock);
+#endif
   std::string current = initial;
   for (unsigned hop = 0; hop <= 3; ++hop) {
     Url u;
     if (!parseUrl(current, u)) return -1;
-    Connection c(start, cancel);
+    Connection c(start, cancel, probe);
     if (!c.open(u)) return -1;
+    if (probe) probe->stage = ProbeStage::Http;
     std::string wire = method + " " + u.target + " HTTP/1.1\r\nHost: " + u.authority +
                        "\r\nConnection: close\r\nUser-Agent: Crosscub-Plugin\r\n";
     if (u.authority == origin.authority)
       for (const auto& h : headers) wire += h.first + ": " + h.second + "\r\n";
     wire += "Content-Length: " + std::to_string(body.size()) + "\r\n\r\n";
-    if (!c.write(wire) || !c.write(body)) return -1;
+    if (!c.write(wire) || !c.write(body)) return fail(Failure::Write);
     size_t budget = MAX_HEADERS, length = 0, count = 0;
     std::string line, location;
     if (!c.line(line, budget) || line.size() < 12 ||
         (line.compare(0, 9, "HTTP/1.1 ") && line.compare(0, 9, "HTTP/1.0 ")) || line[9] < '1' || line[9] > '5' ||
         line[10] < '0' || line[10] > '9' || line[11] < '0' || line[11] > '9' || (line.size() > 12 && line[12] != ' '))
-      return -1;
+      return fail(Failure::Framing);
     const int status = (line[9] - '0') * 100 + (line[10] - '0') * 10 + line[11] - '0';
     if (status < 200) return -1;  // interim responses are not silently misframed
     bool haveLength = false, chunked = false, haveEncoding = false, haveLocation = false;
@@ -340,8 +436,9 @@ int exchange(const std::string& initial, const std::string& method, const std::s
       }
       response.emplace_back(name, value);
     }
-    if (chunked && haveLength) return -1;
+    if (chunked && haveLength) return fail(Failure::Framing);
     if (status == 301 || status == 302 || status == 303 || status == 307 || status == 308) {
+      if (admission == Admission::Diagnostic) return fail(Failure::Input);  // fixed targets, no redirect escape
       if ((method == "GET" || method == "HEAD") && body.empty() && !location.empty()) {
         if (hop == 3) return -1;
         if (location.compare(0, 2, "//") == 0)
@@ -583,6 +680,40 @@ void loadConfigFile(const std::string& file, Headers& out) {
 
 void setNetworkEnabled(bool enabled) { networkAllowed.store(enabled); }
 bool networkEnabled() { return networkAllowed.load(); }
+
+#if defined(CROSSCUB_PLUGIN_TRANSPORT_DIAGNOSTICS) && CROSSCUB_PLUGIN_TRANSPORT_DIAGNOSTICS == 1
+void runTransportDiagnostics(const std::function<void(const char*)>& emit) {
+  if (!emit) return;
+  // No settings, authentication, install or response payload retention.
+  WifiPowerSaveGuard psGuard;
+  const char* source = CROSSINK_GIT_SHA;
+  // Generated build metadata is not a general-purpose log string.
+  const size_t sourceLength = strlen(source);
+  bool sourceSafe = sourceLength >= 7 && sourceLength <= 40;
+  for (size_t n = 0; n < sourceLength; ++n)
+    sourceSafe = sourceSafe && ((source[n] >= '0' && source[n] <= '9') || (source[n] >= 'a' && source[n] <= 'f'));
+  if (!sourceSafe) source = "unknown";
+  for (unsigned i = 0; diagnosticTarget(i); ++i) {
+    Probe probe;
+    bool complete = false;
+    const uint32_t start = millis();
+    const int status = exchange(
+        diagnosticTarget(i), "GET", "", {}, [](int, const Headers&, long) { return true; },
+        [](const uint8_t*, size_t) { return true; }, complete, 32768, nullptr, Admission::Diagnostic, &probe);
+    char record[512];
+    const unsigned dirty = !strcmp(CROSSINK_GIT_DIRTY, "0") ? 0u : !strcmp(CROSSINK_GIT_DIRTY, "1") ? 1u : 2u;
+    snprintf(record, sizeof(record),
+             "{\"build\":\"plugin-diag-1\",\"source\":\"%s\",\"dirty\":%u,"
+             "\"qualification\":\"UNQUALIFIED\",\"probe\":%u,\"clock_ready\":%s,\"stage\":%u,"
+             "\"verify_flags\":%u,\"http_writes\":%u,\"http_bytes\":%u,\"status\":%d,"
+             "\"complete\":%s,\"elapsed_ms\":%lu}",
+             source, dirty, i, probe.clockReady ? "true" : "false", static_cast<unsigned>(probe.stage),
+             probe.verifyFlags, static_cast<unsigned>(probe.httpWrites), static_cast<unsigned>(probe.httpBytes), status,
+             complete ? "true" : "false", static_cast<unsigned long>(uint32_t(millis() - start)));
+    emit(record);
+  }
+}
+#endif
 
 int request(freeink::SecureHttpClient* session, const std::string& url, const std::string& method,
             const std::string& body, const Headers& headers, String& out, const size_t maxResponse,

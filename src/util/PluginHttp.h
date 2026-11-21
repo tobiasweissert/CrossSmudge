@@ -93,6 +93,12 @@ void loadConfigFile(const std::string& file, Headers& out);
 void setNetworkEnabled(bool enabled);
 bool networkEnabled();
 
+#if defined(CROSSCUB_PLUGIN_TRANSPORT_DIAGNOSTICS) && CROSSCUB_PLUGIN_TRANSPORT_DIAGNOSTICS == 1
+// Owner serial command only. Fixed anonymous public GETs; never generic admission.
+// Observations are not qualification; no URLs, auth, payload or settings writes.
+void runTransportDiagnostics(const std::function<void(const char*)>& emit);
+#endif
+
 // Collects one checked DRAM buffer, capped at maxResponse. Returns HTTP status
 // (including OAuth polling's 4xx bodies), or -1 on OOM, truncation, or transport failure.
 // responseHeaders (optional) receives the response headers in receive order,
