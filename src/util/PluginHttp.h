@@ -20,6 +20,11 @@ class SecureHttpClient;
 // bounded transport live here.
 namespace pluginhttp {
 
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC) && !defined(SIMULATOR)
+// Fixed public probes only; no caller-supplied URLs, trust anchors or credentials.
+void runDiagnostics();
+#endif
+
 using Headers = std::vector<std::pair<std::string, std::string>>;
 
 // --- JSON / template helpers ---

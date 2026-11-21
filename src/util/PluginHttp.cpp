@@ -28,6 +28,49 @@
 namespace {
 constexpr size_t MAX_TOKEN_FILE_SIZE = 2 * 1024;
 
+// Fixed, nonsecret failure-stage codes only; never include request/peer data.
+// 1 qualification, 2 clock, 3 DNS, 4 address, 5 TLS handshake,
+// 6 TLS verify, 7 TLS date/chain bounds, 8 framing, 9 input,
+// 10 permission/cancellation/elapsed, 11 write.
+enum class Failure : unsigned {
+  Qualification = 1,
+  Clock,
+  Dns,
+  Address,
+  TlsHandshake,
+  TlsVerify,
+  TlsDate,
+  Framing,
+  Input,
+  Stopped,
+  Write
+};
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC) && !defined(SIMULATOR)
+std::atomic<TaskHandle_t> diagnosticTask{nullptr};
+unsigned diagnosticStage = 0;
+size_t diagnosticWrites = 0;
+size_t diagnosticWriteCalls = 0;
+bool inDiagnostic() { return diagnosticTask.load() == xTaskGetCurrentTaskHandle(); }
+// This local qualification image admits read-only Hub indexes, not arbitrary plugins.
+bool diagnosticHubUrl(const std::string& url) {
+  return url == "https://raw.githubusercontent.com/crosspoint-reader/crosspoint-plugin-hub/main/catalog.json" ||
+         url == "https://raw.githubusercontent.com/crosspoint-reader/crosspoint-plugin-hub/main/community-catalog.json" ||
+         url == "https://raw.githubusercontent.com/crosspoint-reader/crosspoint-plugin-hub/main/catalog-lists.json" ||
+         url == "https://raw.githubusercontent.com/crosspoint-reader/crosspoint-plugin-hub/main/catalog-lists-capabilities.json";
+}
+#endif
+int fail(Failure stage) {
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC) && !defined(SIMULATOR)
+  if (inDiagnostic()) diagnosticStage = static_cast<unsigned>(stage);
+#endif
+  LOG_ERR("PHTP", "stage=%u", static_cast<unsigned>(stage));
+  return -1;
+}
+bool reject(Failure stage) {
+  fail(stage);
+  return false;
+}
+
 // No permission prompts: public plugin networking is admitted by default.
 // This optional global opt-out is independent of the parent's qualification flag.
 std::atomic<bool> networkAllowed{true};
@@ -155,9 +198,10 @@ struct Connection {
     return !networkAllowed.load() || uint32_t(millis() - start) >= ELAPSED_MS || (cancel && cancel());
   }
   bool open(const Url& u) {
-    if (stopped() || !halClock.hasSynchronizedSystemTime()) return false;
+    if (stopped()) return reject(Failure::Stopped);
+    if (!halClock.hasSynchronizedSystemTime()) return reject(Failure::Clock);
     const time_t epoch = trustedTlsNow();
-    if (epoch < 1735689600 || epoch > 4102444800LL) return false;
+    if (epoch < 1735689600 || epoch > 4102444800LL) return reject(Failure::Clock);
     addrinfo hints{};
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
@@ -165,7 +209,7 @@ struct Connection {
     const int rc = getaddrinfo(u.host.c_str(), nullptr, &hints, &answers);
     if (rc || !answers) {
       if (answers) freeaddrinfo(answers);
-      return false;
+      return reject(Failure::Dns);
     }
     uint32_t chosen = 0;
     bool valid = true;
@@ -182,13 +226,14 @@ struct Connection {
       if (!chosen) chosen = ip;
     }
     freeaddrinfo(answers);
-    if (!valid || !chosen || stopped()) return false;
+    if (!valid || !chosen) return reject(Failure::Address);
+    if (stopped()) return reject(Failure::Stopped);
     char numeric[16];
     in_addr address{};
     address.s_addr = chosen;
-    if (!inet_ntop(AF_INET, &address, numeric, sizeof(numeric))) return false;
+    if (!inet_ntop(AF_INET, &address, numeric, sizeof(numeric))) return reject(Failure::Address);
     tls = esp_tls_init();
-    if (!tls) return false;
+    if (!tls) return reject(Failure::TlsHandshake);
     esp_tls_cfg_t cfg{};
     cfg.crt_bundle_attach = esp_crt_bundle_attach;
     cfg.common_name = u.host.c_str();
@@ -196,32 +241,60 @@ struct Connection {
     cfg.tls_version = ESP_TLS_VER_TLS_1_2;
     cfg.timeout_ms = 1000;
     cfg.non_block = true;
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC)
+    if (inDiagnostic()) LOG_INF("PDIA", "numeric=%s host=%s nameVerify=1 bundle=1", numeric, u.host.c_str());
+#endif
     int result;
     do {
-      if (stopped()) return false;
+      if (stopped()) return reject(Failure::Stopped);
       result = esp_tls_conn_new_async(numeric, strlen(numeric), u.port, &cfg, tls);
       if (!result) delay(10);
     } while (!result);
-    if (result != 1 || stopped()) return false;
+    if (stopped()) return reject(Failure::Stopped);
+    if (result != 1) {
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC)
+      if (inDiagnostic()) {
+        esp_tls_error_handle_t error = nullptr;
+        int code = 0, flags = 0;
+        if (esp_tls_get_error_handle(tls, &error) == ESP_OK) {
+          const auto last = esp_tls_get_and_clear_last_error(error, &code, &flags);
+          LOG_INF("PDIA", "tlsError=%d mbedtls=%d verifyFlags=%d", last, code, flags);
+        }
+      }
+#endif
+      return reject(Failure::TlsHandshake);
+    }
     auto* ssl = static_cast<mbedtls_ssl_context*>(esp_tls_get_ssl_context(tls));
-    if (!ssl || mbedtls_ssl_get_verify_result(ssl) != 0) return false;
+    if (!ssl || mbedtls_ssl_get_verify_result(ssl) != 0) return reject(Failure::TlsVerify);
     auto* cert = mbedtls_ssl_get_peer_cert(ssl);
     time_t now = trustedTlsNow();
     tm utc{};
-    if (!now || !cert || !gmtime_r(&now, &utc)) return false;
+    if (!now || !cert || !gmtime_r(&now, &utc)) return reject(Failure::TlsDate);
     size_t count = 0, total = 0;
     for (; cert; cert = cert->next) {
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC)
+      if (inDiagnostic()) LOG_INF("PDIA", "cert=%u from=%04d%02d%02d to=%04d%02d%02d utc=%lld",
+                                  static_cast<unsigned>(count), cert->valid_from.year, cert->valid_from.mon,
+                                  cert->valid_from.day, cert->valid_to.year, cert->valid_to.mon,
+                                  cert->valid_to.day, static_cast<long long>(now));
+#endif
       total += cert->raw.len;
       if (++count > 8 || total > 32768 || compareDate(cert->valid_from, utc) > 0 ||
           compareDate(cert->valid_to, utc) < 0)
-        return false;
+        return reject(Failure::TlsDate);
     }
     return !stopped();
   }
   int transfer(uint8_t* data, size_t n, bool writing) {
     for (;;) {
       if (stopped()) return -1;
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC)
+      if (writing && inDiagnostic()) ++diagnosticWriteCalls;
+#endif
       const int rc = writing ? esp_tls_conn_write(tls, data, n) : esp_tls_conn_read(tls, data, n);
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC)
+      if (writing && inDiagnostic() && rc > 0) diagnosticWrites += static_cast<size_t>(rc);
+#endif
       if (rc != ESP_TLS_ERR_SSL_WANT_READ && rc != ESP_TLS_ERR_SSL_WANT_WRITE) return rc;
       delay(1);
     }
@@ -286,17 +359,39 @@ int exchange(const std::string& initial, const std::string& method, const std::s
 #if !defined(CROSSCUB_VERIFIED_PLUGIN_TRANSPORT) || CROSSCUB_VERIFIED_PLUGIN_TRANSPORT != 1
   // Source integration is not certificate qualification. Parent enables this
   // only after the actual ESP adapter's target crypto/compatibility gates.
-  return -1;
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC) && !defined(SIMULATOR)
+  if (!inDiagnostic() && !(method == "GET" && body.empty() && headers.empty() && diagnosticHubUrl(initial)))
+    return fail(Failure::Qualification);
+#else
+  return fail(Failure::Qualification);
+#endif
 #endif
   Url origin;
   if (!onStart || !onData || !parseUrl(initial, origin) || !token(method) || body.size() > MAX_UPLOAD ||
       !requestHeaders(headers) || cap > MAX_BODY)
-    return -1;
+    return fail(Failure::Input);
   const uint32_t start = millis();
+  Connection preparation(start, cancel);
+  if (preparation.stopped()) return fail(Failure::Stopped);
+#ifndef SIMULATOR
+  // Reuse per-boot HAL synchronization, not persisted UI/RTC preferences.
+  // HAL's 5s SNTP wait is not a total bound: mutex/DNS are synchronous.
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC)
+  LOG_INF("PDIA", "prepare synchronized=%u", halClock.hasSynchronizedSystemTime());
+#endif
+  const bool timeReady = halClock.hasSynchronizedSystemTime() || halClock.syncSystemTimeFromNTP();
+  // Pin immediately, before callbacks or later wall-clock edits can intervene.
+  const time_t prepared = timeReady ? trustedTlsNow() : 0;
+  if (preparation.stopped()) return fail(Failure::Stopped);
+  if (!prepared) return fail(Failure::Clock);
+#endif
   std::string current = initial;
   for (unsigned hop = 0; hop <= 3; ++hop) {
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC) && !defined(SIMULATOR)
+    if (!inDiagnostic() && !diagnosticHubUrl(current)) return fail(Failure::Qualification);
+#endif
     Url u;
-    if (!parseUrl(current, u)) return -1;
+    if (!parseUrl(current, u)) return fail(Failure::Input);
     Connection c(start, cancel);
     if (!c.open(u)) return -1;
     std::string wire = method + " " + u.target + " HTTP/1.1\r\nHost: " + u.authority +
@@ -304,13 +399,13 @@ int exchange(const std::string& initial, const std::string& method, const std::s
     if (u.authority == origin.authority)
       for (const auto& h : headers) wire += h.first + ": " + h.second + "\r\n";
     wire += "Content-Length: " + std::to_string(body.size()) + "\r\n\r\n";
-    if (!c.write(wire) || !c.write(body)) return -1;
+    if (!c.write(wire) || !c.write(body)) return fail(Failure::Write);
     size_t budget = MAX_HEADERS, length = 0, count = 0;
     std::string line, location;
     if (!c.line(line, budget) || line.size() < 12 ||
         (line.compare(0, 9, "HTTP/1.1 ") && line.compare(0, 9, "HTTP/1.0 ")) || line[9] < '1' || line[9] > '5' ||
         line[10] < '0' || line[10] > '9' || line[11] < '0' || line[11] > '9' || (line.size() > 12 && line[12] != ' '))
-      return -1;
+      return fail(Failure::Framing);
     const int status = (line[9] - '0') * 100 + (line[10] - '0') * 10 + line[11] - '0';
     if (status < 200) return -1;  // interim responses are not silently misframed
     bool haveLength = false, chunked = false, haveEncoding = false, haveLocation = false;
@@ -340,7 +435,7 @@ int exchange(const std::string& initial, const std::string& method, const std::s
       }
       response.emplace_back(name, value);
     }
-    if (chunked && haveLength) return -1;
+    if (chunked && haveLength) return fail(Failure::Framing);
     if (status == 301 || status == 302 || status == 303 || status == 307 || status == 308) {
       if ((method == "GET" || method == "HEAD") && body.empty() && !location.empty()) {
         if (hop == 3) return -1;
@@ -618,6 +713,51 @@ int requestStream(freeink::SecureHttpClient* session, const std::string& url, co
   WifiPowerSaveGuard psGuard;
   return exchange(url, method, body, headers, onStart, onData, complete, std::min(maxResponse, MAX_BODY), shouldAbort);
 }
+
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC) && !defined(SIMULATOR)
+void runDiagnostics() {
+  // A task identity confines the gate exception to these fixed probes. Other tasks
+  // remain limited to the exact public Hub index URLs; no test CA is installed.
+  if (diagnosticTask.load()) return;
+  diagnosticTask.store(xTaskGetCurrentTaskHandle());
+  static const char* const probes[] = {
+      "https://raw.githubusercontent.com/crosspoint-reader/crosspoint-plugin-hub/main/catalog.json",
+      "https://pluginhub.crosspointreader.com/device.json",
+      "https://wrong.host.badssl.com/", "https://self-signed.badssl.com/",
+      "https://untrusted-root.badssl.com/", "https://expired.badssl.com/",
+      "https://127.0.0.1/"};
+  LOG_INF("PDIA", "begin synchronized=%u gate=closed hubReadOnly=1", halClock.hasSynchronizedSystemTime());
+  for (unsigned i = 0; i < sizeof(probes) / sizeof(probes[0]); ++i) {
+    diagnosticStage = 0;
+    diagnosticWrites = 0;
+    diagnosticWriteCalls = 0;
+    size_t received = 0;
+    bool complete = false;
+    const uint32_t started = millis();
+    const int status = requestStream(
+        nullptr, probes[i], "GET", "", {}, [](int, const Headers&, long) { return true; },
+        [&](const uint8_t*, size_t n) { received += n; return true; }, complete, nullptr, 256 * 1024);
+    LOG_INF("PDIA", "case=%u status=%d complete=%u stage=%u httpWritten=%u writeCalls=%u bodyBytes=%u ms=%u "
+                    "synchronized=%u heap=%u largest=%u psram=%u psramLargest=%u stack=%u",
+            i, status, complete, diagnosticStage, static_cast<unsigned>(diagnosticWrites),
+            static_cast<unsigned>(diagnosticWriteCalls), static_cast<unsigned>(received), millis() - started,
+            halClock.hasSynchronizedSystemTime(),
+            ESP.getFreeHeap(), ESP.getMaxAllocHeap(), ESP.getFreePsram(), ESP.getMaxAllocPsram(),
+            static_cast<unsigned>(uxTaskGetStackHighWaterMark(nullptr)));
+  }
+  diagnosticStage = 0;
+  diagnosticWrites = 0;
+  diagnosticWriteCalls = 0;
+  bool complete = false;
+  const int cancelled = requestStream(
+      nullptr, probes[0], "GET", "", {}, [](int, const Headers&, long) { return true; },
+      [](const uint8_t*, size_t) { return true; }, complete, [] { return true; }, 256 * 1024);
+  LOG_INF("PDIA", "cancel status=%d stage=%u httpWritten=%u", cancelled, diagnosticStage,
+          static_cast<unsigned>(diagnosticWrites));
+  LOG_INF("PDIA", "end missing=future-leaf,invalid-date-intermediate,blocked-ntp,wallclock-rewind");
+  diagnosticTask.store(nullptr);
+}
+#endif
 
 int requestToFile(freeink::SecureHttpClient* session, const std::string& url, const std::string& method,
                   const std::string& body, const Headers& headers, const char* destPath, const size_t maxResponse,

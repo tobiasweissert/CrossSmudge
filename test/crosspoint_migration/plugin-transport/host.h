@@ -15,6 +15,15 @@
 #include <string>
 #include <utility>
 #include <vector>
+inline std::vector<std::string> diagnostics;
+template <typename... Args>
+inline void captureLog(const char* tag, const char* format, Args... args) {
+  char message[96];
+  const int n = snprintf(message, sizeof(message), format, args...);
+  assert(std::string(tag) == "PHTP" && n >= 0 && n < static_cast<int>(sizeof(message)));
+  diagnostics.emplace_back(message);
+}
+#define LOG_ERR(...) captureLog(__VA_ARGS__)
 namespace freeink {
 class SecureHttpClient {};
 }  // namespace freeink
@@ -32,8 +41,16 @@ struct WifiPowerSaveGuard {
   ~WifiPowerSaveGuard() {}
 };
 struct Clock {
-  bool valid = true;
+  bool valid = true, syncOk = false;
+  unsigned syncCalls = 0;
+  std::function<void()> duringSync;
   bool hasSynchronizedSystemTime() { return valid; }
+  bool syncSystemTimeFromNTP() {
+    ++syncCalls;
+    if (duringSync) duringSync();
+    valid = syncOk;
+    return syncOk;
+  }
 };
 inline Clock halClock;
 struct File {

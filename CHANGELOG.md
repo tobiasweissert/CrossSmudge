@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- Plugin HTTPS prepares per-boot network time before certificate checks. The Sticky Plugin Hub diagnostic build can open the community plugin list and respond to taps immediately after loading it. Long-running TLS probes are opt-in.
+
 - Corrected CI formatting and static-analysis failures; restored GitHub Pages configuration for documentation deployment.
 
 - File deletion preserves reading metadata when removal fails; moving a file preserves its reading state and refuses existing destinations.

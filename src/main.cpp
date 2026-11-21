@@ -114,6 +114,11 @@ inline esp_sleep_wakeup_cause_t esp_sleep_get_wakeup_cause() { return ESP_SLEEP_
 #include "components/icons/tablerFilledIcons.h"
 #include "fontIds.h"
 #include "network/UsbSerialFileTransfer.h"
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC) && !defined(SIMULATOR)
+#include <esp_ota_ops.h>
+
+#include "util/PluginHttp.h"
+#endif
 #ifdef SIMULATOR
 #include <SimulatorLifecycle.h>
 
@@ -1353,6 +1358,15 @@ void setup() {
   const bool rebootedFromPanic = HalSystem::isRebootFromPanic();
   LOG_INF("BOOT", "Reset diagnostic: reset=%d(%s) sleepWake=%d(%s)", static_cast<int>(rawResetReason),
           resetReasonName(rawResetReason), static_cast<int>(rawWakeupCause), wakeupCauseName(rawWakeupCause));
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC) && !defined(SIMULATOR)
+  const esp_partition_t* diagnosticRunning = esp_ota_get_running_partition();
+  esp_ota_img_states_t diagnosticImageState = ESP_OTA_IMG_UNDEFINED;
+  const esp_err_t diagnosticStateResult =
+      diagnosticRunning ? esp_ota_get_state_partition(diagnosticRunning, &diagnosticImageState) : ESP_FAIL;
+  const bool diagnosticPendingVerify = diagnosticStateResult == ESP_OK && diagnosticImageState == ESP_OTA_IMG_PENDING_VERIFY;
+  LOG_INF("PDIA", "boot slot=%lu state=%d stateResult=%d", diagnosticRunning ? diagnosticRunning->address : 0UL,
+          static_cast<int>(diagnosticImageState), diagnosticStateResult);
+#endif
 
   // Read-and-clear so a panic later in setup() doesn't loop into silent reboot.
   // Validate the target too — RTC_NOINIT memory is uninitialized on cold boot.
@@ -1393,7 +1407,11 @@ void setup() {
   const auto wakeupReason = gpio.getWakeupReason();
 #ifndef SIMULATOR
   const bool shortPressWakes = readWakeShortPressFromNvs();
-  if (wakeupReason == HalGPIO::WakeupReason::PowerButton && !gpio.verifyPowerButtonWakeup(shortPressWakes)) {
+  if (
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC)
+      !diagnosticPendingVerify &&
+#endif
+      wakeupReason == HalGPIO::WakeupReason::PowerButton && !gpio.verifyPowerButtonWakeup(shortPressWakes)) {
     LOG_DBG("MAIN", "Power-button wake not held through verification, sleeping");
     powerManager.startDeepSleep(gpio);
   }
@@ -1446,6 +1464,15 @@ void setup() {
     return;
   }
   logBootHeap("storage ready");
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC) && !defined(SIMULATOR)
+  // Mandatory PSRAM boot checks and storage initialization passed. Confirm
+  // before a normal sleep/wake can make a pending diagnostic image roll back.
+  if (diagnosticPendingVerify) {
+    const esp_err_t confirm = esp_ota_mark_app_valid_cancel_rollback();
+    LOG_INF("PDIA", "confirm result=%d", confirm);
+    if (confirm != ESP_OK) LOG_ERR("PDIA", "Diagnostic image confirmation failed");
+  }
+#endif
 
   HalSystem::checkPanic();
 
@@ -1976,6 +2003,16 @@ void loop() {
   mappedInputManager.clearDeferredHomeGesture();
 #endif
   const unsigned long activityDuration = millis() - activityStartTime;
+
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC) && CROSSCUB_PLUGIN_TLS_PROBES == 1 && !defined(SIMULATOR)
+  // Dedicated TLS test images can occupy the input loop for a timeout per probe.
+  static bool pluginDiagnosticsRun = false;
+  if (!pluginDiagnosticsRun && WiFi.status() == WL_CONNECTED) {
+    pluginDiagnosticsRun = true;
+    LOG_INF("PDIA", "savedClock=%u savedDate=%u", SETTINGS.clockHasBeenSynced, SETTINGS.clockDateHasBeenSynced);
+    pluginhttp::runDiagnostics();
+  }
+#endif
 
 #ifdef SIMULATOR
   runSimulatorSmokeTestTick();

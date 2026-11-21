@@ -955,7 +955,13 @@ bool PluginCatalogActivity::parseUpdateFirstBrowseResponse(const size_t pageOffs
 
   size_t eligibleCount = 0;
   size_t updateCount = 0;
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC)
+  size_t rawCount = 0;
+#endif
   auto count = [&](JsonListParser::Row& row) {
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC)
+    ++rawCount;
+#endif
     if (!eligible(row)) return;
     ++eligibleCount;
     if (catalogItemHasUpdate(row.field[JsonListParser::F_ID], row.field[JsonListParser::F_VERSION])) ++updateCount;
@@ -1046,6 +1052,12 @@ bool PluginCatalogActivity::parseUpdateFirstBrowseResponse(const size_t pageOffs
   }
   hasMore = eligibleCount > pageOffset + visibleCount;
   computeInstallStatus();
+#if defined(CROSSCUB_PLUGIN_HUB_DIAGNOSTIC)
+  LOG_INF("PDIA", "native page=%d raw=%u eligible=%u rows=%u more=%u heap=%u largest=%u stack=%u", page,
+          static_cast<unsigned>(rawCount), static_cast<unsigned>(eligibleCount), static_cast<unsigned>(items.size()),
+          hasMore, ESP.getFreeHeap(), ESP.getMaxAllocHeap(),
+          static_cast<unsigned>(uxTaskGetStackHighWaterMark(nullptr)));
+#endif
   return true;
 }
 

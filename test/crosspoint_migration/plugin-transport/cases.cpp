@@ -1,17 +1,21 @@
 #if !defined(CROSSCUB_VERIFIED_PLUGIN_TRANSPORT) || CROSSCUB_VERIFIED_PLUGIN_TRANSPORT != 1
 int main() {
   bool complete = true;
+  halClock.valid = false;
+  halClock.syncOk = true;
   assert(pluginhttp::networkEnabled());
   int s = exchange(
       "https://public.example/", "GET", "", {}, [](int, const auto&, long) { return true; },
       [](const uint8_t*, size_t) { return true; }, complete, 1024, nullptr);
-  assert(s == -1 && !complete && created == 0 && dnsCalls == 0);
+  assert(s == -1 && !complete && created == 0 && dnsCalls == 0 && halClock.syncCalls == 0);
+  assert(diagnostics == std::vector<std::string>{"stage=1"});
   puts("PASS unqualified build blocks before DNS while network permission defaults allowed");
 }
 #else
 static void reset(std::vector<std::string> r = {"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"}) {
   assert(created == destroyed);
   created = destroyed = dnsCalls = 0;
+  diagnostics.clear();
   writes.clear();
   hosts.clear();
   targets.clear();
@@ -21,6 +25,7 @@ static void reset(std::vector<std::string> r = {"HTTP/1.1 200 OK\r\nContent-Leng
   handshake = 1;
   verifyFlags = 0;
   certificate = {};
+  halClock = {};
   halClock.valid = true;
   clockSeconds = 1795080000;
   networkAllowed = true;
@@ -47,9 +52,87 @@ static int run(const std::string& url = "https://public.example/book?q=one two",
       },
       done, cap, cancel);
   assert(created == destroyed);
+  assert(diagnostics.size() <= 1);
+  for (const auto& diagnostic : diagnostics) {
+    bool allowed = false;
+    for (unsigned code = 1; code <= 11; ++code) allowed = allowed || diagnostic == "stage=" + std::to_string(code);
+    assert(allowed);  // No URL, header, token, body, IP or exception text.
+  }
   return s;
 }
 int main() {
+  // Per-boot HAL flag is false even when persisted Wi-Fi/clock preferences
+  // suppressed Wi-Fi's first-time sync, or the radio was already connected.
+  reset();
+  halClock.valid = false;
+  halClock.syncOk = true;
+  assert(run() == 200 && done && output == "ok");
+  assert(halClock.syncCalls == 1 && dnsCalls == 1 && !writes[0].empty());
+  assert(timeEpoch == clockSeconds && diagnostics.empty());
+  assert(run() == -1);  // Fixture response is consumed; no resync on next request.
+  assert(halClock.syncCalls == 1);
+  for (unsigned scenario = 0; scenario < 2; ++scenario) {
+    reset();
+    timeEpoch = timeMono = 0;
+    halClock.valid = false;  // saved sync flags / already-connected style
+    halClock.syncOk = true;
+    halClock.duringSync = [] { tick += 6000; };
+    assert(run() == 200 && done && output == "ok" && halClock.syncCalls == 1);
+    assert(timeEpoch == clockSeconds && timeMono == 6000000);
+  }
+  for (unsigned stop = 0; stop < 3; ++stop) {
+    reset();
+    timeEpoch = timeMono = 0;
+    halClock.valid = false;
+    halClock.syncOk = true;
+    bool cancelled = false;
+    halClock.duringSync = [&] {
+      if (stop == 0) networkAllowed = false;
+      if (stop == 1) cancelled = true;
+      if (stop == 2) tick += 30000;
+    };
+    assert(run("https://public.example/", "GET", "", {}, 1024, [&] { return cancelled; }) == -1);
+    assert(!done && halClock.syncCalls == 1 && dnsCalls == 0 && created == 0);
+    assert(timeEpoch == clockSeconds);  // anchor precedes post-NTP callbacks
+    assert(diagnostics == std::vector<std::string>{"stage=10"});
+  }
+  reset();
+  timeEpoch = timeMono = 0;
+  halClock.valid = false;
+  assert(run() == -1 && dnsCalls == 0 && halClock.syncCalls == 1);
+  assert(diagnostics == std::vector<std::string>{"stage=2"});
+  reset();
+  halClock.valid = false;
+  bool checkedAfterFailedNtp = false;
+  assert(run("https://public.example/", "GET", "", {}, 1024, [&] {
+           if (halClock.syncCalls) checkedAfterFailedNtp = true;
+           return halClock.syncCalls > 0;
+         }) == -1);
+  assert(checkedAfterFailedNtp && dnsCalls == 0 && created == 0);
+  assert(diagnostics == std::vector<std::string>{"stage=10"});
+  reset();
+  timeEpoch = timeMono = 0;
+  halClock.valid = false;
+  halClock.syncOk = true;
+  halClock.duringSync = [] { clockSeconds = 1; };
+  assert(run() == -1 && halClock.syncCalls == 1 && dnsCalls == 0 && created == 0);
+  assert(diagnostics == std::vector<std::string>{"stage=2"});
+  for (unsigned deny = 0; deny < 3; ++deny) {
+    reset();
+    halClock.valid = false;
+    halClock.syncOk = true;
+    if (deny == 0) networkAllowed = false;
+    assert(run(deny == 2 ? "http://invalid/" : "https://public.example/", "GET", "", {}, 1024,
+               [=] { return deny == 1; }) == -1);
+    assert(dnsCalls == 0 && created == 0 && halClock.syncCalls == 0);
+  }
+  reset();
+  timeEpoch = timeMono = 0;
+  assert(run() == 200 && halClock.syncCalls == 0);
+  clockSeconds = 1;
+  replies.push_back("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
+  assert(run() == 200 && halClock.syncCalls == 0);
+  puts("PASS cold boot prepares UTC before actual HTTP exchange");
   reset();
   assert(run() == 200 && done && output == "ok");
   assert(dnsCalls == 1 && targets[0] == "8.8.8.8" && hosts[0] == "public.example");
@@ -72,19 +155,24 @@ int main() {
   reset();
   dnsAnswers = {"8.8.8.8", "127.0.0.1"};
   assert(run() == -1 && created == 0);
+  assert(diagnostics == std::vector<std::string>{"stage=4"});
   reset();
   dnsAnswers = {};
   assert(run() == -1 && created == 0);
+  assert(diagnostics == std::vector<std::string>{"stage=3"});
   puts("PASS URL/userinfo/IPv6 denial and all-answer public IPv4 vetting");
   reset();
   verifyFlags = 1;
   assert(run() == -1 && writes[0].empty());
+  assert(diagnostics == std::vector<std::string>{"stage=6"});
   reset();
   handshake = -1;
   assert(run() == -1 && writes[0].empty());
+  assert(diagnostics == std::vector<std::string>{"stage=5"});
   reset();
   certificate.valid_to.year = 2021;
   assert(run() == -1 && writes[0].empty());
+  assert(diagnostics == std::vector<std::string>{"stage=7"});
   reset();
   certificate.valid_from.year = 2090;
   assert(run() == -1 && writes[0].empty());
@@ -147,6 +235,11 @@ int main() {
   reset();
   assert(run("https://public.example/", "POST", std::string(65537, 'x'), {}) == -1 && dnsCalls == 0);
   puts("PASS request injection/framing/upload bounds");
+  reset({"secret-response-body-not-a-status\r\n"});
+  assert(run("https://public.example/secret-url?token=secret-query", "POST", "secret-body",
+             {{"Authorization", "Bearer secret-token"}, {"Cookie", "secret-cookie"}}) == -1);
+  assert(diagnostics == std::vector<std::string>{"stage=8"});
+  puts("PASS bounded stage-only diagnostics omit URL/headers/token/body/IP");
   for (const char* method : {"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}) {
     reset();
     assert(run("https://public.example/", method, "payload",
