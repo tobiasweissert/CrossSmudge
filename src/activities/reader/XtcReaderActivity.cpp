@@ -219,8 +219,8 @@ void XtcReaderActivity::loop() {
   // Paged back into the book: release the end screen app and its theme tokens.
   {
     RenderLock lock(*this);
-    if (currentPage < xtc->getPageCount() && endOfBookOptions) {
-      endOfBookOptions.reset();
+    if (currentPage < xtc->getPageCount() && formatEndOfBookOptions) {
+      formatEndOfBookOptions.reset();
     }
   }
 
@@ -233,8 +233,8 @@ void XtcReaderActivity::loop() {
   bool endOfBookNeedsUpdate = false;
   {
     RenderLock lock(*this);
-    if (currentPage >= xtc->getPageCount() && endOfBookOptions && endOfBookOptions->menuActive()) {
-      endOfBookAction = endOfBookOptions->handleMenuInput(mappedInput, &openPath);
+    if (currentPage >= xtc->getPageCount() && formatEndOfBookOptions && formatEndOfBookOptions->menuActive()) {
+      endOfBookAction = formatEndOfBookOptions->handleMenuInput(mappedInput, &openPath);
       if (endOfBookAction == EndOfBookOptions::Action::LastPage) {
         const uint32_t pageCount = xtc->getPageCount();
         currentPage = pageCount > 0 ? pageCount - 1 : 0;
@@ -524,7 +524,7 @@ void XtcReaderActivity::loop() {
     // At end of the book with no suggestion menu, forward button goes home and back
     // button returns to last page.
     if (currentPage >= pageCount) {
-      if (endOfBookOptions && endOfBookOptions->menuActive()) {
+      if (formatEndOfBookOptions && formatEndOfBookOptions->menuActive()) {
         // Selection movement was handled above; absorb leftover page-turn triggers so
         // e.g. "previous" at the top of the list doesn't jump back into the book.
         return;
@@ -1084,16 +1084,16 @@ void XtcReaderActivity::render(RenderLock&&) {
   if (pageToRender >= xtc->getPageCount()) {
     // This is the sole creation and load site: its app and theme tokens are
     // absent during normal reading and allocation failure leaves an empty end screen.
-    if (!endOfBookOptions) {
-      endOfBookOptions = makeUniqueNoThrow<EndOfBookOptions>(renderer);
-      if (!endOfBookOptions) {
+    if (!formatEndOfBookOptions) {
+      formatEndOfBookOptions = makeUniqueNoThrow<EndOfBookOptions>(renderer);
+      if (!formatEndOfBookOptions) {
         LOG_ERR("XTR", "OOM: EndOfBookOptions (%u bytes)", static_cast<unsigned>(sizeof(EndOfBookOptions)));
       }
     }
     renderer.clearScreen();
-    if (endOfBookOptions) {
-      endOfBookOptions->loadOnce(xtc->getPath());
-      endOfBookOptions->render(renderer, mappedInput);
+    if (formatEndOfBookOptions) {
+      formatEndOfBookOptions->loadOnce(xtc->getPath());
+      formatEndOfBookOptions->render(renderer, mappedInput);
     }
     renderer.displayBuffer();
     return;
@@ -1194,13 +1194,13 @@ void XtcReaderActivity::renderPage(const uint32_t pageToRender) {
     }
     clearHiddenStatusBar();
 
-    if (pagesUntilFullRefresh <= 1) {
-      renderer.displayBuffer(pagesUntilFullRefresh < 0 ? manualScreenRefreshMode() : HalDisplay::HALF_REFRESH);
+    if (formatPagesUntilFullRefresh <= 1) {
+      renderer.displayBuffer(formatPagesUntilFullRefresh < 0 ? manualScreenRefreshMode() : HalDisplay::HALF_REFRESH);
       renderer.preconditionGrayscale();
-      pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
+      formatPagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
     } else {
       renderer.displayGrayscaleBase(HalDisplay::FAST_REFRESH);
-      pagesUntilFullRefresh--;
+      formatPagesUntilFullRefresh--;
     }
 
     renderer.clearScreen(0x00);
@@ -1291,7 +1291,7 @@ void XtcReaderActivity::renderPage(const uint32_t pageToRender) {
   }
 
   // Display with appropriate refresh
-  ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
+  ReaderUtils::displayWithRefreshCycle(renderer, formatPagesUntilFullRefresh);
 }
 
 bool XtcReaderActivity::saveProgress(const uint32_t page) {
@@ -1489,7 +1489,7 @@ bool XtcReaderActivity::loadBook() {
 }
 bool XtcReaderActivity::isAtEndOfBook() const { return xtc && currentPage >= xtc->getPageCount(); }
 bool XtcReaderActivity::inputOverPage() const {
-  return quickActionsPopup.isActive() || (endOfBookOptions && endOfBookOptions->menuActive());
+  return quickActionsPopup.isActive() || (formatEndOfBookOptions && formatEndOfBookOptions->menuActive());
 }
 bool XtcReaderActivity::pageTurn(const bool forward) {
   if (!xtc || inputOverPage()) return false;

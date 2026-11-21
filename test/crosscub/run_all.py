@@ -5,7 +5,7 @@ Supply existing read-only dependency/fixture paths via environment; no downloads
 from pathlib import Path
 import argparse,json,os,subprocess,sys,time,hashlib
 R=Path(__file__).resolve().parents[2]
-p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--reader-only',action='store_true');p.add_argument('--airdrop-only',action='store_true');p.add_argument('--ota-only',action='store_true');p.add_argument('--keyboard-only',action='store_true');p.add_argument('--keyboard-mode',choices=['all','normal','ubsan'],default='all');p.add_argument('--heatmap-only',action='store_true');a=p.parse_args();O=a.output.resolve();O.mkdir(parents=True,exist_ok=True)
+p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--reader-only',action='store_true');p.add_argument('--reader-members-only',action='store_true');p.add_argument('--airdrop-only',action='store_true');p.add_argument('--ota-only',action='store_true');p.add_argument('--keyboard-only',action='store_true');p.add_argument('--keyboard-mode',choices=['all','normal','ubsan'],default='all');p.add_argument('--heatmap-only',action='store_true');a=p.parse_args();O=a.output.resolve();O.mkdir(parents=True,exist_ok=True)
 heatmap_commands=[[sys.executable,str(R/'test/reading_heatmap/run.py')]+(['--sanitize'] if sanitized else []) for sanitized in [False,True]]
 ota_commands=[
  [sys.executable,str(R/'test/ota_transition/run.py'),'--output',str(O/('ota-ubsan' if sanitized else 'ota-normal'))]+(['--sanitize'] if sanitized else [])
@@ -69,8 +69,13 @@ if a.airdrop_only:
 reader_commands=[
  [sys.executable,str(R/'test/epub_reader_regressions/run.py'),'--case',str(case),'--output',str(O/'reader-probe')]+(['--sanitize'] if sanitized else [])
  for sanitized in [False,True] for case in range(1,6)
+] + [
+ [sys.executable,str(R/'test/epub_reader_regressions/member_rename.py'),'--output',str(O/('reader-members-sanitized' if sanitized else 'reader-members-normal'))]+(['--sanitize'] if sanitized else [])
+ for sanitized in [False,True]
 ]
-if a.reader_only:
+if a.reader_members_only:
+ reader_commands=reader_commands[-2:]
+if a.reader_only or a.reader_members_only:
  rows=[]
  for index,command in enumerate(reader_commands):
   log=O/f'reader-{index:02d}.log'

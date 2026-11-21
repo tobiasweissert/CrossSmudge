@@ -53,7 +53,7 @@ struct State {uint16_t pendingBookmarkSpine=UINT16_MAX,pendingBookmarkParagraphI
 namespace EpubReaderUtils { struct Progress {int spineIndex=0,pageNumber=4,pageCount=10;bool hasPageCount=true,hasVisibleTextOffset=true;uint32_t visibleTextOffset=123;};bool hasProgress=false; bool loadProgress(Epub&,Progress&){return hasProgress;} }
 float clampPercent(float x){return std::max(0.f,std::min(x,100.f));}
 struct Harness {
- std::unique_ptr<Epub> epub=std::make_unique<Epub>();Slot section;std::unique_ptr<End>endOfBookOptions;
+ std::unique_ptr<Epub> epub=std::make_unique<Epub>();Slot section;std::unique_ptr<End>formatEndOfBookOptions;
  int currentSpineIndex=0,nextPageNumber=0,pageLoadRetryCount=0;std::optional<uint16_t>pendingPageJump;
  unsigned long lastPageTurnTime=0;static constexpr unsigned long MIN_MANUAL_PAGE_TURN_GAP_MS=200;
  ManualPageTurnQueue pendingManualPageTurns;QueuedTurnRenderingState queuedTurnRendering;
@@ -97,7 +97,7 @@ for(bool typed:{false,true})for(bool forward:{true,false}){
  if(forward)CHECK(h.homes==1);else CHECK(h.currentSpineIndex==1 && h.pendingPageJump==UINT16_MAX);
 }
 Harness missing;missing.requestManualPageTurn(true,"shortcut");missing.requestManualPageTurn(false,"shortcut");CHECK(missing.homes==0);
-Harness menu;menu.currentSpineIndex=2;menu.endOfBookOptions=std::make_unique<End>();menu.endOfBookOptions->active=true;menu.requestManualPageTurn(false,"shortcut");CHECK(menu.currentSpineIndex==2);
+Harness menu;menu.currentSpineIndex=2;menu.formatEndOfBookOptions=std::make_unique<End>();menu.formatEndOfBookOptions->active=true;menu.requestManualPageTurn(false,"shortcut");CHECK(menu.currentSpineIndex==2);
 '''
 elif a.case == 2:
     parts = [method(n) for n in ['pageTurn','applyBookStatsEditsFromDisk','handleBookStatsReturn','onFrontlightPanelOpened','onFrontlightPanelClosed']]
