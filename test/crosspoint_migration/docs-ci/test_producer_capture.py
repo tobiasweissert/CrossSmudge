@@ -73,31 +73,38 @@ class ProducerTests(unittest.TestCase):
             self.assertEqual((root/'evidence/producer-idf-sdkconfig.h').read_bytes(), b'#define CONFIG_SPIRAM 1\n')
             self.assertEqual(calls[-1], 0)
 
-    def test_middleware_selects_actual_variant_source_not_dummy(self):
-        self.assertTrue(HELPER.exists(), 'missing producer-boundary implementation')
+    def test_post_registration_skips_outer_dummy_graph(self):
+        import sys
+        sys.path.insert(0, str(Path.home()/'.platformio/packages/tool-scons/scons-local-4.8.1'))
+        from SCons.Script import Environment
+        from unittest.mock import patch
         m = load()
         with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as temp:
             root = Path(temp)
-            class Node:
-                def __init__(self, path): self.path = path
-                def get_abspath(self): return str(root/'.pio/build/sticky'/self.path)
-                def srcnode(self):
-                    from types import SimpleNamespace
-                    return SimpleNamespace(get_abspath=lambda: str(root/self.path))
-            class Env:
-                def subst(self, value): return str(root) if value == '$PROJECT_DIR' else str(root/'.pio/build/sticky')
-                def AddBuildMiddleware(self, callback, pattern): self.callback = callback
-                def AddPostAction(self, target, callback): self.action = callback
-            from unittest.mock import patch
-            env = Env()
+            env = Environment(tools=['g++'])
+            env.Replace(PROJECT_DIR=str(root), BUILD_DIR=str(root/'build'))
+            dummy = env.Object(target=str(root/'build/.dummy/sketch.cpp.o'), source=str(root/'.dummy/sketch.cpp'))[0]
             with patch.dict(os.environ, CROSSCUB_PRIVATE_EVIDENCE=str(root/'evidence')):
-                m.install(env)
-                dummy = Node('.dummy/sketch.cpp')
-                self.assertIs(env.callback(env, dummy), dummy)
-                self.assertFalse(hasattr(env, 'action'))
-                node = Node('src/main.cpp')
-                self.assertIs(env.callback(env, node), node)
-                self.assertTrue(hasattr(env, 'action'), 'variant srcnode must install actual application post action')
+                m.install_main(env)
+            self.assertFalse(env.File('$BUILD_DIR/src/main.cpp.o').has_builder())
+            self.assertEqual(dummy.get_executor().post_actions, [])
+            self.assertFalse((root/'evidence').exists())
+
+    def test_opt_in_schedules_only_post_scope_preserving_scripts(self):
+        import sys
+        sys.path.insert(0, str(Path.home()/'.platformio/packages/tool-scons/scons-local-4.8.1'))
+        from SCons.Script import Environment
+        from unittest.mock import patch
+        env = Environment(tools=[])
+        env.AddMethod(lambda e,scope:['existing-'+scope], 'GetExtraScripts')
+        m = load()
+        with patch.dict(os.environ, {}, clear=True):
+            m.install(env)
+        self.assertEqual(env.GetExtraScripts('post'), ['existing-post'])
+        with patch.dict(os.environ, CROSSCUB_PRIVATE_EVIDENCE='/unused-synthetic'):
+            m.install(env)
+        self.assertEqual(env.GetExtraScripts('pre'), ['existing-pre'])
+        self.assertEqual(env.GetExtraScripts('post'), ['existing-post', str(HELPER)])
 
     def test_actual_main_callback_runs_fake_external_preprocessor(self):
         self.assertTrue(HELPER.exists(), 'missing producer-boundary implementation')
@@ -125,17 +132,83 @@ class ProducerTests(unittest.TestCase):
             env = Environment(tools=['g++'], ENV={'PATH': os.defpath})
             env.Replace(PIOENV='sticky', PROJECT_DIR=str(root), BUILD_DIR=str(root/'.pio/build/sticky'),
                         CXX=str(fake), CXXCOM='$CXX -DAPP=1 -c $SOURCE -o $TARGET')
-            env.AddMethod(lambda self, callback, pattern: setattr(self, 'callback', callback), 'AddBuildMiddleware')
+            env.Object(target=str(root/'.pio/build/sticky/src/main.cpp.o'), source=str(root/'src/main.cpp'))
             env.AddMethod(lambda self, target, callback: setattr(self, 'action', callback), 'AddPostAction')
             from unittest.mock import patch
             with patch.dict(os.environ, CROSSCUB_PRIVATE_EVIDENCE=str(root/'evidence')):
-                m.install(env)
-                env.callback(env, Node())
+                m.install_main(env)
                 self.assertEqual(env.action([env.File('src/main.cpp')], [env.File('.pio/build/sticky/src/main.cpp.o')], env), 0)
             receipt = json.loads((root/'evidence/producer-main-receipt.json').read_text())
             self.assertEqual(receipt['probe_exit'], 0)
             self.assertEqual((root/'evidence/producer-application-sdkconfig.h').read_bytes(), header.read_bytes())
             self.assertIn('-DAPP=1', receipt['probe_argv'])
+            self.assertFalse(receipt['publication_authorized'])
+
+    def test_real_scons_graph_post_phase_survives_object_lto_executor_replacement(self):
+        import sys
+        import subprocess
+        import textwrap
+        scons = Path.home()/'.platformio/packages/tool-scons/scons.py'
+        self.assertTrue(scons.is_file(), 'pinned real SCons required; no mocked executor')
+        with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as temp:
+            root = Path(temp)
+            (root/'src').mkdir()
+            (root/'src/main.cpp').write_text('// synthetic graph input\n')
+            # Actual SCons Object creation and project LTO callback. Only SPAWN
+            # is synthetic; neither a compiler nor PlatformIO is launched.
+            program = textwrap.dedent('''\
+                import os,runpy,shlex
+                from pathlib import Path
+                import SCons.Platform.posix
+                root=Path(Dir('.').get_abspath())
+                def no_compiler(shell,escape,cmd,args,execution_env):
+                    argv=shlex.split(' '.join(args))
+                    p=Path(argv[argv.index('-o')+1]);p.parent.mkdir(parents=True,exist_ok=True)
+                    p.write_text('NOT AN OBJECT')
+                    return 0
+                SCons.Platform.posix.subprocess_spawn=no_compiler
+                env=Environment(tools=['g++'],ENV={'PATH':os.defpath})
+                env.Replace(SPAWN=no_compiler,PROJECT_DIR=str(root),BUILD_DIR=str(root/'build'),
+                    PROJECT_SRC_DIR=str(root/'src'),PIOENV='sticky-owner-test',CCFLAGS=['-Os'],
+                    CXX='/nonexistent-python-only-graph-driver')
+                env.AddMethod(lambda e,k,default=None: {'custom_sticky_project_lto':'yes',
+                    'custom_firmware_device_type':'sticky'}.get(k,default),'GetProjectOption')
+                env.AddMethod(lambda e,scope: [],'GetExtraScripts')
+                callbacks=[]
+                env.AddMethod(lambda e,fn,pattern=None:callbacks.append(fn),'AddBuildMiddleware')
+                helper=runpy.run_path(HELPER)
+                helper['install'](env)
+                runpy.run_path(LTO,init_globals={'env':env,'Import':lambda *a:None})
+                # Exact Core CollectBuildFiles -> middleware -> BuildSources
+                # ordering: middleware receives source before Object construction.
+                # Focused suffix control; full pinned replay separately executes
+                # Core's authenticated scons_patched_match_splitext body.
+                env.Replace(OBJSUFFIX='.cpp.o')
+                env.VariantDir(str(root/'build/src'),str(root/'src'),duplicate=False)
+                node=env.File(str(root/'build/src/main.cpp'))
+                for fn in callbacks: node=fn(env,node)
+                obj=node[0]
+                assert obj.get_abspath()==str(root/'build/src/main.cpp.o')
+                for script in env.GetExtraScripts('post'):
+                    env.SConscript(script,exports={'env':env})
+                assert len(obj.get_executor().post_actions)==1
+                Default(obj)
+                ''')
+            # Project SConscript import resolves through PROJECT_DIR, no __file__.
+            (root/'scripts').symlink_to(ROOT/'scripts',target_is_directory=True)
+            (root/'SConstruct').write_text('HELPER='+repr(str(HELPER))+'\nLTO='+repr(str(ROOT/'scripts/sticky_project_lto_pre.py'))+'\n'+program)
+            result = subprocess.run([sys.executable,str(scons),'-Q'],cwd=root,
+                env=dict(os.environ,CROSSCUB_PRIVATE_EVIDENCE=str(root/'evidence')),
+                capture_output=True,text=True,timeout=30)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            receipt=json.loads((root/'evidence/producer-main-receipt.json').read_text())
+            self.assertIn('-Oz',receipt['compile_argv'])
+            self.assertIn('-flto=1',receipt['compile_argv'])
+            self.assertNotIn('-Os',receipt['compile_argv'])
+            # No actual diagnostic driver exists in this graph fixture. The
+            # original object action succeeded via no-op SPAWN, callback ran,
+            # and bounded diagnostic failure remains private/incomplete.
+            self.assertIn('probe_error',receipt)
             self.assertFalse(receipt['publication_authorized'])
 
     def test_overlay_rejects_unknown_bytes(self):
@@ -166,7 +239,7 @@ class BoundedProducerTests(unittest.TestCase):
         env = Environment(tools=['g++'], ENV={'PATH': os.defpath, 'ONLY_CONSTRUCTION': 'synthetic-env-sentinel'})
         env.Replace(PIOENV='sticky', PROJECT_DIR=str(root), BUILD_DIR=str(root/'build'),
                     CXXCOM=shlex.quote(sys.executable)+' '+shlex.quote(str(driver))+r' -DCROSSCUB_APP_VERSION=\"release\" -c $SOURCE -o $TARGET')
-        env.AddMethod(lambda self, fn, pattern: setattr(self, 'callback', fn), 'AddBuildMiddleware')
+        env.Object(target=str(root/'build/src/main.cpp.o'), source=str(root/'src/main.cpp'))
         env.AddMethod(lambda self, target, fn: setattr(self, 'action', fn), 'AddPostAction')
         module = load()
         import selectors
@@ -177,8 +250,7 @@ class BoundedProducerTests(unittest.TestCase):
             return select(selector, timeout)
         # Public callback, real SCons expansion and Python-only driver.
         with patch.dict(os.environ, CROSSCUB_PRIVATE_EVIDENCE=str(root/'evidence')), patch.object(module, 'PROBE_TIMEOUT', deadline, create=True), patch.object(selectors.DefaultSelector, 'select', fault):
-            module.install(env)
-            env.callback(env, env.File(str(root/'src/main.cpp')))
+            module.install_main(env)
             self.assertEqual(env.action([env.File(str(root/'src/main.cpp'))], [env.File(str(root/'build/main.o'))], env), 0)
         receipt = json.loads((root/'evidence/producer-main-receipt.json').read_text())
         expected_env_digest = hashlib.sha256(json.dumps(dict(env['ENV']), sort_keys=True, separators=(',', ':')).encode()).hexdigest()
@@ -267,10 +339,26 @@ class EffectiveArgvTests(unittest.TestCase):
             self.assertIn('-Iinclude with spaces', replay[0])
             self.assertIn('-DNAME=quoted value', replay[0])
             self.assertEqual(replay[1], 'synthetic-env-sentinel')
-            self.assertIn(str(root/'main input.cpp'), replay[0])
-            self.assertIn(str(root/'main output.o'), replay[0])
+            self.assertIn(str(source[0]), replay[0])
+            self.assertIn(str(target[0]), replay[0])
             self.assertIs(env['SPAWN'], original_spawn)
             self.assertEqual(dict(env['ENV']), original_env)
+
+    def test_object_local_override_executor_preserves_effective_arguments(self):
+        import sys
+        sys.path.insert(0, str(Path.home()/'.platformio/packages/tool-scons/scons-local-4.8.1'))
+        from SCons.Script import Environment
+        env = Environment(tools=['g++'], ENV={'PATH': os.defpath})
+        env.Replace(CXXCOM='/not-executed/cxx $CCFLAGS -c $SOURCE -o $TARGET', CCFLAGS=['-Os'])
+        obj = env.Object(target='override-main.o', source='override-main.cpp', CCFLAGS=['-flto=1', '-Oz'])[0]
+        effective_env = obj.get_executor().get_build_env()
+        argv, execution_env = load().effective_compile(effective_env, [obj], obj.sources)
+        self.assertIn('-Oz', argv)
+        self.assertIn('-flto=1', argv)
+        self.assertNotIn('-Os', argv)
+        self.assertEqual(env['CCFLAGS'], ['-Os'])
+        self.assertEqual(effective_env['CCFLAGS'], ['-flto=1', '-Oz'])
+        self.assertEqual(execution_env, dict(effective_env['ENV']))
 
     def test_shell_expansion_and_unknown_spawn_fail_closed_without_execution(self):
         import sys

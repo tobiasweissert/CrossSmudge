@@ -10,6 +10,110 @@ ROOT = Path(__file__).resolve().parents[3]
 HELPER = ROOT/'scripts/ci_cppcheck_capture.py'
 
 class AnalyzerCaptureTests(unittest.TestCase):
+    def run_entrypoint(self, root, behavior, capture='none'):
+        # Only PlatformIO is controlled: execute the actual production __main__
+        # in a fresh OS process, including its real diagnostic capture callback.
+        import subprocess
+        import sys
+        bootstrap = '''
+import json, pathlib, runpy, sys, types
+scripts, behavior, capture = sys.argv[1:]
+sys.path.insert(0, scripts)
+for name in ('platformio', 'platformio.check', 'platformio.check.tools',
+             'platformio.check.tools.cppcheck', 'platformio.__main__'):
+    sys.modules[name] = types.ModuleType(name)
+command = [sys.executable, '-c',
+           'import sys; sys.stderr.write("private-diagnostic-canary\\\\n"); sys.exit(7)']
+if capture == 'error':
+    command = ['/nonexistent/private-diagnostic-canary']
+strict_result = {'returncode': 3, 'stdout': 'unchanged strict result',
+                 'stderr': 'unchanged strict error'}
+class Tool:
+    def on_tool_output(self, line):
+        pass
+    def execute_check_cmd(self, args):
+        assert args == command
+        if capture != 'plain':
+            self.on_tool_output('id=syntaxError')
+        return strict_result
+sys.modules['platformio.check.tools.cppcheck'].CppcheckCheckTool = Tool
+def main():
+    assert sys.argv[1:] == ['check', '--verbose', '--fail-on-defect', 'low',
+                            '--fail-on-defect', 'medium', '--fail-on-defect', 'high']
+    if capture != 'none':
+        tool = Tool()
+        output = tool.on_tool_output
+        result = tool.execute_check_cmd(command)
+        assert result is strict_result, 'capture replaced the strict result'
+        assert tool.on_tool_output == output, 'capture did not restore output'
+        pathlib.Path('observed-result.json').write_text(json.dumps(result))
+    if behavior == 'raise3':
+        raise SystemExit(3)
+    if behavior == 'raise0':
+        raise SystemExit(0)
+    return None if behavior == 'None' else int(behavior)
+sys.modules['platformio.__main__'].main = main
+sys.argv = [str(pathlib.Path(scripts)/'ci_cppcheck_capture.py'), 'check',
+            '--verbose', '--fail-on-defect', 'low', '--fail-on-defect',
+            'medium', '--fail-on-defect', 'high']
+runpy.run_path(sys.argv[0], run_name='__main__')
+'''
+        env = {'PATH': os.defpath, 'CROSSCUB_PRIVATE_EVIDENCE': str(root/'evidence')}
+        return subprocess.run([sys.executable, '-I', '-B', '-c', bootstrap,
+                               str(ROOT/'scripts'), behavior, capture],
+                              cwd=root, env=env, capture_output=True, timeout=10)
+
+    def test_actual_entrypoint_propagates_core_nonzero_return(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as temp:
+            result = self.run_entrypoint(Path(temp), '3')
+        self.assertEqual(result.returncode, 3, 'Core returned 3 but wrapper reported OS success')
+        self.assertEqual(result.stdout, b'')
+        self.assertEqual(result.stderr, b'')
+
+    def test_actual_entrypoint_preserves_success_and_system_exit(self):
+        for behavior, expected in (('0', 0), ('None', 0), ('raise0', 0), ('raise3', 3)):
+            with self.subTest(behavior=behavior), tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as temp:
+                result = self.run_entrypoint(Path(temp), behavior)
+                self.assertEqual(result.returncode, expected)
+                self.assertEqual(result.stdout, b'')
+                self.assertEqual(result.stderr, b'')
+
+    def test_actual_entrypoint_preserves_capture_results_and_private_errors(self):
+        import json
+        import stat
+        for capture in ('plain', 'syntax', 'error'):
+            for behavior in ('3', 'raise3'):
+                with self.subTest(capture=capture, behavior=behavior), tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as temp:
+                    root = Path(temp)
+                    (root/'lib/I18n').mkdir(parents=True)
+                    (root/'lib/I18n/I18nKeys.h').write_bytes(b'private header fixture\n')
+                    result = self.run_entrypoint(root, behavior, capture)
+                    self.assertEqual(result.returncode, 3)
+                    self.assertEqual(result.stdout, b'')
+                    self.assertEqual(result.stderr, b'')
+                    self.assertEqual(json.loads((root/'observed-result.json').read_text()),
+                                     {'returncode': 3, 'stdout': 'unchanged strict result',
+                                      'stderr': 'unchanged strict error'})
+                    evidence = root/'evidence'
+                    self.assertEqual(stat.S_IMODE(evidence.stat().st_mode), 0o700)
+                    for file in evidence.iterdir():
+                        self.assertEqual(stat.S_IMODE(file.stat().st_mode), 0o600)
+                    receipt_path = evidence/'cppcheck-0001-receipt.json'
+                    if capture == 'plain':
+                        self.assertFalse(receipt_path.exists())
+                        continue
+                    receipt = json.loads(receipt_path.read_text())
+                    self.assertEqual(receipt['original_exit'], 3)
+                    self.assertFalse(receipt['publication_authorized'])
+                    if capture == 'syntax':
+                        self.assertEqual(receipt['preprocess_exit'], 7)
+                        self.assertNotIn('preprocess_error', receipt)
+                        self.assertEqual((evidence/'cppcheck-0001-preprocess.log').read_bytes(),
+                                         b'private-diagnostic-canary\n')
+                    else:
+                        self.assertEqual(receipt['preprocess_error'], 'FileNotFoundError')
+                        self.assertNotIn('preprocess_exit', receipt)
+
     def test_exact_command_include_list_header_and_preprocessor_retained(self):
         self.assertTrue(HELPER.exists(), 'missing cppcheck command-boundary capture')
         import sys

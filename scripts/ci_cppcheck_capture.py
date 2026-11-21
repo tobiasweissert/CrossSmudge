@@ -80,8 +80,8 @@ def main():
         return capture_execute(original, tool, command)
     CppcheckCheckTool.execute_check_cmd = execute
     # No changed check options, severities, suppressions or result handling.
-    pio_main()
+    return pio_main()
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

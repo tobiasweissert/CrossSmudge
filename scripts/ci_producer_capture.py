@@ -220,8 +220,10 @@ def effective_compile(env, target, source):
             raise ValueError('unsupported-shell-syntax')
         observed.append((shlex.split(text, posix=True), dict(execution_env)))
         return 0
-    clone = env.Clone(SPAWN=observe)
-    if Action('$CXXCOM').execute(target, source, clone) != 0 or len(observed) != 1:
+    # Object-local LTO uses OverrideEnvironment; Clone() on that proxy fails
+    # under pinned SCons/Python 3.14. Overlay only SPAWN, keeping its real flags.
+    observed_env = env.Override({'SPAWN': observe})
+    if Action('$CXXCOM').execute(target, source, observed_env) != 0 or len(observed) != 1:
         raise ValueError('unsupported-compile-action')
     return observed[0]
 
@@ -229,63 +231,79 @@ def effective_compile(env, target, source):
 def install(env):
     if not os.environ.get('CROSSCUB_PRIVATE_EVIDENCE'):
         return
+    # Core 6.1.19 reads post scripts after BUILD_SCRIPT constructs objects.
+    # A pre-build middleware post-action lives on a temporary Executor which
+    # Object() replaces (including the later project-local LTO middleware).
+    extra_scripts = env.GetExtraScripts
+    script = str(Path(__file__).resolve())
+    def with_producer_post_script(build_env, scope):
+        paths = extra_scripts(scope)
+        return paths + [script] if scope == 'post' else paths
+    env.AddMethod(with_producer_post_script, 'GetExtraScripts')
+
+
+def install_main(env):
+    if not os.environ.get('CROSSCUB_PRIVATE_EVIDENCE'):
+        return
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     project = Path(env.subst('$PROJECT_DIR')).resolve()
-    def middleware(build_env, node):
-        if Path(node.srcnode().get_abspath()).resolve() != project/'src/main.cpp':
-            return node
-        def captured(source, target, env):
-            out = output_root()
-            receipt = {'environment': env['PIOENV'], 'boundary': 'inner-application-main',
-                       'files': {}, 'publication_authorized': False}
-            try:
-                args, execution_env = effective_compile(env, target, source)
-            except Exception as exc:
-                # Diagnostic admission must not alter the original compilation.
-                receipt['probe_error'] = type(exc).__name__
-                save_receipt(out, 'producer-main-receipt.json', receipt)
-                return 0
-            receipt['compile_argv'] = args
-            # Exact environment is used internally only. No credential values or
-            # environment dump, even in encrypted diagnostics.
-            receipt['compile_env_sha256'] = hashlib.sha256(json.dumps(execution_env, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-            dep = out/'producer-main.d'
-            macros = out/'producer-main.macros'
-            command = probe_command(receipt['compile_argv'], dep, macros, str(target[0]))
-            receipt['probe_argv'] = command
-            try:
-                receipt['probe_exit'] = bounded_diagnostic(command, out/'producer-main-preprocess.log',
-                    cwd=project, env=execution_env, timeout=PROBE_TIMEOUT, files=(dep, macros))
-            except Exception as exc:
-                receipt['probe_error'] = type(exc).__name__
-            # Freeze selected header bytes at the actual compiler boundary.
-            if receipt.get('probe_exit') == 0:
-                from capture_sticky_startup_config import parse_dependencies, read_regular
-                try:
-                    paths = parse_dependencies(read_regular(dep).decode(), str(target[0]))
-                    headers = {str((project/p).resolve()) for p in paths if Path(p).name == 'sdkconfig.h'}
-                    if len(headers) != 1:
-                        raise ValueError('header-not-unique')
-                    retain(out, 'producer-application-sdkconfig.h', Path(headers.pop()), receipt['files'])
-                except (OSError, ValueError, UnicodeError) as exc:
-                    receipt['selection_error'] = type(exc).__name__
-            from capture_sticky_startup_config import read_regular
-            for path in (dep, macros):
-                try:
-                    data = read_regular(path)
-                    os.chmod(path, 0o600)
-                    if 'probe_error' not in receipt:
-                        receipt[path.name+'_sha256'] = hashlib.sha256(data).hexdigest()
-                except (OSError, ValueError) as exc:
-                    receipt[path.name+'_error'] = type(exc).__name__
-            retain(out, 'producer-application-main.d', Path(str(target[0])).with_suffix('.d'), receipt['files'])
+    node = env.File('$BUILD_DIR/src/main.cpp.o')
+    # The outer HybridCompile graph contains only .dummy sources. Never create
+    # a phantom application executor there or borrow the outer environment.
+    if not node.has_builder() or len(node.sources) != 1:
+        return
+    if Path(node.sources[0].srcnode().get_abspath()).resolve() != project/'src/main.cpp':
+        return
+    def captured(source, target, env):
+        out = output_root()
+        receipt = {'environment': env['PIOENV'], 'boundary': 'inner-application-main',
+                   'files': {}, 'publication_authorized': False}
+        try:
+            args, execution_env = effective_compile(env, target, source)
+        except Exception as exc:
+            # Diagnostic admission must not alter the original compilation.
+            receipt['probe_error'] = type(exc).__name__
             save_receipt(out, 'producer-main-receipt.json', receipt)
-            # Diagnostic failure is admitted only by the existing fail-closed collector.
             return 0
-        # The middleware's construction environment owns the real application TU.
-        build_env.AddPostAction(str(Path(env.subst('$BUILD_DIR'))/'src/main.cpp.o'), captured)
-        return node
-    env.AddBuildMiddleware(middleware, '*')
+        receipt['compile_argv'] = args
+        # Exact environment is used internally only. No credential values or
+        # environment dump, even in encrypted diagnostics.
+        receipt['compile_env_sha256'] = hashlib.sha256(json.dumps(execution_env, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+        dep = out/'producer-main.d'
+        macros = out/'producer-main.macros'
+        command = probe_command(receipt['compile_argv'], dep, macros, str(target[0]))
+        receipt['probe_argv'] = command
+        try:
+            receipt['probe_exit'] = bounded_diagnostic(command, out/'producer-main-preprocess.log',
+                cwd=project, env=execution_env, timeout=PROBE_TIMEOUT, files=(dep, macros))
+        except Exception as exc:
+            receipt['probe_error'] = type(exc).__name__
+        # Freeze selected header bytes at the actual compiler boundary.
+        if receipt.get('probe_exit') == 0:
+            from capture_sticky_startup_config import parse_dependencies, read_regular
+            try:
+                paths = parse_dependencies(read_regular(dep).decode(), str(target[0]))
+                headers = {str((project/p).resolve()) for p in paths if Path(p).name == 'sdkconfig.h'}
+                if len(headers) != 1:
+                    raise ValueError('header-not-unique')
+                retain(out, 'producer-application-sdkconfig.h', Path(headers.pop()), receipt['files'])
+            except (OSError, ValueError, UnicodeError) as exc:
+                receipt['selection_error'] = type(exc).__name__
+        from capture_sticky_startup_config import read_regular
+        for path in (dep, macros):
+            try:
+                data = read_regular(path)
+                os.chmod(path, 0o600)
+                if 'probe_error' not in receipt:
+                    receipt[path.name+'_sha256'] = hashlib.sha256(data).hexdigest()
+            except (OSError, ValueError) as exc:
+                receipt[path.name+'_error'] = type(exc).__name__
+        retain(out, 'producer-application-main.d', Path(str(target[0])).with_suffix('.d'), receipt['files'])
+        save_receipt(out, 'producer-main-receipt.json', receipt)
+        # Diagnostic failure is admitted only by the existing fail-closed collector.
+        return 0
+    # This is the final Object executor, with its object-local flags/ENV.
+    env.AddPostAction(node, captured)
 
 
 def main():
@@ -303,5 +321,10 @@ def main():
     args.producer.write_bytes(after)
 
 
-if __name__ == '__main__':
+if 'Import' in globals():
+    Import('env')
+    # SCons does not define __file__; runpy supplies it to the actual helper.
+    import runpy
+    runpy.run_path(str(Path(env.subst('$PROJECT_DIR'))/'scripts/ci_producer_capture.py'))['install_main'](env)
+elif __name__ == '__main__':
     main()
