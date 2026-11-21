@@ -1,63 +1,184 @@
 {
-  "repo": "tobiasweissert/Crosscub",
-  "branch": "feat/crosscub-sticky-only",
+  "repo": "tobiasweissert/CrossSmudge",
+  "branch": "integration/sticky-test-all",
   "apps": [
     {
+      "id": "flashcards",
+      "name": "Flashcards",
+      "version": "0.1.3",
+      "author": "CrossSmudge",
+      "description": "Create and study question and answer cards.",
+      "min_api": 2,
+      "files": [
+        "core.lua",
+        "editor.lua",
+        "icon.raw",
+        "keyboard.lua",
+        "main.lua",
+        "manifest.json",
+        "storage.lua",
+        "ui.lua",
+        "unified_ui.lua"
+      ]
+    },
+    {
+      "id": "habits",
+      "name": "Habits",
+      "version": "0.1.3",
+      "author": "CrossSmudge",
+      "description": "Daily habit checklists, streaks and sixteen weeks of history.",
+      "min_api": 2,
+      "files": [
+        "core.lua",
+        "editor.lua",
+        "icon.raw",
+        "keyboard.lua",
+        "main.lua",
+        "manifest.json",
+        "storage.lua",
+        "ui.lua",
+        "unified_ui.lua"
+      ]
+    },
+    {
+      "id": "pomodoro",
+      "name": "Pomodoro",
+      "version": "0.1.2",
+      "author": "CrossSmudge",
+      "description": "Focus sessions with short and long breaks.",
+      "min_api": 2,
+      "files": [
+        "core.lua",
+        "digits.lua",
+        "editor.lua",
+        "icon.raw",
+        "keyboard.lua",
+        "main.lua",
+        "manifest.json",
+        "numeric_sans.lua",
+        "numeric_sans_128.bin",
+        "numeric_sans_150.bin",
+        "numeric_sans_180.bin",
+        "numeric_sans_24.bin",
+        "numeric_sans_32.bin",
+        "numeric_sans_48.bin",
+        "numeric_sans_64.bin",
+        "numeric_sans_96.bin",
+        "numeric_sans_OFL.txt",
+        "numeric_sans_SOURCE.txt",
+        "numeric_sans_metrics.lua",
+        "storage.lua",
+        "ui.lua",
+        "unified_ui.lua"
+      ]
+    },
+    {
+      "id": "weather",
+      "name": "Weather",
+      "version": "0.1.2",
+      "author": "CrossSmudge",
+      "description": "Current conditions and forecasts from Open-Meteo.",
+      "min_api": 3,
+      "requires_psram": true,
+      "files": [
+        "digits.lua",
+        "editor.lua",
+        "forecast.lua",
+        "icon.raw",
+        "json.lua",
+        "keyboard.lua",
+        "main.lua",
+        "manifest.json",
+        "model.lua",
+        "storage.lua",
+        "ui.lua",
+        "unified_ui.lua"
+      ]
+    },
+    {
+      "id": "browser",
+      "name": "Browser",
+      "version": "0.3.6",
+      "author": "CrossSmudge",
+      "description": "Public keyless Assisted reader with shared capacity, Direct/Offline modes, checked saves, links and search forms. Assisted needs public-mode firmware.",
+      "min_api": 6,
+      "requires_psram": true,
+      "files": [
+        "b7cache.lua",
+        "backend.lua",
+        "cache.lua",
+        "css.lua",
+        "editor.lua",
+        "icon.raw",
+        "json.lua",
+        "keyboard.lua",
+        "layout.lua",
+        "main.lua",
+        "manifest.json",
+        "model.lua",
+        "png.lua",
+        "protocol.lua",
+        "source.lua",
+        "tokenizer.lua",
+        "ui.lua",
+        "unified_ui.lua",
+        "url.lua",
+        "work.lua"
+      ]
+    },
+    {
       "id": "dice",
-      "name": "Dice",
-      "version": "1.0.2",
+      "name": "Dice Roller",
+      "version": "1.0.0",
       "author": "Mumfee",
       "description": "Multi-polyhedral tabletop dice simulator with running history",
       "files": [
-        "FONT-LICENSE.txt",
-        "dice_shapes.lua",
-        "icon.raw",
-        "main.lua",
         "manifest.json",
-        "numeral_fonts.lua",
-        "numerals.lua",
+        "main.lua",
+        "icon.raw",
         "sprites/coin_heads.raw",
-        "sprites/coin_tails.raw",
-        "unified_ui.lua"
+        "sprites/coin_tails.raw"
       ]
     },
     {
       "id": "lifecounter",
       "name": "Life Counter",
-      "version": "1.0.2",
+      "version": "1.0.0",
       "author": "Mumfee",
       "description": "Magic: The Gathering & card game life tracker with commander mode",
       "files": [
-        "FONT-LICENSE.txt",
-        "icon.raw",
-        "main.lua",
         "manifest.json",
-        "numeral_fonts.lua",
-        "numerals.lua",
-        "unified_ui.lua"
+        "main.lua",
+        "icon.raw"
       ]
     },
     {
       "id": "rosary",
-      "name": "Rosary",
-      "version": "1.0.2",
+      "name": "Holy Rosary",
+      "version": "1.0.0",
       "author": "Mumfee",
       "description": "Interactive Holy Rosary prayer guide with bead tracking and mysteries",
       "files": [
-        "icon.raw",
-        "main.lua",
         "manifest.json",
-        "sprites/crucifix.raw",
-        "unified_ui.lua"
+        "main.lua",
+        "icon.raw",
+        "sprites/crucifix.raw"
       ]
     },
     {
       "id": "dailyoffice",
-      "name": "Daily Office",
-      "version": "1.0.2",
+      "name": "Divine Worship",
+      "version": "1.0.0",
       "author": "Mumfee",
       "description": "Daily Office liturgical prayer book (Morning, Evening & Compline)",
       "files": [
+        "manifest.json",
+        "main.lua",
+        "parser.lua",
+        "hymns.lua",
+        "icon.raw",
+        "propers.txt",
+        "psalter.txt",
         "hours/compline.txt",
         "hours/evensong.txt",
         "hours/hymns.txt",
@@ -65,22 +186,13 @@
         "hours/none.txt",
         "hours/prime.txt",
         "hours/sext.txt",
-        "hours/terce.txt",
-        "hymns.lua",
-        "icon.raw",
-        "lessons/2026-09-30.txt",
-        "main.lua",
-        "manifest.json",
-        "parser.lua",
-        "propers.txt",
-        "psalter.txt",
-        "unified_ui.lua"
+        "hours/terce.txt"
       ]
     },
     {
       "id": "wordle",
       "name": "Wordle",
-      "version": "1.2.1",
+      "version": "1.2.2",
       "author": "Mumfee",
       "description": "CrossPlay Wordle on Sticky; original game and saves unchanged on other devices",
       "files": [
@@ -117,6 +229,7 @@
         "enhanced.lua",
         "graphics.lua",
         "icon.raw",
+        "keypad.lua",
         "legacy_main.lua",
         "main.lua",
         "manifest.json",
@@ -126,25 +239,24 @@
     {
       "id": "2048",
       "name": "2048",
-      "version": "1.1.1",
+      "version": "1.1.0",
       "author": "Mumfee",
       "description": "Classic 4x4 sliding tile number puzzle with high scores",
       "files": [
-        "FONT-LICENSE.txt",
-        "fonts.lua",
-        "icon.raw",
-        "legacy_main.lua",
-        "main.lua",
         "manifest.json",
+        "main.lua",
+        "legacy_main.lua",
         "sticky_main.lua",
         "ui.lua",
-        "unified_ui.lua"
+        "fonts.lua",
+        "FONT-LICENSE.txt",
+        "icon.raw"
       ]
     },
     {
       "id": "sudoku",
       "name": "Sudoku",
-      "version": "1.1.1",
+      "version": "1.1.2",
       "author": "Mumfee",
       "description": "CrossPlay Sudoku on Sticky; original game and saves unchanged on other devices",
       "files": [
@@ -172,6 +284,7 @@
         "generator.lua",
         "graphics.lua",
         "icon.raw",
+        "keypad.lua",
         "legacy_main.lua",
         "main.lua",
         "manifest.json"
@@ -180,7 +293,7 @@
     {
       "id": "blackjack",
       "name": "Blackjack",
-      "version": "1.0.2",
+      "version": "1.0.0",
       "author": "Mumfee",
       "description": "Classic 21 card game with betting chips, hit, stand, and dealer rules",
       "files": [
@@ -190,27 +303,25 @@
         "sprites/clubs.raw",
         "sprites/diamonds.raw",
         "sprites/hearts.raw",
-        "sprites/spades.raw",
-        "unified_ui.lua"
+        "sprites/spades.raw"
       ]
     },
     {
       "id": "blockdrop",
       "name": "Block Drop",
-      "version": "1.0.3",
+      "version": "1.0.1",
       "author": "Mumfee",
       "description": "Classic falling block puzzle optimized for e-paper displays",
       "files": [
         "manifest.json",
         "main.lua",
-        "icon.raw",
-        "unified_ui.lua"
+        "icon.raw"
       ]
     },
     {
       "id": "codex",
       "name": "Codex: Ink & Iron",
-      "version": "1.0.2",
+      "version": "1.0.0",
       "author": "Mumfee",
       "description": "Medieval illuminated manuscript deckbuilder with Couplet synergy and page progression",
       "files": [
@@ -226,7 +337,6 @@
         "monsters.txt",
         "relics.lua",
         "relics.txt",
-        "save_codec.lua",
         "screens/combat.lua",
         "screens/deck_view.lua",
         "screens/game_over.lua",
@@ -271,114 +381,55 @@
         "sprites/relic_8.raw",
         "sprites/relic_9.raw",
         "state.lua",
-        "ui_base.lua",
-        "unified_ui.lua"
+        "ui_base.lua"
       ]
     },
     {
       "id": "watertracker",
       "name": "Water Tracker",
-      "version": "1.0.3",
+      "version": "1.0.1",
       "author": "Mumfee",
-      "description": "Daily hydration tracker with intake, goals, streaks and history",
+      "description": "Daily hydration tracker with a cute water cup that fills as you drink",
       "files": [
-        "PARITY.md",
-        "icon.raw",
-        "main.lua",
         "manifest.json",
-        "numeric_sans.lua",
-        "numeric_sans_128.bin",
-        "numeric_sans_150.bin",
-        "numeric_sans_180.bin",
-        "numeric_sans_24.bin",
-        "numeric_sans_32.bin",
-        "numeric_sans_48.bin",
-        "numeric_sans_64.bin",
-        "numeric_sans_96.bin",
-        "numeric_sans_OFL.txt",
-        "numeric_sans_SOURCE.txt",
-        "numeric_sans_metrics.lua",
-        "primary_numerals.lua",
-        "unified_ui.lua"
+        "main.lua",
+        "icon.raw"
       ]
     },
     {
       "id": "stopwatch",
       "name": "Stopwatch",
-      "version": "1.0.3",
+      "version": "1.0.1",
       "author": "Mumfee",
-      "description": "Digital stopwatch with elapsed time and lap split recording",
+      "description": "Pixel cartoon stopwatch with digital display and lap split recording",
       "files": [
-        "icon.raw",
-        "main.lua",
         "manifest.json",
-        "numeric_sans.lua",
-        "numeric_sans_128.bin",
-        "numeric_sans_150.bin",
-        "numeric_sans_180.bin",
-        "numeric_sans_24.bin",
-        "numeric_sans_32.bin",
-        "numeric_sans_48.bin",
-        "numeric_sans_64.bin",
-        "numeric_sans_96.bin",
-        "numeric_sans_OFL.txt",
-        "numeric_sans_SOURCE.txt",
-        "numeric_sans_metrics.lua",
-        "primary_numerals.lua",
-        "unified_ui.lua"
+        "main.lua",
+        "icon.raw"
       ]
     },
     {
       "id": "dashboard",
       "name": "Desk Stand",
-      "version": "1.0.4",
+      "version": "1.0.3",
       "author": "Mumfee",
       "description": "Multi-style ambient desk clock with calendar, year progress, and landscape stand",
       "files": [
-        "icon.raw",
-        "main.lua",
         "manifest.json",
-        "numeric_sans.lua",
-        "numeric_sans_128.bin",
-        "numeric_sans_150.bin",
-        "numeric_sans_180.bin",
-        "numeric_sans_24.bin",
-        "numeric_sans_32.bin",
-        "numeric_sans_48.bin",
-        "numeric_sans_64.bin",
-        "numeric_sans_96.bin",
-        "numeric_sans_OFL.txt",
-        "numeric_sans_SOURCE.txt",
-        "numeric_sans_metrics.lua",
-        "primary_numerals.lua",
-        "unified_ui.lua"
+        "main.lua",
+        "icon.raw"
       ]
     },
     {
       "id": "hourglass",
       "name": "Hourglass",
-      "version": "1.0.3",
+      "version": "1.0.1",
       "author": "Mumfee",
-      "description": "Minimalist hourglass timer with customizable increments",
+      "description": "Expressive countdown timer with dynamic sand funnel physics and cute expressions",
       "files": [
-        "PARITY.md",
-        "icon.raw",
-        "main.lua",
         "manifest.json",
-        "numeric_sans.lua",
-        "numeric_sans_128.bin",
-        "numeric_sans_150.bin",
-        "numeric_sans_180.bin",
-        "numeric_sans_24.bin",
-        "numeric_sans_32.bin",
-        "numeric_sans_48.bin",
-        "numeric_sans_64.bin",
-        "numeric_sans_96.bin",
-        "numeric_sans_OFL.txt",
-        "numeric_sans_SOURCE.txt",
-        "numeric_sans_metrics.lua",
-        "primary_numerals.lua",
-        "unified_ui.lua"
+        "main.lua",
+        "icon.raw"
       ]
     },
     {
@@ -588,7 +639,7 @@
     {
       "id": "cp-calculator",
       "name": "Calculator",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "author": "CrossPlay contributors; Lua port",
       "description": "Decimal calculator with contextual percent and repeated equals.",
       "files": [
@@ -622,6 +673,7 @@
         "enhanced.lua",
         "graphics.lua",
         "icon.raw",
+        "keypad.lua",
         "legacy_enhanced.lua",
         "legacy_graphics.lua",
         "main.lua",
@@ -719,7 +771,7 @@
     {
       "id": "cp-forehead",
       "name": "Forehead",
-      "version": "0.1.5",
+      "version": "0.1.4",
       "author": "CrossPlay contributors; Lua port",
       "description": "Timed spoken-clue party game. 2474 entries in 17 categories.",
       "files": [
@@ -843,14 +895,13 @@
         "played.lua",
         "presentation.lua",
         "storage.lua",
-        "support.lua",
-        "unified_ui.lua"
+        "support.lua"
       ]
     },
     {
       "id": "cp-hearts",
       "name": "Hearts",
-      "version": "0.1.5",
+      "version": "0.1.4",
       "author": "CrossPlay contributors; Lua port",
       "description": "Four-seat Hearts with passing, moon scoring, saved matches and heuristic opponents.",
       "files": [
@@ -898,8 +949,7 @@
         "manifest.json",
         "records.lua",
         "storage.lua",
-        "support.lua",
-        "unified_ui.lua"
+        "support.lua"
       ]
     },
     {
@@ -1142,7 +1192,7 @@
     {
       "id": "cp-wavelength",
       "name": "Wavelength",
-      "version": "0.1.5",
+      "version": "0.1.4",
       "author": "CrossPlay contributors; Lua port",
       "description": "Hidden-target party game with original spectrum deck, practice and team end-call scoring.",
       "files": [
@@ -1184,8 +1234,7 @@
         "presentation.lua",
         "storage.lua",
         "support.lua",
-        "ui_record.lua",
-        "unified_ui.lua"
+        "ui_record.lua"
       ]
     },
     {
@@ -1547,7 +1596,7 @@
     {
       "id": "cp-murdle",
       "name": "Murdle",
-      "version": "0.1.5",
+      "version": "0.1.4",
       "author": "CrossPlay contributors; Lua port",
       "description": "64 source-generated logic cases across four tiers, grid notes and accusations.",
       "files": [
@@ -1645,7 +1694,6 @@
         "phrases.lua",
         "storage.lua",
         "ui.lua",
-        "unified_ui.lua",
         "util.lua"
       ]
     },
@@ -1704,7 +1752,7 @@
     {
       "id": "cp-hackernews",
       "name": "Hacker News",
-      "version": "0.1.4",
+      "version": "0.1.3",
       "author": "CrossSmudge contributors",
       "description": "Live Hacker News stories and bounded article reading; APIv3 preview",
       "min_api": 3,
@@ -1740,15 +1788,13 @@
         "presentation.lua",
         "reader.lua",
         "sticky_presentation.lua",
-        "ui.lua",
-        "unified_ui.lua",
-        "utf8_compat.lua"
+        "ui.lua"
       ]
     },
     {
       "id": "cp-trivia",
       "name": "Trivia",
-      "version": "0.1.4",
+      "version": "0.1.3",
       "author": "CrossSmudge contributors",
       "description": "Live Open Trivia DB questions; APIv3 preview",
       "min_api": 3,
@@ -1774,128 +1820,7 @@
         "model.lua",
         "sticky_main.lua",
         "sticky_ui.lua",
-        "ui.lua",
-        "unified_ui.lua",
-        "utf8_compat.lua"
-      ]
-    },
-    {
-      "id": "browser",
-      "name": "Browser",
-      "version": "0.3.5",
-      "author": "CrossSmudge",
-      "description": "Public keyless Assisted reader with shared capacity, Direct/Offline modes, checked saves, links and search forms. Assisted needs public-mode firmware.",
-      "min_api": 6,
-      "requires_psram": true,
-      "files": [
-        "b7cache.lua",
-        "backend.lua",
-        "cache.lua",
-        "css.lua",
-        "editor.lua",
-        "icon.raw",
-        "json.lua",
-        "layout.lua",
-        "main.lua",
-        "manifest.json",
-        "model.lua",
-        "png.lua",
-        "protocol.lua",
-        "source.lua",
-        "tokenizer.lua",
-        "ui.lua",
-        "unified_ui.lua",
-        "url.lua",
-        "work.lua"
-      ]
-    },
-    {
-      "id": "flashcards",
-      "name": "Flashcards",
-      "version": "0.1.2",
-      "author": "CrossSmudge",
-      "description": "Create and study question and answer cards.",
-      "min_api": 2,
-      "files": [
-        "core.lua",
-        "editor.lua",
-        "icon.raw",
-        "main.lua",
-        "manifest.json",
-        "storage.lua",
-        "ui.lua",
-        "unified_ui.lua"
-      ]
-    },
-    {
-      "id": "habits",
-      "name": "Habits",
-      "version": "0.1.2",
-      "author": "CrossSmudge",
-      "description": "Daily habit checklists, streaks and sixteen weeks of history.",
-      "min_api": 2,
-      "files": [
-        "core.lua",
-        "editor.lua",
-        "icon.raw",
-        "main.lua",
-        "manifest.json",
-        "storage.lua",
-        "ui.lua",
-        "unified_ui.lua"
-      ]
-    },
-    {
-      "id": "pomodoro",
-      "name": "Pomodoro",
-      "version": "0.1.1",
-      "author": "CrossSmudge",
-      "description": "Focus sessions with short and long breaks.",
-      "min_api": 2,
-      "files": [
-        "core.lua",
-        "digits.lua",
-        "editor.lua",
-        "icon.raw",
-        "main.lua",
-        "manifest.json",
-        "numeric_sans.lua",
-        "numeric_sans_128.bin",
-        "numeric_sans_150.bin",
-        "numeric_sans_180.bin",
-        "numeric_sans_24.bin",
-        "numeric_sans_32.bin",
-        "numeric_sans_48.bin",
-        "numeric_sans_64.bin",
-        "numeric_sans_96.bin",
-        "numeric_sans_OFL.txt",
-        "numeric_sans_SOURCE.txt",
-        "numeric_sans_metrics.lua",
-        "storage.lua",
-        "ui.lua",
-        "unified_ui.lua"
-      ]
-    },
-    {
-      "id": "weather",
-      "name": "Weather",
-      "version": "0.1.1",
-      "author": "CrossSmudge",
-      "description": "Current conditions and forecasts from Open-Meteo.",
-      "min_api": 3,
-      "requires_psram": true,
-      "files": [
-        "digits.lua",
-        "editor.lua",
-        "forecast.lua",
-        "icon.raw",
-        "json.lua",
-        "main.lua",
-        "manifest.json",
-        "model.lua",
-        "storage.lua",
-        "ui.lua",
-        "unified_ui.lua"
+        "ui.lua"
       ]
     }
   ]
