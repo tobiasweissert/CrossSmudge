@@ -253,6 +253,7 @@ import sys
 subprocess.run([sys.executable,str(Path(__file__).with_name('codec_probe.py'))]+(['--sanitize'] if a.sanitize else []),check=True)
 subprocess.run([sys.executable,str(Path(__file__).with_name('recent_probe.py'))]+(['--sanitize'] if a.sanitize else []),check=True)
 subprocess.run([sys.executable,str(Path(__file__).with_name('store_probe.py'))]+(['--sanitize'] if a.sanitize else []),check=True)
+subprocess.run([sys.executable,str(Path(__file__).with_name('icon_probe.py'))]+(['--sanitize'] if a.sanitize else []),check=True)
 subprocess.run([sys.executable,str(Path(__file__).with_name('render_probe.py'))]+(['--sanitize'] if a.sanitize else []),check=True)
 
 # Optional full production input path, using an already-built hash-bound launch fixture.

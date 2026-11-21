@@ -28,6 +28,7 @@ struct GfxRenderer {
  void drawPixel(int x,int y,bool){pixels.push_back({x,y});}
  template<class B>bool drawBitmap(B&,int x,int y,int w,int h){frames.push_back({x,y,w,h});return true;}
  std::vector<std::string> wrappedText(int,const char*,int,int,int=0);
+ std::string truncatedText(int f,const char* s,int w){std::string t(s);int n=w/(f==SMALL_FONT_ID?8:12);return int(t.size())>n?t.substr(0,n-3)+"...":t;}
 
 };
 std::vector<std::string> GfxRenderer::wrappedText(int f,const char* s,int w,int n,int){int charW=f==SMALL_FONT_ID?8:12;std::string t(s);std::vector<std::string> out;while(!t.empty() && int(out.size())<n){out.push_back(t.substr(0,w/charW));t=t.substr(std::min(t.size(),size_t(w/charW)));}return out;}
@@ -66,6 +67,9 @@ int main(){
   GfxRenderer r{width,width==480?800:480,{},{},{},{}};renderReadingHeatmapPage(r,&input,stats,true,{});
   std::set<int> rows;for(const auto& c:r.fills)rows.insert(c.y);
   assert(rows.size()==7); // Exactly one continuous week-column grid in BOTH orientations.
+  int gridRight=0;std::set<int> columns;for(const auto& c:r.fills){gridRight=std::max(gridRight,c.x+c.w);columns.insert(c.x);}
+  assert(columns.size()==14);
+  assert(gridRight==width-20-2); // Full plot width after weekday band; 2px today-marker clearance.
   assert(r.fills.size()==96 && r.frames.size()==1 && r.pixels.empty());
   assert(r.texts.size()<=17); // One count, small month/weekday labels, no paragraphs/legend/range.
   for(const auto& t:r.texts){assert(t.x>=0 && t.y>=64 && t.x+r.getTextWidth(10,t.value.c_str())<=width);}
@@ -89,6 +93,12 @@ int main(){
   GfxRenderer cards{width,r.height,{},{},{},{}};placeholders.clear();opened.clear();
   renderReadingHeatmapPage(cards,&input,stats,true,recent);
   assert(placeholders.size()==2);bool lifetime=false,noTime=false;
+  assert(placeholders[0].x==20 && placeholders[1].x==20);
+  assert(placeholders[1].y>=placeholders[0].y+placeholders[0].height+8);
+  int gridBottom=0;for(const auto& c:cards.fills)gridBottom=std::max(gridBottom,c.y+c.h);
+  assert(placeholders[0].y>gridBottom);
+  assert(placeholders[0].width+12+cards.getTextWidth(SMALL_FONT_ID,"71582788 min total")<=width-40);
+  for(const auto& t:cards.texts)if(t.value=="120 min total" || t.value=="No recorded time")assert(t.x>20+placeholders[0].width);
   for(const auto& t:cards.texts){if(t.value=="120 min total")lifetime=true;if(t.value=="No recorded time")noTime=true;
    assert(t.x>=0 && t.x+cards.getTextWidth(SMALL_FONT_ID,t.value.c_str())<=width && t.y+22<cards.height-60);}
   assert(lifetime && noTime);
@@ -96,6 +106,17 @@ int main(){
   for(const auto& c:placeholders)assert(c.width>0 && c.height>0 && c.y+c.height<cards.height-60);
   validClock=false;GfxRenderer invalidCards{width,r.height,{},{},{},{}};renderReadingHeatmapPage(invalidCards,&input,stats,true,recent);
   bool invalidLifetime=false;for(const auto& t:invalidCards.texts)if(t.value=="120 min total")invalidLifetime=true;assert(invalidLifetime);validClock=true;
+  for(size_t n=0;n<=3;++n){
+   recent.count=n;recent.books[0].totalReadingSeconds=UINT32_MAX;
+   recent.books[0].title="Über die Hügel – "+std::string(200,'X');
+   for(size_t i=0;i<n;++i)recent.books[i].coverBmpPath="missing";
+   GfxRenderer variant{width,r.height,{},{},{},{}};placeholders.clear();renderReadingHeatmapPage(variant,&input,stats,true,recent);
+   assert(placeholders.size()==n);size_t totals=0;bool maximum=n==0;
+   for(const auto& t:variant.texts){if(t.value=="71582788 min total")maximum=true;if(t.value.find(" total")!=std::string::npos || t.value=="No recorded time")++totals;
+    assert(t.x+variant.getTextWidth(SMALL_FONT_ID,t.value.c_str())<=width-20 && t.y+22<variant.height-60);}
+   assert(maximum && totals==n);
+   for(size_t i=1;i<n;++i)assert(placeholders[i].x==20 && placeholders[i].y>=placeholders[i-1].y+placeholders[i-1].height+8);
+  }
  }
  GlobalReadingStats tinyStats;MappedInputManager input;
  GfxRenderer tiny{160,240,{},{},{},{}};renderReadingHeatmapPage(tiny,&input,tinyStats,true,{});

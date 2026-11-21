@@ -29,9 +29,12 @@ when lower after reset); other books keep persisted totals. Nothing is added,
 reordered or saved, and progress/history are not repurposed as time.
 Cached thumbnails (including adaptive Home thumbnails, with a 48-file bounded
 read-only search in that book's cache) use native Bitmap rendering; missing/corrupt
-art uses `BaseTheme::drawCoverPlaceholder`. Titles wrap to two lines. Portrait
-places text below covers; landscape places it beside them. Insufficient tiny bounds
-omit the chart/cards instead of drawing negative/out-of-screen rectangles.
+art uses `BaseTheme::drawCoverPlaceholder`. Both orientations use up to three
+vertically stacked full-width rows, each with its cover on the left and a native
+ellipsized title plus untruncated lifetime total on the right. The 14 calendar
+columns span the available plot width after the weekday-label band; landscape
+uses rectangular cells to reserve space for all three rows and button hints.
+Insufficient tiny bounds omit the chart/rows instead of drawing negative/out-of-screen rectangles.
 Missing/corrupt/zero-duration records show `No recorded time`, not a fabricated
 lifetime value. Recovery-only v5 stats are left intact and shown without a duration:
 the explicit codec mode disables repair, including when canonical exists but
@@ -86,11 +89,17 @@ binary and candidate source hashes must match its sibling `render-inputs.json`.
 The fixture must expose only launch/access/telemetry seams, not replace the UI renderer.
 A missing full fixture does not silently imply this integration was exercised.
 
-Candidate evidence, build recipe, exact reused-object hashes and genuine production-font
-screenshots for this task are retained under
-`/root/github/.host-data/crosssmudge/reading-stats-heatmap/simplified/`.
-Earlier captures/review/freezes in the parent evidence directory are historical,
-not approval of this simplified successor.
-The simulator uses the native 480x800 / 800x480 logical bounds; its screenshot exporter
-removes a two-pixel border, producing 476x796 / 796x476 PNGs. No artwork is synthesized.
-Target compilation and physical-device behavior remain separate acceptance gates.
+Current full-width/vertical-row layout evidence, exact compiler/link commands,
+input hashes and fresh genuine real-font SDL captures are retained under
+`/root/.hermes/task-state/crosscub-owner-next-release/stats/layout-refinement-round1/`.
+The earlier `/root/github/.host-data/crosssmudge/reading-stats-heatmap/simplified/`
+captures show the superseded three-column cards and are not new-layout proof.
+This generation captures the native full panel at 480x800 / 800x480 without image
+scaling. Portable geometry and normal/ASan/UBSan regressions pass independently
+of native visual acceptance. The existing production `drawIcon` orientation defect
+still omits the open-book icon in the one-book missing-cover landscape fixture;
+the native placeholder's own size gate omits its icon in smaller rows normally.
+No icons, renderer, SDK or assets were patched to conceal this defect. See the
+new report for the exact renderer fix proposal requiring separate authorization.
+Target compilation, full Activity boot/input and physical-device behavior remain
+separate acceptance gates.
