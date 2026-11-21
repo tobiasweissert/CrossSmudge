@@ -6,8 +6,10 @@ and ASan/UBSan modes. Both are also registered in `test/crosscub/CMakeLists.txt`
 No network, dependency installation, migration or firmware build is involved.
 
 The calendar model reads the existing 730-day Boolean bitset. It displays the last
-365 days inclusive of today (shortened only at the supported calendar's 2000-01-01
-boundary), in Monday-first week columns. Outside-period/future padding is absent;
+14 Monday-first calendar weeks including the current partial week. Future cells in
+that week remain outside the display; dates before 2000-01-01 are also outside.
+The window contains 92–98 days depending on today's weekday, not a fixed 98-day
+rolling period. Outside-period/future padding is absent;
 out-of-retention/missing history is unknown, not a zero-duration reading day.
 The anchor is the latest recorded activity, not today's date. There is no daily
 minutes/intensity field and the heatmap does not create one.
@@ -15,7 +17,42 @@ minutes/intensity field and the heatmap does not create one.
 The first page is Reading activity, followed by Per Book, This Device and optional
 All Devices. Both portrait and landscape show exactly one continuous calendar grid.
 Only a compact active-day count (or `No history`), small month/weekday labels and the
-native header remain; invalid clocks show `Set clock`. Solid cells mean recorded
+native header precede the recent-book section; invalid clocks show `Set clock` but
+still allow recent-book totals below it. The section snapshots up to three unique,
+existing paths from `RecentBooksStore` in its original order on Activity entry.
+`RecentReadingStats` uses EPUB/Markdown and XTC cache identities and the real
+`BookReadingStats` lifetime decoder with `LoadMode::ReadOnly`. TXT uses its own
+reader/index cache and has no lifetime-statistics producer; absent time stays zero.
+Cache-helper doubles test selection only, not real TXT tracking. The matching
+active book's constructor-supplied lifetime preview replaces the disk value (even
+when lower after reset); other books keep persisted totals. Nothing is added,
+reordered or saved, and progress/history are not repurposed as time.
+Cached thumbnails (including adaptive Home thumbnails, with a 48-file bounded
+read-only search in that book's cache) use native Bitmap rendering; missing/corrupt
+art uses `BaseTheme::drawCoverPlaceholder`. Titles wrap to two lines. Portrait
+places text below covers; landscape places it beside them. Insufficient tiny bounds
+omit the chart/cards instead of drawing negative/out-of-screen rectangles.
+Missing/corrupt/zero-duration records show `No recorded time`, not a fabricated
+lifetime value. Recovery-only v5 stats are left intact and shown without a duration:
+the explicit codec mode disables repair, including when canonical exists but
+opening it fails. The ordinary default `load` still recovers `.tmp`/`.bak` files. The existing reader
+remains responsible for recovery. `codec_probe.py` executes the actual codec and
+loader against in-memory storage and asserts zero mutation calls; its stubs derive
+from the existing `test/book_reading_stats_atomic` fixtures. `recent_probe.py`
+separately checks ordering, identity, cache-helper routing, bounds and cover fallback.
+`store_probe.py` is also registered in the same normal/sanitizer routine. It compiles
+actual `RecentBooksStore.cpp`, its exact repository `Serialization.h` and the real
+`PersistableStoreBase::readDocFromFile` body with ArduinoJson. It starts a fresh
+process for each cold legacy v1/v2/v3 and JSON/recovery/fault scenario, before any
+Home/getBooks initialization, checking every storage byte and mutation counter.
+The store-owned snapshot reuses these decoders, does not mark the singleton loaded,
+and never constructs an EPUB or runs migration. Ordinary getBooks migration remains
+separately asserted; its writes are acknowledgement doubles, not physical SD tests.
+The snapshot can conservatively omit unreadable/truncated records, leaving originals
+and recovery roots intact. The JSON dependency must already exist: set
+`READING_HEATMAP_ARDUINOJSON` to its `src` directory if the documented host cache
+is absent. No download/install or new CMake suite is needed.
+Solid cells mean recorded
 activity, hollow cells inactivity, dots unavailable history; an extra outline marks
 today. Missing history is anchor zero **with bit zero clear**; a recorded 2000-01-01
 is anchor zero **with bit zero set**, and is covered through the production writer.

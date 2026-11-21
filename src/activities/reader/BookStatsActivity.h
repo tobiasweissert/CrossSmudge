@@ -7,6 +7,7 @@
 #include "../Activity.h"
 #include "BookReadingStats.h"
 #include "GlobalReadingStats.h"
+#include "RecentReadingStats.h"
 
 class BookStatsActivity final : public Activity {
   enum class Page : uint8_t { Heatmap, PerBook, ThisDevice, AllDevices, EditDates };
@@ -16,6 +17,7 @@ class BookStatsActivity final : public Activity {
   BookReadingStats stats;
   GlobalReadingStats globalStats;
   GlobalReadingStats allDevicesStats;
+  RecentReadingStats recentReadingStats;
   bool showAllDevicesStats = false;
   bool returnToHomeOnExit = false;
   float progressPercent = -1.0f;

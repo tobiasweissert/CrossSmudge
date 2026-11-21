@@ -1,8 +1,10 @@
 #include "BookStatsView.h"
 
+#include <Bitmap.h>
 #include <FreeInkUICore.h>
 #include <GfxRenderer.h>
 #include <HalClock.h>
+#include <HalStorage.h>
 #include <I18n.h>
 
 #include <algorithm>
@@ -538,7 +540,8 @@ void renderPerBookStatsPage(GfxRenderer& renderer, const MappedInputManager* map
 }
 
 void renderReadingHeatmapPage(GfxRenderer& renderer, const MappedInputManager* mappedInput,
-                              const GlobalReadingStats& stats, const bool showMoreButton) {
+                              const GlobalReadingStats& stats, const bool showMoreButton,
+                              const RecentReadingStats& recent) {
   renderer.clearScreen();
   if (mappedInput && mappedInput->hasTouchHardware()) {
     TouchHeaderBackButton::drawCompact(renderer, "Reading activity", false);
@@ -563,44 +566,109 @@ void renderReadingHeatmapPage(GfxRenderer& renderer, const MappedInputManager* m
     y += line + 18;
 
     // One continuous Monday-first calendar, never split into portrait bands.
-    // Single-letter weekdays leave room for all 53 weeks even at 480px.
+    // Single-letter weekday labels keep the calendar compact.
     const int labelW = renderer.getTextWidth(UI_10_FONT_ID, "W") + 8;
-    const int step = std::min(14, (w - labelW - 2) / model.columns);
-    const int size = step - 3;
-    const int gx = x + labelW;
-    int lastLabelRight = -100;
-    for (int col = 0; col < model.columns; ++col) {
-      for (int row = 0; row < 7; ++row) {
-        const auto state = model.cell(col, row);
-        if (state == ReadingHeatmap::Cell::Outside) continue;
-        const int px = gx + col * step, py = y + line + row * step;
-        const uint32_t day = model.gridStart + col * 7 + row;
-        ReadingStatsDate date;
-        readingStatsDateFromDayIndex(day, date);
-        if (date.day == 1 && px >= lastLabelRight) {
-          char month[8];
-          formatReadingStatsMonthToken(date, month, sizeof(month));
-          const int textW = renderer.getTextWidth(UI_10_FONT_ID, month);
-          if (px + textW <= x + w) {
-            renderer.drawText(UI_10_FONT_ID, px, y, month);
-            lastLabelRight = px + textW + 4;
+    const int chartBottom = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing - 40;
+    const int step = std::min({14, (w - labelW - 2) / model.columns, (chartBottom - y - line - 2) / 7});
+    if (step >= 4) {
+      const int size = step - 3;
+      const int gx = x + labelW;
+      int lastLabelRight = -100;
+      for (int col = 0; col < model.columns; ++col) {
+        for (int row = 0; row < 7; ++row) {
+          const auto state = model.cell(col, row);
+          if (state == ReadingHeatmap::Cell::Outside) continue;
+          const int px = gx + col * step, py = y + line + row * step;
+          const uint32_t day = model.gridStart + col * 7 + row;
+          ReadingStatsDate date;
+          readingStatsDateFromDayIndex(day, date);
+          if (date.day == 1 && px >= lastLabelRight) {
+            char month[8];
+            formatReadingStatsMonthToken(date, month, sizeof(month));
+            const int textW = renderer.getTextWidth(UI_10_FONT_ID, month);
+            if (px + textW <= x + w) {
+              renderer.drawText(UI_10_FONT_ID, px, y, month);
+              lastLabelRight = px + textW + 4;
+            }
           }
+          // Solid = recorded reading; hollow = inactive; dotted = unavailable.
+          if (state == ReadingHeatmap::Cell::Active) {
+            renderer.fillRect(px, py, size, size, true);
+          } else if (state == ReadingHeatmap::Cell::Inactive) {
+            renderer.drawRect(px, py, size, size, true);
+          } else {
+            renderer.drawPixel(px + size / 2, py + size / 2, true);
+          }
+          // The extra outline marks today without touching adjacent day cells.
+          if (day == model.lastDay) renderer.drawRect(px - 1, py - 1, size + 2, size + 2, true);
         }
-        // Solid = recorded reading; hollow = inactive; dotted = unavailable.
-        if (state == ReadingHeatmap::Cell::Active) {
-          renderer.fillRect(px, py, size, size, true);
-        } else if (state == ReadingHeatmap::Cell::Inactive) {
-          renderer.drawRect(px, py, size, size, true);
-        } else {
-          renderer.drawPixel(px + size / 2, py + size / 2, true);
-        }
-        // The extra outline marks today without touching adjacent day cells.
-        if (day == model.lastDay) renderer.drawRect(px - 1, py - 1, size + 2, size + 2, true);
       }
+      const char* weekdays[] = {"M", "S"};
+      for (int row = 0; row < 2; ++row) {
+        renderer.drawText(UI_10_FONT_ID, x, y + line + row * 6 * step - 4, weekdays[row]);
+      }
+      y += line + 7 * step + 12;
     }
-    const char* weekdays[] = {"M", "S"};
-    for (int row = 0; row < 2; ++row) {
-      renderer.drawText(UI_10_FONT_ID, x, y + line + row * 6 * step - 4, weekdays[row]);
+  }
+  if (!model.valid) y += line + 12;
+  const size_t countBooks = std::min(recent.count, recent.books.size());
+  if (countBooks > 0 && w > 0) {
+    const int smallLine = renderer.getLineHeight(SMALL_FONT_ID);
+    const int bottom = renderer.getScreenHeight() - metrics.buttonHintsHeight - metrics.verticalSpacing - 40;
+    const int cardW = (w - 16 * (static_cast<int>(countBooks) - 1)) / static_cast<int>(countBooks);
+    const bool sideBySide = renderer.getScreenWidth() > renderer.getScreenHeight();
+    const int coverH = std::min(180, bottom - y - line - 12 - (sideBySide ? 0 : 4 * smallLine + 12));
+    // Below the minimum supported layout do not draw out-of-bounds partial cards.
+    if (coverH >= 12 && cardW >= 24) {
+      renderer.drawText(UI_10_FONT_ID, x, y, "Recently read");
+      y += line + 12;
+      const int coverW = std::min(sideBySide ? cardW / 3 : cardW, coverH * 2 / 3);
+      for (size_t i = 0; i < countBooks; ++i) {
+        const auto& book = recent.books[i];
+        const int cx = x + static_cast<int>(i) * (cardW + 16);
+        const Rect cover{sideBySide ? cx : cx + (cardW - coverW) / 2, y, coverW, coverH};
+        const int textX = sideBySide ? cx + coverW + 8 : cx;
+        const int textW = sideBySide ? cardW - coverW - 8 : cardW;
+        const int textY = sideBySide ? y : y + coverH + 6;
+        bool drawn = false;
+        // Try the requested cached size, then the existing Home size. Never
+        // generate a cover/cache or reuse a different book's cover on this view.
+        const std::array<std::string, 2> paths = {
+            UITheme::getCoverThumbPath(book.coverBmpPath, coverW, coverH),
+            UITheme::getCoverThumbPath(book.coverBmpPath, metrics.homeCoverHeight)};
+        for (const auto& path : paths) {
+          if (drawn || path.empty()) continue;
+          HalFile file;
+          if (!Storage.openFileForRead("STATS", path, file)) continue;
+          Bitmap bitmap(file);
+          if (bitmap.parseHeaders() == BmpReaderError::Ok && bitmap.getWidth() > 0 && bitmap.getHeight() > 0) {
+            const float scale = std::min(static_cast<float>(coverW) / bitmap.getWidth(),
+                                         static_cast<float>(coverH) / bitmap.getHeight());
+            const int bw = std::max(1, static_cast<int>(bitmap.getWidth() * scale));
+            const int bh = std::max(1, static_cast<int>(bitmap.getHeight() * scale));
+            drawn = renderer.drawBitmap(bitmap, cover.x + (coverW - bw) / 2, cover.y + (coverH - bh) / 2, bw, bh);
+          }
+          file.close();
+        }
+        if (!drawn) BaseTheme::drawCoverPlaceholder(renderer, cover);
+        const auto titles = renderer.wrappedText(SMALL_FONT_ID, book.title.c_str(), textW, 2);
+        for (size_t row = 0; row < titles.size(); ++row) {
+          renderer.drawText(SMALL_FONT_ID, textX, textY + static_cast<int>(row) * smallLine, titles[row].c_str());
+        }
+        char duration[48];
+        if (book.totalReadingSeconds > 0) {
+          char time[32];
+          BookReadingStats::formatDuration(book.totalReadingSeconds, time, sizeof(time));
+          snprintf(duration, sizeof(duration), "%s total", time);
+        } else {
+          snprintf(duration, sizeof(duration), "No recorded time");
+        }
+        const auto timeLines = renderer.wrappedText(SMALL_FONT_ID, duration, textW, 2);
+        for (size_t row = 0; row < timeLines.size(); ++row) {
+          renderer.drawText(SMALL_FONT_ID, textX, textY + (2 + static_cast<int>(row)) * smallLine,
+                            timeLines[row].c_str());
+        }
+      }
     }
   }
   if (mappedInput) {
