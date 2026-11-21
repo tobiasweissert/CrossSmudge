@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include <mutex>
 
 namespace trustedtime {
 
@@ -63,7 +64,29 @@ void writeFloor(const int64_t value) {
 }
 
 // SNTP sync callback (lwIP task context; Preferences/NVS is mutex-guarded).
-void onTimeSynced(struct timeval*) { note(); }
+struct Observation {
+  uint32_t sequence;
+  SyncSample sample;
+};
+Observation latest{};
+std::mutex configureLock;
+unsigned waiters = 0;
+Observation snapshot() {
+  portENTER_CRITICAL(&ramFloorLock);
+  const auto value = latest;
+  portEXIT_CRITICAL(&ramFloorLock);
+  return value;
+}
+void onTimeSynced(struct timeval* tv) {
+  if (tv && tv->tv_sec >= MIN_VALID_EPOCH && tv->tv_sec <= MAX_VALID_EPOCH) {
+    const SyncSample sample{static_cast<uint32_t>(tv->tv_sec), static_cast<uint32_t>(millis())};
+    portENTER_CRITICAL(&ramFloorLock);
+    latest.sample = sample;
+    ++latest.sequence;
+    portEXIT_CRITICAL(&ramFloorLock);
+  }
+  note();
+}
 
 void configureSntp() {
   // SNTP uses UTC epochs regardless of the display timezone. Copy TZ before
@@ -119,20 +142,44 @@ void adopt(const int64_t epoch) {
 }
 
 void startSync() {
+  std::lock_guard<std::mutex> lock(configureLock);
   if (esp_sntp_enabled()) return;  // running; the sync callback handles the rest
   configureSntp();
 }
 
 bool syncNow(const uint32_t timeoutMs) {
-  // configureSntp() (configTzTime) restarts SNTP if already running.
-  configureSntp();
-  const unsigned long deadline = millis() + timeoutMs;
-  while (sntp_get_sync_status() != SNTP_SYNC_STATUS_COMPLETED && static_cast<long>(deadline - millis()) > 0) {
-    delay(100);
+  SyncSample sample{};
+  return syncCurrent(timeoutMs, sample);
+}
+
+bool syncCurrent(uint32_t timeoutMs, SyncSample& sample) {
+  sample = {};
+  const uint32_t start = millis();
+  uint32_t baseline;
+  {
+    std::lock_guard<std::mutex> lock(configureLock);
+    baseline = snapshot().sequence;
+    // Join an outstanding request only while it still awaits its notification.
+    static uint32_t requestedAt = 0;
+    if (!waiters || requestedAt != baseline) {
+      requestedAt = baseline;
+      configureSntp();
+    }
+    ++waiters;
   }
-  const bool synced = sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED;
-  if (synced) note();
-  return synced;
+  bool ok = false;
+  while (static_cast<uint32_t>(millis() - start) <= timeoutMs) {
+    const auto current = snapshot();
+    if (current.sequence != baseline) {
+      sample = current.sample;
+      ok = true;
+      break;
+    }
+    delay(25);
+  }
+  std::lock_guard<std::mutex> lock(configureLock);
+  --waiters;
+  return ok;
 }
 
 int64_t trustedNow() {

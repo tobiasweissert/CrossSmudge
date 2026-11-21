@@ -19,10 +19,15 @@ using portMUX_TYPE = int;
 #define portEXIT_CRITICAL(lock) ((void)(lock))
 inline bool enabled = false;
 inline bool completed = true;
+inline void (*callback)(timeval*) = nullptr;
+inline void (*competing)() = nullptr;
+inline unsigned registrations=0;
 inline int configurations = 0;
 inline unsigned long ticks = 0;
 inline unsigned long millis() { return ticks; }
-inline void delay(unsigned long ms) { ticks += ms; }
+inline void delay(unsigned long ms) { ticks += ms;
+  if(competing){auto f=competing;competing=nullptr;f();}
+  if(completed && callback){timeval tv{time(nullptr),0};callback(&tv);} }
 inline void configTzTime(const char* tz, const char*) {
   enabled = true;
   ++configurations;
@@ -50,7 +55,7 @@ struct Preferences {
 constexpr int SNTP_SYNC_STATUS_COMPLETED = 1;
 inline bool esp_sntp_enabled() { return enabled; }
 inline int sntp_get_sync_status() { return completed ? SNTP_SYNC_STATUS_COMPLETED : 0; }
-inline void sntp_set_time_sync_notification_cb(void (*)(timeval*)) {}
+inline void sntp_set_time_sync_notification_cb(void (*f)(timeval*)) {callback=f;++registrations;}
 ''',
 }
 
@@ -132,6 +137,9 @@ int main() {
   assert(configurations == 1);
   assert(trustedtime::syncNow(200));
   assert(configurations == 2 && strcmp(getenv("TZ"), zone) == 0);
+  storedFloor=0;
+  competing=[] {trustedtime::startSync(); assert(trustedtime::syncNow(200));};
+  assert(trustedtime::syncNow(200));assert(configurations==3 && registrations==1 && storedFloor>=1735689600);
   completed = false;
   assert(!trustedtime::syncNow(200));
   assert(strcmp(getenv("TZ"), zone) == 0);

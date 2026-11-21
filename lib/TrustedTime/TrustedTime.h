@@ -43,6 +43,11 @@ void startSync();
 // Blocking SNTP sync with a deadline, for callers that need the wall clock
 // right now (e.g. progress-sync timestamps). Returns true when synced.
 bool syncNow(uint32_t timeoutMs);
+// Only a new network notification, never an adopted RTC or the persisted floor.
+struct SyncSample {
+  uint32_t epoch, monotonicMs;
+};
+bool syncCurrent(uint32_t timeoutMs, SyncSample& sample);
 
 // Epoch seconds when the clock is trustworthy (a plausible present-day
 // value, restored or synced), else 0. Never earlier than a time already seen

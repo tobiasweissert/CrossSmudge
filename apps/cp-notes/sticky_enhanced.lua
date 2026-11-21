@@ -21,8 +21,37 @@ local function load(index_)
 end
 local function redraw()smudge.request_update()end
 local options={'Resume','Clear checked lines','Convert to checklist','Convert to page','Import from note file','Help','Save and close'}
+local dictationCard
+if smudge.request_dictation then options[#options+1]='Dictate (OpenAI)' end
 local function change(new)
- summaries[index]=nil;pageAnchor=0;viewPage=1;S.last=nil;offset=0;doc=new;lines=nil;collectgarbage('collect');lines=N.parse(doc,true);selected=math.min(selected,#lines);redraw()
+ local parsed=N.parse(new,true);summaries[index]=nil;pageAnchor=0;viewPage=1;S.last=nil;offset=0;doc=new;lines=parsed;selected=math.min(selected,#lines);redraw()
+end
+-- Validate Unicode scalar values without enabling network libraries in Notes.
+local function validUtf8(s)
+ local i=1
+ while i<=#s do
+  local b=s:byte(i);i=i+1
+  if b>=128 then
+   if b<194 or b>244 then return false end
+   local n=b<224 and 1 or b<240 and 2 or 3
+   local c=s:byte(i)
+   if not c or (b==224 and c<160) or (b==237 and c>=160) or (b==240 and c<144) or (b==244 and c>=144) then return false end
+   for _=1,n do c=s:byte(i);if not c or c<128 or c>191 then return false end;i=i+1 end
+  end
+ end
+ return true
+end
+-- The trusted native editor returns only on Done; never replace existing text.
+function on_dictation_reviewed(text)
+ local card=dictationCard;dictationCard=nil
+ if not loaded or closed or index~=card or screen~='dictating' then return end
+ screen='note'
+ if type(text)=='string' and #text>0 then
+  local nextDoc=doc..(doc=='' and '' or '\n')..text
+  if validUtf8(text) and not text:find('[%z\1-\8\11-\31\127]') and N.validate(nextDoc) then change(nextDoc);notice=''
+  else notice='Transcript invalid or card full. Nothing added.' end
+ end
+ redraw()
 end
 local function operate()
  if not loaded then screen='library';redraw();return end
@@ -31,6 +60,7 @@ local function operate()
  elseif choice==3 then change(N.tolist(doc,lines));screen='note'
  elseif choice==4 then change(N.strip(doc,lines));screen='note'
  elseif choice==6 then screen='help'
+ elseif choice==8 and smudge.request_dictation then if save() then dictationCard=index;screen='dictating';smudge.request_dictation() else screen='note' end
  elseif save() then loaded=false;screen='library';choice=index end
  redraw()
 end

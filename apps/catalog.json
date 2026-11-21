@@ -1152,7 +1152,7 @@
     {
       "id": "cp-notes",
       "name": "Notes",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "author": "CrossPlay contributors; Lua port",
       "description": "Bounded app-local notes and checklists with manual imports; no phone or sleep-screen integration.",
       "files": [
@@ -1184,6 +1184,7 @@
         "legacy_graphics.lua",
         "main.lua",
         "manifest.json",
+        "notes_015.lua",
         "original_graphics.lua",
         "sticky_enhanced.lua",
         "storage.lua"

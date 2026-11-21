@@ -16,6 +16,11 @@ size_t MySerialImpl::write(const uint8_t* buffer, size_t size) { return logSeria
 void MySerialImpl::flush() { logSerial.flush(); }
 #endif
 
+#if defined(ARDUINO_ARCH_ESP32) && defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+#include "DictationPrivacy.h"
+RTC_NOINIT_ATTR volatile uint32_t dictationPrivacy::retained;
+#endif
+
 #define MAX_ENTRY_LEN 256
 #define MAX_LOG_LINES 16
 
@@ -31,6 +36,9 @@ RTC_NOINIT_ATTR uint32_t rtcLogMagic;
 static constexpr uint32_t LOG_RTC_MAGIC = 0xDEADBEEF;
 
 void addToLogRingBuffer(const char* message) {
+#if defined(ARDUINO_ARCH_ESP32) && defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+  if (dictationPrivacy::active()) return;
+#endif
   // Add the message to the ring buffer, overwriting old messages if necessary.
   // If the magic is wrong or logHead is out of range (RTC_NOINIT_ATTR garbage
   // on cold boot), clear the entire buffer so subsequent reads are safe.
@@ -48,6 +56,9 @@ void addToLogRingBuffer(const char* message) {
 // This logPrintf prepend the timestamp, level and origin to the user-provided message, so that the user only needs to
 // provide the format string for the message itself.
 void logPrintf(const char* level, const char* origin, const char* format, ...) {
+#if defined(ARDUINO_ARCH_ESP32) && defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+  if (dictationPrivacy::active()) return;
+#endif
   va_list args;
   va_start(args, format);
   char buf[MAX_ENTRY_LEN];

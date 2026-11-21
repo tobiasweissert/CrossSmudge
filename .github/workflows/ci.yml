@@ -263,7 +263,7 @@ jobs:
           done
           trap 'test -f sticky-evidence/image-validation.json || printf "{\"valid\":false,\"error\":\"provenance collection failed\",\"publication_authorized\":false}\\n" > sticky-evidence/image-validation.json' EXIT
           startup_capture_status=0
-          python3 scripts/capture_sticky_startup_config.py \
+          python3 scripts/capture_sticky_startup_config.py --require-producer \
             --project . --env "$PIO_ENV" --memory-type qio_opi \
             --out sticky-evidence || startup_capture_status=$?
           git diff --binary HEAD > sticky-evidence/source-after-build.patch
@@ -432,11 +432,7 @@ jobs:
 
       - name: Extract firmware stats
         run: |
-          set -euo pipefail
-          {
-            echo "## $PIO_ENV firmware build stats"
-            grep -E "RAM:\s|Flash:\s" "pio-$PIO_ENV.log" | while read -r line; do echo "- ${line}"; done
-          } >> "$GITHUB_STEP_SUMMARY"
+          echo 'Firmware size diagnostics remain private.' >> "$GITHUB_STEP_SUMMARY"
 
   # This job is used as the PR required actions check, allows for changes to other steps in the future without breaking
   # PR requirements.

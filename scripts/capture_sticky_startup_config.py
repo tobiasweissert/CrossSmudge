@@ -29,6 +29,37 @@ KEYS = (
     'CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP', 'CONFIG_BT_ENABLED',
 )
 
+def validate_producer_phases(receipt, argv, target, dep, macros):
+    from ci_producer_capture import MAX_MACRO_STREAM, preprocessing_base
+    base = preprocessing_base(argv)
+    if ('probe_error' in receipt or not re.fullmatch(r'[a-f0-9]{64}', receipt.get('compile_env_sha256', '')) or
+            any(type(receipt.get(k)) is not int or receipt[k] != 0 for k in ('dependency_exit', 'macro_exit'))):
+        raise ValueError('producer-phase-incomplete')
+    dep_cmd = receipt.get('dependency_argv', [])
+    macro_cmd = receipt.get('probe_argv', [])
+    if (dep_cmd not in [base + ['-M', '-MF', str(dep), '-MT', t] for t in target] or
+            not isinstance(macro_cmd, list) or macro_cmd[:-1] != base + ['-E', '-dM', '-o'] or
+            not re.fullmatch(r'/dev/fd/[0-9]+', macro_cmd[-1])):
+        raise ValueError('producer-command-conflict')
+    projection = receipt['macro_projection']
+    if not isinstance(projection, dict):
+        raise ValueError('producer-projection-type')
+    if (not macros.endswith('\n') or not all(line.startswith('#define CONFIG_') for line in macros.splitlines()) or
+            any(type(projection.get(k)) is not int for k in ('raw_bytes', 'records', 'config_records')) or
+            not 0 < macros.count('\n') == projection['config_records'] <= projection['records'] or
+            not len(macros.encode()) <= projection['raw_bytes'] <= MAX_MACRO_STREAM or
+            not re.fullmatch(r'[0-9a-f]{64}', projection.get('raw_sha256', ''))):
+        raise ValueError('producer-projection-incomplete')
+    retained = macros.encode()
+    extra_records = projection['records'] - projection['config_records']
+    extra_bytes = projection['raw_bytes'] - len(retained)
+    # Each omitted record includes at least '#define X\n'. A mixed stream's
+    # digest is producer-attested; only an all-selected digest is reproducible.
+    if (not len(b'#define X\n') * extra_records <= extra_bytes <= MAX_FILE * extra_records or
+            (not extra_records and projection['raw_sha256'] != hashlib.sha256(retained).hexdigest())):
+        raise ValueError('producer-projection-conflict')
+
+
 def parse_config(text):
     result = {}
     for line in text.splitlines():
@@ -212,10 +243,36 @@ def read_regular(path):
         os.close(fd)
 
 
-def capture(project, environment, memory_type, out):
+def package_libs():
+    return Path.home() / '.platformio/packages/framework-arduinoespressif32-libs/esp32s3'
+
+
+def select_dependency_header(paths, project, build, libs):
+    selected = set()
+    for path in map(Path, paths):
+        if path.name != 'sdkconfig.h':
+            continue
+        if '..' in path.parts:
+            raise ValueError('dependency-path-traversal')
+        header = project / path
+        if header != build / 'config/sdkconfig.h':
+            relative = header.relative_to(libs) if header.is_relative_to(libs) else None
+            if (relative is None or len(relative.parts) != 3 or
+                    not re.fullmatch(r'[A-Za-z0-9_-]+', relative.parts[0]) or
+                    relative.parts[1:] != ('include', 'sdkconfig.h')):
+                raise ValueError('foreign-sdk-header')
+        selected.add(header)
+    if not selected:
+        raise ValueError('dependency-header-missing')
+    if len(selected) != 1:
+        raise ValueError('dependency-header-ambiguous')
+    return selected.pop()
+
+
+def capture(project, environment, memory_type, out, *, require_producer=True):
     project = Path(os.path.abspath(project))
     out = Path(os.path.abspath(out))
-    libs = Path.home() / '.platformio/packages/framework-arduinoespressif32-libs/esp32s3'
+    libs = package_libs()
     platform = Path.home() / '.platformio/platforms/espressif32'
     idf = Path.home() / '.platformio/packages/framework-espidf'
     build = project / '.pio/build' / environment
@@ -352,6 +409,7 @@ def capture(project, environment, memory_type, out):
         try:
             producer_path = out / 'producer-main-receipt.json'
             if producer_path.exists() or producer_path.is_symlink():
+                from ci_producer_capture import MAX_DIAGNOSTIC
                 producer = json.loads(take('producer-main-receipt.json', producer_path) or '{}')
                 if not isinstance(producer, dict):
                     raise ValueError('producer-proof-type')
@@ -364,11 +422,18 @@ def capture(project, environment, memory_type, out):
                         not isinstance(argv, list) or not all(isinstance(a, str) for a in argv) or '-c' not in argv or
                         not any(Path(os.path.abspath(project / a)) == project / 'src/main.cpp' for a in argv if not a.startswith('-')) or
                         proof is None or macros is None or frozen is None or
+                        report['files']['producer-main.d']['size'] >= MAX_DIAGNOSTIC or
+                        report['files']['producer-main.macros']['size'] >= MAX_DIAGNOSTIC or
                         hashlib.sha256(proof.encode()).hexdigest() != producer.get('producer-main.d_sha256') or
                         hashlib.sha256(macros.encode()).hexdigest() != producer.get('producer-main.macros_sha256')):
                     raise ValueError('producer-proof-incomplete')
+                object_path = build / 'src/main.cpp.o'
+                validate_producer_phases(producer, argv, (str(object_path), str(object_path.relative_to(project))),
+                                         out/'producer-main.d', macros)
                 dependencies = {'producer-main.d': proof}
                 report['dependency_selection'] = 'inner-main-exact-command-system-inclusive-preprocessing'
+            elif require_producer:
+                raise ValueError('producer-receipt-missing')
             headers = set()
             count = 0
             for name, dependency in dependencies.items():
@@ -380,25 +445,11 @@ def capture(project, environment, memory_type, out):
                     paths = parse_dependencies(dependency, target)
                 except ValueError:
                     paths = parse_dependencies(dependency, str(build / 'src/main.cpp.o'))
-                header_paths = [p for p in paths if Path(p).name == 'sdkconfig.h']
-                if any('..' in Path(p).parts for p in header_paths):
-                    raise ValueError('dependency-path-traversal')
-                selected = {str(Path(os.path.abspath(project / p))) for p in header_paths}
-                if not selected:
-                    raise ValueError('dependency-header-missing')
-                if len(selected) != 1:
-                    raise ValueError('dependency-header-ambiguous')
-                headers.update(selected)
+                headers.add(select_dependency_header(paths, project, build, libs))
             if not count or len(headers) != 1:
                 raise ValueError('dependency-header-unresolved')
-            header = Path(headers.pop())
+            header = headers.pop()
             relative = header.relative_to(libs) if header.is_relative_to(libs) else None
-            allowed = (header == build / 'config/sdkconfig.h' or
-                       (relative is not None and len(relative.parts) == 3 and
-                        re.fullmatch(r'[A-Za-z0-9_-]+', relative.parts[0]) and
-                        relative.parts[1:] == ('include', 'sdkconfig.h')))
-            if not allowed:
-                raise ValueError('foreign-sdk-header')
             report['actual_header'] = str(header)
             header_text = take('application-sdkconfig.h', header)
             if producer is not None:
@@ -417,7 +468,7 @@ def capture(project, environment, memory_type, out):
             raw_definitions = parse_generated_header(header_text)
             definitions = {key: resolve_header_value(raw_definitions, key) for key in raw_definitions}
             if producer is not None:
-                macro_definitions = parse_generated_header('\n'.join(line for line in macros.splitlines() if line.startswith('#define CONFIG_')))
+                macro_definitions = parse_generated_header(macros)
                 active = {key: resolve_header_value(macro_definitions, key) for key in macro_definitions}
                 keys = {key for key in definitions.keys() | active.keys() if key.startswith('CONFIG_SPIRAM') or key in KEYS}
                 if any(active.get(key) != definitions.get(key) for key in keys):
@@ -492,11 +543,15 @@ def main():
     parser.add_argument('--env', required=True)
     parser.add_argument('--memory-type', required=True)
     parser.add_argument('--out', type=Path, required=True)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--require-producer', dest='require_producer', action='store_true', default=True)
+    mode.add_argument('--legacy-dependencies', dest='require_producer', action='store_false',
+                      help='allow ordinary dependency evidence only when no producer receipt exists')
     args = parser.parse_args()
     if not all(re.fullmatch(r'[A-Za-z0-9_-]+', v) for v in (args.env, args.memory_type)):
         parser.error('invalid environment or memory type')
     try:
-        report = capture(args.project, args.env, args.memory_type, args.out)
+        report = capture(args.project, args.env, args.memory_type, args.out, require_producer=args.require_producer)
     except (OSError, ValueError):
         print(json.dumps({'actual_resolved_config_captured': False, 'capture_error': True}))
         return 1

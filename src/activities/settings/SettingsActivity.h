@@ -56,6 +56,7 @@ enum class SettingAction {
   Plugins,
   Library,
   About,
+  NotesDictation,
 };
 
 struct SettingInfo {

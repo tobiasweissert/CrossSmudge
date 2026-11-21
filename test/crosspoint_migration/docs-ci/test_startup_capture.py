@@ -49,10 +49,11 @@ class CaptureTests(unittest.TestCase):
         escaped = str(self.header).replace(' ', '\\ ')
         self.write(self.dep, '.pio/build/sticky/src/main.cpp.o: src/main.cpp \\\n ' + escaped + '\n')
 
-    def run_capture(self):
+    def run_capture(self, mode=None):
         before = digest_tree(self.project), digest_tree(self.home)
         env = dict(os.environ, HOME=str(self.home), PYTHONDONTWRITEBYTECODE='1')
-        proc = subprocess.run([sys.executable, str(HELPER), '--project', str(self.project), '--env', 'sticky', '--memory-type', 'qio_opi', '--out', str(self.out)],
+        mode = mode or getattr(self, 'capture_mode', '--legacy-dependencies')
+        proc = subprocess.run([sys.executable, str(HELPER), mode, '--project', str(self.project), '--env', 'sticky', '--memory-type', 'qio_opi', '--out', str(self.out)],
                               env=env, capture_output=True, text=True, timeout=10)
         self.assertEqual((digest_tree(self.project), digest_tree(self.home)), before, 'capture mutated source/SDK')
         self.assertNotIn(str(self.base), proc.stdout + proc.stderr)
@@ -70,11 +71,12 @@ class CaptureTests(unittest.TestCase):
 
     def producer_fixture(self):
         self.complete_fixture()
+        self.capture_mode = '--require-producer'
         self.dep.write_text('.pio/build/sticky/src/main.cpp.o: src/main.cpp\n')
         proof = '.pio/build/sticky/src/main.cpp.o: src/main.cpp ' + str(self.header).replace(' ', '\\ ') + '\n'
         self.out.mkdir()
         (self.out/'producer-main.d').write_text(proof)
-        (self.out/'producer-main.macros').write_text('#define __cplusplus 202302L\n'+self.header.read_text())
+        (self.out/'producer-main.macros').write_bytes(self.header.read_bytes())
         (self.out/'producer-application-sdkconfig.h').write_bytes(self.header.read_bytes())
         receipt = {'environment': 'sticky', 'boundary': 'inner-application-main', 'probe_exit': 0,
                    'compile_argv': ['/fake/g++', '-c', 'src/main.cpp', '-o', '.pio/build/sticky/src/main.cpp.o'],
@@ -82,12 +84,91 @@ class CaptureTests(unittest.TestCase):
                    'producer-main.macros_sha256': hashlib.sha256((self.out/'producer-main.macros').read_bytes()).hexdigest(),
                    'files': {'producer-application-sdkconfig.h': {'source': str(self.header), 'present': True,
                        'sha256': hashlib.sha256(self.header.read_bytes()).hexdigest()}}}
+        receipt.update(dependency_exit=0, macro_exit=0, compile_env_sha256=hashlib.sha256(b'{}').hexdigest(),
+                       dependency_argv=['/fake/g++', 'src/main.cpp', '-M', '-MF', str(self.out/'producer-main.d'),
+                                        '-MT', '.pio/build/sticky/src/main.cpp.o'],
+                       probe_argv=['/fake/g++', 'src/main.cpp', '-E', '-dM', '-o', '/dev/fd/8'])
+        data = self.header.read_bytes()
+        receipt['macro_projection'] = dict(raw_bytes=len(data), raw_sha256=hashlib.sha256(data).hexdigest(),
+                                           config_records=data.count(b'\n'), records=data.count(b'\n'))
         (self.out/'producer-main-receipt.json').write_text(json.dumps(receipt))
+
+    def test_missing_producer_cannot_certify_hosted_capture(self):
+        self.complete_fixture()
+        self.assertEqual(self.run_capture('--require-producer').returncode, 1)
+        self.assertFalse(self.receipt()['actual_resolved_config_captured'])
+        self.out = self.base / 'legacy-output'
+        self.assertEqual(self.run_capture('--legacy-dependencies').returncode, 0)
+
+    def test_producer_success_artifact_size_boundaries(self):
+        for name in ('producer-main.macros', 'producer-main.d'):
+            for size in (262143, 262144, 262145):
+                with self.subTest(name=name, size=size):
+                    self.out = self.base / f'{name}-{size}'
+                    self.producer_fixture()
+                    artifact = self.out / name
+                    original = artifact.read_bytes()
+                    # Pad the last line with harmless whitespace; keep all values intact.
+                    data = original[:-1].ljust(size - 1, b' ') + b'\n'
+                    self.assertEqual(len(data), size)
+                    artifact.write_bytes(data)
+                    path = self.out / 'producer-main-receipt.json'
+                    receipt = json.loads(path.read_text())
+                    digest = hashlib.sha256(data).hexdigest()
+                    receipt[name + '_sha256'] = digest
+                    if name == 'producer-main.macros':
+                        receipt['macro_projection'].update(raw_bytes=size, raw_sha256=digest)
+                    path.write_text(json.dumps(receipt))
+                    if size == 262143:
+                        self.assertEqual(self.run_capture().returncode, 0)
+                        self.assertTrue(self.receipt()['actual_resolved_config_captured'])
+                    else:
+                        self.assert_incomplete()
+
+    def test_projection_attestation_consistency(self):
+        for field in ('raw_bytes', 'raw_sha256', 'records', 'mixed'):
+            with self.subTest(field=field):
+                self.out = self.base / field
+                self.producer_fixture()
+                path = self.out/'producer-main-receipt.json'
+                receipt = json.loads(path.read_text())
+                projection = receipt['macro_projection']
+                if field == 'mixed':
+                    raw = b'#define OTHER 1\n' + self.header.read_bytes()
+                    projection.update(records=projection['records'] + 1, raw_bytes=len(raw),
+                                      raw_sha256=hashlib.sha256(raw).hexdigest())
+                elif field == 'raw_sha256':
+                    projection[field] = '0' * 64
+                else:
+                    projection[field] += 1
+                path.write_text(json.dumps(receipt))
+                if field == 'mixed':
+                    self.assertEqual(self.run_capture().returncode, 0)
+                else:
+                    self.assert_incomplete()
 
     def test_producer_dependency_closes_observed_mmd_system_header_gap(self):
         self.producer_fixture()
         self.assertEqual(self.run_capture().returncode, 0)
         self.assertTrue(self.receipt()['actual_resolved_config_captured'])
+
+    def test_producer_complete_evidence_required(self):
+        self.producer_fixture()
+        original = self.out
+        import shutil
+        # Preserve the same absolute evidence paths for every independent run.
+        template = self.base / 'template'
+        shutil.copytree(original, template)
+        for change in ({'dependency_exit': None}, {'macro_exit': 1}, {'compile_env_sha256': ''},
+                       {'probe_error': 'OutputLimitExceeded'}, {'macro_projection': {}}, {'probe_argv': []}):
+            with self.subTest(change=change):
+                shutil.rmtree(original)
+                shutil.copytree(template, original)
+                path = original/'producer-main-receipt.json'
+                receipt = json.loads(path.read_text())
+                receipt.update(change)
+                path.write_text(json.dumps(receipt))
+                self.assert_incomplete()
 
     def test_producer_macro_header_disagreement_fails_closed(self):
         self.producer_fixture()
@@ -96,6 +177,7 @@ class CaptureTests(unittest.TestCase):
         receipt_path = self.out/'producer-main-receipt.json'
         receipt = json.loads(receipt_path.read_text())
         receipt['producer-main.macros_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+        receipt['macro_projection']['raw_sha256'] = receipt['producer-main.macros_sha256']
         receipt_path.write_text(json.dumps(receipt))
         self.assert_incomplete()
 

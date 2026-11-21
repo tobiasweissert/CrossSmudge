@@ -1,9 +1,9 @@
 {
   "id": "cp-notes",
   "name": "Notes",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "author": "CrossPlay contributors; Lua port",
   "description": "Local CrossPlay port. Read PARITY.md for exact limitations on stock firmware.",
-  "entry": "main.lua",
+  "entry": "notes_015.lua",
   "min_api": 2
 }

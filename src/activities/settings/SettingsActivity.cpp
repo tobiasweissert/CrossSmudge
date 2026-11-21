@@ -32,6 +32,9 @@
 #include "FrontlightTimePickerActivity.h"
 #include "KOReaderSettingsActivity.h"
 #include "KeyboardLayoutsActivity.h"
+#if defined(ARDUINO_ARCH_ESP32) && defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+#include "activities/notes/DictationSettings.h"
+#endif
 #include "MappedInputManager.h"
 #include "OpdsServerListActivity.h"
 #include "OtaUpdateActivity.h"
@@ -1203,6 +1206,11 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::Language:
         openLanguagePicker();
         break;
+#if defined(ARDUINO_ARCH_ESP32) && defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+      case SettingAction::NotesDictation:
+        dictation::openSettings(*this, renderer, mappedInput);
+        break;
+#endif
       case SettingAction::KeyboardLayouts:
         startActivityForResult(std::make_unique<KeyboardLayoutsActivity>(renderer, mappedInput), resultHandler);
         break;

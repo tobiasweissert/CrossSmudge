@@ -9,6 +9,9 @@
 #include "../../../../lib/AirDrop/browser/BrowserLaunch.h"
 #include "GfxRenderer.h"
 #include "LuaTouchDispatch.h"
+#if defined(ARDUINO_ARCH_ESP32) && defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+#include "activities/notes/DictationActivity.h"
+#endif
 #include "MappedInputManager.h"
 #include "Memory.h"
 #include "activities/Activity.h"
@@ -166,6 +169,22 @@ class LuaAppActivityAdapter : public Activity {
       runner_->clearNativeCancel();
     } else
       ownership.lock();
+#if defined(ARDUINO_ARCH_ESP32) && defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+    if (runner_->takeDictationRequest()) {
+      startActivityForResult(std::make_unique<dictation::DictationActivity>(renderer, mappedInput),
+                             [this](const ActivityResult& result) {
+                               std::lock_guard<std::mutex> lock(luaMutex_);
+                               auto k = std::get_if<KeyboardResult>(&result.data);
+                               if (runner_) {
+                                 if (!result.isCancelled && k)
+                                   runner_->finishDictation(k->text);
+                                 else
+                                   runner_->finishDictation({});
+                               }
+                             });
+      return;
+    }
+#endif
     bool buttonHandled = false;
 
     if (mappedInput.wasReleased(MappedInputManager::Button::Back) || pendingBack_) {

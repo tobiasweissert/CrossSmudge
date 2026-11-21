@@ -1,29 +1,20 @@
 #include "HalClock.h"
 
 #include <Logging.h>
+#include <TrustedTime.h>
 #include <WiFi.h>
-#include <esp_netif.h>
-#include <esp_netif_sntp.h>
-#include <lwip/dns.h>
 #include <time.h>
 
 #include <cassert>
-#include <mutex>
 
 HalClock halClock;  // Singleton instance
 
 namespace {
-std::mutex ntpMutex;
 constexpr uint16_t kBaseYear = 2000;
 constexpr const char* kMonthNames[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
                                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 constexpr char kFullMonthNames[][10] = {"January", "February", "March",     "April",   "May",      "June",
                                         "July",    "August",   "September", "October", "November", "December"};
-
-esp_err_t clearDnsCache(void*) {
-  dns_clear_cache();
-  return ESP_OK;
-}
 
 bool isLeapYear(const uint16_t year) { return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0; }
 
@@ -294,41 +285,12 @@ bool HalClock::syncFromNTP() {
   return true;
 }
 
-bool HalClock::syncSystemTimeFromNTP() {
-  // The UI and the Lua HTTP worker share esp-netif's single SNTP instance.
-  std::lock_guard<std::mutex> lock(ntpMutex);
-  if (WiFi.status() != WL_CONNECTED) {
-    LOG_ERR("CLK", "WiFi not connected, cannot sync NTP");
-    return false;
-  }
-
-  esp_netif_sntp_deinit();
-
-  LOG_INF("CLK", "Starting NTP sync...");
-  // esp-netif owns the small temporary SNTP state/semaphore and routes all
-  // lwIP timer changes through its core-lock-safe execution path.
-  esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
-  const esp_err_t initResult = esp_netif_sntp_init(&config);
-  if (initResult != ESP_OK) {
-    LOG_ERR("CLK", "Failed to start NTP sync: %s", esp_err_to_name(initResult));
-    return false;
-  }
-
-  const esp_err_t syncResult = esp_netif_sntp_sync_wait(pdMS_TO_TICKS(5000));
-  // An SNTP timeout can leave its DNS callback pending. Drain that callback
-  // under lwIP's core lock before stopping SNTP; the next hostname lookup may
-  // otherwise invoke it from the application task while clearing the cache.
-  const esp_err_t clearResult = esp_netif_tcpip_exec(clearDnsCache, nullptr);
-  esp_netif_sntp_deinit();
-  if (clearResult != ESP_OK) {
-    LOG_ERR("CLK", "Failed to clear DNS after NTP sync: %s", esp_err_to_name(clearResult));
-    return false;
-  }
-  if (syncResult != ESP_OK) {
-    LOG_ERR("CLK", "NTP sync failed: %s", esp_err_to_name(syncResult));
-    return false;
-  }
-
+bool HalClock::syncSystemTimeFromNTP() { return syncSystemTimeFromNTP(nullptr); }
+bool HalClock::syncSystemTimeFromNTP(SyncSample* sample) {
+  if (sample) *sample = {};
+  trustedtime::SyncSample current{};
+  if (WiFi.status() != WL_CONNECTED || !trustedtime::syncCurrent(5000, current)) return false;
+  if (sample) *sample = {current.epoch, current.monotonicMs};
   _systemTimeSynchronized.store(true);
   return true;
 }

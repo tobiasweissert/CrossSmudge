@@ -86,6 +86,12 @@ class HalClock {
 
   // Sync the ESP32 system clock without requiring an external RTC.
   bool syncSystemTimeFromNTP();
+  // Optional per-exchange sample from the SNTP notification, not the possibly
+  // restored RTC/NVS wall time. Never returns a sample cached from an older call.
+  struct SyncSample {
+    uint32_t epoch, monotonicMs;
+  };
+  bool syncSystemTimeFromNTP(SyncSample* sample);
   bool hasSynchronizedSystemTime() const { return _systemTimeSynchronized.load(); }
 
  private:

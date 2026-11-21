@@ -17,6 +17,10 @@
 #include "xtensa/corebits.h"
 #endif
 
+#if defined(ARDUINO_ARCH_ESP32) && defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+#include <DictationPrivacy.h>
+#endif
+
 #define MAX_PANIC_STACK_DEPTH 32
 #define MAX_PANIC_BACKTRACE_DEPTH 32
 #define PANIC_CAPTURE_MAGIC 0x50414E49u
@@ -124,6 +128,9 @@ void IRAM_ATTR captureRiscvPanicRegisters(const void* frame) {
 #endif
 
 void IRAM_ATTR __wrap_panic_abort(const char* message) {
+#if defined(ARDUINO_ARCH_ESP32) && defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+  if (dictationPrivacy::retained == dictationPrivacy::marker) message = PANIC_REASON_UNKNOWN;
+#endif
   if (!message) message = PANIC_REASON_UNKNOWN;
   // IRAM-safe bounded copy (strncpy is not IRAM-safe in panic context)
   int i = 0;
@@ -137,6 +144,12 @@ void IRAM_ATTR __wrap_panic_abort(const char* message) {
 }
 
 void IRAM_ATTR __wrap_panic_print_backtrace(const void* frame, int core) {
+#if defined(ARDUINO_ARCH_ESP32) && defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+  if (dictationPrivacy::retained == dictationPrivacy::marker) {
+    panicCaptureMarker = PANIC_CAPTURE_MAGIC;
+    return;
+  }
+#endif
   if (!frame) {
     __real_panic_print_backtrace(frame, core);
     return;
@@ -186,8 +199,20 @@ void IRAM_ATTR __wrap_panic_print_backtrace(const void* frame, int core) {
 }
 
 namespace HalSystem {
+#if defined(ARDUINO_ARCH_ESP32) && defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+static bool omitPrivateReport = false;
+#endif
 
 void begin() {
+#if defined(ARDUINO_ARCH_ESP32) && defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+  if (dictationPrivacy::active()) {
+    const bool panic = isRebootFromPanic();
+    omitPrivateReport = panic;
+    clearPanic();
+    if (panic) panicCaptureMarker = PANIC_CAPTURE_MAGIC;
+    dictationPrivacy::retained = 0;
+  }
+#endif
   // On a panic reboot, preserve diagnostics until checkPanic() has tried to write them to the SD card.
   // Ordinary boots clear any stale retained diagnostics.
   if (!isRebootFromPanic()) {
@@ -204,6 +229,9 @@ void begin() {
 }
 
 void checkPanic() {
+#if defined(ARDUINO_ARCH_ESP32) && defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+  if (omitPrivateReport) return;  // Leave any earlier report untouched.
+#endif
   if (isRebootFromPanic()) {
     auto panicInfo = getPanicInfo(true);
     auto file = Storage.open("/crash_report.txt", O_WRITE | O_CREAT | O_TRUNC);
@@ -241,6 +269,9 @@ void clearPanic() {
 }
 
 std::string getPanicInfo(bool full) {
+#if defined(ARDUINO_ARCH_ESP32) && defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+  if (omitPrivateReport || dictationPrivacy::active()) return "Private session: diagnostics omitted.";
+#endif
   if (!full) {
     return panicMessage;
   } else {

@@ -26,8 +26,12 @@
 #include "Logging.h"
 #include "LuaKeyboardPaint.h"
 #include "LuaRuntime.h"
+#if defined(ARDUINO_ARCH_ESP32) && defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+#include "activities/notes/NotesLaunch.h"
+#endif
 #include "MappedInputManager.h"
 #include "Memory.h"
+#include "activities/notes/ReviewedResult.h"
 #include "components/TouchRegistry.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -273,6 +277,8 @@ bool LuaRunner::setBrowserLaunch(const airdrop::browser::LaunchHandle& launch, u
 }
 
 void LuaRunner::shutdown() {
+  firmwareNotes_ = false;
+  dictationRequested_ = false;
   if (launchBinding_.launch) {
     launchBinding_.launch->failAttempt(launchBinding_.attempt, airdrop::browser::LaunchError::ExitedBeforeAck);
   }
@@ -315,6 +321,28 @@ bool LuaRunner::loadScript(const std::string& scriptPath) {
     setError("Invalid app entry path");
     return false;
   }
+#if defined(ARDUINO_ARCH_ESP32) && defined(FREEINK_DEVICE_STICKY) && FREEINK_DEVICE_STICKY && !defined(SIMULATOR)
+  if (dictation::firmwareRoute(appDir_, checkedPath) && !browser_ && !http_.domains.count) {
+    // Selecting this entry starts ROM code, never the package's entry or its helpers.
+    s_activeRunner = this;
+    if (!lua_checkstack(L, 2)) {
+      setError("Notes memory unavailable");
+      return false;
+    }
+    lua_pushcfunction(L, dictation::installNotes);
+    lua_pushcfunction(L, [](lua_State* owner) -> int {
+      if (s_activeRunner && s_activeRunner->L == owner && s_activeRunner->firmwareNotes_)
+        s_activeRunner->dictationRequested_ = true;
+      return 0;
+    });
+    firmwareNotes_ = true;
+    if (lua_pcall(L, 1, 0, 0) == LUA_OK) return true;
+    firmwareNotes_ = false;
+    lua_pop(L, 1);
+    setError("Firmware Notes failed to start");
+    return false;
+  }
+#endif
   FileReaderContext ctx;
   if (!Storage.openFileForRead("LUA", checkedPath.c_str(), ctx.file)) {
     std::string err = "Failed to read script file: " + scriptPath;
@@ -363,6 +391,13 @@ void LuaRunner::onInit() {
   } else {
     lua_pop(L, 1);
   }
+}
+
+void LuaRunner::finishDictation(const std::string& text) {
+  if (!L || hasError_ || !firmwareNotes_) return;
+  s_activeRunner = this;
+  if (!dictation::dispatchReviewed(L, text))
+    dictation::dispatchReviewed(L, {});  // recover UI as cancelled; never poison on_exit
 }
 
 void LuaRunner::onUpdate() {
@@ -544,6 +579,7 @@ void LuaRunner::onExit() {
 
 void LuaRunner::registerSmudgeApi() {
   lua_newtable(L);  // table 'smudge' (and 'ink')
+
   http_.backendEnabled = browser_;
   http_.backendAccess = HalBrowserBackend::access();
   http::registerApi(L, http_);

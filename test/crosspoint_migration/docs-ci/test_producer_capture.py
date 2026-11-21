@@ -113,15 +113,19 @@ class ProducerTests(unittest.TestCase):
             root = Path(temp)
             (root/'src').mkdir()
             (root/'src/main.cpp').write_text('// synthetic main input\n')
-            header = root/'sdk/include/sdkconfig.h'
+            header = root/'.pio/build/sticky/config/sdkconfig.h'
             header.parent.mkdir(parents=True)
             header.write_text('#define CONFIG_SPIRAM 1\n')
             fake = root/'fake-driver'
             import sys
             fake.write_text('#!'+sys.executable+'\nimport sys,pathlib\na=sys.argv\n'
-                'assert "-c" not in a and "-MD" in a and "-E" in a\n'
-                'pathlib.Path(a[a.index("-MF")+1]).write_text(a[a.index("-MT")+1]+": src/main.cpp '+str(header)+'\\n")\n'
-                'pathlib.Path(a[a.index("-o")+1]).write_text("#define CONFIG_SPIRAM 1\\n")\n')
+                'assert "-c" not in a\n'
+                'if "-M" in a:\n'
+                ' pathlib.Path(a[a.index("-MF")+1]).write_text(a[a.index("-MT")+1]+": src/main.cpp '+str(header)+'\\n")\n'
+                'else:\n'
+                ' assert "-dM" in a and pathlib.Path("evidence/producer-application-sdkconfig.h").is_file()\n'
+                ' with open(a[a.index("-o")+1], "wb") as f:\n'
+                '  f.write(b"#define UNRELATED 1\\n"*15000 + b"#define CONFIG_SPIRAM 1\\n")\n')
             fake.chmod(0o700)
             class Node:
                 def srcnode(self): return self
@@ -140,6 +144,12 @@ class ProducerTests(unittest.TestCase):
                 self.assertEqual(env.action([env.File('src/main.cpp')], [env.File('.pio/build/sticky/src/main.cpp.o')], env), 0)
             receipt = json.loads((root/'evidence/producer-main-receipt.json').read_text())
             self.assertEqual(receipt['probe_exit'], 0)
+            projection = receipt['macro_projection']
+            full = b'#define UNRELATED 1\n'*15000 + header.read_bytes()
+            self.assertGreater(len(full), m.MAX_DIAGNOSTIC)
+            self.assertEqual(projection, dict(raw_sha256=hashlib.sha256(full).hexdigest(), raw_bytes=len(full),
+                                              records=15001, config_records=1))
+            self.assertEqual((root/'evidence/producer-main.macros').read_bytes(), header.read_bytes())
             self.assertEqual((root/'evidence/producer-application-sdkconfig.h').read_bytes(), header.read_bytes())
             self.assertIn('-DAPP=1', receipt['probe_argv'])
             self.assertFalse(receipt['publication_authorized'])
@@ -219,8 +229,8 @@ class ProducerTests(unittest.TestCase):
     def test_probe_uses_exact_compile_arguments_without_compiling(self):
         self.assertTrue(HELPER.exists(), 'missing producer-boundary implementation')
         args = ['/fake/g++', '-o', 'main.o', '-c', '-MMD', '-MF', 'main.d', '-DVALUE=2', '-isystem', '/sdk', 'src/main.cpp']
-        command = load().probe_command(args, 'proof.d', 'proof.macros', 'main.o')
-        self.assertEqual(command, ['/fake/g++', '-DVALUE=2', '-isystem', '/sdk', 'src/main.cpp', '-E', '-dM', '-MD', '-MF', 'proof.d', '-MT', 'main.o', '-o', 'proof.macros'])
+        command = load().preprocessing_base(args)
+        self.assertEqual(command, ['/fake/g++', '-DVALUE=2', '-isystem', '/sdk', 'src/main.cpp'])
         self.assertEqual(args[1:3], ['-o', 'main.o'])
 
 class BoundedProducerTests(unittest.TestCase):
@@ -232,6 +242,7 @@ class BoundedProducerTests(unittest.TestCase):
         from SCons.Script import Environment
         (root/'src').mkdir(exist_ok=True)
         (root/'src/main.cpp').write_text('// fixture')
+        (root/'.pio/build/sticky/config').mkdir(parents=True, exist_ok=True)
         driver = root/'python driver.py'
         driver.write_text('import sys,os,pathlib,time,subprocess\n'
                           'assert os.environ["ONLY_CONSTRUCTION"] == "synthetic-env-sentinel"\n'
@@ -260,18 +271,79 @@ class BoundedProducerTests(unittest.TestCase):
             self.assertNotIn(b'ONLY_CONSTRUCTION', path.read_bytes(), 'environment dump leaked into evidence')
         return receipt
 
+    def test_raw_header_identity_required_before_retention_or_macro_phase(self):
+        allowed = '.pio/build/sticky/config/sdkconfig.h'
+        for candidate in ('.pio/build/sticky/config/unused/../sdkconfig.h', 'other/sdkconfig.h'):
+            with self.subTest(candidate=candidate), tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as temp:
+                root = Path(temp)
+                header = root / (allowed if '..' in Path(candidate).parts else candidate)
+                header.parent.mkdir(parents=True)
+                header.write_text('// fixture')
+                paths = (allowed + ' ' if '..' in Path(candidate).parts else '') + candidate
+                body = ('if "-M" in sys.argv:\n pathlib.Path(sys.argv[sys.argv.index("-MF")+1]).write_text('
+                        'sys.argv[sys.argv.index("-MT")+1]+' + repr(': ' + paths + '\n') + ')\n'
+                        'else:\n pathlib.Path("macro-start").touch()')
+                receipt = self.invoke(root, body)
+                self.assertEqual(receipt['dependency_exit'], 0)
+                self.assertIn('probe_error', receipt)
+                self.assertFalse((root/'evidence/producer-application-sdkconfig.h').exists())
+                self.assertFalse((root/'macro-start').exists())
+
+    def test_shared_oversize_receipt_preserves_caller_result(self):
+        module = load()
+        argv = ['fixture', 'x' * (module.MAX_DIAGNOSTIC // 2)]
+        def finish(out, result):
+            module.save_receipt(out, 'receipt.json', {'argv': argv, 'probe_argv': argv, 'exit': result[0]})
+            return result
+        with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as temp:
+            out = Path(temp)
+            original = (7, 'synthetic diagnostic')
+            self.assertIs(finish(out, original), original)
+            raw = (out/'receipt.json').read_bytes()
+            self.assertLessEqual(len(raw), module.MAX_DIAGNOSTIC)
+            self.assertEqual(json.loads(raw), {'probe_error': 'OutputLimitExceeded', 'publication_authorized': False})
+
     def test_each_diagnostic_output_is_bounded(self):
         for channel in ('stdout', 'stderr', 'dependency', 'macro'):
             with self.subTest(channel=channel), tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as temp:
                 root = Path(temp)
                 body = {'stdout': 'os.write(1,b"x"*300000)', 'stderr': 'os.write(2,b"x"*300000)',
                         'dependency': 'pathlib.Path(sys.argv[sys.argv.index("-MF")+1]).write_bytes(b"x"*300000)',
-                        'macro': 'pathlib.Path(sys.argv[sys.argv.index("-o")+1]).write_bytes(b"x"*300000)'}[channel]
+                        'macro': 'if "-M" in sys.argv:\n pathlib.Path(".pio/build/sticky/config/sdkconfig.h").write_text("// test")\n pathlib.Path(sys.argv[sys.argv.index("-MF")+1]).write_text(sys.argv[sys.argv.index("-MT")+1]+": .pio/build/sticky/config/sdkconfig.h\\n")\nelse:\n pathlib.Path(sys.argv[sys.argv.index("-o")+1]).write_bytes(b"#define CONFIG_A 1\\n"*20000)'}[channel]
                 receipt = self.invoke(root, body)
                 self.assertEqual(receipt.get('probe_error'), 'OutputLimitExceeded')
                 self.assertNotEqual(receipt.get('probe_exit'), 0)
                 for path in (root/'evidence').iterdir():
                     self.assertLessEqual(path.stat().st_size, 262144, path.name)
+                self.assertNotIn('producer-main.macros_sha256', receipt)
+
+    def test_macro_transfer_limit_is_distinct_from_retention_limit(self):
+        import io
+        module = load()
+        self.assertEqual(module.MAX_DIAGNOSTIC, 262144)
+        output = io.BytesIO()
+        projection = module.ConfigProjection(output)
+        # Real transfer ceiling, without a large fixture/file or a long line.
+        chunk = b'#define OUTSIDE '+b'x'*(65536-17)+b'\n'
+        self.assertEqual(len(chunk), 65536)
+        for _ in range(module.MAX_MACRO_STREAM // len(chunk)):
+            projection.feed(chunk)
+        with self.assertRaises(module.OutputLimitExceeded):
+            projection.feed(b'#define CONFIG_A 1\n')
+        self.assertEqual(output.getvalue(), b'')
+
+    def test_macro_phase_rejects_partial_record_nonzero_exit_and_malformed_stream(self):
+        dep = ('if "-M" in sys.argv:\n pathlib.Path(".pio/build/sticky/config/sdkconfig.h").write_text("#define CONFIG_A 1")\n'
+               ' pathlib.Path(sys.argv[sys.argv.index("-MF")+1]).write_text(sys.argv[sys.argv.index("-MT")+1]+": .pio/build/sticky/config/sdkconfig.h\\n")\n')
+        for tail in ('os.write(f,b"#define E")', 'sys.exit(3)', 'os.write(f,b"not-a-definition\\n")',
+                     'os.write(f,b"#define BIG "+b"x"*262144+b"\\n")'):
+            with self.subTest(tail=tail), tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as temp:
+                root = Path(temp)
+                receipt = self.invoke(root, dep+'else:\n f=os.open(sys.argv[sys.argv.index("-o")+1],os.O_WRONLY)\n os.write(f,b"#define CONFIG_A 1\\n")\n '+tail)
+                self.assertEqual(receipt['dependency_exit'], 0)
+                self.assertTrue(receipt['files']['producer-application-sdkconfig.h']['present'])
+                self.assertIn('probe_error', receipt)
+                self.assertNotIn('probe_exit', receipt)
                 self.assertNotIn('producer-main.macros_sha256', receipt)
 
     def test_descendants_cannot_write_after_callback(self):

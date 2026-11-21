@@ -33,6 +33,8 @@ class LuaRunner {
   bool loadScript(const std::string& scriptPath);
   bool setBrowserLaunch(const airdrop::browser::LaunchHandle& launch, uint32_t attempt);
   void shutdown();
+  bool takeDictationRequest() { return firmwareNotes_ && dictationRequested_.exchange(false); }
+  void finishDictation(const std::string& text);
 
   // Lifecycle dispatches
   void onInit();
@@ -81,6 +83,8 @@ class LuaRunner {
   http::Session http_{http::platformExecutor()};
   bool resolvePath(const char* path, std::string& result) const;
   lua_State* L = nullptr;
+  bool firmwareNotes_ = false;
+  std::atomic<bool> dictationRequested_{false};
   bool browser_ = false;
   std::atomic<bool> renderCancel_{false};
   browser::ImageSession images_;

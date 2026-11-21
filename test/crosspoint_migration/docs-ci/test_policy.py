@@ -3,6 +3,9 @@ from pathlib import Path
 import re
 import subprocess
 import shutil
+import os
+import tempfile
+import textwrap
 import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -43,6 +46,23 @@ class Policy(unittest.TestCase):
         self.assertNotIn('contents: write', text)
         self.assertNotIn('gh release', text)
         self.assertNotIn('secrets.RELEASE_PAT', text)
+
+    def test_firmware_stats_do_not_publish_log_lines(self):
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        body = re.search(r'(?m)^      - name: Extract firmware stats\n        run: \|\n((?:          .*\n|\n)+)', workflow)
+        if body is None:
+            self.fail('missing firmware stats step body')
+        with tempfile.TemporaryDirectory() as tmp:
+            summary = Path(tmp) / 'summary'
+            (Path(tmp) / 'pio-sticky.log').write_text(
+                'RAM:   [==        ] 20.0% (used 20 bytes from 100 bytes)\n'
+                'synthetic diagnostic Flash: not a size record\n'
+                'Flash: [===       ] 30.0% (used 30 bytes from 100 bytes) synthetic trailer\n')
+            result = subprocess.run(['bash', '-ec', textwrap.dedent(body[1])], cwd=tmp,
+                                    env={'PATH': os.defpath, 'PIO_ENV': 'sticky', 'GITHUB_STEP_SUMMARY': str(summary)},
+                                    capture_output=True, timeout=5, check=True)
+            self.assertEqual((result.stdout, result.stderr), (b'', b''))
+            self.assertEqual(summary.read_bytes(), b'Firmware size diagnostics remain private.\n')
 
     def test_sticky_build_is_verbose_without_weakening_cppcheck(self):
         text = (ROOT / '.github/workflows/ci.yml').read_text()

@@ -41,6 +41,20 @@ class IntegrationPolicy(unittest.TestCase):
         def settings(section):
             return {line.strip() for line in option(c, section, 'custom_sdkconfig').splitlines()
                     if line.strip() and not line.lstrip().startswith(';')}
+        # Every physical Sticky can provision a session key, including debug aliases.
+        security = {'CONFIG_MBEDTLS_HAVE_TIME=y', 'CONFIG_MBEDTLS_HAVE_TIME_DATE=y',
+                    'CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y', 'CONFIG_ESP_COREDUMP_ENABLE_TO_NONE=y',
+                    'CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=n', 'CONFIG_ESP_SYSTEM_PANIC_SILENT_REBOOT=y',
+                    'CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=n'}
+        keys = {setting.split('=')[0] for setting in security}
+        for section in c.sections():
+            if not section.startswith('env:') and section not in ('base', 'firmware_tuned'):
+                continue
+            selected = {s for s in settings(section) if s.split('=')[0] in keys}
+            target = section.removeprefix('env:') in [*packed, 'sticky-debug', 'debug']
+            self.assertEqual(selected, security if target else set(), section)
+            for key in keys:
+                self.assertNotIn('-D' + key, option(c, section, 'build_flags'), section)
         baseline = settings('env:sticky-debug')
         self.assertIn('CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024', baseline)
         self.assertIn('CONFIG_BT_ENABLED=n', baseline)
