@@ -74,7 +74,7 @@ class ExperimentalRouting(unittest.TestCase):
         self.assertNotIn('contents: write', text)
 
     def test_actual_cli_three_environments_and_invalid_rejected(self):
-        with tempfile.TemporaryDirectory(dir=os.environ['TMPDIR']) as tmp:
+        with tempfile.TemporaryDirectory(dir=tempfile.gettempdir()) as tmp:
             root = Path(tmp)
             tools = root/'tools'; tools.mkdir()
             producer = '#!/usr/bin/env python3\nimport json,os,sys\nwith open(os.environ["RECORD"],"a") as f:f.write(json.dumps([os.path.basename(sys.argv[0]),*sys.argv[1:]])+"\\n")\n'
@@ -101,7 +101,7 @@ class ExperimentalRouting(unittest.TestCase):
                 self.assertIn(['pio', 'run', '--verbose', '-j1', '-e', name], commands)
                 self.assertIn(['pio', 'pkg', 'install', '-e', name], commands)
                 self.assertIn(['pio', 'pkg', 'list', '-e', name], commands)
-                self.assertIn(['capture_sticky_startup_config.py', '--project', '.', '--env', name, '--memory-type', 'qio_opi', '--out', 'sticky-evidence'], commands)
+                self.assertIn(['capture_sticky_startup_config.py', '--require-producer', '--project', '.', '--env', name, '--memory-type', 'qio_opi', '--out', 'sticky-evidence'], commands)
                 self.assertEqual((root/'sticky-evidence/firmware.bin').read_bytes(), (folder/'firmware.bin').read_bytes())
             for name in ['', 'sticky; touch INJECTED', '../sticky', 'sticky-debug']:
                 result = subprocess.run(['bash', '-c', block('Validate selected build environment')], env={**os.environ, 'PIO_ENV': name}, cwd=root, capture_output=True)
@@ -123,7 +123,7 @@ class ExperimentalRouting(unittest.TestCase):
         self.assertEqual(libc.prctl(37, ctypes.byref(previous_subreaper), 0, 0, 0), 0)
         self.assertEqual(libc.prctl(36, 1, 0, 0, 0), 0)
         self.addCleanup(lambda: libc.prctl(36, previous_subreaper.value, 0, 0, 0))
-        with tempfile.TemporaryDirectory(dir=os.environ['TMPDIR']) as tmp:
+        with tempfile.TemporaryDirectory(dir=tempfile.gettempdir()) as tmp:
             root = Path(tmp); out = root/'out'; out.mkdir()
             elf = root/'firmware.elf'; elf.write_bytes(b'SYNTHETIC ELF NOT TARGET')
             compiler = root/'xtensa-esp-elf-g++'; compiler.write_text('SYNTHETIC COMPILER')
@@ -268,7 +268,7 @@ class ExperimentalRouting(unittest.TestCase):
     def test_bounded_initializer_diagnostic_recorded_producers(self):
         from unittest.mock import patch
         capture = diagnostic()
-        with patch.dict(os.environ, {'PIO_ENV': EXPERIMENT}), tempfile.TemporaryDirectory(dir=os.environ['TMPDIR']) as tmp:
+        with patch.dict(os.environ, {'PIO_ENV': EXPERIMENT}), tempfile.TemporaryDirectory(dir=tempfile.gettempdir()) as tmp:
             root = Path(tmp); out = root/'out'; out.mkdir()
             elf = root/'firmware.elf'; elf.write_bytes(b'SYNTHETIC ELF NOT TARGET')
             compiler = root/'xtensa-esp-elf-g++'; compiler.write_text('SYNTHETIC COMPILER')
