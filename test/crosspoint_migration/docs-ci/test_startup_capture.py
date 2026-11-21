@@ -68,6 +68,42 @@ class CaptureTests(unittest.TestCase):
         self.assertTrue(self.receipt()['diagnostics'])
         self.assertFalse(self.receipt()['publication_authorized'])
 
+    def producer_fixture(self):
+        self.complete_fixture()
+        self.dep.write_text('.pio/build/sticky/src/main.cpp.o: src/main.cpp\n')
+        proof = '.pio/build/sticky/src/main.cpp.o: src/main.cpp ' + str(self.header).replace(' ', '\\ ') + '\n'
+        self.out.mkdir()
+        (self.out/'producer-main.d').write_text(proof)
+        (self.out/'producer-main.macros').write_text('#define __cplusplus 202302L\n'+self.header.read_text())
+        (self.out/'producer-application-sdkconfig.h').write_bytes(self.header.read_bytes())
+        receipt = {'environment': 'sticky', 'boundary': 'inner-application-main', 'probe_exit': 0,
+                   'compile_argv': ['/fake/g++', '-c', 'src/main.cpp', '-o', '.pio/build/sticky/src/main.cpp.o'],
+                   'producer-main.d_sha256': hashlib.sha256(proof.encode()).hexdigest(),
+                   'producer-main.macros_sha256': hashlib.sha256((self.out/'producer-main.macros').read_bytes()).hexdigest(),
+                   'files': {'producer-application-sdkconfig.h': {'source': str(self.header), 'present': True,
+                       'sha256': hashlib.sha256(self.header.read_bytes()).hexdigest()}}}
+        (self.out/'producer-main-receipt.json').write_text(json.dumps(receipt))
+
+    def test_producer_dependency_closes_observed_mmd_system_header_gap(self):
+        self.producer_fixture()
+        self.assertEqual(self.run_capture().returncode, 0)
+        self.assertTrue(self.receipt()['actual_resolved_config_captured'])
+
+    def test_producer_macro_header_disagreement_fails_closed(self):
+        self.producer_fixture()
+        path = self.out/'producer-main.macros'
+        path.write_text(path.read_text().replace('#define CONFIG_SPIRAM 1', '#define CONFIG_SPIRAM 0'))
+        receipt_path = self.out/'producer-main-receipt.json'
+        receipt = json.loads(receipt_path.read_text())
+        receipt['producer-main.macros_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+        receipt_path.write_text(json.dumps(receipt))
+        self.assert_incomplete()
+
+    def test_producer_wrong_environment_or_tampered_dependency_fails_closed(self):
+        self.producer_fixture()
+        (self.out/'producer-main.d').write_text('tampered\n')
+        self.assert_incomplete()
+
     def test_unsupported_generated_header_cannot_certify(self):
         for index, change in enumerate((
                 lambda h: h + '#define CONFIG_SPIRAM_BOOT_INIT\n',
@@ -329,6 +365,19 @@ class CaptureTests(unittest.TestCase):
         path = self.header.parent / '..' / 'include/sdkconfig.h'
         self.write(self.dep, '.pio/build/sticky/src/main.cpp.o: ' + str(path).replace(' ', '\\ ') + '\n')
         self.assert_incomplete()
+
+    def test_ci44834357235_missing_header_in_retained_main_closure_is_explicit(self):
+        # Authenticated CI44834357235 main.cpp.d contains SDK FreeRTOS headers,
+        # but no sdkconfig.h prerequisite. Root paths alone cannot select a
+        # memory variant; the matching board/config candidate is not authority.
+        self.complete_fixture()
+        prerequisite = self.libs / 'include/freertos/config/include/freertos/FreeRTOSConfig.h'
+        self.write(self.dep, '.pio/build/sticky/src/main.cpp.o: src/main.cpp \\\n ' +
+                   str(prerequisite).replace(' ', '\\ ') + '\n')
+        self.assert_incomplete()
+        self.assertEqual(self.receipt().get('configuration_error'), 'dependency-header-missing')
+        self.assertEqual((self.out / 'startup-main.cpp.d').read_bytes(), self.dep.read_bytes())
+        self.assertFalse((self.out / 'startup-application-sdkconfig.h').exists())
 
     def test_missing_dependency_never_uses_board_candidate(self):
         self.complete_fixture()

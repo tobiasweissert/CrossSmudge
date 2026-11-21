@@ -82,9 +82,11 @@ class ExperimentalRouting(unittest.TestCase):
                 path = tools/name; path.write_text(producer); path.chmod(0o700)
             (root/'scripts').mkdir()
             (root/'scripts/capture_sticky_startup_config.py').write_text(producer)
+            # CLI-routing fixture only; real producer overlay/body has its own tests.
+            (root/'scripts/ci_producer_capture.py').write_text(producer)
             for name in ['sticky', 'sticky-owner-test', EXPERIMENT]:
                 record = root/'record'; record.write_text('')
-                env = {**os.environ, 'PATH': str(tools)+':'+os.environ['PATH'], 'PIO_ENV': name, 'RECORD': str(record)}
+                env = {**os.environ, 'PATH': str(tools)+':'+os.environ['PATH'], 'PIO_ENV': name, 'RECORD': str(record), 'GITHUB_WORKSPACE': str(root)}
                 subprocess.run(['bash', '-c', 'set -euo pipefail\n'+block('Validate selected build environment')], cwd=root, env=env, check=True)
                 build = block('Build ${{ matrix.environment }} firmware')
                 subprocess.run(['bash', '-c', build], cwd=root, env=env, check=True)

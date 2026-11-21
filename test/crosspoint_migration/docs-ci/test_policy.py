@@ -29,7 +29,7 @@ class Policy(unittest.TestCase):
         self.assertNotIn('github.event.repository.private', text)
         self.assertIn('vars.CROSSCUB_ARTIFACT_RECIPIENT_CERT', text)
         self.assertIn("if: always() && steps.seal.outcome == 'success'", text)
-        uploads = text[text.index('uses: actions/upload-artifact@'):text.index('      - name: Extract firmware stats')]
+        uploads = text[text.index('      - name: Retain encrypted Sticky evidence'):text.index('      - name: Extract firmware stats')]
         upload_paths = re.search(r'(?m)^          path: \|\n((?:            .+\n)+)', uploads)
         self.assertIsNotNone(upload_paths)
         self.assertEqual([p.strip() for p in upload_paths[1].splitlines()],
@@ -49,8 +49,12 @@ class Policy(unittest.TestCase):
         build = text.split('      - name: Build ${{ matrix.environment }} firmware', 1)[1]
         build = build.split('      - name: Stage exact Sticky BIN ELF and provenance', 1)[0]
         commands = re.findall(r'(?m)^          pio run .+$', build)
-        self.assertEqual(commands, ['          pio run --verbose -j1 -e "$PIO_ENV" > "pio-$PIO_ENV.log" 2>&1'])
-        self.assertIn('pio check --verbose --fail-on-defect low --fail-on-defect medium --fail-on-defect high', text)
+        self.assertEqual(commands, ['          pio run --verbose -j1 -e "$PIO_ENV" >> "pio-$PIO_ENV.log" 2>&1'])
+        analyzer = text.split('      - name: Run cppcheck', 1)[1].split('      - name: Seal analyzer', 1)[0]
+        self.assertIn('python3 scripts/ci_cppcheck_capture.py check --verbose --fail-on-defect low --fail-on-defect medium --fail-on-defect high > cppcheck-evidence/check.log 2>&1', analyzer)
+        self.assertNotIn('continue-on-error', analyzer)
+        self.assertIn('cppcheck-sealed/sealed.envelope', text)
+        self.assertNotIn('path: cppcheck-evidence', text)
 
     def test_release_is_owner_sticky_and_guarded(self):
         text = (ROOT / '.github/workflows/release.yml').read_text()

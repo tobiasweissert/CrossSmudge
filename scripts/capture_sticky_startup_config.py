@@ -348,7 +348,27 @@ def capture(project, environment, memory_type, out):
                 raise ValueError('platform-version-disagreement')
         except (ValueError, TypeError, KeyError, configparser.Error):
             report['diagnostics'].append('candidate-metadata-incomplete')
+        producer = None
         try:
+            producer_path = out / 'producer-main-receipt.json'
+            if producer_path.exists() or producer_path.is_symlink():
+                producer = json.loads(take('producer-main-receipt.json', producer_path) or '{}')
+                if not isinstance(producer, dict):
+                    raise ValueError('producer-proof-type')
+                proof = take('producer-main.d', out / 'producer-main.d')
+                macros = take('producer-main.macros', out / 'producer-main.macros')
+                frozen = take('producer-application-sdkconfig.h', out / 'producer-application-sdkconfig.h')
+                argv = producer.get('compile_argv', [])
+                if (producer.get('boundary') != 'inner-application-main' or producer.get('environment') != environment or
+                        type(producer.get('probe_exit')) is not int or producer['probe_exit'] != 0 or
+                        not isinstance(argv, list) or not all(isinstance(a, str) for a in argv) or '-c' not in argv or
+                        not any(Path(os.path.abspath(project / a)) == project / 'src/main.cpp' for a in argv if not a.startswith('-')) or
+                        proof is None or macros is None or frozen is None or
+                        hashlib.sha256(proof.encode()).hexdigest() != producer.get('producer-main.d_sha256') or
+                        hashlib.sha256(macros.encode()).hexdigest() != producer.get('producer-main.macros_sha256')):
+                    raise ValueError('producer-proof-incomplete')
+                dependencies = {'producer-main.d': proof}
+                report['dependency_selection'] = 'inner-main-exact-command-system-inclusive-preprocessing'
             headers = set()
             count = 0
             for name, dependency in dependencies.items():
@@ -364,6 +384,8 @@ def capture(project, environment, memory_type, out):
                 if any('..' in Path(p).parts for p in header_paths):
                     raise ValueError('dependency-path-traversal')
                 selected = {str(Path(os.path.abspath(project / p))) for p in header_paths}
+                if not selected:
+                    raise ValueError('dependency-header-missing')
                 if len(selected) != 1:
                     raise ValueError('dependency-header-ambiguous')
                 headers.update(selected)
@@ -379,6 +401,14 @@ def capture(project, environment, memory_type, out):
                 raise ValueError('foreign-sdk-header')
             report['actual_header'] = str(header)
             header_text = take('application-sdkconfig.h', header)
+            if producer is not None:
+                selected_header = producer['files']['producer-application-sdkconfig.h']
+                if not isinstance(selected_header, dict):
+                    raise ValueError('producer-header-type')
+                if (header_text != frozen or not selected_header.get('present') or
+                        selected_header.get('source') != str(header) or
+                        selected_header.get('sha256') != hashlib.sha256(frozen.encode()).hexdigest()):
+                    raise ValueError('producer-header-conflict')
             if header_text is None or project_config is None or package_config is None:
                 raise ValueError('required-config-missing')
             report['project_package_byte_equal'] = project_config == package_config
@@ -386,6 +416,12 @@ def capture(project, environment, memory_type, out):
                 raise ValueError('project-package-conflict')
             raw_definitions = parse_generated_header(header_text)
             definitions = {key: resolve_header_value(raw_definitions, key) for key in raw_definitions}
+            if producer is not None:
+                macro_definitions = parse_generated_header('\n'.join(line for line in macros.splitlines() if line.startswith('#define CONFIG_')))
+                active = {key: resolve_header_value(macro_definitions, key) for key in macro_definitions}
+                keys = {key for key in definitions.keys() | active.keys() if key.startswith('CONFIG_SPIRAM') or key in KEYS}
+                if any(active.get(key) != definitions.get(key) for key in keys):
+                    raise ValueError('producer-active-macro-conflict')
             report['header_identifier_aliases'] = {k: v for k, v in raw_definitions.items()
                                                    if re.fullmatch(r'CONFIG_[A-Za-z0-9_]+', v)}
             qualified = qualify_invisible_ignore(
@@ -420,7 +456,11 @@ def capture(project, environment, memory_type, out):
             if relative is not None and relative.parts[0] != memory_type:
                 raise ValueError('actual-header-candidate-disagreement')
             report['actual_resolved_config_captured'] = not report['diagnostics']
-        except (ValueError, TypeError, KeyError, configparser.Error):
+        except (ValueError, TypeError, KeyError, configparser.Error) as exc:
+            # Preserve the observed missing-closure failure without disclosing
+            # arbitrary exception text or treating a board candidate as proof.
+            if isinstance(exc, ValueError) and exc.args == ('dependency-header-missing',):
+                report['configuration_error'] = 'dependency-header-missing'
             report['diagnostics'].append('configuration-incomplete')
         report['captured_bytes'] = total
         # Count-bound derived detail before serialization; a small receipt must
