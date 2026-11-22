@@ -225,9 +225,9 @@ bool restorePreservedFiles(const std::string& cachePath, const std::vector<Resol
 
 bool preserveUserStateFiles(const std::string& cachePath, const std::vector<ResolvedPreservedCacheFile>& files,
                             bool* movedFiles) {
-  for (const auto& file : files) {
-    if (Storage.exists((cachePath + "." + file.tmpName).c_str())) return false;
-  }
+  if (std::any_of(files.begin(), files.end(),
+                  [&cachePath](const auto& file) { return Storage.exists((cachePath + "." + file.tmpName).c_str()); }))
+    return false;
   for (size_t i = 0; i < files.size(); i++) {
     if (movedFiles) {
       movedFiles[i] = false;
@@ -265,9 +265,9 @@ bool clearBookCacheForPath(const std::string& path) {
 // Durable encompassing latch: a failed FAT acknowledgement is not rollback evidence.
 bool hasCacheRecoveryRoots(const std::string& cachePath, const std::vector<ResolvedPreservedCacheFile>& files) {
   if (Storage.exists((cachePath + ".cache-clear.pending").c_str())) return true;
-  for (const auto& file : files)
-    if (Storage.exists((cachePath + "." + file.tmpName).c_str())) return true;
-  return false;
+  return std::any_of(files.begin(), files.end(), [&cachePath](const auto& file) {
+    return Storage.exists((cachePath + "." + file.tmpName).c_str());
+  });
 }
 
 bool beginCacheClear(const std::string& cachePath, const std::vector<ResolvedPreservedCacheFile>& files) {
